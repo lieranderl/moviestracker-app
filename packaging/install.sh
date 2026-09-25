@@ -261,7 +261,9 @@ linux() {
 		[ "$service" = yes ] && systemctl daemon-reload
 		if [ "$purge" = yes ]; then
 			rm -rf "$data" "$etc"
-			[ "$service" = yes ] && userdel moviestracker 2>/dev/null || true
+			if [ "$service" = yes ]; then
+				userdel moviestracker 2>/dev/null || true
+			fi
 			say "Moviestracker, its settings and its data are removed."
 		else
 			say "Moviestracker and TorrServer are removed; Moviestracker's accounts and settings in $data and $etc are kept."
