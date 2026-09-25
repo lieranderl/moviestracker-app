@@ -1,0 +1,49 @@
+package views
+
+// themeEffect applies the selected theme and persists it. The initial theme is
+// applied before first paint by /static/theme.js (no flash of wrong theme).
+const themeEffect = `
+if ($theme === 'system') { document.documentElement.removeAttribute('data-theme') }
+else if ($theme) { document.documentElement.setAttribute('data-theme', $theme) }
+localStorage.setItem('theme', $theme || 'system')
+`
+
+// redirectEffect performs server-requested navigations (CSP forbids inline scripts).
+const redirectEffect = `if ($redirectUrl) { window.location.assign($redirectUrl) }`
+
+templ Layout(title string) {
+	@layoutWithScripts(title) {
+		{ children... }
+	}
+}
+
+// layoutWithScripts renders the document shell. Page-specific module scripts
+// are passed explicitly so heavy bundles (hls.js) load only where needed.
+templ layoutWithScripts(title string, scripts ...string) {
+	<!DOCTYPE html>
+	<html lang="en" class="scroll-smooth">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<meta name="color-scheme" content="light dark"/>
+			<title>{ title } · Moviestracker</title>
+			<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎬</text></svg>"/>
+			<!-- Render-blocking by design: tiny, sets data-theme before first paint -->
+			<script src="/static/theme.js"></script>
+			<link href="/static/app.css" rel="stylesheet"/>
+			<!-- Datastar Client (v1.0.4); modules are deferred and never block rendering -->
+			<script type="module" src="/static/datastar.js"></script>
+			for _, src := range scripts {
+				<script type="module" src={ src }></script>
+			}
+		</head>
+		<body
+			class="bg-base-100 text-base-content min-h-dvh flex flex-col font-sans antialiased selection:bg-primary selection:text-primary-content"
+			data-signals="{ redirectUrl: '', theme: localStorage.getItem('theme') || 'system' }"
+			data-effect={ themeEffect }
+		>
+			<div class="hidden" data-effect={ redirectEffect }></div>
+			{ children... }
+		</body>
+	</html>
+}

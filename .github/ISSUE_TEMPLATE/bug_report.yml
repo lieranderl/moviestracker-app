@@ -1,0 +1,58 @@
+name: Bug report
+description: Something does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please **do not** report security problems here: see [SECURITY.md](../blob/main/SECURITY.md).
+        Before posting logs, remove addresses, keys, passwords and torrent names you would rather keep private.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      placeholder: When I press Play on an MKV file in Safari, the player stays black…
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open TorrServer
+        2. …
+  - type: input
+    id: version
+    attributes:
+      label: Moviestracker version
+      description: Shown in the page footer (e.g. "Moviestracker v0.3.0").
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How is it installed?
+      options:
+        - macOS app (DMG)
+        - Linux (install.sh)
+        - Container
+        - Built from source
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System
+      placeholder: macOS 26.1 on Apple Silicon / Ubuntu 24.04 on a Raspberry Pi 5
+  - type: input
+    id: browser
+    attributes:
+      label: Browser or player
+      placeholder: Safari 26, Chrome 140, VLC on an LG TV…
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        macOS: menu bar icon → Show Logs. Linux: `sudo journalctl -u moviestracker -n 200`.
+      render: text

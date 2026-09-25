@@ -1,0 +1,32 @@
+# Dependencies and build output
+node_modules/
+bin/
+dist/
+tmp/
+coverage.out
+*.test
+/server
+/moviestracker
+# Release archives unpacked in the source folder
+/moviestracker_*/
+
+# Local data, secrets and logs: never commit these
+.devdata/
+.env
+.env.*
+!.env.example
+.tmdb-shared-key
+*.log
+*.bundle
+
+# Editors, OS and agent tooling (per developer)
+.DS_Store
+.idea/
+.vscode/
+.worktrees/
+.superpowers/
+.claude/settings.local.json
+docs/superpowers/
+
+# Scratch scripts
+installTorrServerMac.sh

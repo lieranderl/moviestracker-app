@@ -1,0 +1,9 @@
+# TorrServer release Moviestracker is tested with, and the SHA-256 GitHub
+# publishes for each file. Update all lines together.
+version MatriX.145
+TorrServer-gst-darwin-amd64 a473e143a0e0fd28723ff0f8a410b0e9d4f70b64d4bd2f2617c35d0444831c19
+TorrServer-gst-darwin-arm64 31676f26a3ba06990e26a4aedde15f78c7e5dc61cb4df83fd4d13a6a2af46ca4
+TorrServer-gst-linux-amd64 4c9f47111dfa73f64b5d82540970d308e7218f62fb1a74674304b3247799e4ea
+TorrServer-gst-linux-arm64 5bf400335d40f5b5d93ece2c2c81df2d8a30097481fa669d6eb61dbf0490ceab
+# TorrServer's licence (GPL-3.0) at that tag, shipped next to its binary.
+LICENSE 8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903

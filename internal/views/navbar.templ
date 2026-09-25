@@ -1,0 +1,134 @@
+package views
+
+import "github.com/lieranderl/moviestracker-app/internal/auth"
+
+type navLink struct {
+	Href  string
+	Label string
+	Icon  string
+}
+
+// appLinks are the signed-in destinations shown in the navbar.
+var appLinks = []navLink{
+	{Href: "/movies", Label: "Home", Icon: "house"},
+	{Href: "/search", Label: "Search", Icon: "search"},
+	{Href: "/dashboard", Label: "Dashboard", Icon: "gauge"},
+	{Href: "/torrserver", Label: "TorrServer", Icon: "server"},
+}
+
+templ brand(href string) {
+	<a href={ templ.SafeURL(href) } class="flex items-center gap-2 text-lg font-extrabold tracking-tight hover:opacity-90 transition-opacity">
+		<span class="size-8 rounded-field bg-primary text-primary-content grid place-items-center">
+			@Icon("clapperboard", "size-4.5")
+		</span>
+		<span>Movies<span class="font-light text-base-content/60">tracker</span></span>
+	</a>
+}
+
+templ Navbar(user *auth.User) {
+	<header id="main-navbar" class="sticky top-0 z-50 w-full backdrop-blur-md bg-base-100/80 border-b border-base-content/10">
+		<nav class="navbar max-w-7xl mx-auto px-4 sm:px-8 min-h-16 gap-2" aria-label="Main">
+			<div class="navbar-start gap-4">
+				if user != nil {
+					@brand("/movies")
+					<ul class="menu menu-horizontal flex-nowrap whitespace-nowrap gap-1 text-sm font-medium hidden md:flex">
+						for _, l := range appLinks {
+							<li>
+								<a href={ templ.SafeURL(l.Href) }>
+									@Icon(l.Icon, "size-4")
+									{ l.Label }
+								</a>
+							</li>
+						}
+					</ul>
+				} else {
+					@brand("/login")
+				}
+			</div>
+			<div class="navbar-end gap-2">
+				if user != nil {
+					<form action="/search" method="GET" role="search" class="hidden lg:block">
+						<label class="input input-sm w-64">
+							@Icon("search", "size-4 opacity-60")
+							<span class="sr-only">Search</span>
+							<input type="search" name="q" maxlength="100" placeholder="Search movies, TV, people" class="grow"/>
+						</label>
+					</form>
+				}
+				@ThemeSwitcher()
+				if user != nil {
+					@userMenu(user)
+				} else {
+					<a href="/login" class="btn btn-primary btn-sm gap-1.5">
+						@Icon("log-in", "size-4")
+						Sign in
+					</a>
+				}
+			</div>
+		</nav>
+	</header>
+}
+
+// userMenu is a DaisyUI 5 popover dropdown anchored to the avatar button.
+templ userMenu(user *auth.User) {
+	<button
+		type="button"
+		popovertarget="user-popover-menu"
+		class="btn btn-ghost btn-circle user-popover-anchor"
+		aria-label="User menu"
+	>
+		<span class="avatar avatar-placeholder avatar-online">
+			<span class="size-9 rounded-full grid place-items-center bg-primary text-primary-content ring-2 ring-primary ring-offset-base-100 ring-offset-1">
+				<span class="text-sm font-bold leading-none">{ user.Initials() }</span>
+			</span>
+		</span>
+	</button>
+	<ul
+		id="user-popover-menu"
+		popover
+		class="dropdown dropdown-end user-popover-menu menu bg-base-200 rounded-box z-50 mt-2 w-64 p-2 shadow-2xl border border-base-content/10"
+	>
+		<li class="menu-title text-xs uppercase tracking-wider">Signed in as</li>
+		<li class="pointer-events-none">
+			<div class="flex items-center gap-3">
+				<span class="avatar avatar-placeholder shrink-0">
+					<span class="size-10 rounded-full grid place-items-center bg-primary text-primary-content">
+						<span class="font-bold leading-none">{ user.Initials() }</span>
+					</span>
+				</span>
+				<span class="flex flex-col min-w-0">
+					<span class="font-bold text-sm truncate">{ user.Name }</span>
+					<span class="text-xs text-base-content/60 font-mono truncate">{ user.Username }</span>
+					<span class="badge badge-accent badge-xs mt-1 font-mono uppercase">{ user.Role }</span>
+				</span>
+			</div>
+		</li>
+		<li></li>
+		for _, l := range appLinks {
+			<li>
+				<a href={ templ.SafeURL(l.Href) }>
+					@Icon(l.Icon, "size-4")
+					{ l.Label }
+				</a>
+			</li>
+		}
+		if user.IsAdmin() {
+			<li>
+				<a href="/settings/sources">
+					@Icon("settings", "size-4")
+					Settings
+				</a>
+			</li>
+		}
+		<li></li>
+		<li>
+			<!-- Progressive enhancement: native POST without JS, Datastar @post with JS (submit is auto-prevented) -->
+			<form action="/api/logout" method="POST" class="p-0" data-on:submit="@post('/api/logout')">
+				<button type="submit" class="w-full flex items-center gap-2 px-3 py-1.5 text-error font-medium">
+					@Icon("log-out", "size-4")
+					Sign Out
+				</button>
+			</form>
+		</li>
+	</ul>
+}

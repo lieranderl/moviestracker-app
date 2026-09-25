@@ -1,0 +1,63 @@
+package views
+
+type themeOption struct {
+	Value     string
+	Label     string
+	Hint      string
+	Icon      string
+	IconClass string
+}
+
+var themeOptions = []themeOption{
+	{Value: "githublight", Label: "Light", Hint: "githublight", Icon: "sun", IconClass: "size-4 text-warning"},
+	{Value: "githubdark", Label: "Dark", Hint: "githubdark", Icon: "moon", IconClass: "size-4 text-primary"},
+	{Value: "system", Label: "System", Hint: "auto", Icon: "monitor", IconClass: "size-4 text-accent"},
+}
+
+// ThemeSwitcher is a DaisyUI dropdown bound to the global $theme signal.
+templ ThemeSwitcher() {
+	<div class="dropdown dropdown-end">
+		<div
+			role="button"
+			tabindex="0"
+			class="btn btn-ghost btn-circle btn-sm"
+			aria-haspopup="menu"
+			aria-label="Theme switcher"
+			title="Change theme"
+		>
+			for _, opt := range themeOptions {
+				<span
+					class={ templ.KV("hidden", opt.Value != "system") }
+					data-class={ "{ hidden: $theme !== '" + opt.Value + "' }" }
+				>
+					@Icon(opt.Icon, opt.IconClass)
+				</span>
+			}
+		</div>
+		<ul
+			tabindex="-1"
+			role="menu"
+			class="dropdown-content menu menu-sm bg-base-200 rounded-box z-50 mt-2 w-48 p-1.5 shadow-2xl border border-base-content/10"
+		>
+			<li class="menu-title text-[10px] uppercase tracking-wider">Theme</li>
+			for _, opt := range themeOptions {
+				<li>
+					<button
+						type="button"
+						role="menuitemradio"
+						data-attr:aria-checked={ "$theme === '" + opt.Value + "'" }
+						data-on:click={ "$theme = '" + opt.Value + "'; document.activeElement?.blur()" }
+						data-class={ "{ 'menu-active': $theme === '" + opt.Value + "' }" }
+						class="justify-between"
+					>
+						<span class="flex items-center gap-2">
+							@Icon(opt.Icon, opt.IconClass)
+							<span>{ opt.Label }</span>
+						</span>
+						<span class="text-[10px] opacity-60 font-mono">{ opt.Hint }</span>
+					</button>
+				</li>
+			}
+		</ul>
+	</div>
+}

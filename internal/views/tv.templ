@@ -1,0 +1,167 @@
+package views
+
+import (
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+	"fmt"
+	"strings"
+)
+
+func plural(n int, word string) string {
+	if n == 1 {
+		return fmt.Sprintf("1 %s", word)
+	}
+	return fmt.Sprintf("%d %ss", n, word)
+}
+
+func tvFacts(t *tmdb.TVDetails) []string {
+	facts := []string{"TV Series"}
+	if y := t.YearRange(); y != "" {
+		facts = append(facts, y)
+	}
+	if t.NumberOfSeasons > 0 {
+		facts = append(facts, plural(t.NumberOfSeasons, "season"))
+	}
+	return facts
+}
+
+func tvAbout(t *tmdb.TVDetails) []factItem {
+	episodes := ""
+	if t.NumberOfEpisodes > 0 {
+		episodes = fmt.Sprint(t.NumberOfEpisodes)
+	}
+	return []factItem{
+		{Label: "Created by", People: t.Creators},
+		{Label: "Network", Value: strings.Join(t.Networks, ", ")},
+		{Label: "Genres", Value: genreNames(t.Genres)},
+		{Label: "First aired", Value: t.ReleaseDate},
+		{Label: "Last aired", Value: t.LastAirDate},
+		{Label: "Status", Value: t.Status},
+		{Label: "Episodes", Value: episodes},
+		{Label: "Episode runtime", Value: t.FormattedEpisodeRuntime()},
+		{Label: "Original title", Value: originalTitle(t.OriginalTitle, t.Title)},
+	}
+}
+
+// SeasonURL is the SSE endpoint that patches one season's episodes.
+func SeasonURL(tvID, season int) string { return fmt.Sprintf("/api/tv/%d/season/%d", tvID, season) }
+
+// seasonClick switches seasons in place; the links still work without JS.
+func seasonClick(tvID int) string {
+	return fmt.Sprintf(`const a = evt.target.closest('[data-season]')
+if (a) { evt.preventDefault(); $season = +a.dataset.season; @get('/api/tv/%d/season/' + a.dataset.season) }`, tvID)
+}
+
+templ TVPage(user *auth.User, t *tmdb.TVDetails, season *tmdb.Season, selected int) {
+	@Layout(PageTitle(t.MediaItem)) {
+		@Navbar(user)
+		<main class="grow pb-16" data-signals={ mediaPageSignals } data-on:click={ videoClick }>
+			@detailHero(t.MediaItem, tvFacts(t), t.ContentRating, genreNames(t.Genres)) {
+				@trailerButton(t.TrailerKey, t.Title+" trailer")
+				@heroLink("#seasons", "list-video", "Episodes")
+				@heroLink("#sources", "magnet", "Find sources")
+			}
+			@aboutSection(t.MediaItem, t.Tagline, tvAbout(t), officialLinks("title", t.Links, t.Homepage))
+			@seasonsSection(t, season, selected)
+			@sourcesSection("tv", t.ID, t.Seasons, selected)
+			@castRail("Series cast", t.Cast)
+			@videoRail(t.Videos)
+			@mediaRail("recommendations", "Recommended", t.Recommendations)
+			@mediaRail("similar", "More like this", t.Similar)
+			@trailerModal()
+			@appToast()
+		</main>
+		@siteFooter()
+	}
+}
+
+templ seasonsSection(t *tmdb.TVDetails, season *tmdb.Season, selected int) {
+	if len(t.Seasons) > 0 {
+		<section
+			id="seasons"
+			class="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-5 scroll-mt-20"
+			data-signals={ fmt.Sprintf("{ season: %d, seasonLoading: false }", selected) }
+		>
+			@sectionHeading("Seasons & episodes", "")
+			<nav
+				class="tabs tabs-box w-full sm:w-fit flex-nowrap overflow-x-auto"
+				aria-label="Seasons"
+				data-on:click={ seasonClick(t.ID) }
+				data-indicator:season-loading
+			>
+				for _, s := range t.Seasons {
+					<a
+						href={ templ.SafeURL(fmt.Sprintf("/tv/%d?season=%d#seasons", t.ID, s.Number)) }
+						role="tab"
+						data-season={ fmt.Sprint(s.Number) }
+						class={ "tab whitespace-nowrap", templ.KV("tab-active", s.Number == selected) }
+						data-class={ fmt.Sprintf("{ 'tab-active': $season === %d }", s.Number) }
+					>
+						{ seasonLabel(s) }
+					</a>
+				}
+			</nav>
+			<div class="transition-opacity" data-class="{ 'opacity-50': $seasonLoading }">
+				if season != nil {
+					@SeasonEpisodes(season)
+				} else {
+					@SeasonError()
+				}
+			</div>
+		</section>
+	}
+}
+
+func seasonLabel(s tmdb.SeasonSummary) string {
+	if s.Number == 0 {
+		return "Specials"
+	}
+	return fmt.Sprintf("Season %d", s.Number)
+}
+
+// SeasonEpisodes is patched by the season SSE endpoint.
+templ SeasonEpisodes(s *tmdb.Season) {
+	<div id="season-episodes" class="space-y-4">
+		if s.Overview != "" {
+			<p class="text-sm text-base-content/70 max-w-3xl leading-relaxed">{ s.Overview }</p>
+		}
+		if len(s.Episodes) == 0 {
+			<p class="text-sm text-base-content/60">No episodes announced yet.</p>
+		}
+		<ol class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+			for _, e := range s.Episodes {
+				<li class="card card-side bg-base-200/60 border border-base-content/5 overflow-hidden">
+					<figure class="w-36 sm:w-56 shrink-0 bg-base-300 aspect-video self-start">
+						if e.StillURL() != "" {
+							<img src={ e.StillURL() } alt="" class="size-full object-cover" loading="lazy" decoding="async" width="224" height="126"/>
+						} else {
+							@Icon("tv", "size-8 opacity-30")
+						}
+					</figure>
+					<div class="card-body p-3 sm:p-4 gap-1 min-w-0">
+						<p class="text-xs font-mono text-base-content/60 flex flex-wrap gap-x-2">
+							<span class="font-semibold text-primary">{ e.Code() }</span>
+							if e.FormattedRuntime() != "" {
+								<span>{ e.FormattedRuntime() }</span>
+							}
+							if e.AirDate != "" {
+								<span>{ e.AirDate }</span>
+							}
+						</p>
+						<h3 class="font-semibold leading-snug line-clamp-2">{ e.Name }</h3>
+						if e.Overview != "" {
+							<p class="text-xs sm:text-sm text-base-content/70 line-clamp-3">{ e.Overview }</p>
+						}
+					</div>
+				</li>
+			}
+		</ol>
+	</div>
+}
+
+templ SeasonError() {
+	<div id="season-episodes" role="alert" class="alert alert-warning alert-soft">
+		@Icon("triangle-alert", "size-5")
+		<span>This season could not be loaded from TMDB. Please try again.</span>
+	</div>
+}

@@ -1,0 +1,210 @@
+package views
+
+import "github.com/lieranderl/moviestracker-app/internal/auth"
+
+// UserRow is one account on the Users page.
+type UserRow struct {
+	Username, Name, Created string
+	Admin, Known            bool
+}
+
+// UsersView is the Users page: every account, and who is looking.
+type UsersView struct {
+	Me       string
+	Accounts []UserRow
+}
+
+const usersSignals = `{newUsername: '', newName: '', newPassword: '', newRole: 'viewer', resetFor: '', resetName: '', resetPassword: '', resetOpen: false}`
+
+// UsersPage lets administrators add accounts, reset passwords, change roles
+// and delete accounts.
+templ UsersPage(user *auth.User, v UsersView) {
+	@settingsShell(user, "users", "Users") {
+		<div class="space-y-6" data-signals={ usersSignals }>
+			<header class="space-y-2">
+				<h1 class="text-3xl font-bold tracking-tight flex items-center gap-3">
+					@Icon("users", "size-7 text-primary")
+					Users
+				</h1>
+				<p class="text-base-content/70">
+					Everyone who uses Moviestracker signs in with their own account.
+					<strong>Viewers</strong> browse, search, add torrents and play.
+					<strong>Administrators</strong> also change settings and manage accounts.
+				</p>
+			</header>
+			@UsersSection(v, SourceStatus{})
+			@resetPasswordDialog()
+		</div>
+	}
+}
+
+// UsersSection is the patchable part: the accounts and the add form.
+templ UsersSection(v UsersView, st SourceStatus) {
+	<div id="users-section" class="space-y-6">
+		@sourceStatus(st)
+		<section class="card bg-base-200/60 border border-base-content/10">
+			<div class="card-body gap-4">
+				<h2 class="card-title">
+					@Icon("contact", "size-5 text-primary")
+					Accounts
+				</h2>
+				<div class="overflow-x-auto">
+					<table class="table">
+						<thead>
+							<tr>
+								<th>Name</th>
+								<th>Role</th>
+								<th class="hidden sm:table-cell">Added</th>
+								<th><span class="sr-only">Actions</span></th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, u := range v.Accounts {
+								@userRow(u, u.Username == v.Me)
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</section>
+		@addUserForm()
+	</div>
+}
+
+templ userRow(u UserRow, me bool) {
+	<tr>
+		<td>
+			<div class="font-semibold">
+				{ u.Name }
+				if me {
+					<span class="badge badge-ghost badge-sm ml-1">you</span>
+				}
+			</div>
+			<div class="text-xs font-mono text-base-content/60">{ u.Username }</div>
+		</td>
+		<td>
+			if u.Admin {
+				<span class="badge badge-primary badge-soft">Administrator</span>
+			} else {
+				<span class="badge badge-ghost">Viewer</span>
+			}
+		</td>
+		<td class="hidden sm:table-cell text-sm text-base-content/70">
+			if u.Known {
+				{ u.Created }
+			}
+		</td>
+		<td>
+			<div class="flex flex-wrap justify-end gap-1">
+				<button
+					type="button"
+					class="btn btn-ghost btn-xs"
+					data-user={ u.Username }
+					data-name={ u.Name }
+					data-on:click="$resetFor = el.dataset.user; $resetName = el.dataset.name; $resetPassword = ''; $resetOpen = true"
+				>
+					@Icon("key-round", "size-3.5")
+					Reset password
+				</button>
+				if !me {
+					if u.Admin {
+						<button type="button" class="btn btn-ghost btn-xs" data-user={ u.Username } data-on:click="@post('/api/settings/users/' + encodeURIComponent(el.dataset.user) + '/role/viewer', {filterSignals: {include: /^$/}})">
+							@Icon("user", "size-3.5")
+							Make viewer
+						</button>
+					} else {
+						<button type="button" class="btn btn-ghost btn-xs" data-user={ u.Username } data-on:click="@post('/api/settings/users/' + encodeURIComponent(el.dataset.user) + '/role/admin', {filterSignals: {include: /^$/}})">
+							@Icon("shield", "size-3.5")
+							Make administrator
+						</button>
+					}
+					<button
+						type="button"
+						class="btn btn-ghost btn-xs text-error"
+						data-user={ u.Username }
+						data-name={ u.Name }
+						data-on:click="confirm('Delete the account of ' + el.dataset.name + '? They are signed out at once.') && @post('/api/settings/users/' + encodeURIComponent(el.dataset.user) + '/delete', {filterSignals: {include: /^$/}})"
+					>
+						@Icon("trash-2", "size-3.5")
+						Delete
+					</button>
+				}
+			</div>
+		</td>
+	</tr>
+}
+
+templ addUserForm() {
+	<section class="card bg-base-200/60 border border-base-content/10">
+		<div class="card-body gap-4">
+			<h2 class="card-title">
+				@Icon("user-plus", "size-5 text-primary")
+				Add an account
+			</h2>
+			<form
+				class="grid gap-3 sm:grid-cols-2"
+				data-indicator:user-adding
+				data-on:submit="@post('/api/settings/users', {filterSignals: {include: /^new(Username|Name|Password|Role)$/}})"
+			>
+				<fieldset class="fieldset">
+					<legend class="fieldset-legend">Username</legend>
+					<input type="text" required maxlength="64" autocomplete="off" class="input w-full" placeholder="anna" data-bind="newUsername"/>
+					<p class="label">Letters, digits, '.', '-' or '_'; used to sign in</p>
+				</fieldset>
+				<fieldset class="fieldset">
+					<legend class="fieldset-legend">Name</legend>
+					<input type="text" maxlength="100" autocomplete="off" class="input w-full" placeholder="Anna" data-bind="newName"/>
+					<p class="label">Shown in the menu; optional</p>
+				</fieldset>
+				<fieldset class="fieldset">
+					<legend class="fieldset-legend">Password</legend>
+					<input type="password" required minlength="10" autocomplete="new-password" class="input w-full" data-bind="newPassword"/>
+					<p class="label">At least 10 characters; share it with them privately</p>
+				</fieldset>
+				<fieldset class="fieldset">
+					<legend class="fieldset-legend">Role</legend>
+					<select class="select w-full" data-bind="newRole">
+						<option value="viewer">Viewer</option>
+						<option value="admin">Administrator</option>
+					</select>
+					<p class="label">Viewers cannot open Settings</p>
+				</fieldset>
+				<div class="sm:col-span-2">
+					<button type="submit" class="btn btn-primary" data-attr:disabled="$userAdding">
+						<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$userAdding"></span>
+						@Icon("user-plus", "size-4")
+						Add account
+					</button>
+				</div>
+			</form>
+		</div>
+	</section>
+}
+
+templ resetPasswordDialog() {
+	@modalDialog("users-reset-modal", "resetOpen", "", "$resetPassword = ''", "max-w-md", nil) {
+		@modalHeader("users-reset-modal", "Reset password", "key-round", "text-primary")
+		<form
+			class="mt-4 space-y-4"
+			data-indicator:resetting
+			data-on:submit="@post('/api/settings/users/' + encodeURIComponent($resetFor) + '/password', {filterSignals: {include: /^resetPassword$/}})"
+		>
+			<p class="text-sm text-base-content/70">
+				A new password for <strong data-text="$resetName"></strong>. They are signed out of every browser
+				and sign in again with it.
+			</p>
+			<fieldset class="fieldset">
+				<legend class="fieldset-legend">New password</legend>
+				<input type="password" required minlength="10" autocomplete="new-password" class="input w-full" data-bind="resetPassword"/>
+				<p class="label">At least 10 characters</p>
+			</fieldset>
+			<div class="modal-action">
+				<button type="button" class="btn btn-ghost btn-sm" data-on:click="$resetOpen = false">Cancel</button>
+				<button type="submit" class="btn btn-primary btn-sm" data-attr:disabled="$resetting">
+					<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$resetting"></span>
+					Save password
+				</button>
+			</div>
+		</form>
+	}
+}

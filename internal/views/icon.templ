@@ -1,0 +1,22 @@
+package views
+
+// Icon renders a Lucide icon as inline SVG on the server.
+// Server rendering keeps icons stable across Datastar morphs (no client
+// re-hydration, no flicker) and removes the Lucide runtime from the bundle.
+// Add new icons by referencing them here and running `bun run icons`.
+templ Icon(name string, class string) {
+	<svg
+		xmlns="http://www.w3.org/2000/svg"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="2"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+		class={ "lucide shrink-0", class }
+		aria-hidden="true"
+		focusable="false"
+	>
+		@templ.Raw(iconPath(name))
+	</svg>
+}

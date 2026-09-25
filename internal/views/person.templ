@@ -1,0 +1,149 @@
+package views
+
+import (
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+	"fmt"
+)
+
+// longBiography is the length above which the biography starts collapsed.
+const longBiography = 700
+
+func creditYear(c tmdb.Credit) string {
+	if y := c.ReleaseYear(); y != "" {
+		return y
+	}
+	return "—"
+}
+
+templ PersonPage(user *auth.User, p *tmdb.Person) {
+	@Layout(p.Name) {
+		@Navbar(user)
+		<main class="grow pb-16" data-signals="{ bioOpen: false, credits: 'movie' }">
+			<section class="bg-linear-to-b from-base-200 to-base-100">
+				<div class="max-w-7xl mx-auto px-4 sm:px-8 pt-12 pb-8 grid grid-cols-1 sm:grid-cols-[12rem_1fr] lg:grid-cols-[16rem_1fr] gap-8 lg:gap-12 items-start">
+					<figure class="w-48 sm:w-full mx-auto">
+						if p.ProfileURL() != "" {
+							<img src={ p.ProfileURL() } alt={ p.Name } class="w-full aspect-[2/3] object-cover rounded-box shadow-2xl ring-1 ring-base-content/10" fetchpriority="high" width="256" height="384"/>
+						} else {
+							<div class="w-full aspect-[2/3] rounded-box bg-base-300 grid place-items-center text-4xl font-bold text-base-content/40">{ initials(p.Name) }</div>
+						}
+					</figure>
+					<div class="space-y-5 min-w-0">
+						<div class="space-y-2">
+							if p.KnownForDepartment != "" {
+								<span class="badge badge-soft badge-primary">{ p.KnownForDepartment }</span>
+							}
+							<h1 class="text-4xl sm:text-5xl font-black tracking-tight text-balance">{ p.Name }</h1>
+						</div>
+						<dl class="flex flex-wrap gap-x-10 gap-y-3 text-sm">
+							if p.Birthday != "" {
+								<div>
+									<dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">Born</dt>
+									<dd class="font-medium">{ p.Birthday }</dd>
+								</div>
+							}
+							if p.PlaceOfBirth != "" {
+								<div>
+									<dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">Birthplace</dt>
+									<dd class="font-medium">{ p.PlaceOfBirth }</dd>
+								</div>
+							}
+							if p.Deathday != "" {
+								<div>
+									<dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">Died</dt>
+									<dd class="font-medium">{ p.Deathday }</dd>
+								</div>
+							}
+							<div>
+								<dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">Credits</dt>
+								<dd class="font-medium">{ fmt.Sprint(len(p.Credits)) }</dd>
+							</div>
+						</dl>
+						@officialLinksRow(officialLinks("name", p.Links, p.Homepage))
+						if paras := p.BiographyParagraphs(); len(paras) > 0 {
+							<div class="space-y-3 max-w-3xl">
+								<h2 class="sr-only">Biography</h2>
+								<div
+									class={ "space-y-3 text-base leading-relaxed text-base-content/85", templ.KV("line-clamp-6", len(p.Biography) > longBiography) }
+									if len(p.Biography) > longBiography {
+										data-class="{ 'line-clamp-6': !$bioOpen }"
+									}
+								>
+									for _, para := range paras {
+										<p>{ para }</p>
+									}
+								</div>
+								if len(p.Biography) > longBiography {
+									<button type="button" class="btn btn-ghost btn-sm px-0" data-on:click="$bioOpen = !$bioOpen" data-attr:aria-expanded="$bioOpen">
+										<span data-text="$bioOpen ? 'Show less' : 'Read more'">Read more</span>
+									</button>
+								}
+							</div>
+						}
+					</div>
+				</div>
+			</section>
+			@mediaRail("known-for", "Known for", p.KnownFor)
+			@filmography(p)
+		</main>
+		@siteFooter()
+	}
+}
+
+templ filmography(p *tmdb.Person) {
+	if len(p.Credits) > 0 {
+		<section id="credits" class="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-4">
+			@sectionHeading("Filmography", "") {
+				<div role="tablist" aria-label="Credit type" class="tabs tabs-box tabs-sm">
+					@creditTab("movie", "Movies", len(p.MovieCredits()))
+					@creditTab("tv", "TV", len(p.TVCredits()))
+				</div>
+			}
+			@creditTable("movie", p.MovieCredits())
+			@creditTable("tv", p.TVCredits())
+		</section>
+	}
+}
+
+templ creditTab(kind, label string, count int) {
+	<button
+		type="button"
+		role="tab"
+		class={ "tab", templ.KV("tab-active", kind == "movie") }
+		data-class={ fmt.Sprintf("{ 'tab-active': $credits === '%s' }", kind) }
+		data-on:click={ fmt.Sprintf("$credits = '%s'", kind) }
+	>
+		{ label } <span class="badge badge-xs ml-1.5">{ fmt.Sprint(count) }</span>
+	</button>
+}
+
+templ creditTable(kind string, credits []tmdb.Credit) {
+	<div
+		class={ "overflow-x-auto rounded-box border border-base-content/5 bg-base-200/40", templ.KV("hidden", kind != "movie") }
+		data-class:hidden={ fmt.Sprintf("$credits !== '%s'", kind) }
+	>
+		if len(credits) == 0 {
+			<p class="p-4 text-sm text-base-content/60">No credits.</p>
+		} else {
+			<table class="table table-sm">
+				<thead>
+					<tr>
+						<th class="w-20">Year</th>
+						<th>Title</th>
+						<th>Role</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, c := range credits {
+						<tr class="hover:bg-base-200">
+							<td class="font-mono text-base-content/60">{ creditYear(c) }</td>
+							<td><a href={ mediaHref(c.MediaItem) } class="link link-hover font-medium">{ c.Title }</a></td>
+							<td class="text-base-content/70">{ c.Role }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		}
+	</div>
+}

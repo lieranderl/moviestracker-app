@@ -1,0 +1,28 @@
+{
+  "languages": {
+    "Go": {
+      "format_on_save": "on",
+    },
+    "Templ": {
+      "format_on_save": "on",
+    }
+  },
+  "lsp": {
+    "gopls": {
+      "initialization_options": {
+        "analyses": {
+          "unusedparams": true
+        },
+        "staticcheck": true
+      }
+    },
+    "tailwindcss-language-server": {
+      "settings": {
+        "includeLanguages": {
+          "templ": "html",
+          "html": "html"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,1382 @@
+package views
+
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/torrserver"
+)
+
+// torrPageSignals is the client state for the TorrServer page. $gst mirrors
+// TorrServer's GStreamer support (kept current by the SSE stream) and gates
+// every HLS/probe control.
+func torrPageSignals(gst, canRemove bool, linkOrigin string) string {
+	origin, _ := json.Marshal(linkOrigin)
+	return fmt.Sprintf(`{
+	gst: %t, canRemove: %t, linkOrigin: %s,
+	playerOpen: false, streamUrl: '', streamCleanUrl: '', streamHlsUrl: '', streamTitle: '', activeHash: '', activeFileIndex: 1,
+	streamBase: '', playKind: 'direct', playNonce: 0, audioTrack: -1, mediaInfoOpen: false, subTrack: -1,
+	_seekHint: '', _seekSum: 0, _seekAt: 0, _zone: '',
+	_paused: true, _time: 0, _dur: 0, _vol: 1, _muted: false, _fs: false, _idle: false, _waiting: false, _seeking: false,
+	_audioMenu: false, _subMenu: false, audioLang: localStorage.getItem('torrAudioLang') || '',
+	addModalOpen: false,
+	probeOpen: false, probeHash: '', probeIndex: 1, probeLoading: false,
+	confirmOpen: false, confirmHash: '', confirmName: '',
+	filterQuery: '', toast: ''
+}`, gst, canRemove, origin)
+}
+
+// torrListActions is the single delegated click handler for every torrent and
+// file action button. Buttons declare intent via data-action and carry their
+// payload in data-* attributes, so no JS strings are built from torrent data.
+const torrListActions = `
+const btn = evt.target.closest('button[data-action]')
+if (!btn) return
+const d = btn.dataset
+const hash = encodeURIComponent(d.hash)
+switch (d.action) {
+	case 'play':
+		$streamCleanUrl = d.clean || ''; $streamHlsUrl = d.hls || ''; $streamTitle = d.title; $activeHash = d.hash; $activeFileIndex = +d.index
+		$playKind = d.kind === 'hls' && $gst ? 'hls' : 'direct'
+		` + torrStartPlay + `
+		break
+	case 'probe':
+		$probeHash = d.hash; $probeIndex = +d.index; $probeOpen = true
+		break
+	case 'copy':
+		window.copyLink(d.url, $linkOrigin).then(ok => { $toast = ok ? d.msg : 'Copy failed' })
+		break
+	case 'files':
+		@post('/api/torrserver/files?hash=' + hash, {filterSignals: {include: /^$/}})
+		break
+	case 'drop':
+		@post('/api/torrserver/action?op=drop&hash=' + hash, {filterSignals: {include: /^$/}})
+		break
+	case 'remove':
+		$confirmHash = d.hash; $confirmName = d.title; $confirmOpen = true
+		break
+}
+`
+
+// torrStartPlay (re)starts the player on $activeHash's file as $playKind:
+// Direct streams the original file, HLS goes through GStreamer and first
+// asks which audio tracks the file has.
+const torrStartPlay = `{
+	$audioTrack = -1; $subTrack = -1; $_audioMenu = false; $_subMenu = false
+	const h = encodeURIComponent($activeHash)
+	$streamBase = $playKind === 'hls'
+		? '/api/torrserver/stream/gst/' + h + '/master.m3u8?index=' + $activeFileIndex
+		: '/api/torrserver/stream/stream?link=' + h + '&index=' + $activeFileIndex + '&play'
+	$playNonce++
+	$playerOpen = true
+	if ($playKind === 'hls') {
+		@get('/api/torrserver/tracks?hash=' + h + '&index=' + $activeFileIndex, {filterSignals: {include: /^audioLang$/}})
+	} else {
+		$audioTrack = 0
+	}
+}`
+
+// torrPlayback (re)starts the stream once the audio track is known: right
+// after the tracks response on play, and again whenever the picker changes it.
+const torrPlayback = `$playNonce && $playerOpen && $audioTrack >= 0 &&
+	window.playHlsVideo($streamUrl = $streamBase + ($streamBase.includes('/gst/') ? '&audio=' + $audioTrack : ''))`
+
+// torrPlayerStatsStream keeps the stats row (and, with GStreamer, the media
+// info) current from one server stream while the player is open. The effect
+// reruns when the torrent, file or audio track changes: Datastar then cancels
+// the element's previous request, and closing the player sends stop=1 so the
+// old stream ends.
+const torrPlayerStatsStream = `$playerOpen && $activeHash
+	? @get('/api/torrserver/player-stats?stream=true&hash=' + encodeURIComponent($activeHash) +
+		($playKind === 'hls' ? '&gst=1&index=' + $activeFileIndex + '&audio=' + Math.max($audioTrack, 0) : ''), {filterSignals: {include: /^$/}})
+	: @get('/api/torrserver/player-stats?stop=1', {filterSignals: {include: /^$/}})`
+
+// torrControlsShown keeps the control bar up while paused, while the pointer
+// moved in the last 3s, or while a track menu is open.
+const torrControlsShown = `$_paused || !$_idle || $_audioMenu || $_subMenu`
+
+// torrFullscreenToggle fullscreens the player container (not the bare
+// <video>) so the control bar and its menus stay available. iPhone Safari
+// only supports native video fullscreen, hence the fallback.
+const torrFullscreenToggle = `document.fullscreenElement ? document.exitFullscreen()
+	: ($_player.requestFullscreen ? $_player.requestFullscreen() : $_video.webkitEnterFullscreen())`
+
+// torrVideoDoubleTap: a double tap (or double click) on the left third of
+// the video goes back 10 seconds, on the right third forward 10 seconds, as
+// on phones' video apps; the middle toggles fullscreen. Taps in a row add up
+// in the hint ("30 s").
+const torrVideoDoubleTap = `const x = evt.offsetX / el.clientWidth
+if (x < 1 / 3 || x > 2 / 3) {
+	const step = x < 1 / 3 ? -10 : 10
+	const dir = step < 0 ? 'back' : 'fwd'
+	const end = Number.isFinite(el.duration) ? el.duration : Infinity
+	el.currentTime = Math.min(Math.max(0, el.currentTime + step), end)
+	$_seekSum = ($_seekHint === dir ? $_seekSum : 0) + 10
+	$_seekHint = dir
+	$_seekAt = Date.now()
+} else {
+	` + torrFullscreenToggle + `
+}`
+
+// torrVideoClick plays or pauses from the centre third only: the sides are
+// for double taps that skip.
+const torrVideoClick = `const x = evt.offsetX / el.clientWidth
+if (x >= 1 / 3 && x <= 2 / 3) { el.paused ? el.play() : el.pause() }`
+
+// torrVideoZone notes which third of the video the pointer is over.
+const torrVideoZone = `$_zone = evt.offsetX < el.clientWidth / 3 ? 'back' : evt.offsetX > el.clientWidth * 2 / 3 ? 'fwd' : 'center'`
+
+// torrTimeText renders "12:34 / 1:58:53"; hours only when the video has them.
+const torrTimeText = `new Date(($_time || 0) * 1000).toISOString().slice($_dur >= 3600 ? 12 : 14, 19) + ' / ' +
+	new Date(($_dur || 0) * 1000).toISOString().slice($_dur >= 3600 ? 12 : 14, 19)`
+
+// torrPlayerKeys: space/k play-pause, f fullscreen, m mute, ←/→ seek 10s.
+// They work wherever focus is while the player is open (it opens with focus
+// on a header button), except while typing; handled keys do nothing else, so
+// space does not also press the focused button.
+const torrPlayerKeys = `
+if (!$playerOpen || evt.metaKey || evt.ctrlKey || evt.altKey) return
+if (evt.target.closest('input:not([type=range]), textarea, select, [contenteditable]')) return
+const v = $_video
+const seek = (s) => { v.currentTime = Math.min(Math.max(0, v.currentTime + s), Number.isFinite(v.duration) ? v.duration : Infinity) }
+switch (evt.key) {
+	case ' ': case 'k': v.paused ? v.play() : v.pause(); break
+	case 'f': ` + torrFullscreenToggle + `; break
+	case 'm': v.muted = !v.muted; break
+	case 'ArrowRight': seek(10); break
+	case 'ArrowLeft': seek(-10); break
+	default: return
+}
+evt.preventDefault()
+$_idle = false
+`
+
+// toastAutoHide clears the toast 3s after the last change to $toast.
+const toastAutoHide = `$toast && ($toast = '')`
+
+// playAttrs carries what the player needs to play one file.
+func playAttrs(hash string, index int, title, clean, hls string) templ.Attributes {
+	return templ.Attributes{
+		"data-hash": hash, "data-index": fmt.Sprint(index), "data-title": title,
+		"data-clean": clean, "data-hls": hls,
+	}
+}
+
+// playlistPath downloads a torrent's .m3u8 of kind "direct" or "hls".
+func playlistPath(hash, kind string) string {
+	return "/api/torrserver/playlist?hash=" + hash + "&kind=" + kind
+}
+
+// StreamLinks make the links other devices and players open for one file:
+// signed Moviestracker /s/ paths, so the TorrServer address never reaches the
+// page. Direct plays the original file; HLS is GStreamer's conversion.
+type StreamLinks struct {
+	Direct, HLS func(hash string, f torrserver.FileStat) string
+	// Page is the movie or TV page a torrent belongs to ("" when unknown);
+	// nil knows none.
+	Page func(hash string) string
+}
+
+// titlePage is where a torrent card links: its movie or TV page, a label
+// for the icon and the icon's name ("" when the torrent's title is unknown).
+func titlePage(links StreamLinks, hash string) (href, label, icon string) {
+	if links.Page == nil {
+		return "", "", ""
+	}
+	if href = links.Page(hash); href == "" {
+		return "", "", ""
+	}
+	if strings.HasPrefix(href, "/tv/") {
+		return href, "Open the TV page", "tv"
+	}
+	return href, "Open the movie page", "clapperboard"
+}
+
+// TorrServer is the TorrServer page. Its address is set in Settings → Sources.
+templ TorrServer(user *auth.User, engine, linkOrigin string, links StreamLinks, echo torrserver.EchoInfo, torrents []torrserver.Torrent, gst GStreamerSetup) {
+	@layoutWithScripts("TorrServer Web Player & Stream Manager", "/static/player.js") {
+		@Navbar(user)
+		<main
+			id="torrserver-app"
+			class="grow w-full max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6"
+			data-signals={ torrPageSignals(echo.GSTAvailable, user.IsAdmin(), linkOrigin) }
+		>
+			<!-- Header & server status -->
+			<section class="card bg-base-200/60 border border-base-content/10 shadow-lg">
+				<div class="card-body gap-5 p-6 sm:p-8">
+					<div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+						<div class="flex items-center gap-3">
+							<span class="size-12 rounded-box bg-linear-to-tr from-primary to-accent grid place-items-center text-primary-content shadow-md shadow-primary/20">
+								@Icon("server", "size-6")
+							</span>
+							<div>
+								<h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">TorrServer Web Hub</h1>
+								<p class="text-xs sm:text-sm text-base-content/70">
+									In-browser HLS streaming, external player playlist export, and batch torrent management
+								</p>
+							</div>
+						</div>
+						<div class="flex flex-wrap items-center gap-2">
+							if user.IsAdmin() {
+								<a href="/settings/sources" class="btn btn-outline btn-sm gap-2 font-mono text-xs" title="Change the TorrServer address in Settings → Sources">
+									@Icon("hard-drive", "size-4 text-secondary")
+									@torrActiveServer(engine)
+								</a>
+							} else {
+								<span class="badge badge-outline gap-2 font-mono text-xs">
+									@Icon("hard-drive", "size-4 text-secondary")
+									@torrActiveServer(engine)
+								</span>
+							}
+							<button
+								type="button"
+								data-on:click="@get('/api/torrserver/torrents')"
+								class="btn btn-ghost btn-sm btn-circle"
+								title="Refresh torrents list"
+								aria-label="Refresh torrents list"
+							>
+								@Icon("refresh-cw", "size-4")
+							</button>
+							<button
+								type="button"
+								data-on:click="$addModalOpen = true"
+								class="btn btn-primary btn-sm gap-2 shadow-md shadow-primary/20"
+							>
+								@Icon("plus", "size-4")
+								Add Torrents
+							</button>
+						</div>
+					</div>
+					@torrStatus(echo)
+				</div>
+			</section>
+			<div id="torr-alert-container"></div>
+			@GStreamerLive(gst, true)
+			@TorrServerGuide(echo, engine, gst.Can)
+			<!-- Toolbar lives outside the streamed fragment so typing is never interrupted -->
+			<section class="space-y-4" aria-labelledby="torr-list-title">
+				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-base-200/40 p-4 rounded-box border border-base-content/10">
+					<div class="flex items-center gap-3">
+						<h2 id="torr-list-title" class="text-xl font-bold flex items-center gap-2">
+							@Icon("film", "size-5 text-primary")
+							Torrents
+							@torrCount(len(torrents))
+						</h2>
+						<span class="badge badge-sm badge-soft badge-success gap-1.5 font-mono text-[11px]">
+							<span class="status status-success animate-pulse"></span>
+							Live Sync
+						</span>
+					</div>
+					<label class="input input-sm w-full sm:w-64">
+						@Icon("search", "size-3.5 opacity-50")
+						<input type="search" data-bind:filter-query placeholder="Search torrents…" aria-label="Search torrents"/>
+					</label>
+				</div>
+				@streamKindsLegend()
+				<!-- Stable wrapper: owns the SSE stream and the delegated action handler -->
+				<div
+					id="torr-list-stream-wrapper"
+					data-init="@get('/api/torrserver/torrents?stream=true', {retry: 'always'})"
+					data-on:click={ torrListActions }
+				>
+					@TorrServerListFragment(links, torrents)
+				</div>
+			</section>
+			@torrToast()
+			@torrPlayerModal()
+			@torrAddModal()
+			@torrProbeModal()
+			@torrConfirmModal()
+		</main>
+	}
+}
+
+// TorrServerLiveFragment bundles every server-owned region of the page into one
+// SSE patch; Datastar morphs each top-level element by id.
+templ TorrServerLiveFragment(torrents []torrserver.Torrent, echo torrserver.EchoInfo, engine string, links StreamLinks, gstCan bool) {
+	@torrStatus(echo)
+	@TorrServerGuide(echo, engine, gstCan)
+	@torrActiveServer(engine)
+	@torrCount(len(torrents))
+	@TorrServerListFragment(links, torrents)
+}
+
+templ torrActiveServer(engine string) {
+	<span id="torr-active-server" class="truncate max-w-[140px] sm:max-w-[220px]">{ engine }</span>
+}
+
+templ torrCount(n int) {
+	<span id="torr-count" class="badge badge-neutral font-mono text-xs">{ fmt.Sprint(n) }</span>
+}
+
+templ torrStatus(echo torrserver.EchoInfo) {
+	<div id="torr-status" class="pt-4 border-t border-base-content/10 flex flex-wrap items-center gap-3 text-xs">
+		if echo.Version != "" {
+			<span class="badge badge-sm badge-soft badge-primary font-mono">{ echo.Version }</span>
+		} else {
+			<span class="badge badge-sm badge-soft badge-error font-mono">Offline</span>
+		}
+		if echo.GSTAvailable {
+			<span class="flex items-center gap-1.5 text-success font-semibold">
+				<span class="status status-success animate-pulse"></span>
+				GStreamer v{ echo.GSTVersion } Active (HLS / Remux Ready)
+			</span>
+		} else {
+			<span class="flex items-center gap-1.5 text-warning font-semibold">
+				<span class="status status-warning"></span>
+				GStreamer Inactive (Direct HTTP Streaming Only)
+			</span>
+		}
+		if echo.Discoverer {
+			<span class="badge badge-sm badge-soft badge-info">GST Discoverer</span>
+		}
+		if echo.HDRTonemap {
+			<span class="badge badge-sm badge-soft badge-accent">HDR Tone Mapping</span>
+		}
+		<span class="text-base-content/50 ml-auto font-mono">Auto-updates via Datastar SSE</span>
+	</div>
+}
+
+templ TorrServerListFragment(links StreamLinks, torrents []torrserver.Torrent) {
+	<div id="torr-list-container" class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+		if len(torrents) == 0 {
+			<div class="card bg-base-200/50 border border-base-content/10 xl:col-span-2">
+				<div class="card-body items-center text-center gap-4 p-12">
+					<span class="size-16 rounded-box bg-base-300 grid place-items-center text-base-content/40">
+						@Icon("film", "size-8")
+					</span>
+					<div class="max-w-md space-y-1">
+						<h3 class="text-lg font-bold">No torrents added yet</h3>
+						<p class="text-sm text-base-content/60">
+							Add one or multiple torrents via HTTP/HTTPS download links or magnet URLs to stream directly in your browser.
+						</p>
+					</div>
+					<button
+						type="button"
+						data-on:click="$addModalOpen = true"
+						class="btn btn-primary btn-sm gap-2"
+					>
+						@Icon("plus", "size-4")
+						Add First Torrent
+					</button>
+				</div>
+			</div>
+		} else {
+			for _, t := range torrents {
+				@torrentCard(links, t)
+			}
+		}
+	</div>
+}
+
+templ torrentCard(links StreamLinks, t torrserver.Torrent) {
+	{{
+		name := t.DisplayName()
+		mainFile := torrserver.FileStat{ID: 1}
+		if mainVideo := torrserver.MainVideoFile(t.FileStats); mainVideo != nil && mainVideo.ID > 0 {
+			mainFile = *mainVideo
+		}
+		mainIndex := mainFile.ID
+		mainClean := links.Direct(t.Hash, mainFile)
+		mainHLS := links.HLS(t.Hash, mainFile)
+		videoCount := len(t.VideoFiles())
+		page, pageLabel, pageIcon := titlePage(links, t.Hash)
+	}}
+	<article
+		id={ "torr-card-" + t.Hash }
+		class="@container card bg-base-200/80 border border-base-content/10 shadow-sm hover:shadow-md transition-shadow"
+		data-name={ strings.ToLower(name) }
+		data-show="!$filterQuery || el.dataset.name.includes($filterQuery.trim().toLowerCase())"
+	>
+		<div class="card-body p-4 sm:p-5 gap-3">
+			<div class="flex flex-col @2xl:flex-row @2xl:items-center justify-between gap-4">
+				<div class="flex items-start gap-4 min-w-0 grow">
+					if t.Poster != "" {
+						<img
+							src={ t.Poster }
+							alt=""
+							class="w-16 h-24 rounded-field object-cover bg-base-300 shadow shrink-0"
+							loading="lazy"
+							decoding="async"
+							width="64"
+							height="96"
+						/>
+					} else {
+						<span class="w-16 h-24 rounded-field bg-base-300 grid place-items-center text-base-content/40 shrink-0">
+							@Icon("film", "size-8")
+						</span>
+					}
+					<div class="space-y-1.5 min-w-0 grow">
+						<h3 class="font-bold text-base sm:text-lg line-clamp-2 min-h-[2lh] leading-snug" title={ name }>
+							if page != "" {
+								<a href={ templ.SafeURL(page) } class="link link-hover">{ name }</a>
+							} else {
+								{ name }
+							}
+						</h3>
+						<div class="flex flex-wrap items-center gap-2 text-xs">
+							<span class="badge badge-sm badge-soft badge-primary font-mono">{ t.FormattedSize() }</span>
+							<span class={ "badge badge-sm font-medium", t.StatusBadgeClass() }>{ t.StatusLabel() }</span>
+							if t.Category != "" {
+								<span class="badge badge-sm badge-ghost font-mono">{ t.Category }</span>
+							}
+							<span class="text-base-content/40 font-mono text-[11px] truncate max-w-[120px] sm:max-w-[200px]" title={ t.Hash }>{ t.Hash }</span>
+						</div>
+						<div class="stats stats-horizontal bg-base-100/90 border border-base-content/10 shadow-xs mt-2 w-full max-w-sm">
+							@torrStat("Peers", t.FormattedPeers(), "")
+							@torrStat("Down", t.FormattedDownloadSpeed(), "text-success")
+							@torrStat("Up", t.FormattedUploadSpeed(), "text-info")
+						</div>
+					</div>
+				</div>
+				<div class="flex flex-wrap items-center gap-2 shrink-0 self-end @2xl:self-center">
+					@streamGroup("direct", mainClean, playlistPath(t.Hash, "direct"), playAttrs(t.Hash, mainIndex, name, mainClean, mainHLS), false)
+					@streamGroup("hls", mainHLS, playlistPath(t.Hash, "hls"), playAttrs(t.Hash, mainIndex, name, mainClean, mainHLS), false)
+					if page != "" {
+						<a href={ templ.SafeURL(page) } class="btn btn-ghost btn-sm btn-circle text-primary" title={ pageLabel } aria-label={ pageLabel }>
+							@Icon(pageIcon, "size-4")
+						</a>
+					}
+					<button
+						type="button"
+						data-action="copy"
+						data-url={ t.MagnetLink() }
+						data-msg="Magnet link copied to clipboard"
+						class="btn btn-ghost btn-sm btn-circle text-accent"
+						title="Copy magnet link"
+						aria-label="Copy magnet link"
+					>
+						@Icon("magnet", "size-4")
+					</button>
+					if !t.GettingInfo() {
+						<button
+							type="button"
+							data-action="drop"
+							data-hash={ t.Hash }
+							class="btn btn-ghost btn-sm btn-circle text-warning"
+							title="Drop active torrent cache"
+							aria-label="Drop cache"
+						>
+							@Icon("rotate-ccw", "size-4")
+						</button>
+					}
+					<button
+						type="button"
+						data-action="remove"
+						data-hash={ t.Hash }
+						data-title={ name }
+						data-show="$canRemove"
+						class="btn btn-ghost btn-sm btn-circle text-error"
+						title="Remove from TorrServer"
+						aria-label="Remove torrent"
+					>
+						@Icon("trash-2", "size-4")
+					</button>
+				</div>
+			</div>
+			if len(t.FileStats) > 0 {
+				<details
+					id={ "torr-files-details-" + t.Hash }
+					data-preserve-attr="open"
+					class="collapse collapse-arrow bg-base-100/50 border border-base-content/10 mt-auto"
+				>
+					<summary class="collapse-title text-xs sm:text-sm font-semibold flex items-center gap-2 py-2.5 min-h-0">
+						@Icon("folder", "size-4 text-primary")
+						Torrent Files ({ fmt.Sprint(len(t.FileStats)) })
+						if videoCount > 0 {
+							<span class="badge badge-xs badge-soft badge-primary font-mono">{ fmt.Sprintf("%d video", videoCount) }</span>
+						}
+					</summary>
+					<div class="collapse-content text-sm">
+						<ul class="divide-y divide-base-content/10">
+							for _, f := range t.FileStats {
+								@torrentFileRow(links, t.Hash, f)
+							}
+						</ul>
+						<div class="mt-3 pt-3 border-t border-base-content/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+							<span class="text-base-content/60">Playlist of all files</span>
+							<div class="flex flex-wrap items-center gap-2">
+								@playlistButton("direct", playlistPath(t.Hash, "direct"))
+								@playlistButton("hls", playlistPath(t.Hash, "hls"))
+								<button
+									type="button"
+									data-action="files"
+									data-hash={ t.Hash }
+									class="btn btn-xs btn-ghost gap-1 text-primary font-mono"
+									title="Refetch files from TorrServer"
+								>
+									@Icon("refresh-cw", "size-3")
+									Refetch
+								</button>
+							</div>
+						</div>
+					</div>
+				</details>
+			} else {
+				<div class="flex items-center justify-between text-xs text-base-content/60 bg-base-100/50 p-2.5 rounded-field border border-base-content/10 mt-auto">
+					<span class="flex items-center gap-2 font-mono">
+						@Icon("folder", "size-3.5 opacity-50")
+						Files: not loaded
+					</span>
+					<button
+						type="button"
+						data-action="files"
+						data-hash={ t.Hash }
+						class="btn btn-xs btn-primary btn-outline font-mono gap-1"
+					>
+						@Icon("folder-search", "size-3.5")
+						Fetch Files
+					</button>
+				</div>
+			}
+		</div>
+	</article>
+}
+
+templ torrStat(title, value, tone string) {
+	<div class="stat py-1.5 px-3">
+		<div class="stat-title text-[10px] uppercase font-bold">{ title }</div>
+		<div class={ "stat-value text-xs sm:text-sm font-mono font-semibold", tone }>{ value }</div>
+	</div>
+}
+
+templ torrentFileRow(links StreamLinks, hash string, f torrserver.FileStat) {
+	{{
+		isVideo := torrserver.IsVideoFile(f.Path)
+		clean := links.Direct(hash, f)
+		hls := links.HLS(hash, f)
+	}}
+	<li class="py-2.5 flex flex-col @md:flex-row @md:items-center justify-between gap-2">
+		<div class="min-w-0 flex items-center gap-2.5 grow">
+			<span class="font-mono text-xs text-base-content/40 w-6 shrink-0 text-right">{ fmt.Sprint(f.ID) }.</span>
+			<div class="min-w-0 grow">
+				<div class="text-xs sm:text-sm font-medium truncate" title={ f.Path }>{ f.Path }</div>
+				<div class="flex items-center gap-2 text-[11px] font-mono text-base-content/60">
+					{ f.FormattedLength() }
+					if isVideo {
+						<span class="badge badge-xs badge-soft badge-primary">Video</span>
+					}
+				</div>
+			</div>
+		</div>
+		<div class="flex items-center gap-1.5 shrink-0 self-end @md:self-center">
+			if isVideo {
+				<button
+					type="button"
+					data-action="probe"
+					data-hash={ hash }
+					data-index={ fmt.Sprint(f.ID) }
+					data-show="$gst"
+					class="btn btn-xs btn-ghost btn-square text-info"
+					title="Inspect codecs & audio/subtitle tracks"
+					aria-label="Inspect tracks"
+				>
+					@Icon("info", "size-3.5")
+				</button>
+			}
+			{{ var play templ.Attributes }}
+			if isVideo {
+				{{ play = playAttrs(hash, f.ID, f.Path, clean, hls) }}
+			}
+			@streamGroup("direct", clean, "", play, true)
+			@streamGroup("hls", hls, "", play, true)
+		</div>
+	</li>
+}
+
+// modalDialog is a native <dialog> driven by a boolean signal: the effect opens
+// it with showModal() (focus trap, Esc, top layer) and the close event keeps
+// the signal in sync however the dialog was dismissed.
+templ modalDialog(id, openSignal, onOpen, onClose, boxClass string, attrs templ.Attributes) {
+	<dialog
+		id={ id }
+		class="modal"
+		aria-labelledby={ id + "-title" }
+		{ attrs... }
+		data-effect={ fmt.Sprintf("if ($%s) { if (!el.open) { el.showModal(); %s } } else if (el.open) { el.close() }", openSignal, onOpen) }
+		data-on:close={ fmt.Sprintf("$%s = false; %s", openSignal, onClose) }
+	>
+		<div class={ "modal-box bg-base-200 border border-base-content/10 shadow-2xl", boxClass }>
+			{ children... }
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button>close</button>
+		</form>
+	</dialog>
+}
+
+templ modalHeader(id, title, icon, iconTone string) {
+	<header class="flex items-center justify-between gap-4 pb-3 border-b border-base-content/10">
+		<h3 id={ id + "-title" } class="font-bold text-lg flex items-center gap-2 min-w-0">
+			@Icon(icon, "size-5 "+iconTone)
+			<span class="truncate">{ title }</span>
+		</h3>
+		<form method="dialog">
+			<button class="btn btn-sm btn-circle btn-ghost" aria-label="Close">
+				@Icon("x", "size-4")
+			</button>
+		</form>
+	</header>
+}
+
+templ torrToast() {
+	<div
+		popover="manual"
+		role="status"
+		aria-live="polite"
+		class="toast toast-end toast-bottom m-0 inset-auto bottom-0 right-0 bg-transparent border-0 overflow-visible [&:not(:popover-open)]:hidden"
+		data-effect="if ($toast) { el.matches(':popover-open') ? (el.hidePopover(), el.showPopover()) : el.showPopover() } else if (el.matches(':popover-open')) { el.hidePopover() }"
+		data-on-signal-patch__debounce.3s={ toastAutoHide }
+		data-on-signal-patch-filter="{ include: /^toast$/ }"
+	>
+		<div class="alert alert-success shadow-xl text-sm">
+			@Icon("circle-check", "size-4")
+			<span data-text="$toast"></span>
+		</div>
+	</div>
+}
+
+templ torrPlayerModal() {
+	@modalDialog("torr-player-modal", "playerOpen", "", "window.stopHlsVideo()", "max-w-5xl bg-base-300 p-4 sm:p-6", nil) {
+		<!-- Live stats every second; with GStreamer it also keeps the pipeline warm -->
+		<div class="hidden" data-effect={ torrPlayerStatsStream }></div>
+		<div class="hidden" data-effect={ torrPlayback }></div>
+		<header class="flex items-center justify-between gap-4 pb-3 border-b border-base-content/10">
+			<div class="flex items-center gap-2 min-w-0">
+				@playKindSwitch()
+				<h3 id="torr-player-modal-title" class="font-bold text-base sm:text-lg truncate" data-text="$streamTitle">Streaming</h3>
+			</div>
+			<form method="dialog">
+				<button class="btn btn-sm btn-circle btn-ghost" aria-label="Close player">
+					@Icon("x", "size-5")
+				</button>
+			</form>
+		</header>
+		<div
+			class="relative mt-4 bg-black rounded-box overflow-hidden shadow-2xl aspect-video outline-none"
+			tabindex="0"
+			data-ref:_player
+			data-on:pointermove="$_idle = false"
+			data-on:pointermove__debounce.3s="$_idle = true"
+			data-on:keydown__window={ torrPlayerKeys }
+			data-on:fullscreenchange="$_fs = document.fullscreenElement === el"
+			data-on-interval__duration.250ms="$_seekHint && Date.now() - $_seekAt > 700 && ($_seekHint = '')"
+			data-class:cursor-none={ "!(" + torrControlsShown + ")" }
+		>
+			<video
+				id="torr-video"
+				playsinline
+				class="size-full object-contain touch-manipulation"
+				data-ref:_video
+				data-on:click={ torrVideoClick }
+				data-on:pointermove={ torrVideoZone }
+				data-on:pointerdown={ torrVideoZone }
+				data-on:pointerleave="$_zone = ''"
+				data-on:dblclick={ torrVideoDoubleTap }
+				data-on:play="$_paused = false"
+				data-on:pause="$_paused = true"
+				data-on:waiting="$_waiting = true"
+				data-on:playing="$_waiting = false"
+				data-on:canplay="$_waiting = false"
+				data-on:timeupdate="$_seeking || ($_time = el.currentTime)"
+				data-on:durationchange="$_dur = Number.isFinite(el.duration) ? el.duration : 0"
+				data-on:volumechange="$_vol = el.muted ? 0 : el.volume; $_muted = el.muted || el.volume === 0"
+				data-on:emptied="$_time = 0; $_dur = 0; $_paused = true; $_waiting = false"
+				data-on:torr-subtitle="$subTrack = evt.detail"
+				data-class:controls-shown={ torrControlsShown }
+			></video>
+			<span class="loading loading-spinner loading-lg text-primary absolute inset-0 m-auto pointer-events-none" data-show="$_waiting"></span>
+			<!--
+				What each third of the video does: hovering (or touching) shows it,
+				a double tap there skips and the hint shows the skip, adding up taps.
+			-->
+			@seekZoneHint("back")
+			<div class="absolute inset-y-0 left-1/3 w-1/3 grid place-items-center pointer-events-none">
+				<span
+					class="size-16 rounded-full bg-base-content/50 text-base-100 grid place-items-center transition-opacity"
+					aria-hidden="true" data-show="$_paused || ($_zone === 'center' && !$_idle)"
+				>
+					<span class="contents" data-show="$_paused">
+						@Icon("play", "size-8 translate-x-0.5")
+					</span>
+					<span class="contents" data-show="!$_paused">
+						@Icon("pause", "size-8")
+					</span>
+				</span>
+			</div>
+			@seekZoneHint("fwd")
+			<!-- Custom control bar: native controls would hide these menus in fullscreen -->
+			<div
+				class="absolute inset-x-0 bottom-0 z-10 bg-linear-to-t from-primary/90 to-transparent px-3 pb-2 pt-10 text-primary-content transition-opacity"
+				data-class:opacity-0={ "!(" + torrControlsShown + ")" }
+				data-class:pointer-events-none={ "!(" + torrControlsShown + ")" }
+			>
+				<input
+					type="range"
+					class="range range-xs w-full"
+					aria-label="Seek"
+					min="0"
+					step="0.1"
+					data-attr:max="$_dur || 0"
+					data-bind:_time
+					data-on:pointerdown="$_seeking = true"
+					data-on:change="$_video.currentTime = +el.value; $_seeking = false"
+				/>
+				<div class="mt-1 flex items-center gap-1">
+					<button type="button" class="btn btn-ghost btn-sm btn-square text-primary-content" aria-label="Play or pause" data-on:click="$_video.paused ? $_video.play() : $_video.pause()">
+						<span data-show="$_paused">
+							@Icon("play", "size-5")
+						</span>
+						<span data-show="!$_paused">
+							@Icon("pause", "size-5")
+						</span>
+					</button>
+					<button type="button" class="btn btn-ghost btn-sm btn-square text-primary-content" aria-label="Mute" data-on:click="$_video.muted = !$_video.muted">
+						<span data-show="!$_muted">
+							@Icon("volume-2", "size-5")
+						</span>
+						<span data-show="$_muted">
+							@Icon("volume-x", "size-5")
+						</span>
+					</button>
+					<input
+						type="range"
+						class="range range-xs w-20 hidden sm:block"
+						aria-label="Volume"
+						min="0"
+						max="1"
+						step="0.05"
+						data-bind:_vol
+						data-on:input="$_video.volume = +el.value; $_video.muted = false"
+					/>
+					<span class="ml-2 font-mono text-xs tabular-nums" data-text={ torrTimeText }>0:00 / 0:00</span>
+					<div class="grow"></div>
+					<span class="contents" data-show="$playKind === 'hls' && $audioTrack >= 0">
+						@TorrAudioPicker(nil, 0)
+					</span>
+					@TorrSubtitleMenu(nil)
+					<button
+						type="button"
+						class="btn btn-ghost btn-sm btn-square text-primary-content"
+						aria-label="Picture in picture"
+						data-show="document.pictureInPictureEnabled"
+						data-on:click="document.pictureInPictureElement ? document.exitPictureInPicture() : $_video.requestPictureInPicture()"
+					>
+						@Icon("picture-in-picture-2", "size-5")
+					</button>
+					<button type="button" class="btn btn-ghost btn-sm btn-square text-primary-content" aria-label="Fullscreen" data-on:click={ torrFullscreenToggle }>
+						<span data-show="!$_fs">
+							@Icon("maximize", "size-5")
+						</span>
+						<span data-show="$_fs">
+							@Icon("minimize", "size-5")
+						</span>
+					</button>
+				</div>
+			</div>
+		</div>
+		<div id="torr-player-stats" class="mt-3 flex flex-wrap items-center gap-2"></div>
+		<div data-show="$playKind === 'hls' && $mediaInfoOpen">
+			<div id="torr-media-info"></div>
+		</div>
+		<div class="mt-4 flex flex-wrap items-center gap-2 pt-3 border-t border-base-content/10">
+			<div role="group" aria-label="Direct: the original file" class="w-full flex flex-wrap items-center gap-2" data-show="$streamCleanUrl">
+				<span class="badge badge-sm badge-primary badge-soft font-bold w-14 justify-center">Direct</span>
+				<button type="button" data-on:click="window.copyLink($streamCleanUrl, $linkOrigin).then(ok => { $toast = ok ? 'Direct link copied' : 'Copy failed' })" class="btn btn-xs btn-outline btn-primary gap-1.5">
+					@Icon("link", "size-3.5")
+					Copy link
+				</button>
+				<a data-attr:href="'/api/torrserver/playlist?hash=' + encodeURIComponent($activeHash) + '&kind=direct'" download class="btn btn-xs btn-outline btn-primary gap-1.5">
+					@Icon("download", "size-3.5")
+					.m3u8
+				</a>
+				<button type="button" data-on:click="window.openInPlayer('vlc', $streamCleanUrl, $linkOrigin)" class="btn btn-xs btn-outline btn-primary gap-1.5" title="Open the original file in VLC">
+					@Icon("external-link", "size-3.5")
+					VLC
+				</button>
+				<button type="button" data-on:click="window.openInPlayer('iina', $streamCleanUrl, $linkOrigin)" class="btn btn-xs btn-outline btn-primary gap-1.5" title="Open the original file in IINA (macOS)">
+					@Icon("external-link", "size-3.5")
+					IINA
+				</button>
+				<span class="text-xs text-base-content/60">The original file, full quality. For VLC, IINA, Infuse and TVs.</span>
+			</div>
+			<div role="group" aria-label="HLS: converted by GStreamer" class="w-full flex flex-wrap items-center gap-2" data-show="$gst">
+				<span class="badge badge-sm badge-secondary badge-soft font-bold w-14 justify-center">HLS</span>
+				<button type="button" data-on:click="window.copyLink($streamHlsUrl, $linkOrigin).then(ok => { $toast = ok ? 'HLS link copied' : 'Copy failed' })" class="btn btn-xs btn-outline btn-secondary gap-1.5">
+					@Icon("link", "size-3.5")
+					Copy link
+				</button>
+				<a data-attr:href="'/api/torrserver/playlist?hash=' + encodeURIComponent($activeHash) + '&kind=hls'" download class="btn btn-xs btn-outline btn-secondary gap-1.5">
+					@Icon("download", "size-3.5")
+					.m3u8
+				</a>
+				<span class="text-xs text-base-content/60">Converted by GStreamer as it plays. For Safari, iPhone, Apple TV and TV browsers.</span>
+			</div>
+			<div class="w-full flex flex-wrap items-center gap-2 pt-2 border-t border-base-content/10" data-show="$gst">
+			<button
+				type="button"
+				data-show="$gst"
+				data-on:click="$probeHash = $activeHash; $probeIndex = $activeFileIndex; $probeOpen = true"
+				class="btn btn-xs btn-ghost gap-1.5 text-info"
+				title="Inspect media codecs, audio streams, and subtitle tracks"
+			>
+				@Icon("info", "size-3.5")
+				Inspect Tracks
+			</button>
+			<button
+				type="button"
+				data-show="$gst"
+				data-on:click="$mediaInfoOpen = !$mediaInfoOpen"
+				data-class:btn-active="$mediaInfoOpen"
+				class="btn btn-xs btn-ghost gap-1.5"
+				title="Compare the source file with the HLS stream"
+			>
+				@Icon("film", "size-3.5")
+				Media Info
+			</button>
+			</div>
+		</div>
+	}
+}
+
+templ torrAddModal() {
+	@modalDialog("torr-add-modal", "addModalOpen", "", "", "max-w-xl", nil) {
+		@modalHeader("torr-add-modal", "Add Torrents", "plus", "text-primary")
+		@TorrAddForm()
+	}
+}
+
+// TorrAddForm adds torrents from links and .torrent files. Datastar sends it
+// as a multipart form, files included.
+templ TorrAddForm() {
+	<form
+		id="torr-add-form"
+		action="/api/torrserver/add"
+		method="POST"
+		enctype="multipart/form-data"
+		class="mt-4"
+		data-indicator:adding
+		data-on:submit="@post('/api/torrserver/add', {contentType: 'form'})"
+	>
+		<fieldset class="fieldset gap-4" data-attr:disabled="$adding">
+			<legend class="sr-only">New torrents</legend>
+			<label class="flex flex-col gap-1.5">
+				<span class="label justify-between font-semibold text-sm text-base-content">
+					Links
+					<span class="text-xs font-normal text-base-content/60">One per line</span>
+				</span>
+				<textarea
+					name="addLinks"
+					rows="4"
+					class="textarea w-full font-mono text-xs"
+					placeholder="magnet:?xt=urn:btih:…&#10;https://tracker.example/file.torrent"
+				></textarea>
+				<span class="text-xs text-base-content/60">Magnet links, http(s) links to .torrent files, torrs:// links or info-hashes</span>
+			</label>
+			<label class="flex flex-col gap-1.5">
+				<span class="label justify-between font-semibold text-sm text-base-content">
+					.torrent files
+					<span class="text-xs font-normal text-base-content/60">Up to 20</span>
+				</span>
+				<input id="torr-add-files" type="file" name="addFiles" multiple accept=".torrent,application/x-bittorrent" class="file-input w-full"/>
+			</label>
+			<label class="flex flex-col gap-1.5">
+				<span class="label justify-between font-semibold text-sm text-base-content">
+					Custom title
+					<span class="text-xs font-normal text-base-content/60">Optional, single torrent only</span>
+				</span>
+				<input
+					type="text"
+					name="addTitle"
+					class="input w-full text-sm"
+					placeholder="e.g. Inception (2010)"
+				/>
+			</label>
+			<div class="modal-action mt-2 pt-3 border-t border-base-content/10">
+				<button type="button" data-on:click="$addModalOpen = false" class="btn btn-sm btn-ghost">Cancel</button>
+				<button type="submit" class="btn btn-sm btn-primary">
+					<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$adding"></span>
+					Add to TorrServer
+				</button>
+			</div>
+		</fieldset>
+	</form>
+}
+
+templ torrProbeModal() {
+	@modalDialog("torr-probe-modal", "probeOpen", "@get('/api/torrserver/probe?hash=' + encodeURIComponent($probeHash) + '&index=' + $probeIndex)", "", "max-w-2xl", templ.Attributes{"data-indicator:probe-loading": true}) {
+		@modalHeader("torr-probe-modal", "GStreamer Media Analysis", "info", "text-info")
+		<div class="mt-4 flex justify-center p-8 hidden" data-class:hidden="!$probeLoading">
+			<span class="loading loading-spinner text-info" aria-label="Loading"></span>
+		</div>
+		<div data-class:hidden="$probeLoading">
+			<div id="torr-probe-content"></div>
+		</div>
+	}
+}
+
+templ torrConfirmModal() {
+	@modalDialog("torr-confirm-modal", "confirmOpen", "", "", "max-w-md", nil) {
+		@modalHeader("torr-confirm-modal", "Remove torrent?", "trash-2", "text-error")
+		<p class="mt-4 text-sm">
+			<span class="font-semibold break-all" data-text="$confirmName"></span>
+			will be removed from the TorrServer database. This cannot be undone.
+		</p>
+		<div class="modal-action">
+			<form method="dialog">
+				<button class="btn btn-sm btn-ghost">Cancel</button>
+			</form>
+			<button
+				type="button"
+				data-on:click="@post('/api/torrserver/action?op=rem&hash=' + encodeURIComponent($confirmHash), {filterSignals: {include: /^$/}}); $confirmOpen = false"
+				class="btn btn-sm btn-error"
+			>
+				@Icon("trash-2", "size-4")
+				Remove
+			</button>
+		</div>
+	}
+}
+
+templ TorrServerProbeFragment(res *torrserver.ProbeResult) {
+	<div id="torr-probe-content" class="mt-4 space-y-4">
+		<dl class="bg-base-100 p-4 rounded-box border border-base-content/10 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
+			<div><dt class="inline text-base-content/60">Container: </dt><dd class="inline font-bold text-primary">{ res.Container }</dd></div>
+			<div><dt class="inline text-base-content/60">Duration: </dt><dd class="inline font-bold text-accent">{ res.DurationFormatted() }</dd></div>
+			<div><dt class="inline text-base-content/60">Size: </dt><dd class="inline font-bold">{ torrserver.FormatBytes(res.FileSize) }</dd></div>
+		</dl>
+		<div class="space-y-2">
+			<h4 class="text-xs font-bold uppercase tracking-wider text-base-content/60">Discovered Media Tracks</h4>
+			<ul class="space-y-2">
+				for _, trk := range res.Tracks {
+					<li class="p-3 rounded-box bg-base-100 border border-base-content/10 flex items-start justify-between gap-3 text-xs">
+						<div class="flex items-start gap-2.5 min-w-0">
+							switch trk.Type {
+								case "video":
+									<span class="badge badge-sm badge-primary font-mono uppercase">Video</span>
+								case "audio":
+									<span class="badge badge-sm badge-secondary font-mono uppercase">Audio</span>
+								default:
+									<span class="badge badge-sm badge-neutral font-mono uppercase">Subtitle</span>
+							}
+							<div class="min-w-0 space-y-1">
+								<div class="font-semibold break-words">
+									if trk.Title != "" {
+										{ trk.Title }
+									} else {
+										{ trk.CapsName }
+									}
+								</div>
+								<div class="text-[11px] text-base-content/60 font-mono">{ trackDetails(trk) }</div>
+								if caps := trackCaps(trk.Codec); caps != "" {
+									<p class="text-[11px] text-base-content/50 font-mono break-all whitespace-normal">{ caps }</p>
+								}
+							</div>
+						</div>
+						<span class="badge badge-xs badge-ghost font-mono">#{ fmt.Sprint(trk.Index) }</span>
+					</li>
+				}
+			</ul>
+		</div>
+	</div>
+}
+
+templ TorrServerProbeError(msg string) {
+	<div id="torr-probe-content" class="mt-4">
+		<div role="alert" class="alert alert-warning alert-soft text-sm">
+			@Icon("circle-alert", "size-4")
+			<span>{ msg }</span>
+		</div>
+	</div>
+}
+
+// TorrMediaInfo compares the source file with what the HLS stream delivers.
+templ TorrMediaInfo(probe *torrserver.ProbeResult, audioIndex int, output *torrserver.HLSOutput) {
+	<div id="torr-media-info" class="mt-3 overflow-x-auto rounded-box border border-base-content/10 bg-base-200">
+		if probe == nil {
+			<p class="p-3 text-xs text-base-content/60">Media info unavailable — the file may still be buffering.</p>
+		} else {
+			<table class="table table-xs font-mono">
+				<thead>
+					<tr>
+						<th></th>
+						<th>Source</th>
+						<th>HLS output</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, row := range newMediaInfo(probe, audioIndex, output).Rows {
+						<tr>
+							<th class="font-sans text-base-content/60">{ row.Label }</th>
+							<td>{ row.Source }</td>
+							<td class={ row.OutputTone }>{ row.Output }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		}
+	</div>
+}
+
+// TorrPlayerStats is the compact live stats row under the video.
+templ TorrPlayerStats(t *torrserver.Torrent, cacheSize int64) {
+	<div id="torr-player-stats" class="mt-3 flex flex-wrap items-center gap-2">
+		if t == nil {
+			<span class="badge badge-sm badge-ghost font-mono">Stats unavailable</span>
+		} else {
+			<span class="badge badge-sm badge-ghost font-mono gap-1" title="Active / total peers">
+				@Icon("users", "size-3.5")
+				{ fmt.Sprintf("Peers %d/%d", t.ActivePeers, max(t.ActivePeers, t.TotalPeers)) }
+			</span>
+			<span class="badge badge-sm badge-ghost font-mono gap-1" title="Connected seeders">
+				@Icon("sprout", "size-3.5")
+				{ fmt.Sprintf("Seeds %d", t.Connected) }
+			</span>
+			<span class="badge badge-sm badge-ghost font-mono gap-1" title="Download speed">
+				@Icon("arrow-down", "size-3.5")
+				{ t.FormattedDownloadSpeed() }
+			</span>
+			<span class={ "badge badge-sm font-mono gap-1", bufferBadgeTone(t.BufferPercent(cacheSize)) } title="TorrServer read-ahead cache fill">
+				@Icon("database", "size-3.5")
+				{ fmt.Sprintf("Buffer %d%%", t.BufferPercent(cacheSize)) }
+			</span>
+		}
+	</div>
+}
+
+// bufferBadgeTone warns when the read-ahead cache is running low.
+func bufferBadgeTone(pct int) string {
+	switch {
+	case pct >= 50:
+		return "badge-success badge-soft"
+	case pct >= 15:
+		return "badge-warning badge-soft"
+	default:
+		return "badge-error badge-soft"
+	}
+}
+
+// torrSubtitlePick drives hls.js; the video's torr-subtitle event reports the
+// active track back into $subTrack, whichever control (this menu or the
+// keyboard/native text tracks) changed it.
+const torrSubtitlePick = `const b = evt.target.closest('[data-track]')
+if (b) { $_subMenu = false; window.setSubtitleTrack(+b.dataset.track) }`
+
+// TorrSubtitleMenu is the subtitles menu in the player's control bar.
+templ TorrSubtitleMenu(tracks []torrserver.ProbeTrack) {
+	<div id="torr-subtitle-menu" class="contents">
+		if len(tracks) > 0 {
+			@trackMenu("Subtitles", "captions", "$_subMenu", "$_subMenu = !$_subMenu; $_audioMenu = false", "$subTrack >= 0", torrSubtitlePick) {
+				<li>
+					<button type="button" data-track="-1" data-class:menu-active="$subTrack < 0">Off</button>
+				</li>
+				for _, trk := range tracks {
+					<li>
+						<button type="button" data-track={ fmt.Sprint(trk.Index) } data-class:menu-active={ fmt.Sprintf("$subTrack === %d", trk.Index) }>{ trackLabel(trk) }</button>
+					</li>
+				}
+			}
+		}
+	</div>
+}
+
+// trackMenu is an upward-opening dropdown in the control bar. openSignal
+// drives it so picking an item (or clicking outside) closes it; highlight
+// tints the icon (e.g. while subtitles are on).
+templ trackMenu(title, icon, openSignal, toggle, highlight, pick string) {
+	<details class="dropdown dropdown-top dropdown-end" data-attr:open={ openSignal } data-on:click__outside={ openSignal + " = false" }>
+		<summary
+			class="btn btn-ghost btn-sm btn-square text-primary-content"
+			aria-label={ title }
+			title={ title }
+			data-class:text-primary={ highlight }
+			data-on:click__prevent={ toggle }
+		>
+			@Icon(icon, "size-5")
+		</summary>
+		<ul class="dropdown-content menu menu-sm bg-base-200 text-base-content rounded-box w-56 p-2 mb-2 shadow-lg font-mono" data-on:click={ pick }>
+			<li class="menu-title">{ title }</li>
+			{ children... }
+		</ul>
+	</details>
+}
+
+// torrAudioPick switches the audio track (restarting the HLS stream on it)
+// and remembers its language for the next file.
+const torrAudioPick = `const b = evt.target.closest('[data-track]')
+if (b) {
+	$audioTrack = +b.dataset.track; $audioLang = b.dataset.lang; $_audioMenu = false
+	localStorage.setItem('torrAudioLang', $audioLang)
+}`
+
+// TorrAudioPicker is the audio menu in the player's control bar. It is only
+// shown when the file has more than one audio track.
+templ TorrAudioPicker(tracks []torrserver.ProbeTrack, selected int) {
+	<div id="torr-audio-picker" class="contents">
+		if len(tracks) > 1 {
+			@trackMenu("Audio", "audio-lines", "$_audioMenu", "$_audioMenu = !$_audioMenu; $_subMenu = false", "false", torrAudioPick) {
+				for _, trk := range tracks {
+					<li>
+						<button type="button" data-track={ fmt.Sprint(trk.Index) } data-lang={ trk.Language } data-class:menu-active={ fmt.Sprintf("$audioTrack === %d", trk.Index) }>{ trackLabel(trk) }</button>
+					</li>
+				}
+			}
+		}
+	</div>
+}
+
+// trackLabel renders "EN · Original · 5.1" for the audio and subtitle pickers.
+func trackLabel(trk torrserver.ProbeTrack) string {
+	var parts []string
+	if trk.Language != "" {
+		parts = append(parts, strings.ToUpper(trk.Language))
+	}
+	if trk.Title != "" {
+		parts = append(parts, trk.Title)
+	}
+	switch trk.Channels {
+	case 0:
+	case 1:
+		parts = append(parts, "Mono")
+	case 2:
+		parts = append(parts, "Stereo")
+	case 6:
+		parts = append(parts, "5.1")
+	case 8:
+		parts = append(parts, "7.1")
+	default:
+		parts = append(parts, fmt.Sprintf("%d ch", trk.Channels))
+	}
+	if len(parts) == 0 {
+		return fmt.Sprintf("Track %d", trk.Index+1)
+	}
+	return strings.Join(parts, " · ")
+}
+
+func trackDetails(trk torrserver.ProbeTrack) string {
+	parts := []string{trk.CapsName}
+	if trk.Language != "" {
+		parts = append(parts, trk.Language)
+	}
+	if trk.Width > 0 && trk.Height > 0 {
+		parts = append(parts, fmt.Sprintf("%dx%d", trk.Width, trk.Height))
+	}
+	if trk.Channels > 0 {
+		parts = append(parts, fmt.Sprintf("%d ch", trk.Channels))
+	}
+	return strings.Join(parts, " • ")
+}
+
+// TorrServerAlertFragment replaces the alert region. A fresh element id per
+// render makes Datastar re-initialise the alert (and its $torrAlert signal).
+templ TorrServerAlertFragment(msg, alertType string) {
+	<div id="torr-alert-container">
+		<div
+			id={ fmt.Sprintf("torr-alert-%d", time.Now().UnixNano()) }
+			role="alert"
+			class={ "alert alert-soft", alertClass(alertType) }
+			data-signals="{ torrAlert: true }"
+			data-show="$torrAlert"
+		>
+			if alertType == "success" {
+				@Icon("circle-check", "size-5")
+			} else {
+				@Icon("circle-alert", "size-5")
+			}
+			<span class="text-sm font-medium grow">{ msg }</span>
+			<button
+				type="button"
+				data-on:click="$torrAlert = false"
+				class="btn btn-xs btn-ghost btn-circle"
+				aria-label="Dismiss"
+			>
+				@Icon("x", "size-4")
+			</button>
+		</div>
+	</div>
+}
+
+// alertClass maps an alert type to a literal DaisyUI class (kept literal so
+// Tailwind's source scanner includes it in the build).
+func alertClass(alertType string) string {
+	switch alertType {
+	case "success":
+		return "alert-success"
+	case "error":
+		return "alert-error"
+	case "warning":
+		return "alert-warning"
+	default:
+		return "alert-info"
+	}
+}
+
+// What Direct and HLS are, in the tooltips and the explainer above the list.
+const (
+	directHelp = "The original file, full quality: for VLC, IINA, Infuse and TVs"
+	hlsHelp    = "Converted by GStreamer as it plays: for Safari, iPhone, Apple TV and TV browsers"
+)
+
+// streamKindsLegend explains, once above the list, the two ways to watch
+// that every card, file and the player offer; tooltips repeat it on hover.
+templ streamKindsLegend() {
+	<div id="stream-kinds" class="grid gap-3 sm:grid-cols-2">
+		@streamKind("Direct", "The original file", "The original file, full quality. For VLC, IINA, Infuse and TVs.", "file-play", false)
+		<div class="contents" data-show="$gst">
+			@streamKind("HLS", "Converted as it plays", "Converted by GStreamer as it plays. For Safari, iPhone, Apple TV and TV browsers.", "monitor-play", true)
+		</div>
+	</div>
+}
+
+templ streamKind(label, title, text, icon string, hls bool) {
+	<div class={ "flex items-start gap-3 rounded-box border p-3", templ.KV("border-primary/30 bg-primary/5", !hls), templ.KV("border-secondary/30 bg-secondary/5", hls) }>
+		<span class={ "size-9 shrink-0 rounded-field grid place-items-center", templ.KV("bg-primary text-primary-content", !hls), templ.KV("bg-secondary text-secondary-content", hls) }>
+			@Icon(icon, "size-5")
+		</span>
+		<div class="min-w-0">
+			<p class="text-sm font-bold">
+				<span class={ "uppercase tracking-wide", templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }>{ label }</span>
+				<span class="font-medium text-base-content/70">· { title }</span>
+			</p>
+			<p class="text-xs text-base-content/70">{ text }</p>
+		</div>
+	</div>
+}
+
+// streamGroup is one way to watch a file outside the browser, labelled and
+// coloured the same everywhere: Direct (primary) or HLS (secondary, only
+// with GStreamer). play, when set, adds a Play of that kind in the browser;
+// playlist, when set, adds the torrent's .m3u8 of that kind.
+templ streamGroup(kind, link, playlist string, play templ.Attributes, compact bool) {
+	{{
+		hls := kind == "hls"
+		label, aria, help, msg := "Direct", "Direct: the original file", directHelp, "Direct link copied"
+		playHelp := "Play the original file here. Browsers can't play every format: if it stays black or silent, use HLS or VLC"
+		if hls {
+			label, aria, help, msg = "HLS", "HLS: converted by GStreamer", hlsHelp, "HLS link copied"
+			playHelp = "Play here, converted by GStreamer: works in every browser, picks audio tracks"
+		}
+	}}
+	<div
+		role="group"
+		aria-label={ aria }
+		if hls {
+			data-show="$gst"
+		}
+		data-tip={ help }
+		class={ "tooltip flex items-center rounded-field border",
+			templ.KV("tooltip-bottom", !compact), templ.KV("tooltip-left", compact),
+			templ.KV("tooltip-primary border-primary/30 bg-primary/5", !hls), templ.KV("tooltip-secondary border-secondary/30 bg-secondary/5", hls) }
+	>
+		<span class={ "pl-2 pr-1 font-bold uppercase tracking-wide cursor-help", templ.KV("text-[9px]", compact), templ.KV("text-[10px]", !compact),
+			templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }>{ label }</span>
+		if play != nil {
+			<button
+				type="button"
+				data-action="play"
+				data-kind={ kind }
+				{ play... }
+				class={ "btn gap-1 shadow-none", templ.KV("btn-xs btn-square", compact), templ.KV("btn-sm", !compact),
+					templ.KV("btn-primary", !hls), templ.KV("btn-secondary", hls) }
+				aria-label={ "Play " + label }
+				title={ playHelp }
+			>
+				@Icon("play", "size-3.5")
+				if !compact {
+					Play
+				}
+			</button>
+		}
+		<button
+			type="button"
+			data-action="copy"
+			data-url={ link }
+			data-msg={ msg }
+			class={ "btn btn-ghost gap-1", templ.KV("btn-xs btn-square", compact), templ.KV("btn-sm", !compact),
+				templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }
+			aria-label={ "Copy " + label + " link" }
+		>
+			@Icon("link", "size-3.5")
+			if !compact {
+				<span class="hidden sm:inline">Link</span>
+			}
+		</button>
+		if playlist != "" {
+			<a
+				href={ templ.SafeURL(playlist) }
+				download
+				class={ "btn btn-ghost btn-sm gap-1", templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }
+				aria-label={ "Download " + label + " playlist" }
+			>
+				@Icon("download", "size-3.5")
+				<span class="hidden sm:inline">.m3u8</span>
+			</a>
+		}
+	</div>
+}
+
+// playlistButton downloads the playlist of all files, Direct or HLS.
+templ playlistButton(kind, href string) {
+	if kind == "hls" {
+		<a href={ templ.SafeURL(href) } download data-show="$gst" aria-label="HLS: converted by GStreamer" class="btn btn-xs btn-outline btn-secondary gap-1.5">
+			@Icon("download", "size-3")
+			HLS .m3u8
+		</a>
+	} else {
+		<a href={ templ.SafeURL(href) } download aria-label="Direct: the original file" class="btn btn-xs btn-outline btn-primary gap-1.5">
+			@Icon("download", "size-3")
+			Direct .m3u8
+		</a>
+	}
+}
+
+// seekZoneHint is a side third's hint: faint while hovered ("double tap to
+// skip 10 s"), solid while a skip is shown with the taps added up.
+templ seekZoneHint(dir string) {
+	{{
+		back := dir == "back"
+		shown := fmt.Sprintf("$_seekHint === '%s' || ($_zone === '%s' && !$_idle && !$_seekHint)", dir, dir)
+		text := fmt.Sprintf("($_seekHint === '%s' ? $_seekSum : 10) + ' s'", dir)
+	}}
+	<div class={ "absolute inset-y-0 w-1/3 grid place-items-center pointer-events-none", templ.KV("left-0", back), templ.KV("right-0", !back) } aria-hidden="true" data-show={ shown }>
+		<span
+			class="badge badge-lg bg-base-content/60 text-base-100 border-0 gap-1 font-mono tabular-nums transition-opacity"
+			data-class:opacity-60={ fmt.Sprintf("$_seekHint !== '%s'", dir) }
+		>
+			if back {
+				@Icon("chevrons-left", "size-4")
+			}
+			<span data-text={ text }>10 s</span>
+			if !back {
+				@Icon("chevrons-right", "size-4")
+			}
+		</span>
+	</div>
+}
+
+// playKindSwitch shows what the player plays and switches it, keeping the
+// position: Direct always, HLS with GStreamer.
+templ playKindSwitch() {
+	<div role="group" aria-label="Stream" class="join shrink-0">
+		<button
+			type="button"
+			class="tooltip tooltip-right tooltip-primary btn btn-xs join-item font-bold"
+			data-class="{ 'btn-primary': $playKind === 'direct' }"
+			aria-label="Play Direct"
+			data-tip={ directHelp }
+			data-on:click={ "if ($playKind !== 'direct') { $playKind = 'direct'\n" + torrStartPlay + "\n}" }
+		>Direct</button>
+		<button
+			type="button"
+			class="tooltip tooltip-right tooltip-secondary btn btn-xs join-item font-bold"
+			data-class="{ 'btn-secondary': $playKind === 'hls' }"
+			data-show="$gst"
+			aria-label="Play HLS"
+			data-tip={ hlsHelp }
+			data-on:click={ "if ($playKind !== 'hls') { $playKind = 'hls'\n" + torrStartPlay + "\n}" }
+		>HLS</button>
+	</div>
+}

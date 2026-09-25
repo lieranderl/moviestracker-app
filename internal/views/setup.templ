@@ -1,0 +1,63 @@
+package views
+
+// Setup is the first-run page: the disclaimer and the administrator account.
+// Setup is the first-run page. askCode is for a browser on another device,
+// which needs the setup code the server printed when it started.
+templ Setup(askCode bool) {
+	@authPage("Set up Moviestracker") {
+		<div
+			id="setup-step"
+			class="card-body p-6 sm:p-10 gap-6"
+			data-signals="{ setupCode: '', accepted: false, username: '', name: '', password: '', submitting: false, setupError: '' }"
+		>
+			@stepHeader("Welcome", "Set up Moviestracker", "Moviestracker runs on this machine. Read how it works, then create the administrator account.")
+			@disclaimerList()
+			<div role="alert" aria-live="assertive" class="alert alert-error alert-soft text-sm py-2.5 hidden" data-class:hidden="!$setupError">
+				@Icon("circle-alert", "size-4")
+				<span data-text="$setupError"></span>
+			</div>
+			<form data-indicator:submitting data-on:submit="$setupError = ''; @post('/api/setup')">
+				<fieldset class="fieldset gap-3" data-attr:disabled="$submitting">
+					if askCode {
+						<legend class="fieldset-legend">Setup code</legend>
+						<label class="input w-full">
+							@Icon("key-round", "size-4 opacity-60")
+							<span class="sr-only">Setup code</span>
+							<input type="text" required autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="32" placeholder="XXXX-XXXX" class="grow font-mono" data-bind:setup-code/>
+						</label>
+						<p class="text-xs text-base-content/60">
+							You are setting up from another device, so Moviestracker asks for the code it printed when it started. Find it in its log:
+							<code class="font-mono">sudo journalctl -u moviestracker</code>, <code class="font-mono">docker logs &lt;container&gt;</code>
+							or the terminal it runs in. On the machine itself, open <code class="font-mono">http://localhost:8095</code> instead: no code needed.
+						</p>
+					}
+					<legend class="fieldset-legend">Administrator account</legend>
+					<label class="input w-full">
+						@Icon("user", "size-4 opacity-60")
+						<span class="sr-only">Username</span>
+						<input type="text" required autocomplete="username" autocapitalize="none" maxlength="64" placeholder="Username" class="grow" data-bind:username/>
+					</label>
+					<label class="input w-full">
+						@Icon("id-card", "size-4 opacity-60")
+						<span class="sr-only">Display name</span>
+						<input type="text" autocomplete="name" maxlength="80" placeholder="Display name (optional)" class="grow" data-bind:name/>
+					</label>
+					<label class="input w-full">
+						@Icon("lock", "size-4 opacity-60")
+						<span class="sr-only">Password</span>
+						<input type="password" required minlength="10" autocomplete="new-password" placeholder="Password (at least 10 characters)" class="grow" data-bind:password/>
+					</label>
+					<label class="flex items-start gap-3 cursor-pointer rounded-box bg-base-200/60 border border-base-content/5 p-4 mt-2">
+						<input type="checkbox" required class="checkbox checkbox-primary mt-0.5" data-bind:accepted/>
+						<span class="text-sm">I have read and accept these terms, and I will only access content I am legally authorized to use.</span>
+					</label>
+					<button type="submit" class="btn btn-primary btn-block" data-attr:disabled="!$accepted">
+						<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$submitting"></span>
+						Create account and continue
+						@Icon("arrow-right", "size-4")
+					</button>
+				</fieldset>
+			</form>
+		</div>
+	}
+}

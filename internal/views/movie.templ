@@ -1,0 +1,57 @@
+package views
+
+import (
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+)
+
+func movieFacts(m *tmdb.MovieDetails) []string {
+	facts := []string{"Movie"}
+	if y := m.ReleaseYear(); y != "" {
+		facts = append(facts, y)
+	}
+	if r := m.FormattedRuntime(); r != "" {
+		facts = append(facts, r)
+	}
+	return facts
+}
+
+func movieAbout(m *tmdb.MovieDetails) []factItem {
+	return []factItem{
+		{Label: "Directed by", People: m.Directors},
+		{Label: "Written by", People: m.Writers},
+		{Label: "Genres", Value: genreNames(m.Genres)},
+		{Label: "Released", Value: m.ReleaseDate},
+		{Label: "Runtime", Value: m.FormattedRuntime()},
+		{Label: "Status", Value: m.Status},
+		{Label: "Original title", Value: originalTitle(m.OriginalTitle, m.Title)},
+	}
+}
+
+func originalTitle(original, title string) string {
+	if original == title {
+		return ""
+	}
+	return original
+}
+
+templ MoviePage(user *auth.User, m *tmdb.MovieDetails) {
+	@Layout(PageTitle(m.MediaItem)) {
+		@Navbar(user)
+		<main class="grow pb-16" data-signals={ mediaPageSignals } data-on:click={ videoClick }>
+			@detailHero(m.MediaItem, movieFacts(m), m.Certification, genreNames(m.Genres)) {
+				@trailerButton(m.TrailerKey, m.Title+" trailer")
+				@heroLink("#sources", "magnet", "Find sources")
+			}
+			@aboutSection(m.MediaItem, m.Tagline, movieAbout(m), officialLinks("title", m.Links, m.Homepage))
+			@sourcesSection("movie", m.ID, nil, 0)
+			@castRail("Cast", m.Cast)
+			@videoRail(m.Videos)
+			@mediaRail("recommendations", "Recommended", m.Recommendations)
+			@mediaRail("similar", "More like this", m.Similar)
+			@trailerModal()
+			@appToast()
+		</main>
+		@siteFooter()
+	}
+}

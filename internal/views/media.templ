@@ -1,0 +1,687 @@
+package views
+
+import (
+	"slices"
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/jacred"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+	"github.com/lieranderl/moviestracker-app/internal/torrserver"
+	"fmt"
+	"strings"
+)
+
+// mediaPageSignals is the client state shared by the movie and TV pages.
+const mediaPageSignals = `{ videoOpen: false, videoKey: '', videoTitle: '', torrMagnet: '', sending: false, q: 'all', trackers: [], toast: '', toastError: false }`
+
+// videoClick opens the trailer dialog for any element carrying data-video.
+// Keys and names travel in data-* attributes, never inside the expression.
+const videoClick = `const b = evt.target.closest('[data-video]')
+if (b) { $videoKey = b.dataset.video; $videoTitle = b.dataset.title || 'Trailer'; $videoOpen = true }`
+
+// mediaHref links a movie or series card to its detail page.
+func mediaHref(item tmdb.MediaItem) templ.SafeURL {
+	if item.MediaType == "tv" {
+		return templ.SafeURL(fmt.Sprintf("/tv/%d", item.ID))
+	}
+	return templ.SafeURL(fmt.Sprintf("/movie/%d", item.ID))
+}
+
+func personHref(id int) templ.SafeURL { return templ.SafeURL(fmt.Sprintf("/person/%d", id)) }
+
+// PageTitle renders "Title (2010)" for the document title and TorrServer entries.
+func PageTitle(item tmdb.MediaItem) string {
+	if y := item.ReleaseYear(); y != "" {
+		return item.Title + " (" + y + ")"
+	}
+	return item.Title
+}
+
+func genreNames(genres []tmdb.Genre) string {
+	names := make([]string, 0, len(genres))
+	for _, g := range genres {
+		names = append(names, g.Name)
+	}
+	return strings.Join(names, ", ")
+}
+
+// MediaError is the page shown when a title cannot be loaded.
+templ MediaError(user *auth.User, heading, message string) {
+	@Layout(heading) {
+		@Navbar(user)
+		<main class="grow grid place-items-center px-4 py-24">
+			<div class="text-center space-y-4 max-w-md">
+				@Icon("film", "size-12 mx-auto text-base-content/30")
+				<h1 class="text-2xl font-bold">{ heading }</h1>
+				<p class="text-base-content/70">{ message }</p>
+				<a href="/movies" class="btn btn-primary">Back to trending</a>
+			</div>
+		</main>
+		@siteFooter()
+	}
+}
+
+// detailHero is the full-bleed cinematic header of a title page. Action
+// buttons are passed as children.
+templ detailHero(item tmdb.MediaItem, facts []string, rating string, genres string) {
+	<!-- Fills the viewport below the sticky navbar (4rem); details follow on scroll -->
+	<section class="relative isolate flex items-end min-h-[calc(100svh-4rem)] overflow-hidden bg-black">
+		if item.BackdropURL() != "" {
+			<img src={ item.BackdropURL() } alt="" class="absolute inset-0 -z-10 size-full object-cover object-top" fetchpriority="high" decoding="async"/>
+		} else if item.PosterURL() != "" {
+			<img src={ item.PosterURL() } alt="" class="absolute inset-0 -z-10 size-full object-cover blur-3xl scale-110 opacity-60" decoding="async"/>
+		}
+		<div class="absolute inset-0 -z-10 bg-linear-to-t from-black via-black/55 via-40% to-black/0"></div>
+		<div class="absolute inset-0 -z-10 bg-linear-to-r from-black/80 via-black/25 via-55% to-transparent"></div>
+		<div class="w-full max-w-7xl mx-auto px-4 sm:px-8 pt-40 pb-20 lg:pb-24 text-white">
+			<div class="max-w-2xl space-y-5">
+				<h1 class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-balance drop-shadow-lg">
+					if item.LogoURL() != "" {
+						<img src={ item.LogoURL() } alt={ item.Title } class="max-h-24 sm:max-h-32 lg:max-h-40 max-w-[18rem] sm:max-w-md w-auto object-contain object-left drop-shadow-xl"/>
+					} else {
+						{ item.Title }
+					}
+				</h1>
+				<div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-medium text-white/85">
+					for i, f := range facts {
+						if i > 0 {
+							<span aria-hidden="true" class="text-white/40">·</span>
+						}
+						<span>{ f }</span>
+					}
+					if rating != "" {
+						<span class="badge badge-sm badge-outline border-white/50 text-white font-semibold">{ rating }</span>
+					}
+					if genres != "" {
+						<span aria-hidden="true" class="text-white/40">·</span>
+						<span>{ genres }</span>
+					}
+				</div>
+				<div class="flex flex-wrap items-center gap-2">
+					@tmdbRatingBadge(item)
+					if item.ImdbID != "" {
+						@HeroIMDbRatingBadge("detail-imdb-rating", item.ImdbID)
+					}
+				</div>
+				if item.Overview != "" {
+					<p class="text-sm sm:text-base text-white/85 leading-relaxed max-w-xl">{ item.Overview }</p>
+				}
+				<div class="flex flex-wrap gap-3 pt-1">
+					{ children... }
+				</div>
+			</div>
+		</div>
+		<a href="#about" class="absolute bottom-5 left-1/2 -translate-x-1/2 btn btn-ghost btn-circle text-white/70 hover:text-white hover:bg-white/10 animate-bounce" aria-label="Scroll to details">
+			@Icon("chevron-down", "size-6")
+		</a>
+	</section>
+}
+
+// trailerButton is picked up by the page-level videoClick delegate.
+templ trailerButton(key, title string) {
+	if key != "" {
+		<button type="button" class="btn sm:btn-lg bg-white text-black border-white hover:bg-white/85 gap-2" data-video={ key } data-title={ title }>
+			@Icon("play", "size-5 fill-current")
+			Play trailer
+		</button>
+	}
+}
+
+templ heroLink(href templ.SafeURL, icon, label string) {
+	<a href={ href } class="btn sm:btn-lg btn-ghost text-white border-white/30 hover:bg-white/10 gap-2">
+		@Icon(icon, "size-5")
+		{ label }
+	</a>
+}
+
+templ sectionHeading(title, subtitle string) {
+	<header class="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+		<div>
+			<h2 class="text-xl sm:text-2xl font-bold tracking-tight">{ title }</h2>
+			if subtitle != "" {
+				<p class="text-sm text-base-content/60">{ subtitle }</p>
+			}
+		</div>
+		{ children... }
+	</header>
+}
+
+// rail is a horizontally scrolling carousel section; items are the children.
+templ rail(id, title, subtitle string) {
+	<section id={ id } class="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-4" aria-label={ title }>
+		@sectionHeading(title, subtitle)
+		<ul class="carousel carousel-start w-[calc(100%+2rem)] gap-4 scroll-smooth scroll-px-4 -mx-4 px-4 -mt-3 pt-3 -mb-5 pb-8">
+			{ children... }
+		</ul>
+	</section>
+}
+
+templ mediaRail(id, title string, items []tmdb.MediaItem) {
+	if len(items) > 0 {
+		@rail(id, title, "") {
+			for _, item := range items {
+				<li class="carousel-item">
+					@MediaCard(item)
+				</li>
+			}
+		}
+	}
+}
+
+templ castRail(title string, cast []tmdb.CastMember) {
+	if len(cast) > 0 {
+		@rail("cast", title, "") {
+			for _, c := range cast {
+				<li class="carousel-item">
+					@personTile(c.ID, c.Name, c.Character, c.ProfileURL())
+				</li>
+			}
+		}
+	}
+}
+
+templ personTile(id int, name, role, imageURL string) {
+	<a href={ personHref(id) } class="group flex flex-col items-center gap-2 w-28 sm:w-32 text-center">
+		if imageURL != "" {
+			<div class="avatar">
+				<div class="w-24 sm:w-28 rounded-full bg-base-300 ring-1 ring-base-content/10 group-hover:ring-primary transition">
+					<img src={ imageURL } alt="" loading="lazy" decoding="async" width="112" height="112"/>
+				</div>
+			</div>
+		} else {
+			<div class="avatar avatar-placeholder">
+				<div class="w-24 sm:w-28 rounded-full bg-base-300 text-base-content/60 ring-1 ring-base-content/10 group-hover:ring-primary transition">
+					<span class="text-2xl font-semibold">{ initials(name) }</span>
+				</div>
+			</div>
+		}
+		<span class="text-sm font-semibold leading-tight line-clamp-2 group-hover:text-primary transition-colors">{ name }</span>
+		if role != "" {
+			<span class="text-xs text-base-content/60 leading-tight line-clamp-2">{ role }</span>
+		}
+	</a>
+}
+
+func initials(name string) string {
+	var out []rune
+	for _, word := range strings.Fields(name) {
+		out = append(out, []rune(word)[0])
+		if len(out) == 2 {
+			break
+		}
+	}
+	return strings.ToUpper(string(out))
+}
+
+templ videoRail(videos []tmdb.Video) {
+	if len(videos) > 0 {
+		@rail("videos", "Trailers & videos", "") {
+			for _, v := range videos {
+				<li class="carousel-item">
+					<button type="button" class="group w-72 sm:w-80 text-left space-y-2" data-video={ v.Key } data-title={ v.Name }>
+						<span class="relative block aspect-video rounded-box overflow-hidden bg-base-300">
+							<img src={ v.ThumbnailURL() } alt="" class="size-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" width="320" height="180"/>
+							<span class="absolute inset-0 grid place-items-center bg-black/20 group-hover:bg-black/35 transition">
+								<span class="size-12 rounded-full bg-white/90 text-black grid place-items-center shadow-xl">
+									@Icon("play", "size-5 fill-current ml-0.5")
+								</span>
+							</span>
+						</span>
+						<span class="block text-sm font-semibold line-clamp-1 group-hover:text-primary">{ v.Name }</span>
+						<span class="block text-xs text-base-content/60">{ v.Type }</span>
+					</button>
+				</li>
+			}
+		}
+	}
+}
+
+// trailerModal plays the selected YouTube video; the iframe only gets a src
+// while the dialog is open, so closing it stops playback.
+templ trailerModal() {
+	@modalDialog("trailer-modal", "videoOpen", "", "$videoKey = ''", "max-w-5xl w-full p-0 bg-black overflow-hidden", nil) {
+		<h3 id="trailer-modal-title" class="sr-only" data-text="$videoTitle">Trailer</h3>
+		<form method="dialog" class="absolute top-2 right-2 z-10">
+			<button class="btn btn-sm btn-circle bg-black/60 border-white/20 text-white hover:bg-black" aria-label="Close trailer">
+				@Icon("x", "size-4")
+			</button>
+		</form>
+		<div class="aspect-video">
+			<iframe
+				title="Trailer"
+				class="size-full border-0"
+				data-attr:src="$videoOpen && $videoKey ? 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent($videoKey) + '?autoplay=1&rel=0&playsinline=1' : null"
+				allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+				allowfullscreen
+			></iframe>
+		</div>
+	}
+}
+
+type factItem struct {
+	Label  string
+	Value  string
+	People []tmdb.CrewMember
+}
+
+// aboutSection holds the poster, tagline, credits and official links; the
+// overview itself lives in the hero so it is shown once.
+templ aboutSection(item tmdb.MediaItem, tagline string, facts []factItem, links []officialLink) {
+	<section id="about" class="max-w-7xl mx-auto px-4 sm:px-8 py-12 grid grid-cols-1 md:grid-cols-[12rem_1fr] lg:grid-cols-[15rem_1fr] gap-8 lg:gap-12">
+		<figure class="hidden md:block">
+			if item.PosterURL() != "" {
+				<img src={ item.PosterURL() } alt={ item.Title + " poster" } class="w-full aspect-[2/3] object-cover rounded-box shadow-2xl ring-1 ring-base-content/10" loading="lazy" decoding="async" width="240" height="360"/>
+			} else {
+				<div class="w-full aspect-[2/3] rounded-box bg-base-300 grid place-items-center">
+					@Icon("film", "size-10 opacity-40")
+				</div>
+			}
+		</figure>
+		<div class="space-y-6 min-w-0">
+			<h2 class="sr-only">About</h2>
+			if tagline != "" {
+				<p class="text-lg sm:text-xl italic text-base-content/70">{ tagline }</p>
+			}
+			<dl class="grid grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5 text-sm max-w-4xl">
+				for _, f := range facts {
+					if f.Value != "" || len(f.People) > 0 {
+						<div class="space-y-1 min-w-0">
+							<dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">{ f.Label }</dt>
+							<dd class="font-medium">
+								if len(f.People) > 0 {
+									for i, p := range f.People {
+										if i > 0 {
+											<span>, </span>
+										}
+										<a href={ personHref(p.ID) } class="link link-hover">{ p.Name }</a>
+									}
+								} else {
+									{ f.Value }
+								}
+							</dd>
+						</div>
+					}
+				}
+			</dl>
+			@officialLinksRow(links)
+		</div>
+	</section>
+}
+
+// torrentActions is the delegated click handler for every release row.
+// Magnets travel in data-magnet; the add URL is built from server ints.
+func torrentActions(addURL string) string {
+	return fmt.Sprintf(`const b = evt.target.closest('button[data-action]')
+if (!b) return
+if (b.dataset.action === 'send') {
+	$torrMagnet = b.dataset.magnet
+	@post('%s', {filterSignals: {include: /^torrMagnet$/}})
+} else if (b.dataset.action === 'copy') {
+	navigator.clipboard.writeText(b.dataset.magnet).then(() => { $toastError = false; $toast = 'Magnet link copied' }, () => { $toastError = true; $toast = 'Copy failed' })
+}`, addURL)
+}
+
+// SourcesSearch is the Datastar expression that (re)runs the JacRed search
+// for a title with the current $sort (and $sourceSeason for series). It is
+// built only from server ints, never from upstream text.
+func SourcesSearch(mediaType string, id int) string {
+	season := ""
+	if mediaType == "tv" {
+		season = " + '&season=' + $sourceSeason"
+	}
+	return fmt.Sprintf("$sourcesRequested = true; @get('/api/torrents?type=%s&id=%d&sort=' + $sort%s, {filterSignals: {include: /^$/}})", mediaType, id, season)
+}
+
+// TorrentAddURL is the endpoint that sends a release of a title to TorrServer.
+func TorrentAddURL(mediaType string, id int) string {
+	return fmt.Sprintf("/api/torrents/add?type=%s&id=%d", mediaType, id)
+}
+
+func sourcesSignals(mediaType string, selected int) string {
+	if mediaType == "tv" {
+		return fmt.Sprintf("{ sort: 'seeders', sourcesRequested: false, sourcesLoading: false, sourceSeason: '%d' }", selected)
+	}
+	return "{ sort: 'seeders', sourcesRequested: false, sourcesLoading: false }"
+}
+
+// sourcesSection searches JacRed only when the user asks; series search one
+// season at a time. The TorrServer status badge loads on its own.
+templ sourcesSection(mediaType string, id int, seasons []tmdb.SeasonSummary, selected int) {
+	<section id="sources" class="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-5 scroll-mt-20" data-signals={ sourcesSignals(mediaType, selected) }>
+		@sectionHeading("Sources", "Torrent releases found by JacRed. Send one to your TorrServer to watch.") {
+			<div data-init="@get('/api/torrserver/status')">
+				@TorrServerStatus(false, "", "")
+			</div>
+		}
+		<div id="torr-activity"></div>
+		<div class="flex flex-wrap items-center gap-2">
+			if mediaType == "tv" && len(seasons) > 0 {
+				<select
+					class="select select-sm w-auto"
+					aria-label="Season to search"
+					data-bind:source-season
+					data-on:change={ "$sourcesRequested && (" + SourcesSearch(mediaType, id) + ")" }
+				>
+					for _, s := range seasons {
+						<option value={ fmt.Sprint(s.Number) } selected?={ s.Number == selected }>{ seasonLabel(s) }</option>
+					}
+				</select>
+			}
+			<button type="button" class="btn btn-primary btn-sm gap-1.5" data-on:click={ SourcesSearch(mediaType, id) } data-indicator:sources-loading data-attr:disabled="$sourcesLoading">
+				<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$sourcesLoading"></span>
+				<span data-class:hidden="$sourcesLoading">
+					@Icon("search", "size-4")
+				</span>
+				<span data-text="$sourcesRequested ? 'Search again' : 'Find sources'">Find sources</span>
+			</button>
+			<span class="ml-auto">
+				@JacRedCredit()
+			</span>
+		</div>
+		<div data-on:click={ torrentActions(TorrentAddURL(mediaType, id)) } data-indicator:sending>
+			<div id="torrent-results"></div>
+		</div>
+	</section>
+}
+
+// TorrServerStatus is patched by /api/torrserver/status. version == "" and
+// !online renders the pending state.
+templ TorrServerStatus(online bool, version, endpoint string) {
+	<a id="torrserver-status" href="/torrserver" class="badge badge-lg gap-2 shrink-0 whitespace-nowrap bg-base-200 border-base-content/10 hover:border-primary" title={ endpoint }>
+		if online {
+			<span class="status status-success" aria-hidden="true"></span>
+			TorrServer { version }
+		} else if endpoint != "" {
+			<span class="status status-error" aria-hidden="true"></span>
+			TorrServer Offline
+		} else {
+			<span class="loading loading-ring loading-xs" aria-hidden="true"></span>
+			Checking TorrServer…
+		}
+	</a>
+}
+
+templ TorrentSearching(title string) {
+	<div id="torrent-results" class="space-y-3" aria-busy="true">
+		<p class="text-sm text-base-content/60 inline-flex items-center gap-2">
+			<span class="loading loading-dots loading-sm text-primary"></span>
+			if title != "" {
+				<span>Searching JacRed for <span class="font-semibold">{ title }</span>…</span>
+			} else {
+				<span>Searching JacRed…</span>
+			}
+		</p>
+		<div class="space-y-2">
+			for range [3]struct{}{} {
+				<div class="skeleton h-16 w-full"></div>
+			}
+		</div>
+	</div>
+}
+
+templ TorrentSearchError(message string) {
+	<div id="torrent-results" role="alert" class="alert alert-warning alert-soft">
+		@Icon("triangle-alert", "size-5")
+		<span>{ message }</span>
+	</div>
+}
+
+var qualityOrder = []string{"4K", "1080p", "720p", "SD"}
+
+func qualityCounts(results []jacred.Result) map[string]int {
+	counts := make(map[string]int, len(qualityOrder))
+	for _, r := range results {
+		counts[r.QualityLabel()]++
+	}
+	return counts
+}
+
+func qualityTone(label string) string {
+	switch label {
+	case "4K":
+		return "badge-primary"
+	case "1080p":
+		return "badge-primary badge-soft"
+	case "720p":
+		return "badge-outline"
+	default:
+		return "badge-ghost"
+	}
+}
+
+// trackerCount is a tracker and how many releases it has.
+type trackerCount struct {
+	Name  string
+	Count int
+}
+
+// trackerCounts lists the trackers of results, busiest first.
+func trackerCounts(results []jacred.Result) []trackerCount {
+	counts := map[string]int{}
+	for _, r := range results {
+		if r.Tracker != "" {
+			counts[r.Tracker]++
+		}
+	}
+	out := make([]trackerCount, 0, len(counts))
+	for name, n := range counts {
+		out = append(out, trackerCount{name, n})
+	}
+	slices.SortFunc(out, func(a, b trackerCount) int {
+		if a.Count != b.Count {
+			return b.Count - a.Count
+		}
+		return strings.Compare(a.Name, b.Name)
+	})
+	return out
+}
+
+// trackerNames are how people write the trackers JacRed searches.
+var trackerNames = map[string]string{
+	"knaben": "Knaben", "bitru": "BitRu", "rutor": "Rutor", "rutracker": "RuTracker", "kinozal": "Kinozal",
+	"nnmclub": "NNM-Club", "megapeer": "MegaPeer", "toloka": "Toloka", "selezen": "Selezen",
+	"anilibria": "AniLibria", "lostfilm": "LostFilm", "torrentby": "TorrentBy", "baibako": "BaibaKo",
+}
+
+func trackerName(tracker string) string {
+	if name, ok := trackerNames[strings.ToLower(tracker)]; ok {
+		return name
+	}
+	return tracker
+}
+
+var sortOptions = []struct{ Key, Label string }{
+	{"seeders", "Seeders"},
+	{"date", "Newest"},
+	{"size", "Size"},
+}
+
+// TorrentResults lists releases sorted by sort; search re-runs the query
+// (see SourcesSearch) when a different sort is picked.
+templ TorrentResults(results []jacred.Result, sort, search string) {
+	<div id="torrent-results" class="space-y-4">
+		if len(results) == 0 {
+			<div role="status" class="alert alert-soft">
+				@Icon("search-x", "size-5")
+				<span>No releases found on JacRed for this title.</span>
+			</div>
+		} else {
+			{{ counts := qualityCounts(results) }}
+			<div class="flex flex-wrap items-center justify-between gap-3">
+			<div role="tablist" aria-label="Filter by quality" class="tabs tabs-box tabs-sm w-fit">
+				<button type="button" role="tab" class="tab tab-active" data-class="{ 'tab-active': $q === 'all' }" data-on:click="$q = 'all'">
+					All <span class="badge badge-xs ml-1.5">{ fmt.Sprint(len(results)) }</span>
+				</button>
+				for _, label := range qualityOrder {
+					if counts[label] > 0 {
+						<button type="button" role="tab" class="tab" data-class={ fmt.Sprintf("{ 'tab-active': $q === '%s' }", label) } data-on:click={ fmt.Sprintf("$q = '%s'", label) }>
+							{ label } <span class="badge badge-xs ml-1.5">{ fmt.Sprint(counts[label]) }</span>
+						</button>
+					}
+				}
+			</div>
+			@trackerFilter(results)
+			<div class="join" role="group" aria-label="Sort releases">
+				for _, o := range sortOptions {
+					<button
+						type="button"
+						class={ "btn btn-sm join-item", templ.KV("btn-active", o.Key == sort) }
+						data-class={ fmt.Sprintf("{ 'btn-active': $sort === '%s' }", o.Key) }
+						data-on:click={ fmt.Sprintf("$sort = '%s'; %s", o.Key, search) }
+					>{ o.Label }</button>
+				}
+			</div>
+			</div>
+			<ul class="list bg-base-200/50 rounded-box border border-base-content/5 max-h-[32rem] overflow-y-auto overscroll-contain">
+				for _, r := range results {
+					@torrentRow(r)
+				}
+			</ul>
+			<p class="text-xs text-base-content/50">
+				Results from JacRed. Moviestracker does not host or distribute media — only access content you are legally authorized to use.
+			</p>
+		}
+	</div>
+}
+
+// trackerFilter picks which trackers' releases show: any number, or all
+// when none is picked. Tracker names come from JacRed, so they stay in
+// values and data attributes, never in expressions. Datastar binds each
+// checkbox to its own slot of $trackers: "" while unticked, its tracker
+// while ticked.
+templ trackerFilter(results []jacred.Result) {
+	{{ trackers := trackerCounts(results) }}
+	if len(trackers) > 1 {
+		<div role="group" aria-label="Filter by tracker" class="basis-full order-last flex flex-wrap items-center gap-2">
+			<span class="text-xs font-medium text-base-content/60 mr-1">Trackers</span>
+			<button type="button" class="btn btn-xs sm:btn-sm gap-1.5" data-class="{ 'btn-primary': !$trackers.some(Boolean) }" data-on:click="$trackers = $trackers.map(() => '')">
+				All <span class="badge badge-xs">{ fmt.Sprint(len(results)) }</span>
+			</button>
+			for _, t := range trackers {
+				<label class="btn btn-xs sm:btn-sm gap-1.5 has-checked:btn-primary has-focus-visible:outline-2 has-focus-visible:outline-primary">
+					<input type="checkbox" class="sr-only" value={ t.Name } data-bind="trackers"/>
+					{ trackerName(t.Name) }
+					<span class="badge badge-xs">{ fmt.Sprint(t.Count) }</span>
+				</label>
+			}
+		</div>
+	}
+}
+
+templ torrentRow(r jacred.Result) {
+	<li
+		class="list-row items-center gap-3 sm:gap-4"
+		data-tracker={ r.Tracker }
+		data-show={ fmt.Sprintf("($q === 'all' || $q === '%s') && (!$trackers.some(Boolean) || $trackers.includes(el.dataset.tracker))", r.QualityLabel()) }
+	>
+		<div class="flex flex-col items-center gap-1 w-14">
+			<span class={ "badge badge-sm font-bold whitespace-nowrap", qualityTone(r.QualityLabel()) }>{ r.QualityLabel() }</span>
+			if r.HDR {
+				<span class="badge badge-xs badge-outline">HDR</span>
+			}
+		</div>
+		<div class="min-w-0 list-col-grow space-y-1">
+			<p class="text-sm font-medium leading-snug line-clamp-2 break-words" title={ r.Title }>{ r.Title }</p>
+			<p class="text-xs text-base-content/60 flex flex-wrap items-center gap-x-3 gap-y-1">
+				<span class="font-mono">{ r.Tracker }</span>
+				if r.SizeName != "" {
+					<span>{ r.SizeName }</span>
+				}
+				if !r.CreatedAt.IsZero() {
+					<span title="Added">{ r.CreatedAt.Format("2006-01-02") }</span>
+				}
+				<span class="inline-flex items-center gap-1 text-success" title="Seeders">
+					@Icon("arrow-up", "size-3")
+					{ fmt.Sprint(r.Seeders) }
+				</span>
+				<span class="inline-flex items-center gap-1" title="Peers">
+					@Icon("arrow-down", "size-3")
+					{ fmt.Sprint(r.Peers) }
+				</span>
+				if len(r.Voices) > 0 {
+					<span class="truncate max-w-64">{ strings.Join(r.Voices, ", ") }</span>
+				}
+			</p>
+		</div>
+		<div class="flex items-center gap-1 max-sm:list-col-wrap max-sm:justify-end">
+			<button type="button" class="btn btn-primary btn-sm gap-1.5" data-action="send" data-magnet={ r.Magnet } data-attr:disabled="$sending" title="Send to TorrServer">
+				@Icon("send", "size-4")
+				<span>TorrServer</span>
+			</button>
+			<button type="button" class="btn btn-ghost btn-sm btn-square" data-action="copy" data-magnet={ r.Magnet } title="Copy magnet link" aria-label="Copy magnet link">
+				@Icon("magnet", "size-4")
+			</button>
+			<a href={ templ.SafeURL(r.SourceURL) } target="_blank" rel="noopener noreferrer nofollow" class="btn btn-ghost btn-sm btn-square" title={ "Open on " + r.Tracker } aria-label={ "Open source page on " + r.Tracker }>
+				@Icon("external-link", "size-4")
+			</a>
+		</div>
+	</li>
+}
+
+// TorrActivity is patched in after a release is sent to TorrServer; it opens
+// a stream of that torrent's download stats.
+templ TorrActivity(hash, title string) {
+	<div id="torr-activity" class="card bg-base-200/60 border border-primary/30" data-init={ fmt.Sprintf("@get('%s')", TorrentStatsURL(hash)) }>
+		<div class="card-body p-4 flex-row flex-wrap items-center gap-4">
+			<span class="size-10 rounded-box bg-primary/10 text-primary grid place-items-center">
+				@Icon("download", "size-5")
+			</span>
+			<div class="grow min-w-0 space-y-1">
+				<p class="font-semibold truncate">{ title }</p>
+				@TorrActivityStats(nil)
+			</div>
+			<a href="/torrserver" class="btn btn-sm btn-primary gap-1.5">
+				@Icon("tv-minimal-play", "size-4")
+				Open player
+			</a>
+		</div>
+	</div>
+}
+
+// TorrentStatsURL streams live stats for one torrent.
+func TorrentStatsURL(hash string) string {
+	return "/api/torrserver/torrent-stats?hash=" + hash + "&stream=true"
+}
+
+templ TorrActivityStats(t *torrserver.Torrent) {
+	<div id="torr-activity-stats" class="text-xs text-base-content/70 flex flex-wrap items-center gap-x-4 gap-y-1">
+		if t == nil {
+			<span class="inline-flex items-center gap-2">
+				<span class="loading loading-spinner loading-xs"></span>
+				Waiting for TorrServer…
+			</span>
+		} else {
+			<span class={ "badge badge-sm", t.StatusBadgeClass() }>{ t.StatusLabel() }</span>
+			<span class="inline-flex items-center gap-1">
+				@Icon("users", "size-3.5")
+				{ t.FormattedPeers() } peers
+			</span>
+			<span class="inline-flex items-center gap-1 font-mono">
+				@Icon("arrow-down", "size-3.5")
+				{ t.FormattedDownloadSpeed() }
+			</span>
+			if t.TorrentSize > 0 {
+				<span class="inline-flex items-center gap-2 grow min-w-40 max-w-80">
+					<progress class="progress progress-primary w-full" value={ fmt.Sprint(t.LoadedSize) } max={ fmt.Sprint(t.TorrentSize) }></progress>
+					<span class="font-mono whitespace-nowrap">{ torrserver.FormatBytes(t.LoadedSize) } / { t.FormattedSize() }</span>
+				</span>
+			}
+		}
+	</div>
+}
+
+// appToast shows $toast for 3s; $toastError switches it to the error tone.
+templ appToast() {
+	<div
+		popover="manual"
+		role="status"
+		aria-live="polite"
+		class="toast toast-end toast-bottom m-0 inset-auto bottom-0 right-0 bg-transparent border-0 overflow-visible [&:not(:popover-open)]:hidden"
+		data-effect="if ($toast) { el.matches(':popover-open') ? (el.hidePopover(), el.showPopover()) : el.showPopover() } else if (el.matches(':popover-open')) { el.hidePopover() }"
+		data-on-signal-patch__debounce.3s={ toastAutoHide }
+		data-on-signal-patch-filter="{ include: /^toast$/ }"
+	>
+		<div class="alert alert-success shadow-xl text-sm" data-class="{ 'alert-success': !$toastError, 'alert-error': $toastError }">
+			<span data-text="$toast"></span>
+		</div>
+	</div>
+}

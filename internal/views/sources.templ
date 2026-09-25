@@ -1,0 +1,393 @@
+package views
+
+import (
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"fmt"
+)
+
+const (
+	tmdbSignupURL   = "https://www.themoviedb.org/signup"
+	tmdbAPIPageURL  = "https://www.themoviedb.org/settings/api"
+	jacredRepoURL   = "https://github.com/jacred-fdb/jacred" // #nosec G101 -- "JacRed" is a service name, not a credential
+	jacredPublicURL = "https://jacred.su"                    // #nosec G101 -- "JacRed" is a service name, not a credential
+)
+
+// SourcesView is what the Sources settings show. Keys are never included:
+// only whether one is saved. A non-empty *Env field names the environment
+// variable that overrides the setting, which makes it read-only.
+type SourcesView struct {
+	Welcome       bool
+	TMDBKeySet    bool
+	TMDBEnv       string
+	TMDBShared    bool // no key of one's own: Moviestracker's shared key is in use
+	TMDBCanShare  bool // this build has a shared key to go back to
+	JacRedURL     string
+	JacRedKeySet  bool
+	JacRedEnv     string
+	IMDbOn        bool
+	IMDbEnv       string
+	TorrServerURL     string
+	TorrServerUser    string
+	TorrServerPassSet bool // a password is saved; never sent back
+	TorrServerEnv     string
+	Engine        EngineView
+	GStreamer     GStreamerSetup // browser playback, when Moviestracker can install GStreamer
+}
+
+// EngineView describes the managed TorrServer. It never carries the
+// engine's address or password.
+type EngineView struct {
+	Available bool   // a TorrServer program was found
+	Mode      string // "managed" or "external"
+	State     string
+	Version   string
+	Port      int
+	Restarts  int
+	LastError string
+}
+
+func (e EngineView) managed() bool { return e.Mode == "managed" }
+
+// SourceStatus is the outcome of the last save of one source.
+type SourceStatus struct {
+	OK      bool
+	Message string
+}
+
+// SourcesPage lets the admin set the services Moviestracker depends on.
+templ SourcesPage(user *auth.User, v SourcesView) {
+	@settingsShell(user, "sources", "Sources") {
+		<header class="space-y-2">
+			<h1 class="text-3xl font-bold tracking-tight flex items-center gap-3">
+				@Icon("plug", "size-7 text-primary")
+				Sources
+			</h1>
+			<p class="text-base-content/70">
+				Moviestracker runs on this machine, but finding titles needs the internet: TMDB for movies and series,
+				JacRed for torrent releases. Streaming goes through TorrServer.
+			</p>
+		</header>
+		if v.Welcome {
+			<div role="status" class="alert alert-info alert-soft">
+				@Icon("party-popper", "size-5")
+				<div>
+					<p class="font-semibold">Your account is ready.</p>
+					if v.TMDBShared {
+						<p class="text-sm">Search already works with Moviestracker's shared TMDB key. Check JacRed and choose where TorrServer runs; you can change all of this later under Settings.</p>
+					} else {
+						<p class="text-sm">Add a TMDB key, check JacRed and choose where TorrServer runs. You can change all of this later under Settings.</p>
+					}
+				</div>
+				<a href="/movies" class="btn btn-sm btn-primary">Continue</a>
+			</div>
+		}
+		@TMDBSource(v, SourceStatus{})
+		@JacRedSource(v, SourceStatus{})
+		@TorrServerSource(v, SourceStatus{})
+		@GStreamerLive(v.GStreamer, false)
+		@IMDbSource(v, SourceStatus{})
+	}
+}
+
+templ sourceCard(id, icon, title string) {
+	<section id={ id } class="card bg-base-200/60 border border-base-content/10">
+		<div class="card-body gap-4">
+			<h2 class="card-title">
+				@Icon(icon, "size-5 text-primary")
+				{ title }
+			</h2>
+			{ children... }
+		</div>
+	</section>
+}
+
+templ sourceStatus(st SourceStatus) {
+	if st.Message != "" {
+		<div role="status" aria-live="polite" class={ "alert alert-soft text-sm py-2.5", templ.KV("alert-success", st.OK), templ.KV("alert-error", !st.OK) }>
+			if st.OK {
+				@Icon("circle-check", "size-4")
+			} else {
+				@Icon("circle-alert", "size-4")
+			}
+			<span>{ st.Message }</span>
+		</div>
+	}
+}
+
+templ envNote(name string) {
+	<p class="text-sm text-base-content/70">
+		@Icon("lock", "size-3.5 inline")
+		Set by the <code class="font-mono">{ name }</code> environment variable; change it there.
+	</p>
+}
+
+// TMDBSource sets the TMDB key and explains how to get one.
+templ TMDBSource(v SourcesView, st SourceStatus) {
+	@sourceCard("source-tmdb", "database", "TMDB — movies and series") {
+		<p class="text-sm text-base-content/70">
+			Titles, posters, cast and trailers come from The Movie Database.
+			if v.TMDBCanShare {
+				Moviestracker comes with a shared key, so it works right away; you can use your own key instead.
+			} else {
+				It needs a free personal key.
+			}
+		</p>
+		if v.TMDBEnv != "" {
+			@envNote(v.TMDBEnv)
+		} else {
+			if v.TMDBShared {
+				@tmdbSharedNote()
+			} else if v.TMDBCanShare {
+				<div class="flex flex-wrap items-center justify-between gap-3 rounded-box bg-base-100 border border-base-content/10 p-3 text-sm">
+					<span class="flex items-center gap-2">
+						@Icon("key-round", "size-4 text-success")
+						Your own TMDB key is in use.
+					</span>
+					<button type="button" class="btn btn-ghost btn-sm" data-on:click="@post('/api/settings/sources/tmdb/shared')">
+						@Icon("undo-2", "size-4")
+						Use the shared key instead
+					</button>
+				</div>
+			}
+			<details class="collapse collapse-arrow bg-base-100 border border-base-content/10" open?={ !v.TMDBKeySet && !v.TMDBShared }>
+				<summary class="collapse-title text-sm font-semibold">
+					if v.TMDBShared {
+						Use your own key: how to get one
+					} else {
+						How to get a TMDB key
+					}
+				</summary>
+				<ol class="collapse-content list-decimal list-inside space-y-2 text-sm text-base-content/80">
+					<li>Create a free account at <a href={ templ.SafeURL(tmdbSignupURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">themoviedb.org</a> and confirm your email.</li>
+					<li>Open <a href={ templ.SafeURL(tmdbAPIPageURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">Settings → API</a> and request an API key for personal, non-commercial use.</li>
+					<li>Copy the <strong>API Read Access Token</strong> (the long one) or the shorter <strong>API Key</strong>, and paste it below.</li>
+				</ol>
+			</details>
+			<form class="space-y-3" data-signals="{ tmdbKey: '' }" data-indicator:tmdb-saving data-on:submit="@post('/api/settings/sources/tmdb', {filterSignals: {include: /^tmdbKey$/}})">
+				<label class="input w-full">
+					@Icon("key-round", "size-4 opacity-60")
+					<span class="sr-only">TMDB key</span>
+					<input
+						type="password"
+						required
+						autocomplete="off"
+						spellcheck="false"
+						class="grow font-mono"
+						if v.TMDBShared {
+							placeholder="Optional: paste your own TMDB token or API key"
+						} else if v.TMDBKeySet {
+							placeholder="A key is saved — paste a new one to replace it"
+						} else {
+							placeholder="Paste your TMDB token or API key"
+						}
+						data-bind:tmdb-key
+					/>
+				</label>
+				<button type="submit" class="btn btn-primary" data-attr:disabled="$tmdbSaving">
+					<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$tmdbSaving"></span>
+					Check and save
+				</button>
+			</form>
+		}
+		@sourceStatus(st)
+	}
+}
+
+// tmdbSharedNote says the shared TMDB key is in use and what that means.
+templ tmdbSharedNote() {
+	<div role="status" class="alert alert-info alert-soft text-sm items-start">
+		@Icon("users", "size-4 mt-0.5")
+		<div class="space-y-2">
+			<p class="font-semibold">Moviestracker's shared TMDB key is in use: search works without any setup.</p>
+			<p>Every Moviestracker install uses this key, so:</p>
+			<ul class="list-disc list-inside space-y-1 text-base-content/80">
+				<li>should TMDB disable it (for example because someone else misuses it), search stops until Moviestracker is updated;</li>
+				<li>TMDB sees these requests as Moviestracker's, not yours;</li>
+				<li>a busy moment for other installs can slow it down.</li>
+			</ul>
+			<p>With your own key, which is free, none of this depends on anyone else. Add it below whenever you like.</p>
+		</div>
+	</div>
+}
+
+// JacRedSource sets the JacRed instance used for torrent search.
+templ JacRedSource(v SourcesView, st SourceStatus) {
+	@sourceCard("source-jacred", "magnet", "JacRed — torrent search") {
+		<p class="text-sm text-base-content/70">
+			Releases for a title are found with JacRed. The public instance at
+			<a href={ templ.SafeURL(jacredPublicURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">jacred.su</a>
+			needs no key. If it is slow or blocked where you are, run your own with
+			<a href={ templ.SafeURL(jacredRepoURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">jacred-fdb/jacred</a>
+			(Docker or Linux, port 9117) and enter its address.
+		</p>
+		if v.JacRedEnv != "" {
+			@envNote(v.JacRedEnv)
+		} else {
+			<form class="space-y-3" data-signals={ templ.JSONString(map[string]string{"jacredUrl": v.JacRedURL, "jacredApiKey": ""}) } data-indicator:jacred-saving data-on:submit="@post('/api/settings/sources/jacred', {filterSignals: {include: /^jacred(Url|ApiKey)$/}})">
+				<label class="input w-full">
+					@Icon("globe", "size-4 opacity-60")
+					<span class="sr-only">JacRed address</span>
+					<input type="url" required placeholder="https://jacred.su" class="grow font-mono" data-bind:jacred-url/>
+				</label>
+				<label class="input w-full">
+					@Icon("key-round", "size-4 opacity-60")
+					<span class="sr-only">JacRed API key</span>
+					<input
+						type="password"
+						autocomplete="off"
+						class="grow font-mono"
+						if v.JacRedKeySet {
+							placeholder="A key is saved — leave empty to keep it"
+						} else {
+							placeholder="API key (only for private instances)"
+						}
+						data-bind:jacred-api-key
+					/>
+				</label>
+				<button type="submit" class="btn btn-primary" data-attr:disabled="$jacredSaving">
+					<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$jacredSaving"></span>
+					Test search and save
+				</button>
+			</form>
+		}
+		@sourceStatus(st)
+	}
+}
+
+// TorrServerSource chooses between the TorrServer Moviestracker runs and an
+// existing one.
+templ TorrServerSource(v SourcesView, st SourceStatus) {
+	@sourceCard("source-torrserver", "server", "TorrServer — streaming") {
+		<p class="text-sm text-base-content/70">
+			TorrServer downloads and streams the torrents you play. Moviestracker can run it for you, hidden behind
+			Moviestracker, or use one you already run.
+		</p>
+		if v.TorrServerEnv != "" {
+			@envNote(v.TorrServerEnv)
+		} else {
+			<form
+				class="space-y-4"
+				data-signals={ templ.JSONString(map[string]string{"torrserverMode": v.Engine.Mode, "torrserverUrl": v.TorrServerURL, "torrserverUser": v.TorrServerUser, "torrserverPassword": ""}) }
+				data-indicator:torrserver-saving
+				data-on:submit="@post('/api/settings/sources/torrserver', {filterSignals: {include: /^torrserver(Mode|Url|User|Password)$/}})"
+			>
+				<div class="space-y-2" role="radiogroup" aria-label="Where TorrServer runs">
+					<label class="flex items-start gap-3 cursor-pointer rounded-box bg-base-100 border border-base-content/10 p-3">
+						<input type="radio" name="torrserver-mode" value="managed" class="radio radio-primary mt-0.5" data-bind:torrserver-mode disabled?={ !v.Engine.Available }/>
+						<span class="space-y-1">
+							<span class="block text-sm font-semibold">Managed by Moviestracker</span>
+							<span class="block text-xs text-base-content/70">
+								Recommended. Moviestracker starts TorrServer, restarts it if it stops, and keeps it off your network.
+							</span>
+							if !v.Engine.Available {
+								<span class="block text-xs text-warning">
+									The TorrServer program was not found: run <code class="font-mono">make torrserver</code> or put a
+									<code class="font-mono">torrserver</code> program next to Moviestracker.
+								</span>
+							}
+						</span>
+					</label>
+					<label class="flex items-start gap-3 cursor-pointer rounded-box bg-base-100 border border-base-content/10 p-3">
+						<input type="radio" name="torrserver-mode" value="external" class="radio radio-primary mt-0.5" data-bind:torrserver-mode/>
+						<span class="space-y-1">
+							<span class="block text-sm font-semibold">A TorrServer I already run</span>
+							<span class="block text-xs text-base-content/70">On this computer, a NAS or an Android TV box.</span>
+						</span>
+					</label>
+				</div>
+				<div class="space-y-3" data-show="$torrserverMode === 'external'">
+					<label class="input w-full">
+						@Icon("globe", "size-4 opacity-60")
+						<span class="sr-only">TorrServer address</span>
+						<input type="url" placeholder="http://127.0.0.1:8090" class="grow font-mono" data-bind:torrserver-url/>
+					</label>
+					<div class="grid gap-3 sm:grid-cols-2">
+						<label class="input w-full">
+							@Icon("user", "size-4 opacity-60")
+							<span class="sr-only">TorrServer username</span>
+							<input type="text" autocomplete="off" placeholder="Username (if it asks for one)" class="grow" data-bind:torrserver-user/>
+						</label>
+						<label class="input w-full">
+							@Icon("key-round", "size-4 opacity-60")
+							<span class="sr-only">TorrServer password</span>
+							<input
+								type="password"
+								autocomplete="off"
+								class="grow"
+								if v.TorrServerPassSet {
+									placeholder="A password is saved — leave empty to keep it"
+								} else {
+									placeholder="Password"
+								}
+								data-bind:torrserver-password
+							/>
+						</label>
+					</div>
+					<p class="text-xs text-base-content/60">
+						Only for a TorrServer started with <code class="font-mono">--httpauth</code>: the login from its
+						<code class="font-mono">accs.db</code>. Moviestracker keeps it in its data folder and never shows the password again.
+					</p>
+				</div>
+				<button type="submit" class="btn btn-primary" data-attr:disabled="$torrserverSaving">
+					<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$torrserverSaving"></span>
+					Connect and save
+				</button>
+			</form>
+			if v.Engine.Available && v.Engine.managed() {
+				@engineStatus(v.Engine)
+			}
+		}
+		@sourceStatus(st)
+	}
+}
+
+// engineStatus shows how the managed TorrServer is doing, with a restart button.
+templ engineStatus(e EngineView) {
+	<div class="flex flex-wrap items-center justify-between gap-3 rounded-box bg-base-100 border border-base-content/10 p-3">
+		<div class="flex items-center gap-2 text-sm">
+			switch e.State {
+				case "running":
+					<span class="status status-success" aria-hidden="true"></span>
+					<span>Running TorrServer <span class="font-mono">{ e.Version }</span></span>
+				case "starting", "restarting":
+					<span class="status status-warning animate-pulse" aria-hidden="true"></span>
+					<span>Starting TorrServer…</span>
+				default:
+					<span class="status status-error" aria-hidden="true"></span>
+					<span>TorrServer is not running</span>
+			}
+			if e.Restarts > 0 {
+				<span class="badge badge-sm badge-ghost">{ fmt.Sprintf("%d restarts", e.Restarts) }</span>
+			}
+		</div>
+		<button type="button" class="btn btn-sm btn-outline" data-indicator:engine-restarting data-attr:disabled="$engineRestarting" data-on:click="@post('/api/settings/engine/restart', {filterSignals: {include: /^$/}})">
+			<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$engineRestarting"></span>
+			@Icon("rotate-cw", "size-4")
+			Restart
+		</button>
+		if e.LastError != "" && e.State != "running" {
+			<p class="w-full text-xs text-error">{ e.LastError }</p>
+		}
+	</div>
+}
+
+// IMDbSource sets the IMDb rating service.
+templ IMDbSource(v SourcesView, st SourceStatus) {
+	@sourceCard("source-imdb", "star", "IMDb ratings") {
+		<p class="text-sm text-base-content/70">
+			Title pages show IMDb ratings from a small public rating service. Ratings are hidden when it is off or unreachable.
+		</p>
+		if v.IMDbEnv != "" {
+			@envNote(v.IMDbEnv)
+		} else {
+			<form class="space-y-3" data-signals={ templ.JSONString(map[string]any{"imdbOn": v.IMDbOn}) } data-on:submit="@post('/api/settings/sources/imdb', {filterSignals: {include: /^imdbOn$/}})">
+				<label class="label cursor-pointer gap-3">
+					<input type="checkbox" class="toggle toggle-primary" data-bind:imdb-on/>
+					<span class="text-sm">Show IMDb ratings</span>
+				</label>
+				<button type="submit" class="btn btn-primary">Save</button>
+			</form>
+		}
+		@sourceStatus(st)
+	}
+}

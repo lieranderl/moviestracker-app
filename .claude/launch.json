@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "moviestracker",
+      "runtimeExecutable": "make",
+      "runtimeArgs": ["dev"],
+      "port": 8095,
+      "autoPort": true
+    }
+  ]
+}

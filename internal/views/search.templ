@@ -1,0 +1,91 @@
+package views
+
+import (
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+	"fmt"
+)
+
+// SearchView is the search page model. A blank Query shows discovery rails.
+type SearchView struct {
+	Query          string
+	Results        *tmdb.SearchResults
+	TrendingMovies []tmdb.MediaItem
+	TrendingSeries []tmdb.MediaItem
+	Err            string
+}
+
+templ SearchPage(user *auth.User, v SearchView) {
+	@Layout("Search") {
+		@Navbar(user)
+		<main class="grow pb-16">
+			<section class="max-w-7xl mx-auto px-4 sm:px-8 pt-10 pb-4 space-y-4">
+				<h1 class="text-3xl sm:text-4xl font-black tracking-tight">Search</h1>
+				<!-- Native GET form (shareable URL, works without JS); typing patches results live -->
+				<form action="/search" method="GET" role="search" class="max-w-2xl">
+					<label class="input input-lg w-full">
+						@Icon("search", "size-5 opacity-60")
+						<span class="sr-only">Search movies, TV series and people</span>
+						<input
+							type="search"
+							name="q"
+							value={ v.Query }
+							maxlength="100"
+							placeholder="Movies, TV series, people…"
+							autocomplete="off"
+							autofocus
+							class="grow"
+							data-bind:q
+							data-indicator:searching
+							data-on:input__debounce.300ms="@get('/api/search', {filterSignals: {include: /^q$/}})"
+						/>
+						<span class="loading loading-spinner loading-sm hidden" data-class:hidden="!$searching" aria-hidden="true"></span>
+					</label>
+				</form>
+			</section>
+			@SearchResults(v)
+		</main>
+		@siteFooter()
+	}
+}
+
+// SearchResults is patched by /api/search as the query changes.
+templ SearchResults(v SearchView) {
+	<div id="search-results" aria-live="polite">
+		switch {
+			case v.Err != "":
+				<div class="max-w-7xl mx-auto px-4 sm:px-8 py-6">
+					<div role="alert" class="alert alert-warning alert-soft">
+						@Icon("triangle-alert", "size-5")
+						<span>{ v.Err }</span>
+					</div>
+				</div>
+			case v.Query == "":
+				@mediaRail("trending-movies", "Trending movies", v.TrendingMovies)
+				@mediaRail("trending-series", "Trending series", v.TrendingSeries)
+			case v.Results == nil || v.Results.Empty():
+				<p class="max-w-7xl mx-auto px-4 sm:px-8 py-6 text-base-content/70">
+					No matches for <span class="font-semibold">“{ v.Query }”</span>. Try another title or name.
+				</p>
+			default:
+				@mediaRail("movie-results", fmt.Sprintf("Movies · %d", len(v.Results.Movies)), v.Results.Movies)
+				@mediaRail("tv-results", fmt.Sprintf("TV series · %d", len(v.Results.Series)), v.Results.Series)
+				if len(v.Results.People) > 0 {
+					@rail("people-results", fmt.Sprintf("People · %d", len(v.Results.People)), "") {
+						for _, p := range v.Results.People {
+							<li class="carousel-item">
+								@personTile(p.ID, p.Name, personSubtitle(p), p.ProfileURL())
+							</li>
+						}
+					}
+				}
+		}
+	</div>
+}
+
+func personSubtitle(p tmdb.PersonSummary) string {
+	if titles := p.KnownForTitles(); titles != "" {
+		return titles
+	}
+	return p.KnownForDepartment
+}

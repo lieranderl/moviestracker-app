@@ -1,0 +1,68 @@
+package views
+
+// TMDBDisclaimer is the attribution wording required by the TMDB API terms.
+const TMDBDisclaimer = "This product uses the TMDB API but is not endorsed or certified by TMDB."
+
+const (
+	tmdbHomeURL     = "https://www.themoviedb.org/"
+	torrentIndexURL = "https://jacred.su/"
+	torrServerURL   = "https://github.com/YouROK/TorrServer"
+	gstreamerURL    = "https://gstreamer.freedesktop.org/"
+)
+
+// siteFooter is the signed-in pages' footer, with the version.
+templ siteFooter() {
+	@footer(true)
+}
+
+// footer credits the sources and tools; showVersion is off on public pages,
+// so strangers cannot tell which version runs.
+templ footer(showVersion bool) {
+	<footer class="footer sm:footer-horizontal bg-base-200 text-base-content/70 px-6 sm:px-10 py-10 border-t border-base-content/10 mt-auto">
+		<aside class="max-w-sm space-y-3">
+			@brand("/")
+			<p class="text-xs leading-relaxed">
+				A free, non-commercial personal catalog. Moviestracker does not host, upload, seed or distribute media.
+			</p>
+		</aside>
+		<nav aria-label="Data sources">
+			<h2 class="footer-title">Data sources</h2>
+			@externalLink(tmdbHomeURL, "The Movie Database (TMDB)")
+			@externalLink(torrentIndexURL, "JacRed torrent index")
+			<p class="text-xs max-w-xs">{ TMDBDisclaimer }</p>
+		</nav>
+		<nav aria-label="Streaming">
+			<h2 class="footer-title">Streaming</h2>
+			@externalLink(torrServerURL, "TorrServer")
+			@externalLink(gstreamerURL, "GStreamer")
+			<p class="text-xs max-w-xs">TorrServer streams torrents; GStreamer converts MKV files for the browser.</p>
+		</nav>
+		<nav aria-label="Built with">
+			<h2 class="footer-title">Built with</h2>
+			@externalLink("https://go.dev", "Go")
+			@externalLink("https://data-star.dev", "Datastar")
+			@externalLink("https://daisyui.com", "DaisyUI")
+			if label := versionLabel(); showVersion && label != "" {
+				<p class="text-xs font-mono text-base-content/50 pt-2">{ label }</p>
+			}
+		</nav>
+	</footer>
+}
+
+templ externalLink(href templ.SafeURL, label string) {
+	<a href={ href } target="_blank" rel="noopener noreferrer" class="link link-hover text-xs inline-flex items-center gap-1">
+		{ label }
+		@Icon("external-link", "size-3")
+		<span class="sr-only">(opens in new tab)</span>
+	</a>
+}
+
+// JacRedCredit credits JacRed, which finds the releases, beside them.
+templ JacRedCredit() {
+	<a href={ torrentIndexURL } target="_blank" rel="noopener noreferrer" class="badge badge-primary badge-soft gap-1.5 hover:badge-outline shrink-0 whitespace-nowrap">
+		@Icon("magnet", "size-3.5")
+		Search is powered by JacRed
+		@Icon("external-link", "size-3")
+		<span class="sr-only">(opens in new tab)</span>
+	</a>
+}

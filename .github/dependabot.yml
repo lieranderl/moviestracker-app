@@ -1,0 +1,36 @@
+# Weekly dependency updates, grouped so minor and patch bumps arrive as one
+# pull request per ecosystem. Security updates are not grouped or delayed.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    labels: [dependencies, go]
+    commit-message: { prefix: "build(deps)" }
+    groups:
+      go:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    labels: [dependencies, ci]
+    commit-message: { prefix: "ci(deps)" }
+    groups:
+      actions:
+        update-types: [minor, patch]
+
+  - package-ecosystem: bun
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    labels: [dependencies, frontend]
+    commit-message: { prefix: "build(deps)" }
+    groups:
+      frontend:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    labels: [dependencies, docker]
+    commit-message: { prefix: "build(deps)" }

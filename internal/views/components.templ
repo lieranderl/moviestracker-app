@@ -1,0 +1,83 @@
+package views
+
+import (
+	"github.com/lieranderl/moviestracker-app/internal/format"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+	"maps"
+	"net/url"
+	"slices"
+	"strings"
+)
+
+// tmdbRatingBadge is the TMDB score pill shown over hero imagery.
+templ tmdbRatingBadge(item tmdb.MediaItem) {
+	<span class="badge h-7 px-3 gap-1.5 text-xs font-semibold bg-black/50 backdrop-blur-md border-white/20 text-white" title={ item.TMDBRatingTitle() }>
+		<span class="bg-linear-to-r from-tmdb-start to-tmdb-end text-tmdb-ink text-[10px] font-black px-1 py-0.5 rounded-xs leading-none tracking-tight">TMDB</span>
+		<span class="font-bold text-tmdb-end">{ item.FormattedRating() }</span>
+		if item.FormattedVoteCount() != "" {
+			<span class="text-white/60 font-normal text-[11px] font-mono">({ item.FormattedVoteCount() })</span>
+		}
+	</span>
+}
+
+// imdbBadge is the shared IMDb pill used by the loading and loaded states.
+templ imdbBadge(title string, loading bool) {
+	<span class={ "badge h-7 px-3 gap-1.5 text-xs font-semibold bg-black/50 backdrop-blur-md border-white/20 text-white", templ.KV("opacity-80", loading) } title={ title }>
+		<span class="bg-imdb text-black text-[10px] font-black px-1 py-0.5 rounded-xs leading-none tracking-tight">IMDb</span>
+		{ children... }
+	</span>
+}
+
+// HeroIMDbRatingBadge loads its own rating after first paint.
+templ HeroIMDbRatingBadge(elementID string, imdbID string) {
+	<div
+		id={ elementID }
+		class="inline-flex items-center"
+		data-init={ "@get('" + IMDbRatingURL(map[string]string{elementID: imdbID}) + "')" }
+	>
+		@imdbBadge("Fetching IMDb rating…", true) {
+			<span class="loading loading-spinner loading-xs text-warning" aria-label="Loading"></span>
+		}
+	</div>
+}
+
+// pendingIMDbRating is a loading badge filled by a request made elsewhere
+// (see heroIMDbRequest).
+templ pendingIMDbRating(elementID string) {
+	<div id={ elementID } class="inline-flex items-center">
+		@imdbBadge("Fetching IMDb rating…", true) {
+			<span class="loading loading-spinner loading-xs text-warning" aria-label="Loading"></span>
+		}
+	</div>
+}
+
+// IMDbRatingURL is one request that patches every badge id → IMDb id,
+// ordered by badge id so the URL is stable.
+func IMDbRatingURL(badges map[string]string) string {
+	var b strings.Builder
+	b.WriteString("/api/movies/imdb-rating?")
+	for i, target := range slices.Sorted(maps.Keys(badges)) {
+		if i > 0 {
+			b.WriteString("&")
+		}
+		b.WriteString("id=")
+		b.WriteString(url.QueryEscape(badges[target]))
+		b.WriteString("&target=")
+		b.WriteString(url.QueryEscape(target))
+	}
+	return b.String()
+}
+
+templ IMDbRatingFragment(targetID string, rating string, votes string) {
+	<div id={ targetID } class="inline-flex items-center">
+		if rating != "" && rating != "N/A" {
+			{{ formattedVotes := format.FormatVotes(votes) }}
+			@imdbBadge(format.RatingTitle("IMDb", rating, formattedVotes), false) {
+				<span class="font-bold text-imdb">{ rating }</span>
+				if formattedVotes != "" {
+					<span class="text-white/60 font-normal text-[11px] font-mono">({ formattedVotes })</span>
+				}
+			}
+		}
+	</div>
+}

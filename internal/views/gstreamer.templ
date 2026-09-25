@@ -1,0 +1,214 @@
+package views
+
+import "fmt"
+
+// GStreamerSetup is what the GStreamer card shows. Moviestracker can
+// download GStreamer only when it runs TorrServer itself in the macOS app.
+type GStreamerSetup struct {
+	Can      bool   // this server can download GStreamer
+	Admin    bool   // the viewer may start it
+	Phase    string // "", "downloading", "installing", "done" or "failed"
+	Percent  int    // of the download
+	Progress string // "87 MB of 154 MB"
+	Size     string // the download's size
+	Error    string // why the last install failed
+	// Installed is the GStreamer Moviestracker downloaded, Pinned the one
+	// this version installs.
+	Installed, Pinned string
+	Working           bool   // TorrServer's GStreamer works
+	Version           string // the working GStreamer's version
+}
+
+func (v GStreamerSetup) running() bool {
+	return v.Phase == "downloading" || v.Phase == "installing" || v.Phase == "starting"
+}
+
+// gstStepsDone is how many install steps are done or under way.
+func (v GStreamerSetup) gstStepsDone() int {
+	switch v.Phase {
+	case "downloading":
+		return 1
+	case "installing":
+		return 2
+	case "starting":
+		return 3
+	case "done":
+		return 4
+	}
+	return 0
+}
+
+func (v GStreamerSetup) update() bool {
+	return v.Installed != "" && v.Pinned != "" && v.Installed != v.Pinned
+}
+
+// shown reports whether the card has something to say: compact cards (the
+// TorrServer page, the dashboard) stay empty when all is well.
+func (v GStreamerSetup) shown(compact bool) bool {
+	if !v.Can {
+		return false
+	}
+	return !compact || v.Phase != "" || v.update() || !v.Working
+}
+
+func gstInstallAction(compact bool) string {
+	if compact {
+		return "@post('/api/gstreamer/install?compact=1')"
+	}
+	return "@post('/api/gstreamer/install')"
+}
+
+func gstDismissAction(compact bool) string {
+	if compact {
+		return "@post('/api/gstreamer/dismiss?compact=1')"
+	}
+	return "@post('/api/gstreamer/dismiss')"
+}
+
+// GStreamerLive keeps the card current while the page is open.
+templ GStreamerLive(v GStreamerSetup, compact bool) {
+	if v.Can {
+		<div
+			if compact {
+				data-init="@get('/api/gstreamer?compact=1', {retry: 'always'})"
+			} else {
+				data-init="@get('/api/gstreamer', {retry: 'always'})"
+			}
+		>
+			@GStreamerCard(v, compact)
+		</div>
+	}
+}
+
+// GStreamerCard offers GStreamer, shows its download, and says whether the
+// browser plays MKV files.
+templ GStreamerCard(v GStreamerSetup, compact bool) {
+	<div id="gst-setup">
+		if v.shown(compact) {
+			<section class={ "card bg-base-200/60 border shadow-sm", templ.KV("border-base-content/10", v.Working && !v.update()), templ.KV("border-info/30", !v.Working || v.update()) } aria-labelledby="gst-setup-title">
+				<div class="card-body gap-4 p-5 sm:p-6">
+					<header class="flex flex-wrap items-center justify-between gap-3">
+						<h2 id="gst-setup-title" class="text-lg font-bold flex items-center gap-2">
+							@Icon("monitor-play", "size-5 text-primary")
+							Play MKV files in the browser
+						</h2>
+						@gstBadge(v)
+					</header>
+					if v.gstStepsDone() > 0 {
+						@gstSteps(v.gstStepsDone())
+					}
+					switch {
+						case v.Phase == "downloading":
+							@gstProgress(v)
+						case v.Phase == "installing":
+							<div class="space-y-2" role="status">
+								<progress class="progress progress-primary w-full" aria-label="Installing GStreamer"></progress>
+								<p class="text-sm text-base-content/70">Installing GStreamer { v.Pinned }… TorrServer restarts when it is ready.</p>
+							</div>
+						case v.Phase == "starting":
+							<div class="space-y-2" role="status">
+								<progress class="progress progress-primary w-full" aria-label="Starting TorrServer"></progress>
+								<p class="text-sm text-base-content/70">Starting TorrServer with GStreamer { v.Pinned }… This takes a few seconds.</p>
+							</div>
+						case v.Phase == "done":
+							<div role="status" class="alert alert-success alert-soft text-sm">
+								@Icon("circle-check", "size-4")
+								<span class="grow">GStreamer { v.Pinned } is ready: TorrServer runs with it, so MKV files now play in the browser.</span>
+								<button type="button" class="btn btn-ghost btn-xs btn-circle" aria-label="Close" title="Close" data-on:click={ gstDismissAction(compact) }>
+									@Icon("x", "size-4")
+								</button>
+							</div>
+						case v.Phase == "failed":
+							<div role="alert" class="alert alert-error alert-soft text-sm items-start">
+								@Icon("circle-alert", "size-4 mt-0.5")
+								<div>
+									<p class="font-semibold">GStreamer was not installed</p>
+									<p>{ v.Error }</p>
+								</div>
+							</div>
+							@gstButton(v, compact, "rotate-ccw", "Try again")
+						case v.update():
+							<p class="text-sm text-base-content/70">
+								GStreamer { v.Pinned } comes with this version of Moviestracker; TorrServer uses { v.Installed } until you update.
+							</p>
+							@gstButton(v, compact, "download", fmt.Sprintf("Update GStreamer to %s (%s)", v.Pinned, v.Size))
+						case v.Working:
+							<p class="text-sm text-base-content/70">
+								TorrServer converts MKV files and their AC3 or DTS audio with GStreamer { v.Version } as they play, so every browser plays them.
+								if v.Installed != "" {
+									Moviestracker downloaded it into its data folder.
+								}
+							</p>
+						default:
+							@gstWhy()
+							@gstButton(v, compact, "download", fmt.Sprintf("Install GStreamer (%s)", v.Size))
+					}
+				</div>
+			</section>
+		}
+	</div>
+}
+
+templ gstBadge(v GStreamerSetup) {
+	switch {
+		case v.running():
+			<span class="badge badge-info badge-soft gap-1.5">
+				<span class="loading loading-spinner loading-xs"></span>
+				Installing
+			</span>
+		case v.Phase == "done":
+			<span class="badge badge-success badge-soft">GStreamer { v.Pinned }</span>
+		case v.Phase == "failed":
+			<span class="badge badge-error badge-soft">Not installed</span>
+		case v.update():
+			<span class="badge badge-info badge-soft">Update available</span>
+		case v.Working:
+			<span class="badge badge-success badge-soft">GStreamer { v.Version }</span>
+		default:
+			<span class="badge badge-warning badge-soft">Not installed</span>
+	}
+}
+
+templ gstWhy() {
+	<div class="text-sm text-base-content/70 space-y-2 max-w-3xl">
+		<p>
+			Browsers cannot play MKV files, the usual format of movie torrents, nor their AC3 or DTS audio.
+			With GStreamer, TorrServer turns them into a stream every browser plays, converting only what it must.
+		</p>
+		<p>Without it, MKV files still play in VLC, IINA, Infuse and on TVs through the Direct links.</p>
+	</div>
+}
+
+templ gstProgress(v GStreamerSetup) {
+	<div class="space-y-2" role="status">
+		<progress class="progress progress-primary w-full" value={ fmt.Sprint(v.Percent) } max="100" aria-label="GStreamer download"></progress>
+		<p class="flex flex-wrap justify-between gap-2 text-sm text-base-content/70">
+			<span>Downloading GStreamer { v.Pinned }… { v.Progress }</span>
+			<span class="font-mono tabular-nums">{ fmt.Sprint(v.Percent) }%</span>
+		</p>
+		<p class="text-xs text-base-content/60">It continues if you leave this page.</p>
+	</div>
+}
+
+templ gstButton(v GStreamerSetup, compact bool, icon, label string) {
+	if v.Admin {
+		<div class="flex flex-wrap items-center gap-3">
+			<button type="button" class="btn btn-primary btn-sm gap-2" data-on:click={ gstInstallAction(compact) }>
+				@Icon(icon, "size-4")
+				{ label }
+			</button>
+			<span class="text-xs text-base-content/60">From gstreamer.freedesktop.org, about 350 MB on disk. No admin password.</span>
+		</div>
+	} else {
+		<p class="text-sm text-base-content/60">Ask an administrator to install it.</p>
+	}
+}
+
+// gstSteps shows where the install is: download, install, start, ready.
+templ gstSteps(done int) {
+	<ul class="steps steps-horizontal w-full text-xs" aria-label="Install steps">
+		for n, step := range []string{"Download", "Install", "Start TorrServer", "Ready"} {
+			<li class={ "step", templ.KV("step-primary", n < done) }>{ step }</li>
+		}
+	</ul>
+}

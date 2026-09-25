@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+@source "../internal/**/*.templ";
+@source "./*.js";
+/* Prose can name class-like words ("ring buffers"); keep docs out of the CSS. */
+@source not "../docs";
+/* Named only as data-class:cursor-none, which Tailwind does not pick up. */
+@source inline("cursor-none");
+
+@plugin "daisyui" {
+  themes: githublight --default, githubdark --prefersdark;
+  logs: false;
+}
+
+@plugin "daisyui/theme" {
+  name: "githublight";
+  default: true;
+  prefersdark: false;
+  color-scheme: "light";
+  --color-base-100: #e7e9ec;
+  --color-base-200: #dadee3;
+  --color-base-300: #c1c8cf;
+  --color-base-content: #292f36;
+  --color-primary: #1067ce;
+  --color-primary-content: #ffffff;
+  --color-secondary: #7b4ed1;
+  --color-secondary-content: oklch(29% 0.066 243.157);
+  --color-accent: #da6147;
+  --color-accent-content: oklch(28% 0.066 53.813);
+  --color-neutral: #2f9b4f;
+  --color-neutral-content: oklch(98% 0.001 106.423);
+  --color-info: #52a3ee;
+  --color-info-content: oklch(97% 0.013 236.62);
+  --color-success: #2f9b4f;
+  --color-success-content: oklch(98% 0.018 155.826);
+  --color-warning: #d9b84f;
+  --color-warning-content: oklch(98% 0.022 95.277);
+  --color-error: #eb7a7c;
+  --color-error-content: oklch(97% 0.013 17.38);
+  --radius-selector: 1rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+    name: "githubdark";
+    default: false;
+    prefersdark: false;
+    color-scheme: "dark";
+    --color-base-100: #0f1317;
+    --color-base-200: #161b22;
+    --color-base-300: #21252c;
+    --color-base-content: #dbe1e6;
+    --color-primary: #106cd4;
+    --color-primary-content: oklch(96% 0.018 272.314);
+    --color-secondary: #ac81e9;
+    --color-secondary-content: oklch(94% 0.028 342.258);
+    --color-accent: #36b4be;
+    --color-accent-content: oklch(38% 0.063 188.416);
+    --color-neutral: #5298e9;
+    --color-neutral-content: oklch(92% 0.004 286.32);
+    --color-info: #a2d4e7;
+    --color-info-content: oklch(29% 0.066 243.157);
+    --color-success: #2dac4a;
+    --color-success-content: #eee8d5;
+    --color-warning: #dfb457;
+    --color-warning-content: oklch(41% 0.112 45.904);
+    --color-error: #e9726a;
+    --color-error-content: oklch(27% 0.105 12.094);
+    --radius-selector: 0.5rem;
+    --radius-field: 0.5rem;
+    --radius-box: 0.5rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 1px;
+    --depth: 0;
+    --noise: 0;
+}
+
+/* Third-party brand colors (IMDb / TMDB rating pills). Centralized here per
+   the "literal colors only in app.css" rule; used as bg-imdb, text-tmdb-end… */
+@theme {
+  --color-imdb: #f5c518;
+  --color-tmdb-start: #90cea1;
+  --color-tmdb-end: #01b4e4;
+  --color-tmdb-ink: #081c22;
+}
+
+@utility user-popover-anchor {
+  anchor-name: --user-popover-anchor;
+}
+
+@utility user-popover-menu {
+  position-anchor: --user-popover-anchor;
+}
+
+.trailer-fade-in {
+  opacity: 1 !important;
+  transition: opacity 1s ease-in-out 1.2s;
+}
+
+.trailer-fade-out {
+  opacity: 0 !important;
+  transition: opacity 0.3s ease-in-out 0s;
+}
+
+/* Lift native subtitle cues above the TorrServer player's custom control bar
+   while it is visible (WebKit/Blink expose the cue container). */
+video.controls-shown::-webkit-media-text-track-container {
+  transform: translateY(-4.5rem);
+  transition: transform 0.2s ease-out;
+}

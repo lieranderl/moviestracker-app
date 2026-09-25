@@ -1,0 +1,80 @@
+package views
+
+import (
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+	"net/url"
+	"regexp"
+	"strings"
+)
+
+// officialLink is one icon link in a title's or person's links row.
+type officialLink struct {
+	Label string
+	URL   string
+	// Brand is a Simple Icons slug; Icon a Lucide name for non-brand links.
+	Brand string
+	Icon  string
+}
+
+// profileID accepts the handle and id shapes TMDB reports; anything else is
+// dropped rather than escaped into a URL path.
+var profileID = regexp.MustCompile(`^@?[A-Za-z0-9._-]{1,100}$`)
+
+// officialLinks builds the links row. imdbKind is "title" or "name".
+func officialLinks(imdbKind string, ids tmdb.ExternalIDs, homepage string) []officialLink {
+	var links []officialLink
+	if u, err := url.Parse(homepage); err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" {
+		links = append(links, officialLink{Label: "Official website", URL: u.String(), Icon: "globe"})
+	}
+	// Brand slugs are written as Brand: "x" literals so frontend/icons.mjs
+	// embeds their logos.
+	add := func(id string, link officialLink, build func(string) string) {
+		if profileID.MatchString(id) {
+			link.URL = build(id)
+			links = append(links, link)
+		}
+	}
+	add(ids.IMDb, officialLink{Label: "IMDb", Brand: "imdb"}, func(id string) string { return "https://www.imdb.com/" + imdbKind + "/" + id + "/" })
+	add(ids.Instagram, officialLink{Label: "Instagram", Brand: "instagram"}, func(id string) string { return "https://www.instagram.com/" + id + "/" })
+	add(ids.Facebook, officialLink{Label: "Facebook", Brand: "facebook"}, func(id string) string { return "https://www.facebook.com/" + id })
+	add(ids.Twitter, officialLink{Label: "X", Brand: "x"}, func(id string) string { return "https://x.com/" + id })
+	add(ids.TikTok, officialLink{Label: "TikTok", Brand: "tiktok"}, func(id string) string { return "https://www.tiktok.com/@" + strings.TrimPrefix(id, "@") })
+	add(ids.YouTube, officialLink{Label: "YouTube", Brand: "youtube"}, func(id string) string {
+		if strings.HasPrefix(id, "@") {
+			return "https://www.youtube.com/" + id
+		}
+		return "https://www.youtube.com/channel/" + id
+	})
+	add(ids.Wikidata, officialLink{Label: "Wikidata", Brand: "wikidata"}, func(id string) string { return "https://www.wikidata.org/wiki/" + id })
+	return links
+}
+
+// BrandIcon renders a Simple Icons brand logo in the current text color.
+templ BrandIcon(slug, class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class={ "shrink-0", class } aria-hidden="true" focusable="false">
+		<path d={ brandIconPath(slug) }></path>
+	</svg>
+}
+
+templ officialLinksRow(links []officialLink) {
+	if len(links) > 0 {
+		<nav aria-label="Official links" class="flex flex-wrap items-center gap-1 -ml-2">
+			for _, l := range links {
+				<a
+					href={ templ.SafeURL(l.URL) }
+					target="_blank"
+					rel="noopener noreferrer"
+					class="btn btn-ghost btn-circle btn-sm tooltip tooltip-bottom"
+					data-tip={ l.Label }
+					aria-label={ l.Label }
+				>
+					if l.Brand != "" {
+						@BrandIcon(l.Brand, "size-4")
+					} else {
+						@Icon(l.Icon, "size-4")
+					}
+				</a>
+			}
+		</nav>
+	}
+}

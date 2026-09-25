@@ -1,0 +1,34 @@
+Moviestracker
+Copyright 2026 lieranderl and the Moviestracker contributors
+
+This product includes software developed by the Moviestracker contributors,
+licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Bundled in the program (static/ and the files generated from frontend/):
+
+- Datastar (https://data-star.dev), Copyright (c) Star Federation, MIT License.
+- hls.js (https://github.com/video-dev/hls.js), Copyright (c) 2017 Dailymotion,
+  Apache License 2.0.
+- Tailwind CSS (https://tailwindcss.com), Copyright (c) Tailwind Labs, Inc., MIT License.
+- daisyUI (https://daisyui.com), Copyright (c) Pouya Saadeghi, MIT License.
+- The icons, including the Moviestracker app icon, are drawn from Lucide
+  (https://lucide.dev), Copyright (c) Lucide Contributors, ISC License.
+- Brand icons from Simple Icons (https://simpleicons.org), CC0 1.0; the brands
+  are trademarks of their owners.
+
+Go modules are listed in go.mod; each keeps its own license.
+
+The macOS app and Linux archives include TorrServer (https://github.com/YouROK/TorrServer),
+an unmodified separate program licensed under the GNU General Public License v3.
+Moviestracker runs it as its own process and talks to it over HTTP; its license
+and a link to its source travel with it.
+
+The macOS app can download GStreamer (https://gstreamer.freedesktop.org), licensed
+under the GNU Lesser General Public License, from its official site at the user's
+request; it is not part of this source tree or of the release downloads.
+
+The agent skills in .agents/skills/golang-* are copied from samber/cc-skills-golang
+(https://github.com/samber/cc-skills-golang), Copyright (c) 2026 Samuel Berthe,
+MIT License (see .agents/skills/LICENSE-cc-skills-golang).
+
+This product uses the TMDB API but is not endorsed or certified by TMDB.

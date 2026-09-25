@@ -1,0 +1,68 @@
+package views
+
+import "github.com/lieranderl/moviestracker-app/internal/tmdb"
+
+// DiscoverRail is one lazily loaded rail on the home page.
+type DiscoverRail struct {
+	Slug     string
+	Title    string
+	Subtitle string
+	Icon     string
+	List     tmdb.List
+}
+
+// DiscoverRails are streamed in by /api/discover, in page order.
+var DiscoverRails = []DiscoverRail{
+	{Slug: "now-playing", Title: "Now playing in theaters", Subtitle: "In cinemas right now", Icon: "ticket", List: tmdb.NowPlayingMovies},
+	{Slug: "popular-movies", Title: "Popular movies", Subtitle: "What everyone is watching", Icon: "flame", List: tmdb.PopularMovies},
+	{Slug: "top-rated-movies", Title: "Top rated movies", Subtitle: "All-time favourites on TMDB", Icon: "award", List: tmdb.TopRatedMovies},
+	{Slug: "popular-series", Title: "Popular series", Subtitle: "Shows people are streaming", Icon: "tv", List: tmdb.PopularSeries},
+	{Slug: "top-rated-series", Title: "Top rated series", Subtitle: "The highest rated shows", Icon: "trophy", List: tmdb.TopRatedSeries},
+}
+
+func (d DiscoverRail) id() string { return "discover-" + d.Slug }
+
+// discoverSection renders skeleton rails; one SSE request fills them in as
+// each TMDB list arrives, so the home page never waits on them.
+templ discoverSection() {
+	<div class="space-y-10" data-init="@get('/api/discover')">
+		for _, d := range DiscoverRails {
+			<section id={ d.id() } class="space-y-4" aria-busy="true" aria-label={ d.Title }>
+				@discoverHeader(d)
+				<div class="flex gap-4 overflow-hidden pb-3" aria-hidden="true">
+					for range [7]struct{}{} {
+						<div class="skeleton w-40 sm:w-48 aspect-[2/3] shrink-0"></div>
+					}
+				</div>
+			</section>
+		}
+	</div>
+}
+
+templ discoverHeader(d DiscoverRail) {
+	<header>
+		<h2 class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
+			@Icon(d.Icon, "size-5 text-primary")
+			{ d.Title }
+		</h2>
+		<p class="text-sm text-base-content/60">{ d.Subtitle }</p>
+	</header>
+}
+
+// DiscoverRailLoaded replaces a skeleton rail; an empty list collapses it.
+templ DiscoverRailLoaded(d DiscoverRail, items []tmdb.MediaItem) {
+	if len(items) == 0 {
+		<section id={ d.id() } class="hidden"></section>
+	} else {
+		<section id={ d.id() } class="space-y-4" aria-label={ d.Title }>
+			@discoverHeader(d)
+			<ul class="carousel carousel-start w-[calc(100%+2rem)] gap-4 scroll-smooth scroll-px-4 -mx-4 px-4 -mt-3 pt-3 -mb-5 pb-8">
+				for _, item := range items {
+					<li class="carousel-item">
+						@MediaCard(item)
+					</li>
+				}
+			</ul>
+		</section>
+	}
+}

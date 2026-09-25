@@ -1,0 +1,268 @@
+package views
+
+import (
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/torrserver"
+	"fmt"
+)
+
+// settingsNavItem is one entry of the settings menu.
+type settingsNavItem struct {
+	ID, Title, Icon string
+}
+
+var settingsNav = []settingsNavItem{
+	{"sources", "Sources", "plug"},
+	{"engine", "Torrent engine", "cpu"},
+	{"streaming", "Streaming", "monitor-play"},
+	{"storage", "Storage", "hard-drive"},
+	{"network", "Network", "network"},
+	{"sharing", "Other devices", "cast"},
+	{"gstreamer", "GStreamer", "film"},
+	{"users", "Users", "users"},
+	{"security", "Security", "shield"},
+}
+
+// settingsShell is the settings layout: the menu and the active page.
+templ settingsShell(user *auth.User, active, title string) {
+	@Layout(title + " · Settings") {
+		@Navbar(user)
+		<main class="grow w-full max-w-6xl mx-auto px-4 sm:px-8 py-10 grid gap-8 lg:grid-cols-[14rem_1fr]">
+			<nav aria-label="Settings">
+				<p class="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-3">Settings</p>
+				<ul class="menu menu-sm lg:menu-md bg-base-200/60 rounded-box w-full border border-base-content/10">
+					for _, item := range settingsNav {
+						<li>
+							<a href={ templ.SafeURL("/settings/" + item.ID) } class={ templ.KV("menu-active", item.ID == active) } aria-current?={ item.ID == active }>
+								@Icon(item.Icon, "size-4")
+								{ item.Title }
+							</a>
+						</li>
+					}
+				</ul>
+			</nav>
+			<div class="min-w-0 space-y-6">
+				{ children... }
+			</div>
+		</main>
+		@siteFooter()
+	}
+}
+
+// SettingChoice is one option of a select setting; Value is JSON.
+type SettingChoice struct {
+	Value string
+	Label string
+}
+
+// SettingField is one editable setting.
+type SettingField struct {
+	Key, Label, Help, Kind, Unit string
+	Min, Max                     int64
+	Choices                      []SettingChoice
+	// ReadOnly, when set, explains why the setting cannot be changed here.
+	ReadOnly string
+}
+
+// SettingsSection is a settings page backed by TorrServer.
+type SettingsSection struct {
+	ID, Title, Icon, Intro string
+	Fields                 []SettingField
+	// Values are the current values, keyed by field, as the form shows them.
+	Values map[string]any
+	// Cost explains what saving does to TorrServer.
+	Cost string
+	// Playing is how many streams saving would interrupt.
+	Playing int
+	// Unavailable, when set, replaces the form (TorrServer unreachable…).
+	Unavailable string
+	SaveURL     string
+	ResetURL    string
+	Header      templ.Component
+}
+
+// SettingsPage shows one settings section.
+templ SettingsPage(user *auth.User, s SettingsSection) {
+	@settingsShell(user, s.ID, s.Title) {
+		<header class="space-y-2">
+			<h1 class="text-3xl font-bold tracking-tight flex items-center gap-3">
+				@Icon(s.Icon, "size-7 text-primary")
+				{ s.Title }
+			</h1>
+			<p class="text-base-content/70">{ s.Intro }</p>
+		</header>
+		if s.Header != nil {
+			@s.Header
+		}
+		@SettingsForm(s, SourceStatus{})
+	}
+}
+
+func settingsSignals(s SettingsSection) string {
+	signals, _ := templ.JSONString(map[string]any{s.ID: s.Values, s.ID + "Saving": false})
+	return signals
+}
+
+func playingWarning(n int) string {
+	if n == 1 {
+		return "1 stream is playing and will pause while TorrServer reconnects."
+	}
+	return fmt.Sprintf("%d streams are playing and will pause while TorrServer reconnects.", n)
+}
+
+// SettingsForm is the patchable form of a section.
+templ SettingsForm(s SettingsSection, st SourceStatus) {
+	<section id={ "settings-" + s.ID } class="card bg-base-200/60 border border-base-content/10">
+		<div class="card-body gap-5">
+			if s.Unavailable != "" {
+				<div role="status" class="alert alert-warning alert-soft">
+					@Icon("plug-zap", "size-5")
+					<span>{ s.Unavailable }</span>
+				</div>
+			} else {
+				<form
+					class="space-y-5"
+					data-signals={ settingsSignals(s) }
+					data-indicator={ s.ID + "Saving" }
+					data-on:submit={ fmt.Sprintf("@post('%s', {filterSignals: {include: /^%s\\./}})", s.SaveURL, s.ID) }
+				>
+					for _, f := range s.Fields {
+						@settingInput(s.ID, f)
+					}
+					<div class="flex flex-wrap items-center gap-3 pt-2">
+						<button type="submit" class="btn btn-primary" data-attr:disabled={ "$" + s.ID + "Saving" }>
+							<span class="loading loading-spinner loading-xs hidden" data-class:hidden={ "!$" + s.ID + "Saving" }></span>
+							Save
+						</button>
+						if s.ResetURL != "" {
+							<button type="button" class="btn btn-ghost" data-on:click={ fmt.Sprintf("confirm('Restore the default settings?') && @post('%s', {filterSignals: {include: /^$/}})", s.ResetURL) }>
+								Restore defaults
+							</button>
+						}
+						if s.Cost != "" {
+							<span class="text-xs text-base-content/60">{ s.Cost }</span>
+						}
+					</div>
+					if s.Playing > 0 {
+						<div role="status" class="alert alert-warning alert-soft text-sm py-2.5">
+							@Icon("circle-alert", "size-4")
+							<span>{ playingWarning(s.Playing) }</span>
+						</div>
+					}
+				</form>
+			}
+			@sourceStatus(st)
+		</div>
+	</section>
+}
+
+templ settingInput(section string, f SettingField) {
+	{{ bind := section + "." + f.Key }}
+	<div class="grid gap-1.5 sm:grid-cols-[16rem_1fr] sm:items-start">
+		<label for={ "setting-" + section + "-" + f.Key } class="text-sm font-medium pt-2">{ f.Label }</label>
+		<div class="space-y-1">
+			switch f.Kind {
+				case "bool":
+					<input id={ "setting-" + section + "-" + f.Key } type="checkbox" class="toggle toggle-primary mt-1.5" data-bind={ bind } disabled?={ f.ReadOnly != "" }/>
+				case "int":
+					<label class="input w-full max-w-xs">
+						<input id={ "setting-" + section + "-" + f.Key } type="number" class="grow font-mono" min={ fmt.Sprint(f.Min) } max={ fmt.Sprint(f.Max) } data-bind={ bind } disabled?={ f.ReadOnly != "" }/>
+						if f.Unit != "" {
+							<span class="text-xs text-base-content/60">{ f.Unit }</span>
+						}
+					</label>
+				case "select":
+					<select id={ "setting-" + section + "-" + f.Key } class="select w-full max-w-md" data-bind={ bind } disabled?={ f.ReadOnly != "" }>
+						for _, c := range f.Choices {
+							<option value={ c.Value }>{ c.Label }</option>
+						}
+					</select>
+				case "textarea":
+					<textarea id={ "setting-" + section + "-" + f.Key } rows="5" class="textarea w-full font-mono text-xs" data-bind={ bind } disabled?={ f.ReadOnly != "" }></textarea>
+				default:
+					<input id={ "setting-" + section + "-" + f.Key } type="text" class="input w-full font-mono" autocomplete="off" spellcheck="false" data-bind={ bind } disabled?={ f.ReadOnly != "" }/>
+			}
+			if f.ReadOnly != "" {
+				<p class="text-xs text-warning">{ f.ReadOnly }</p>
+			} else if f.Help != "" {
+				<p class="text-xs text-base-content/60">{ f.Help }</p>
+			}
+		</div>
+	</div>
+}
+
+// SecurityPage offers cancelling every shared stream link.
+templ SecurityPage(user *auth.User, st SourceStatus) {
+	@settingsShell(user, "security", "Security") {
+		<header class="space-y-2">
+			<h1 class="text-3xl font-bold tracking-tight flex items-center gap-3">
+				@Icon("shield", "size-7 text-primary")
+				Security
+			</h1>
+		</header>
+		@SecurityLinks(st)
+	}
+}
+
+// SecurityLinks is the patchable shared-links card.
+templ SecurityLinks(st SourceStatus) {
+	<section id="security-links" class="card bg-base-200/60 border border-base-content/10">
+		<div class="card-body gap-4">
+			<h2 class="card-title">
+				@Icon("link", "size-5 text-primary")
+				Shared stream links
+			</h2>
+			<p class="text-sm text-base-content/70">
+				Links copied for VLC, TVs and playlists work without signing in for 7 days, each for one file.
+				If one got into the wrong hands, cancel all of them: new links work at once, old ones stop.
+			</p>
+			<div>
+				<button type="button" class="btn btn-error btn-outline" data-on:click="confirm('Cancel every shared link? Saved playlists will stop working.') && @post('/api/settings/security/cancel-links', {filterSignals: {include: /^$/}})">
+					@Icon("link-2-off", "size-4")
+					Cancel all shared links
+				</button>
+			</div>
+			@sourceStatus(st)
+		</div>
+	</section>
+}
+
+const (
+	hdrToneMapHelp = "TorrServer can convert HDR video to SDR, for screens and browsers that cannot show HDR."
+	hdrKeptHelp    = "This GStreamer cannot convert HDR video to SDR, so HDR files stream as HDR. On an HDR screen in Safari they look right; on an SDR screen, or in a browser without HDR, they can look dark or washed out. Direct play in VLC or IINA handles this itself."
+)
+
+// GStreamerRuntime shows what TorrServer's GStreamer can do.
+templ GStreamerRuntime(echo torrserver.EchoInfo) {
+	<div class="flex flex-wrap items-center gap-2">
+		if echo.GSTAvailable {
+			<span class="badge badge-success badge-soft gap-1.5">
+				@Icon("circle-check", "size-3.5")
+				{ "GStreamer " + echo.GSTVersion }
+			</span>
+		} else {
+			<span class="badge badge-warning badge-soft gap-1.5">
+				@Icon("circle-alert", "size-3.5")
+				GStreamer is not installed on this machine
+			</span>
+		}
+		if echo.Discoverer {
+			<span class="badge badge-ghost">gst-discoverer</span>
+		}
+		if echo.HDRTonemap {
+			<span class="tooltip tooltip-bottom" data-tip={ hdrToneMapHelp }>
+				<span class="badge badge-ghost gap-1.5">
+					HDR tone mapping
+					@Icon("info", "size-3.5 opacity-60")
+				</span>
+			</span>
+		} else {
+			<span class="tooltip tooltip-bottom" data-tip={ hdrKeptHelp }>
+				<span class="badge badge-ghost gap-1.5">
+					HDR stays HDR (no tone mapping)
+					@Icon("info", "size-3.5 opacity-60")
+				</span>
+			</span>
+		}
+	</div>
+}

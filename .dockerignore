@@ -1,0 +1,21 @@
+# The Dockerfile copies this folder into its build stage: keep secrets,
+# local data and build output out (packaging/dockerignore_test.go checks).
+.git
+.github
+.claude
+.worktrees
+.tmdb-shared-key
+.env
+.env.*
+!.env.example
+.devdata
+bin
+dist
+tmp
+moviestracker_*
+installTorrServerMac.sh
+node_modules
+coverage.out
+build-errors.log
+*.log
+docs

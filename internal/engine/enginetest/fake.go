@@ -1,0 +1,89 @@
+// Package enginetest lets a test binary double as a fake TorrServer, so the
+// engine supervisor can be tested with a real child process.
+package enginetest
+
+import (
+	"encoding/json"
+	"flag"
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+	"time"
+)
+
+// FakeEnv set to "1" in a test binary's environment makes it a fake TorrServer.
+const FakeEnv = "ENGINE_FAKE_TORRSERVER"
+
+// RunFakeIfRequested serves as a fake TorrServer and exits when FakeEnv is
+// set; otherwise it returns at once. Call it first in TestMain.
+func RunFakeIfRequested() {
+	if os.Getenv(FakeEnv) != "1" {
+		return
+	}
+	fakeTorrServer()
+	os.Exit(0)
+}
+
+// fakeTorrServer accepts TorrServer's flags, enforces accs.db Basic auth like
+// `TorrServer --httpauth`, and exits after FAKE_EXIT_AFTER when set.
+func fakeTorrServer() {
+	fs := flag.NewFlagSet("torrserver", flag.ExitOnError)
+	ip := fs.String("ip", "", "")
+	port := fs.String("port", "8090", "")
+	dir := fs.String("path", ".", "")
+	fs.String("logpath", "", "")
+	httpAuth := fs.Bool("httpauth", false, "")
+	for _, name := range []string{"proxyurl", "proxymode", "pubipv4", "pubipv6", "maxsize", "torrentsdir"} {
+		fs.String(name, "", "")
+	}
+	_ = fs.Parse(os.Args[1:])
+
+	accounts := map[string]string{}
+	if *httpAuth {
+		raw, err := os.ReadFile(filepath.Join(*dir, "accs.db")) // #nosec G304 -- test fake
+		if err != nil || json.Unmarshal(raw, &accounts) != nil {
+			fmt.Fprintln(os.Stderr, "fake: unreadable accs.db")
+			os.Exit(3)
+		}
+	}
+	authorized := func(r *http.Request) bool {
+		user, pass, ok := r.BasicAuth()
+		return !*httpAuth || (ok && accounts[user] == pass)
+	}
+	if after, err := time.ParseDuration(os.Getenv("FAKE_EXIT_AFTER")); err == nil {
+		time.AfterFunc(after, func() { os.Exit(1) })
+	}
+	mux := http.NewServeMux()
+	// /args reports the command line, so tests see the flags the engine got.
+	mux.HandleFunc("GET /args", func(w http.ResponseWriter, r *http.Request) { _ = json.NewEncoder(w).Encode(os.Args[1:]) })
+	mux.HandleFunc("GET /echo", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("MatriX.fake")) })
+	mux.HandleFunc("POST /settings", func(w http.ResponseWriter, r *http.Request) {
+		if !authorized(r) {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte(`{"CacheSize":67108864}`))
+	})
+	mux.HandleFunc("POST /torrents", func(w http.ResponseWriter, r *http.Request) {
+		if !authorized(r) {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte(`[]`))
+	})
+	mux.HandleFunc("GET /shutdown", func(w http.ResponseWriter, r *http.Request) {
+		if !authorized(r) {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		go func() { time.Sleep(20 * time.Millisecond); os.Exit(0) }()
+	})
+	srv := &http.Server{Addr: net.JoinHostPort(*ip, *port), Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	if err := srv.ListenAndServe(); err != nil {
+		fmt.Fprintln(os.Stderr, "fake:", err)
+		os.Exit(2)
+	}
+}

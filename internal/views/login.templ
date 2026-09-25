@@ -1,0 +1,150 @@
+package views
+
+import "fmt"
+
+type disclaimerPoint struct {
+	Icon     string
+	Title    string
+	Body     string
+	LinkURL  string
+	LinkText string
+	Note     string
+}
+
+var disclaimerPoints = []disclaimerPoint{
+	{Icon: "heart", Title: "Free and non-commercial", Body: "Moviestracker is a free, non-commercial personal catalog."},
+	{Icon: "database", Title: "Metadata by TMDB", Body: "Movie and TV metadata and images are provided by The Movie Database.", LinkURL: tmdbHomeURL, LinkText: "themoviedb.org", Note: TMDBDisclaimer},
+	{Icon: "magnet", Title: "Search results by JacRed", Body: "Torrent search results, magnet links and source links are provided by JacRed.", LinkURL: torrentIndexURL, LinkText: "jacred.su"},
+	{Icon: "cloud-off", Title: "No media is hosted here", Body: "Moviestracker does not host, upload, seed, or distribute media."},
+	{Icon: "server", Title: "Runs on your own machine", Body: "Moviestracker and TorrServer run on your computer or home server; streams stay on your network."},
+	{Icon: "scale", Title: "Your responsibility", Body: "Only access content you are legally authorized to use."},
+}
+
+// Login renders the two-step sign-in card: the disclaimer until this browser
+// has accepted it, then the sign-in form.
+templ Login(consented bool, errorMsg string) {
+	@authPage("Sign in") {
+		if consented {
+			@SignInStep(errorMsg)
+		} else {
+			@ConsentStep()
+		}
+	}
+}
+
+// authPage is the centered card of the signed-out pages (sign-in, setup).
+templ authPage(title string) {
+	@Layout(title) {
+		<main class="relative grow bg-base-200/50 flex flex-col">
+			<div class="flex items-center justify-between px-4 sm:px-8 py-4">
+				@brand("/login")
+				@ThemeSwitcher()
+			</div>
+			<div class="grow flex items-center justify-center px-4 pb-12">
+				<div id="login-card" class="card w-full max-w-xl bg-base-100 shadow-xl border border-base-content/10">
+					{ children... }
+				</div>
+			</div>
+			@footer(false)
+		</main>
+	}
+}
+
+templ stepHeader(step, title, body string) {
+	<header class="space-y-2">
+		<p class="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{ step }</p>
+		<h1 class="text-2xl sm:text-3xl font-bold tracking-tight">{ title }</h1>
+		<p class="text-sm text-base-content/70">{ body }</p>
+	</header>
+}
+
+// ConsentStep is the disclaimer every browser accepts before signing in.
+// Plain form POST without JS; with Datastar the response patches SignInStep in.
+templ ConsentStep() {
+	<div id="login-step" class="card-body p-6 sm:p-10 gap-6" data-signals="{ accepted: false }">
+		@stepHeader("Step 1 of 2", "Before you sign in", "Please read how Moviestracker works and where its data comes from.")
+		@disclaimerList()
+		<form
+			action="/api/consent"
+			method="POST"
+			class="space-y-4"
+			data-on:submit="$accepted && @post('/api/consent', {filterSignals: {include: /^accepted$/}})"
+		>
+			<label class="flex items-start gap-3 cursor-pointer rounded-box bg-base-200/60 border border-base-content/5 p-4">
+				<input type="checkbox" name="accept" value="yes" required class="checkbox checkbox-primary mt-0.5" data-bind:accepted/>
+				<span class="text-sm">I have read and accept these terms, and I will only access content I am legally authorized to use.</span>
+			</label>
+			<button type="submit" class="btn btn-primary btn-block" data-attr:disabled="!$accepted">
+				Continue
+				@Icon("arrow-right", "size-4")
+			</button>
+		</form>
+	</div>
+}
+
+// SignInStep is the local account sign-in form.
+templ SignInStep(errorMsg string) {
+	<div
+		id="login-step"
+		class="card-body p-6 sm:p-10 gap-6"
+		data-signals={ fmt.Sprintf("{ username: '', password: '', submitting: false, errorMessage: %q }", errorMsg) }
+	>
+		@stepHeader("Step 2 of 2", "Sign in", "Use the account created when Moviestracker was set up.")
+		<!-- Error alert: fully signal-driven, the server only patches $errorMessage -->
+		<div
+			role="alert"
+			id="login-alert-container"
+			aria-live="assertive"
+			data-class:hidden="!$errorMessage"
+			class={ "alert alert-error alert-soft text-sm py-2.5", templ.KV("hidden", errorMsg == "") }
+		>
+			@Icon("circle-alert", "size-4")
+			<span data-text="$errorMessage">{ errorMsg }</span>
+		</div>
+		<form action="/api/login" method="POST" data-indicator:submitting data-on:submit="$errorMessage = ''; @post('/api/login')">
+			<fieldset class="fieldset gap-3" data-attr:disabled="$submitting">
+				<legend class="sr-only">Account</legend>
+				<label class="input w-full">
+					@Icon("user", "size-4 opacity-60")
+					<span class="sr-only">Username</span>
+					<input name="username" type="text" required autocomplete="username" autocapitalize="none" placeholder="Username" class="grow" data-bind:username/>
+				</label>
+				<label class="input w-full">
+					@Icon("lock", "size-4 opacity-60")
+					<span class="sr-only">Password</span>
+					<input name="password" type="password" required autocomplete="current-password" placeholder="Password" class="grow" data-bind:password/>
+				</label>
+				<button type="submit" id="submit-login-btn" class="btn btn-primary btn-block">
+					<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$submitting"></span>
+					<span data-text="$submitting ? 'Signing in…' : 'Sign in'">Sign in</span>
+				</button>
+			</fieldset>
+		</form>
+		<a href="/login?review=1" class="link link-hover text-xs text-base-content/60 text-center">Review the disclaimer</a>
+	</div>
+}
+
+// disclaimerList is how Moviestracker works and where its data comes from.
+templ disclaimerList() {
+	<ul class="list -mx-2">
+		for _, p := range disclaimerPoints {
+			<li class="list-row px-2 py-3">
+				<span class="size-9 rounded-field bg-base-200 grid place-items-center text-base-content/70">
+					@Icon(p.Icon, "size-4.5")
+				</span>
+				<div class="space-y-1">
+					<p class="font-semibold text-sm">{ p.Title }</p>
+					<p class="text-sm text-base-content/70 leading-relaxed">
+						{ p.Body }
+						if p.LinkURL != "" {
+							<a href={ templ.SafeURL(p.LinkURL) } target="_blank" rel="noopener noreferrer" class="link link-primary whitespace-nowrap">{ p.LinkText }</a>
+						}
+					</p>
+					if p.Note != "" {
+						<p class="text-xs text-base-content/60 italic">{ p.Note }</p>
+					}
+				</div>
+			</li>
+		}
+	</ul>
+}

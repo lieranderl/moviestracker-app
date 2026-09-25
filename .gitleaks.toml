@@ -1,0 +1,20 @@
+# Secret scanning (CI runs gitleaks over the whole history on every push).
+# Only made-up test values and documentation examples are allowed here;
+# a real key must never be added to this list: remove it and rotate it.
+title = "Moviestracker"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Made-up keys and tokens used by tests"
+regexTarget = "match"
+regexes = [
+  '''0123456789abcdef0123456789abcdef''',
+  '''fedcba9876543210fedcba9876543210''',
+  '''dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c\.1\.1790000000\.c2lnbmF0dXJl''',
+]
+
+[[allowlists]]
+description = "Examples of what not to do in the vendored Go security skill"
+paths = ['''^\.agents/skills/golang-security/references/secrets\.md$''']

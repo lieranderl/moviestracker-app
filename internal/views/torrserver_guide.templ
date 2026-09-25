@@ -1,0 +1,203 @@
+package views
+
+import (
+	"strconv"
+
+	"github.com/lieranderl/moviestracker-app/internal/torrserver"
+)
+
+// Setup facts from the TorrServer README (https://github.com/YouROK/TorrServer).
+const (
+	torrServerRepoURL     = "https://github.com/YouROK/TorrServer"
+	torrServerReleasesURL = torrServerRepoURL + "/releases/latest"
+	torrServerGstURL      = torrServerRepoURL + "#gstreamer"
+	gstreamerMacURL       = "https://gstreamer.freedesktop.org/download/#macos"
+	torrServerLocalURL    = "http://127.0.0.1:8090"
+	// torrServerWindowsGst has GStreamer built in: nothing else to install.
+	torrServerWindowsGst = "TorrServer-gst-windows-amd64.exe"
+	macGStreamerCommand  = "brew install gstreamer"
+	// macTorrServerCommand installs the GStreamer (-gst) build.
+	macTorrServerCommand = "curl -s https://raw.githubusercontent.com/YouROK/TorrServer/master/installTorrServerMac.sh -o installTorrServerMac.sh && chmod 755 installTorrServerMac.sh && bash ./installTorrServerMac.sh --install --gst"
+)
+
+// featureCard is one icon-titled benefit in a grid.
+type featureCard struct {
+	Icon  string
+	Tone  string
+	Title string
+	Body  string
+}
+
+// gstreamerBenefits explains, for viewers, what the GStreamer build adds.
+var gstreamerBenefits = []featureCard{
+	{Icon: "file-video", Tone: "text-primary", Title: "Plays MKV in the browser", Body: "Most releases are MKV files, which browsers cannot open. GStreamer repackages them on the fly into HLS, a format every modern browser plays."},
+	{Icon: "zap", Tone: "text-secondary", Title: "No quality loss", Body: "H.264, HEVC, AV1 and VP9 video is copied as-is, not re-encoded, so you see exactly the picture of the release."},
+	{Icon: "audio-lines", Tone: "text-accent", Title: "Every audio track", Body: "Cinema audio such as AC-3, E-AC-3 or DTS is converted to AAC so the browser can play it, and you can switch between dubs and languages in the player."},
+	{Icon: "captions", Tone: "text-success", Title: "Subtitles", Body: "Text subtitles inside the file become tracks you can turn on in the player."},
+}
+
+// copyCommand copies the text of any [data-copy] button inside the guide.
+const copyCommand = `const b = evt.target.closest('[data-copy]')
+if (b) (navigator.clipboard ? navigator.clipboard.writeText(b.dataset.copy) : Promise.reject()).then(() => { $toast = 'Command copied' }, () => { $toast = 'Copy failed: select the command instead' })`
+
+// TorrServerGuide helps set up playback: install steps while TorrServer is
+// unreachable, the GStreamer build while it runs without GStreamer, nothing
+// once GStreamer works. It is part of the live fragment, so it changes on its
+// own as soon as TorrServer answers.
+// canInstallGStreamer means Moviestracker runs the GStreamer build itself
+// and offers GStreamer in its own card, so no other build is suggested.
+templ TorrServerGuide(echo torrserver.EchoInfo, engine string, canInstallGStreamer bool) {
+	<div id="torr-setup-guide" data-on:click={ copyCommand }>
+		if echo.Version == "" {
+			<section class="card bg-base-200/60 border border-warning/30 shadow-sm" aria-labelledby="torr-setup-title">
+				<div class="card-body gap-5 p-6 sm:p-8">
+					<header class="space-y-2">
+						<h2 id="torr-setup-title" class="text-xl font-bold flex items-center gap-2">
+							@Icon("plug", "size-5 text-warning")
+							Set up TorrServer
+						</h2>
+						<p class="text-sm text-base-content/70 leading-relaxed max-w-3xl">
+							Moviestracker plays through <a href={ templ.SafeURL(torrServerRepoURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">TorrServer</a>,
+							a free program you run on your computer or home server. It streams a torrent over HTTP while it downloads,
+							so playback starts in seconds. TorrServer (<span class="font-mono">{ engine }</span>) is not answering yet.
+						</p>
+					</header>
+					@torrInstallTabs()
+					<div role="note" class="alert alert-soft text-sm items-start">
+						@Icon("info", "size-4 mt-0.5")
+						<div class="space-y-1">
+							<p>
+								Moviestracker connects to TorrServer (<span class="font-mono">{ engine }</span>) from this machine.
+								This page notices on its own once TorrServer answers.
+							</p>
+							<p>If TorrServer runs on another computer in your network, set its address in <a href="/settings/sources" class="link link-primary">Settings → Sources</a>, for example <span class="font-mono">http://192.168.1.50:8090</span>.</p>
+						</div>
+					</div>
+					@gstreamerWhy()
+				</div>
+			</section>
+		} else if !echo.GSTAvailable && !canInstallGStreamer {
+			<section class="card bg-base-200/60 border border-warning/30 shadow-sm" aria-labelledby="torr-gst-title">
+				<div class="card-body gap-5 p-6 sm:p-8">
+					<header class="space-y-2">
+						<h2 id="torr-gst-title" class="text-xl font-bold flex items-center gap-2">
+							@Icon("monitor-play", "size-5 text-warning")
+							Play right here with the GStreamer build
+						</h2>
+						<p class="text-sm text-base-content/70 leading-relaxed max-w-3xl">
+							TorrServer { echo.Version } is running without GStreamer. It still streams to external players such as VLC or IINA:
+							use the Link and Playlist buttons on a torrent. To play in the browser, switch to the GStreamer build of TorrServer.
+						</p>
+					</header>
+					@torrInstallTabs()
+					@gstreamerWhy()
+				</div>
+			</section>
+		}
+	</div>
+}
+
+// torrInstallTabs are the per-platform install steps (DaisyUI radio tabs, no JS).
+templ torrInstallTabs() {
+	<div class="tabs tabs-box tabs-sm">
+		<input type="radio" name="torr-install-os" class="tab" aria-label="macOS" checked/>
+		<div class="tab-content bg-base-100 border-base-content/10 rounded-box p-4 sm:p-5">
+			<ol class="space-y-4 text-sm">
+				@installStep(1, "Install GStreamer with Homebrew") {
+					@shellCommand(macGStreamerCommand)
+					<p class="text-xs text-base-content/60">
+						No Homebrew? Install the <a href={ templ.SafeURL(gstreamerMacURL) } target="_blank" rel="noopener noreferrer" class="link">official GStreamer runtime</a> instead.
+					</p>
+				}
+				@installStep(2, "Install TorrServer, GStreamer build, in Terminal") {
+					@shellCommand(macTorrServerCommand)
+					<p class="text-xs text-base-content/60">Works on Apple Silicon and Intel Macs.</p>
+				}
+				@installStep(3, "Check that it runs") {
+					@openTorrServer()
+				}
+			</ol>
+		</div>
+		<input type="radio" name="torr-install-os" class="tab" aria-label="Windows"/>
+		<div class="tab-content bg-base-100 border-base-content/10 rounded-box p-4 sm:p-5">
+			<ol class="space-y-4 text-sm">
+				@installStep(1, "Download TorrServer, GStreamer build") {
+					<p>
+						Download <span class="font-mono font-semibold">{ torrServerWindowsGst }</span> from the
+						<a href={ templ.SafeURL(torrServerReleasesURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">latest release</a>.
+						GStreamer is built into this file: there is nothing else to install.
+					</p>
+				}
+				@installStep(2, "Run it") {
+					<p>Double-click the file and keep it running while you watch. Windows may ask you to confirm an app from an unknown publisher.</p>
+				}
+				@installStep(3, "Check that it runs") {
+					@openTorrServer()
+				}
+			</ol>
+		</div>
+		<input type="radio" name="torr-install-os" class="tab" aria-label="Linux, Docker, NAS"/>
+		<div class="tab-content bg-base-100 border-base-content/10 rounded-box p-4 sm:p-5 text-sm">
+			<p>
+				TorrServer also runs on Linux (with an install script that takes <span class="font-mono">--gst</span>), in Docker and on NAS systems.
+				See the <a href={ templ.SafeURL(torrServerRepoURL + "#installation") } target="_blank" rel="noopener noreferrer" class="link link-primary">installation guide</a>.
+			</p>
+		</div>
+	</div>
+}
+
+templ installStep(n int, title string) {
+	<li class="flex gap-3">
+		<span class="size-6 shrink-0 rounded-full bg-primary text-primary-content grid place-items-center text-xs font-bold">{ strconv.Itoa(n) }</span>
+		<div class="min-w-0 grow space-y-2">
+			<p class="font-semibold">{ title }</p>
+			{ children... }
+		</div>
+	</li>
+}
+
+templ shellCommand(cmd string) {
+	<div class="relative">
+		<div class="mockup-code w-full text-xs bg-base-300 text-base-content border border-base-content/10 pr-12">
+			<pre data-prefix="$"><code class="select-all">{ cmd }</code></pre>
+		</div>
+		<button type="button" class="btn btn-ghost btn-sm btn-square absolute top-2 right-2" data-copy={ cmd } aria-label="Copy command" title="Copy command">
+			@Icon("copy", "size-4")
+		</button>
+	</div>
+}
+
+templ openTorrServer() {
+	<p>
+		Open <a href={ templ.SafeURL(torrServerLocalURL) } target="_blank" rel="noopener noreferrer" class="link link-primary font-mono">{ torrServerLocalURL }</a>
+		on the same computer: TorrServer's own page should appear.
+	</p>
+}
+
+// gstreamerWhy explains why the GStreamer build matters, collapsed by default.
+templ gstreamerWhy() {
+	<details class="collapse collapse-arrow bg-base-100 border border-base-content/10">
+		<summary class="collapse-title text-sm font-semibold">Why GStreamer?</summary>
+		<div class="collapse-content space-y-4">
+			@gstreamerBenefitList()
+			<p class="text-xs text-base-content/60">
+				Without it, TorrServer still streams, but only to external players such as VLC or IINA.
+				<a href={ templ.SafeURL(torrServerGstURL) } target="_blank" rel="noopener noreferrer" class="link">More about the GStreamer build</a>
+			</p>
+		</div>
+	</details>
+}
+
+templ gstreamerBenefitList() {
+	<ul class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+		for _, b := range gstreamerBenefits {
+			<li class="flex gap-3">
+				@Icon(b.Icon, "size-5 shrink-0 mt-0.5 "+b.Tone)
+				<div class="space-y-1">
+					<p class="text-sm font-semibold">{ b.Title }</p>
+					<p class="text-sm text-base-content/70 leading-relaxed">{ b.Body }</p>
+				</div>
+			</li>
+		}
+	</ul>
+}
