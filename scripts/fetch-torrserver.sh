@@ -40,7 +40,7 @@ want="$(awk -v a="$asset" '$1 == a {print $2}' "$lock")"
 
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
-echo "Downloading TorrServer $version $asset…"
+echo "Downloading TorrServer ${version} ${asset}…"
 curl -fsSL --retry 3 -o "$tmp" "$url"
 
 if command -v sha256sum >/dev/null; then

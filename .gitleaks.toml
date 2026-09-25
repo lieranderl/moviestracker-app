@@ -6,15 +6,14 @@ title = "Moviestracker"
 [extend]
 useDefault = true
 
-[[allowlists]]
-description = "Made-up keys and tokens used by tests"
+# The classic single [allowlist] works with every gitleaks 8 release (the CI
+# action pins its own); any one of the conditions below allows a finding.
+[allowlist]
+description = "Made-up test values, and the what-not-to-do examples of the vendored Go security skill"
 regexTarget = "match"
 regexes = [
   '''0123456789abcdef0123456789abcdef''',
   '''fedcba9876543210fedcba9876543210''',
   '''dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c\.1\.1790000000\.c2lnbmF0dXJl''',
 ]
-
-[[allowlists]]
-description = "Examples of what not to do in the vendored Go security skill"
 paths = ['''^\.agents/skills/golang-security/references/secrets\.md$''']

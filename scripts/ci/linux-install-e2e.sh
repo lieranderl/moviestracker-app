@@ -45,7 +45,11 @@ systemctl is-active --quiet moviestracker || fail "the service is not active"
 systemctl is-enabled --quiet moviestracker || fail "the service does not start at boot"
 [ "$(stat -c %U /var/lib/moviestracker)" = moviestracker ] || fail "the data folder is not owned by the service user"
 pgrep -u moviestracker -x torrserver >/dev/null || fail "TorrServer is not running under the service user"
-sudo ss -ltnp | grep torrserver | grep -qv '127.0.0.1' && fail "TorrServer listens beyond loopback"
+# Its web API (--port) stays on loopback; its BitTorrent port must not.
+api_port="$(pgrep -u moviestracker -a -x torrserver | sed -n 's/.*--port \([0-9]*\).*/\1/p' | head -n 1)"
+[ -n "$api_port" ] || fail "cannot find TorrServer's API port"
+listening="$(sudo ss -Hltn "sport = :$api_port" | awk '{print $4}')"
+[ "$listening" = "127.0.0.1:$api_port" ] || fail "TorrServer's API listens on ${listening:-nothing}, not only 127.0.0.1:$api_port"
 [ "$(location /movies)" = "$base/setup" ] || fail "a fresh install does not send visitors to setup"
 
 step "First-run setup from this machine"
@@ -65,7 +69,9 @@ sudo /usr/local/lib/moviestracker/uninstall.sh
 for gone in /usr/local/bin/moviestracker /usr/local/lib/moviestracker /etc/systemd/system/moviestracker.service /var/lib/moviestracker/engine; do
   [ ! -e "$gone" ] || fail "$gone is left behind"
 done
-[ -d /var/lib/moviestracker ] && [ -f /etc/moviestracker/moviestracker.env ] || fail "the settings were not kept"
+if [ ! -d /var/lib/moviestracker ] || [ ! -f /etc/moviestracker/moviestracker.env ]; then
+  fail "the settings were not kept"
+fi
 pgrep -x torrserver >/dev/null && fail "TorrServer still runs"
 
 step "Reinstall picks the settings up again"
