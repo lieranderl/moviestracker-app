@@ -683,13 +683,12 @@ func (c *Client) FetchTorrentFiles(ctx context.Context, hash string) (*TorrentDe
 func (c *Client) UploadTorrent(ctx context.Context, filename string, data []byte, title string) error {
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
-	fw, err := mw.CreateFormFile("file", filename)
-	if err != nil {
+	if _, err := mw.CreateFormFile("file", filename); err != nil {
 		return err
 	}
-	if _, err := fw.Write(data); err != nil {
-		return err
-	}
+	// A part's writer passes its bytes straight to body, so the file goes
+	// there directly (and no io.Writer of unknown kind carries it).
+	body.Write(data)
 	_ = mw.WriteField("save", "true")
 	if title != "" {
 		_ = mw.WriteField("title", title)
