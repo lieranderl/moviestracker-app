@@ -8,6 +8,10 @@ const (
 	torrentIndexURL = "https://jacred.su/"
 	torrServerURL   = "https://github.com/YouROK/TorrServer"
 	gstreamerURL    = "https://gstreamer.freedesktop.org/"
+	// SourceURL is where Moviestracker's source code is. AGPL-3.0 section 13
+	// asks every copy, modified ones included, to offer its source to the
+	// people who use it over the network: a fork links its own source here.
+	SourceURL = "https://github.com/lieranderl/moviestracker-app"
 )
 
 // siteFooter is the signed-in pages' footer, with the version.
@@ -42,6 +46,7 @@ templ footer(showVersion bool) {
 			@externalLink("https://go.dev", "Go")
 			@externalLink("https://data-star.dev", "Datastar")
 			@externalLink("https://daisyui.com", "DaisyUI")
+			@externalLink(SourceURL, "Source code (AGPL-3.0)")
 			if label := versionLabel(); showVersion && label != "" {
 				<p class="text-xs font-mono text-base-content/50 pt-2">{ label }</p>
 			}

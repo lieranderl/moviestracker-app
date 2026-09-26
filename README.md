@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/lieranderl/moviestracker-app/actions/workflows/ci.yml/badge.svg)](https://github.com/lieranderl/moviestracker-app/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/lieranderl/moviestracker-app?sort=semver)](https://github.com/lieranderl/moviestracker-app/releases/latest)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 **Your own movie and TV catalog, on your Mac, for every screen in your home.**
 
@@ -165,7 +165,9 @@ Security problems: please report them privately, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-[Apache License 2.0](LICENSE); see [NOTICE](NOTICE) for the software
-Moviestracker bundles. TorrServer, shipped inside the app and archives, is a
+[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). You may
+use, change and share Moviestracker freely. If you run a changed version that
+other people use over a network, you must offer them its source code, as the
+footer link does; see [NOTICE](NOTICE) for the software Moviestracker bundles. TorrServer, shipped inside the app and archives, is a
 separate program under the GPL-3.0, with its license and source link
 included.

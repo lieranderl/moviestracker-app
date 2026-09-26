@@ -87,6 +87,12 @@ Maintainers: branches, CI, secrets and releases are described in
 
 ## Licensing of contributions
 
-Moviestracker is licensed under the [Apache License 2.0](LICENSE). By
-submitting a contribution you agree that it is licensed under the same
-license (section 5 of the license), and that you have the right to submit it.
+Moviestracker is licensed under the [GNU Affero General Public License
+v3.0](LICENSE) (AGPL-3.0-only). By submitting a contribution you agree that it
+is licensed under the same license ("inbound = outbound", as in section D.6 of
+GitHub's Terms of Service), and that you have the right to submit it. There is
+no contributor license agreement.
+
+New dependencies must be compatible with the AGPL-3.0: MIT, BSD, ISC, Apache-2.0,
+MPL-2.0, LGPL, GPL-3.0 and AGPL-3.0 are fine; GPL-2.0-only, SSPL, BUSL and
+"non-commercial" licenses are not.

@@ -91,7 +91,7 @@ cat > "$contents/Info.plist" <<PLIST
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.entertainment</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Apache License 2.0. Includes TorrServer $ts_version (GPL-3.0).</string>
+	<string>AGPL-3.0. Includes TorrServer $ts_version (GPL-3.0).</string>
 </dict>
 </plist>
 PLIST

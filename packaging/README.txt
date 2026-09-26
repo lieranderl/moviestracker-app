@@ -32,6 +32,6 @@ Remove:  sudo /usr/local/lib/moviestracker/uninstall.sh
 
 What is inside
 --------------
-  moviestracker  the app (Apache-2.0, see LICENSE and NOTICE)
+  moviestracker  the app (AGPL-3.0, see LICENSE and NOTICE)
   torrserver     TorrServer by YouROK, unmodified (GPL-3.0, see licenses/)
   install.sh     the installer
