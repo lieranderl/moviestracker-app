@@ -53,8 +53,8 @@ type Gateway struct {
 	Logins   []AppLogin `json:"logins,omitempty"`
 }
 
-// AppLogin is the login one app uses. The password is random and long, so
-// a SHA-256 of it is kept (hex), never the password itself.
+// AppLogin is the login one app uses. Only the bcrypt hash of its random
+// password is kept.
 type AppLogin struct {
 	Name         string    `json:"name"`
 	User         string    `json:"user"`

@@ -15,5 +15,7 @@ regexes = [
   '''0123456789abcdef0123456789abcdef''',
   '''fedcba9876543210fedcba9876543210''',
   '''dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c\.1\.1790000000\.c2lnbmF0dXJl''',
+  # internal/gateway: the characters app passwords are made of, not a key
+  '''23456789abcdefghjkmnpqrstuvwxyz''',
 ]
 paths = ['''^\.agents/skills/golang-security/references/secrets\.md$''']

@@ -9,9 +9,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,6 +22,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/lieranderl/moviestracker-app/internal/config"
 )
@@ -49,10 +49,19 @@ type Gateway struct {
 
 	mu      sync.Mutex
 	saved   map[string]time.Time // info hash → until when it counts as saved
+	signed  map[string]signedIn  // user → the login it last signed in with
 	guesses *guessLimiter
 	// mark is sent with every request passed on: one that comes back is
 	// the gateway's own, so TorrServer's address is the gateway.
 	mark string
+}
+
+// signedIn is a login that passed bcrypt: the Authorization header that
+// carried it and the hash it matched. Apps ask many times a second (a TV
+// polls the torrent list), and bcrypt is slow on purpose, so a header seen
+// before is taken as long as the login's hash has not changed.
+type signedIn struct {
+	header, hash string
 }
 
 // markHeader carries the gateway's mark.
@@ -64,7 +73,7 @@ const savedFor = time.Minute
 
 // New returns the gateway for cfg.
 func New(cfg Config) *Gateway {
-	g := &Gateway{cfg: cfg, client: &http.Client{Timeout: 10 * time.Second}, saved: map[string]time.Time{}, guesses: newGuessLimiter(), mark: rand.Text()}
+	g := &Gateway{cfg: cfg, client: &http.Client{Timeout: 10 * time.Second}, saved: map[string]time.Time{}, signed: map[string]signedIn{}, guesses: newGuessLimiter(), mark: rand.Text()}
 	g.proxy = &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			up := cfg.Upstream()
@@ -174,11 +183,24 @@ func (g *Gateway) login(r *http.Request) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	sum := hashPassword(password)
+	header := r.Header.Get("Authorization")
 	for _, l := range g.cfg.Store.State().Gateway.Logins {
-		if l.User == user && subtle.ConstantTimeCompare([]byte(l.PasswordHash), []byte(sum)) == 1 {
+		if l.User != user {
+			continue
+		}
+		g.mu.Lock()
+		seen, ok := g.signed[user]
+		g.mu.Unlock()
+		if ok && seen.hash == l.PasswordHash && subtle.ConstantTimeCompare([]byte(seen.header), []byte(header)) == 1 {
 			return l.Name, true
 		}
+		if bcrypt.CompareHashAndPassword([]byte(l.PasswordHash), []byte(password)) != nil {
+			return "", false
+		}
+		g.mu.Lock()
+		g.signed[user] = signedIn{header: header, hash: l.PasswordHash}
+		g.mu.Unlock()
+		return l.Name, true
 	}
 	return "", false
 }
@@ -277,14 +299,9 @@ func (g *Gateway) inTorrServer(ctx context.Context, hash string) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-func hashPassword(password string) string {
-	sum := sha256.Sum256([]byte(password))
-	return hex.EncodeToString(sum[:])
-}
-
-// passwordAlphabet leaves out 0/O and 1/I/L, which are easy to mistype on a
+// loginAlphabet leaves out 0/O and 1/I/L, which are easy to mistype on a
 // TV remote.
-const passwordAlphabet = "23456789abcdefghjkmnpqrstuvwxyz"
+const loginAlphabet = "23456789abcdefghjkmnpqrstuvwxyz"
 
 // NewLogin makes a login for the app called name, with a user name unlike
 // those in existing and a random password (shown once: only its hash is
@@ -303,7 +320,11 @@ func NewLogin(name string, existing []config.AppLogin) (config.AppLogin, string,
 	if err != nil {
 		return config.AppLogin{}, "", err
 	}
-	return config.AppLogin{Name: name, User: user, PasswordHash: hashPassword(password), CreatedAt: time.Now().UTC()}, password, nil
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return config.AppLogin{}, "", fmt.Errorf("keep the password: %w", err)
+	}
+	return config.AppLogin{Name: name, User: user, PasswordHash: string(hash), CreatedAt: time.Now().UTC()}, password, nil
 }
 
 // userName is name in lowercase letters and digits: "Living room TV" is
@@ -333,7 +354,7 @@ func taken(user string, logins []config.AppLogin) bool {
 // randomPassword is three groups of four characters, about 59 random bits:
 // short enough to type with a remote, and the gateway limits guessing.
 func randomPassword() (string, error) {
-	size := big.NewInt(int64(len(passwordAlphabet)))
+	size := big.NewInt(int64(len(loginAlphabet)))
 	b := make([]byte, 0, 14)
 	for i := range 12 {
 		if i > 0 && i%4 == 0 {
@@ -343,7 +364,7 @@ func randomPassword() (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("make a password: %w", err)
 		}
-		b = append(b, passwordAlphabet[n.Int64()])
+		b = append(b, loginAlphabet[n.Int64()])
 	}
 	return string(b), nil
 }
