@@ -42,5 +42,10 @@ This document defines testing conventions, the test-driven development loop, sea
   ```bash
   make ci
   ```
+- **End-to-end tests** (CI runs all of them on every pull request):
+  - `make docker-smoke` (`scripts/ci/docker-e2e.sh`): builds the image and runs it with `compose.yaml` as a server would: health, TorrServer and GStreamer, setup, TorrServer for other apps on port 8090, persistence, graceful shutdown, an external TorrServer and the licences. Needs Docker.
+  - `scripts/ci/windows-install-e2e.ps1`: installs, sets up, upgrades, quits, uninstalls and purges the Windows installer (Windows only).
+  - On macOS, `go test ./packaging/...` builds `Moviestracker.app` with Swift and checks both CPU slices.
+  - `TORRSERVER_BIN=bin/torrserver go test -run TestTheClientSpeaksTheRealTorrServerAPI ./internal/engine/` checks the client against the pinned TorrServer (`make torrserver`).
 - **Memory Leak & Goroutine Verification**:
   - Concurrency and SSE tests must assert that goroutines terminate cleanly after context cancellation and that active stream counters decrement to zero.

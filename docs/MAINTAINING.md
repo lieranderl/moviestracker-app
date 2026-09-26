@@ -154,3 +154,8 @@ directive signs the uninstaller too.
 
 Updating TorrServer or GStreamer means updating the pin and its checksums
 together, then checking playback on a Mac.
+
+Waiting upstream: TorrServer copies AAC Main audio into HLS unchanged, which
+browsers refuse (the player explains it). The fix is
+[YouROK/TorrServer#879](https://github.com/YouROK/TorrServer/pull/879); once a
+release has it, move `scripts/torrserver.lock` to that release.

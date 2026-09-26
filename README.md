@@ -4,12 +4,13 @@
 [![Release](https://img.shields.io/github/v/release/lieranderl/moviestracker-app?sort=semver)](https://github.com/lieranderl/moviestracker-app/releases/latest)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
-**Your own movie and TV catalog, on your Mac, for every screen in your home.**
+**Your own movie and TV catalog for every screen in your home: on a Mac, a
+Windows PC, or a NAS or home server.**
 
 Moviestracker shows what is trending, with trailers, cast, seasons and ratings,
 finds sources for a title, and plays them in your browser or on your TV
 through [TorrServer](https://github.com/YouROK/TorrServer), which it runs for
-you. It is free, runs entirely on your computer, and needs no account
+you. It is free, runs entirely on your own machine, and needs no account
 anywhere.
 
 - **Discover:** trending movies and series, trailers, cast and crew, seasons
@@ -18,15 +19,32 @@ anywhere.
   or playlist to VLC, IINA, Infuse or a smart TV on your network.
 - **Share the house:** accounts for the family (administrators and viewers)
   and a live dashboard of what is playing and on which device.
-- **Private by design:** everything stays on your Mac. Pages never show your
-  TorrServer or keys, and links for TVs expire after a week.
+- **Works with TorrServer apps:** TorrServe on an Android TV, Lampa and other
+  TorrServer apps can use the same TorrServer and torrent list, each with a
+  login of its own ([more](#torrserver-apps-torrserve-lampa)).
+- **Private by design:** everything stays on your machine. Pages never show
+  your TorrServer or keys, and links for TVs expire after a week.
 
 > Moviestracker does not host, upload, seed or distribute any media. Use it
 > only for content you have the right to access. This product uses the TMDB
 > API but is not endorsed or certified by TMDB.
 
-There is a [Windows](#windows-preview) preview too, and on Linux, a NAS or a
-home server it runs [in Docker](#linux-nas-and-home-servers-docker).
+## Get it
+
+| Where | Download | Guide |
+| --- | --- | --- |
+| **macOS 13+** (Apple Silicon, Intel) | `Moviestracker-<version>.dmg` | [Install on your Mac](#install-on-your-mac) |
+| **Windows 10/11** (64-bit, preview) | `Moviestracker-Setup-<version>-x64.exe` | [Windows](#windows-preview) |
+| **Linux, NAS, home servers** (amd64, arm64) | `ghcr.io/lieranderl/moviestracker` | [Docker](#linux-nas-and-home-servers-docker) |
+
+Downloads are on the [latest release](https://github.com/lieranderl/moviestracker-app/releases/latest),
+with `checksums.txt`. Every file and image is built by this repository's
+release workflow, which anyone can check with the
+[GitHub CLI](https://cli.github.com):
+
+```bash
+gh attestation verify Moviestracker-<version>.dmg -R lieranderl/moviestracker-app
+```
 
 ## Install on your Mac
 
@@ -62,6 +80,10 @@ No Homebrew, Terminal or password is needed, and it is removed with the app.
 
 Without GStreamer, MKV files still play in VLC, IINA, Infuse and on TVs
 through stream links.
+
+A few files use audio or video browsers cannot decode at all, such as the
+rare AAC Main audio: the player then says what it cannot play, and the
+file's **Direct** link plays in VLC, IINA, Infuse or on a TV.
 
 ### Watch on a TV, phone or tablet
 
@@ -190,7 +212,8 @@ docker run -d --name moviestracker --restart unless-stopped -p 8095:8095 \
   (`./moviestracker:/data`), give it to uid 1000 (`sudo chown 1000:1000
   moviestracker`), or set `user:` in `compose.yaml` to the folder's owner.
 - **Only port 8095** is published. TorrServer stays inside the container,
-  behind a password Moviestracker generates.
+  behind a password Moviestracker generates; to let
+  [TorrServer apps](#torrserver-apps-torrserve-lampa) in, publish 8090 too.
 - **Names and links:** Moviestracker answers to IP addresses and `localhost`.
   To use a name such as `http://nas.local:8095`, add it to `MT_HOSTNAMES` in
   `compose.yaml`. If you open it as `localhost`, set `MT_LAN_ADDRESS` to the
@@ -264,6 +287,7 @@ Security problems: please report them privately, see [SECURITY.md](SECURITY.md).
 [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). You may
 use, change and share Moviestracker freely. If you run a changed version that
 other people use over a network, you must offer them its source code, as the
-footer link does; see [NOTICE](NOTICE) for the software Moviestracker bundles. TorrServer, shipped inside the app and archives, is a
-separate program under the GPL-3.0, with its license and source link
-included.
+footer link does; see [NOTICE](NOTICE) for the software Moviestracker
+bundles. TorrServer, shipped in the Mac app, the Windows installer and the
+Docker image, is a separate program under the GPL-3.0, with its license and
+source link included.
