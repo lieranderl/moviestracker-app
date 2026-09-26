@@ -12,6 +12,8 @@
 #
 # It needs Docker with Compose and port 8095 free, and removes what it made.
 set -euo pipefail
+# Under pipefail, "cmd | grep -q x" can fail after a match: grep -q stops
+# reading, cmd dies of SIGPIPE. Checks use "cmd | grep x >/dev/null".
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 image="${IMAGE:-moviestracker:e2e}"
@@ -64,7 +66,7 @@ commands() {
   docker exec "$1" bash -c 'for p in /proc/[0-9]*; do tr "\0" " " <"$p/cmdline" 2>/dev/null; echo; done'
 }
 # engine_port is the API port of the bundled TorrServer in container $1.
-engine_port() { commands "$1" | sed -n 's|^/usr/local/bin/torrserver .*--port \([0-9]*\).*|\1|p' | head -n 1; }
+engine_port() { commands "$1" | sed -n 's|^/usr/local/bin/torrserver .*--port \([0-9]*\).*|\1|p' | sed -n 1p; }
 
 step "Build the image (the shared TMDB and JacRed keys as build secrets)"
 if [ -z "${IMAGE:-}" ]; then
@@ -75,9 +77,9 @@ if [ -z "${IMAGE:-}" ]; then
     fail "the binary lacks the shared TMDB key it was built with"
   docker run --rm --entrypoint grep "$image" -q "$jacred_key" /usr/local/bin/moviestracker ||
     fail "the binary lacks the shared JacRed key it was built with"
-  docker history --no-trunc "$image" | grep -q "$jacred_key" && fail "the image history holds the shared JacRed key"
+  docker history --no-trunc "$image" | grep "$jacred_key" >/dev/null && fail "the image history holds the shared JacRed key"
   [ "$(docker run --rm "$image" --version)" = "moviestracker v0.0.0-e2e" ] || fail "the image does not know its version"
-  docker history --no-trunc "$image" | grep -q "$key" && fail "the image history holds the shared TMDB key"
+  docker history --no-trunc "$image" | grep "$key" >/dev/null && fail "the image history holds the shared TMDB key"
 fi
 
 step "Licences travel with the image"
@@ -108,13 +110,13 @@ listen="$(in_container cat /proc/net/tcp /proc/net/tcp6 | awk -v p=":$hexport" '
 [ "$listen" = "0100007F:$hexport" ] || fail "TorrServer's API listens on ${listen:-nothing}, not only 127.0.0.1"
 uids="$(in_container bash -c 'for p in /proc/[0-9]*; do awk "/^Uid:/{print \$2}" "$p/status"; done' | sort -u | tr '\n' ' ')"
 [ "$uids" = "1000 " ] || fail "processes run as uid(s) $uids, not only 1000"
-in_container bash -c 'tr "\0" " " </proc/1/cmdline' | grep -q '^/usr/bin/tini' || fail "PID 1 is not tini"
+in_container bash -c 'tr "\0" " " </proc/1/cmdline' | grep '^/usr/bin/tini' >/dev/null || fail "PID 1 is not tini"
 
 step "TorrServer's GStreamer works, and converts MKV with AC3 for the browser"
 echo_json="$(engine_get /gst/echo)"
 echo "$echo_json"
-echo "$echo_json" | grep -q '"gstreamer":{"found":true,"available":true,"works":true' || fail "TorrServer has no working GStreamer"
-echo "$echo_json" | grep -q '"gst_discoverer":{"found":true,"available":true,"works":true' || fail "gst-discoverer does not work"
+echo "$echo_json" | grep '"gstreamer":{"found":true,"available":true,"works":true' >/dev/null || fail "TorrServer has no working GStreamer"
+echo "$echo_json" | grep '"gst_discoverer":{"found":true,"available":true,"works":true' >/dev/null || fail "gst-discoverer does not work"
 in_container bash -c '
   set -e
   gst-launch-1.0 -q videotestsrc num-buffers=60 ! video/x-raw,width=320,height=240,framerate=30/1 ! x264enc tune=zerolatency ! h264parse ! \
@@ -142,9 +144,9 @@ action() { curl -fsS -b "$jar" -c "$jar" -X POST "$base$1" -H 'Content-Type: app
 action /api/consent '{"accepted":true}' >/dev/null
 action /api/login "{\"username\":\"e2e\",\"password\":\"$password\"}" >/dev/null
 grep -q datastar_session "$jar" || fail "the administrator could not sign in"
-action /api/settings/apps '{"appsOn":true,"appsInternet":false}' | grep -q "is open" || fail "Other apps did not switch on"
+action /api/settings/apps '{"appsOn":true,"appsInternet":false}' | grep "is open" >/dev/null || fail "Other apps did not switch on"
 created="$(action /api/settings/apps/logins '{"appName":"Living room TV"}')"
-app_password="$(printf '%s' "$created" | grep -oE '[2-9a-hj-km-np-z]{4}-[2-9a-hj-km-np-z]{4}-[2-9a-hj-km-np-z]{4}' | head -n 1)"
+app_password="$(printf '%s' "$created" | grep -oE '[2-9a-hj-km-np-z]{4}-[2-9a-hj-km-np-z]{4}-[2-9a-hj-km-np-z]{4}' | sed -n 1p)"
 [ -n "$app_password" ] || fail "no password for the new app login"
 apps=http://127.0.0.1:8090
 [ "$(curl -fsS -u "livingroomtv:$app_password" $apps/echo)" = "$(awk '$1 == "version" {print $2}' "$root/scripts/torrserver.lock")" ] ||
@@ -161,7 +163,7 @@ started=$(date +%s)
 took=$(( $(date +%s) - started ))
 [ "$took" -lt 25 ] || fail "stopping took ${took}s"
 [ "$(docker inspect -f '{{.State.ExitCode}}' "$project")" = 0 ] || fail "exit code $(docker inspect -f '{{.State.ExitCode}}' "$project")"
-docker logs "$project" 2>&1 | grep -q "server stopped cleanly" || fail "the server did not stop cleanly"
+docker logs "$project" 2>&1 | grep "server stopped cleanly" >/dev/null || fail "the server did not stop cleanly"
 
 step "Accounts, settings and TorrServer's state persist in the volume"
 "${compose[@]}" up -d
@@ -178,10 +180,10 @@ wait_healthy
 step "An external TorrServer replaces the bundled one"
 docker run -d --name "$project-external" -e TORRSERVER_URL=http://192.0.2.1:8090 "$image" >/dev/null
 for _ in $(seq 1 60); do
-  docker logs "$project-external" 2>&1 | grep -q "Moviestracker running" && break
+  docker logs "$project-external" 2>&1 | grep "Moviestracker running" >/dev/null && break
   sleep 1
 done
-if ! docker logs "$project-external" 2>&1 | grep -q 'torrserver=http://192.0.2.1:8090'; then
+if ! docker logs "$project-external" 2>&1 | grep 'torrserver=http://192.0.2.1:8090' >/dev/null; then
   docker logs --tail 40 "$project-external" >&2 2>&1 || true
   fail "TORRSERVER_URL was not used"
 fi
