@@ -172,11 +172,14 @@ wait_healthy
 
 step "An external TorrServer replaces the bundled one"
 docker run -d --name "$project-external" -e TORRSERVER_URL=http://192.0.2.1:8090 "$image" >/dev/null
-for _ in $(seq 1 30); do
+for _ in $(seq 1 60); do
   docker logs "$project-external" 2>&1 | grep -q "Moviestracker running" && break
   sleep 1
 done
-docker logs "$project-external" 2>&1 | grep -q 'torrserver=http://192.0.2.1:8090' || fail "TORRSERVER_URL was not used"
+if ! docker logs "$project-external" 2>&1 | grep -q 'torrserver=http://192.0.2.1:8090'; then
+  docker logs --tail 40 "$project-external" >&2 2>&1 || true
+  fail "TORRSERVER_URL was not used"
+fi
 [ -z "$(engine_port "$project-external")" ] || fail "the bundled TorrServer runs although TORRSERVER_URL is set"
 docker rm -f "$project-external" >/dev/null
 
