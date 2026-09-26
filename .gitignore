@@ -9,8 +9,6 @@ coverage.out
 /moviestracker
 # Windows resources scripts/winapp.sh makes for the tray app while it builds
 *.syso
-# Release archives unpacked in the source folder
-/moviestracker_*/
 
 # Local data, secrets and logs: never commit these
 .devdata/

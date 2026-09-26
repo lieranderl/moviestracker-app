@@ -31,6 +31,7 @@ Everything is set in the browser under Settings → Sources and kept in the data
 | --- | --- | --- |
 | `MT_LISTEN` | `:8095` | Listen address; the default serves every network interface so TVs and phones can connect |
 | `MT_DATA_DIR` | `moviestracker` in the user config directory | Where accounts, sessions and sources are kept (the Mac app sets `~/Library/Application Support/moviestracker`, the Windows tray app `%LOCALAPPDATA%\Moviestracker`) |
+| `MT_LAN_ADDRESS` | *(empty: found)* | The address TVs and phones use to reach this machine, put in links made while Moviestracker is opened as `localhost`; `off` keeps `localhost` (the Docker image's default) |
 | `MT_HOSTNAMES` | *(empty)* | Extra hostnames to answer to (comma-separated) besides IP addresses, `localhost` and `<hostname>.local` |
 | `MT_SECURE_COOKIES` | `false` | Secure cookies and HSTS, for HTTPS setups |
 | `MT_TORRSERVER_BIN` | *(empty)* | TorrServer program for managed mode; otherwise `torrserver` (`torrserver.exe` on Windows) next to Moviestracker or `<data dir>/engine/bin/torrserver` |
@@ -41,27 +42,27 @@ Everything is set in the browser under Settings → Sources and kept in the data
 
 ## External services
 
-**TMDB key.** Releases carry a shared TMDB key, so search works right after setup; it is never shown in the pages. Every install shares it, so: should TMDB disable it (for example because someone misuses it), search stops until an update ships a new one; TMDB sees the requests as Moviestracker's; and busy moments elsewhere can slow it. A free key of your own (Settings → Sources) avoids all of that, and **Use the shared key instead** goes back. The key is built in by `scripts/release.sh` and `scripts/macapp.sh` from `MT_SHARED_TMDB_KEY` or the git-ignored `.tmdb-shared-key` file, never from git; like any key inside a program, it can be read out of the binary, so use a key made for this purpose only. Development builds use `TMDB_API_KEY` from `.env`.
+**TMDB key.** Releases carry a shared TMDB key, so search works right after setup; it is never shown in the pages. Every install shares it, so: should TMDB disable it (for example because someone misuses it), search stops until an update ships a new one; TMDB sees the requests as Moviestracker's; and busy moments elsewhere can slow it. A free key of your own (Settings → Sources) avoids all of that, and **Use the shared key instead** goes back. The key is built in by `scripts/macapp.sh` and `scripts/winapp.sh` from `MT_SHARED_TMDB_KEY` or the git-ignored `.tmdb-shared-key` file, and by the `Dockerfile` from the `tmdb_key` build secret, never from git; like any key inside a program, it can be read out of the binary, so use a key made for this purpose only. Development builds use `TMDB_API_KEY` from `.env`.
 
 Streaming is local, but discovery needs outbound internet access to TMDB (`api.themoviedb.org`, `image.tmdb.org`) and a JacRed instance (the public `https://jacred.su` by default, or your own [jacred-fdb/jacred](https://github.com/jacred-fdb/jacred)). IMDb ratings come from a small public rating service and are optional.
 
-## Container
+## Docker
 
-The image is non-root and read-only; mount a volume at `/data` for its state:
+The image (`ghcr.io/lieranderl/moviestracker`, linux/amd64 and linux/arm64) is how Moviestracker runs on Linux, a NAS or a home server; [compose.yaml](../compose.yaml) runs it. It holds `moviestracker`, TorrServer's GStreamer build (pinned in `scripts/torrserver.lock`) and Debian 13's GStreamer 1.26 with the plugin sets TorrServer lists.
 
-```bash
-make docker-build
-docker run --read-only --cap-drop=ALL --security-opt=no-new-privileges \
-  -p 8095:8095 -v moviestracker:/data moviestracker:local
-```
+- **Processes:** `tini` (PID 1) runs `moviestracker`, which runs TorrServer on `127.0.0.1` behind generated credentials and restarts it if it stops, as the native apps do. Everything runs as uid 1000. Only port 8095 is published.
+- **Storage:** `/data` is the only volume: `moviestracker.json` (accounts, sessions, sources) and `engine/` (TorrServer's database, settings and log). The root filesystem can be read-only; GStreamer's plugin registry goes to `/tmp`, a tmpfs. A bind-mounted folder must be writable by uid 1000 (or run the container as its owner with `user:`); otherwise Moviestracker stops with a message saying so.
+- **Health and shutdown:** `moviestracker --health` asks `/healthz` (the image's `HEALTHCHECK`; passing probes are not logged). `SIGTERM` closes open pages, then stops TorrServer; allow 30 seconds (`stop_grace_period`).
+- **Setup:** a browser reaching the container through Docker's network is never "this machine", so the first account needs the setup code from `docker compose logs moviestracker`.
+- **Links for TVs:** the image sets `MT_LAN_ADDRESS=off`, because the container's own address is not one other devices can reach; set it to the host's address if you open Moviestracker as `localhost`.
+- **External TorrServer:** `TORRSERVER_URL` (with `TORRSERVER_USER` and `TORRSERVER_PASSWORD` if it uses `--httpauth`) or Settings → Sources; the bundled one then does not run.
+- **Licences:** `/usr/share/doc/moviestracker/` holds Moviestracker's AGPL-3.0 licence and NOTICE, TorrServer's GPL-3.0 licence and source link, and `GSTREAMER.txt`; every Debian package's licence is in `/usr/share/doc/<package>/copyright`.
+
+`make docker-build` builds it locally (with Docker, or Apple's `container` CLI; `make container-run` runs it that way), and `make docker-smoke` runs `scripts/ci/docker-e2e.sh`, the end-to-end test CI runs.
 
 ## Building releases
 
-```bash
-make release VERSION=v0.1.0
-```
-
-writes `dist/` with the Linux archives (amd64, arm64), `Moviestracker-<version>.dmg` when run on a Mac, and `checksums.txt`. `make dmg VERSION=v0.1.0` builds only the Mac app (`scripts/macapp.sh`): universal `moviestracker-server` and `torrserver` joined with `lipo`, the Swift menu bar app from `macos/Moviestracker/main.swift` (Command Line Tools are enough), icons drawn from Lucide's clapperboard by `macos/icon.swift`, all signed ad hoc. Each TorrServer build is downloaded and checked against the SHA-256 in `scripts/torrserver.lock`; its GPL-3.0 license and source link travel with it.
+`make dmg VERSION=v0.1.0` builds the Mac app and its DMG (`scripts/macapp.sh`): universal `moviestracker-server` and `torrserver` joined with `lipo`, the Swift menu bar app from `macos/Moviestracker/main.swift` (Command Line Tools are enough), icons drawn from Lucide's clapperboard by `macos/icon.swift`, all signed ad hoc. Each TorrServer build is downloaded and checked against the SHA-256 in `scripts/torrserver.lock`; its GPL-3.0 license and source link travel with it.
 
 `make winapp VERSION=v0.1.0` builds the Windows installer (`scripts/winapp.sh`, in Git Bash on Windows): `moviestracker-server.exe`, the tray app `Moviestracker.exe` from `cmd/tray` (Go, [fyne.io/systray](https://github.com/fyne-io/systray); its portable part is `internal/tray`), and TorrServer's `TorrServer-gst-windows-amd64.exe`, which carries GStreamer inside. [Inno Setup 7](https://jrsoftware.org/isinfo.php) packs them with `packaging/windows/moviestracker.iss` into `Moviestracker-Setup-<version>-x64.exe`, a per-user install without administrator rights. The programs build anywhere (`GOOS=windows`); only the installer needs Windows. `scripts/windows-icon.sh` redraws the tray and program icon, `cmd/tray/moviestracker.ico`, on a Mac.
 

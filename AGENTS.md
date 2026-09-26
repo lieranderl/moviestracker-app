@@ -49,8 +49,8 @@ Every task follows the four-step loop:
 - `bun run assets`: Compile Tailwind CSS v4 and bundle frontend scripts
 - `make build`: Compile static production binary to `bin/server`
 - `make ci`: Run full verification pipeline (format, lint, templ, assets, tests, security, build)
-- `make docker-build`: Build non-root production container
-- `make docker-smoke`: Run read-only container smoke test asserting `/healthz` returns `ok`
+- `make docker-build`: Build the Linux image (non-root, TorrServer and GStreamer inside)
+- `make docker-smoke`: Test the image end to end with `compose.yaml` (`scripts/ci/docker-e2e.sh`, needs Docker)
 
 ## Progressive Disclosure
 For detailed domain specifications and conventions, consult the targeted guide:

@@ -221,7 +221,7 @@ func TestOnlyThisMachineOrTheSetupCodeCreatesTheFirstAdmin(t *testing.T) {
 	l := newLocal(t, nil, withSetupCode(code))
 	page := httptest.NewRequest(http.MethodGet, "/setup", nil)
 	lan(page)
-	if body := l.do(t, page, nil).Body.String(); !strings.Contains(body, "Setup code") || !strings.Contains(body, "journalctl") {
+	if body := l.do(t, page, nil).Body.String(); !strings.Contains(body, "Setup code") || !strings.Contains(body, "docker compose logs moviestracker") {
 		t.Error("the setup page seen from another device does not ask for the setup code or say where to find it")
 	}
 	for _, try := range []struct {

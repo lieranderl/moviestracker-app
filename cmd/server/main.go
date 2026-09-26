@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"math/big"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -33,12 +34,20 @@ import (
 var version = "dev"
 
 // sharedTMDBKey is the TMDB key release builds carry (set with -ldflags by
-// scripts/release.sh and macapp.sh), used when there is no other key.
+// scripts/macapp.sh, scripts/winapp.sh and the Dockerfile), used when there is
+// no other key.
 var sharedTMDBKey string
 
 func main() {
 	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-version") {
 		fmt.Println("moviestracker " + version)
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "--health" {
+		if err := checkHealth(listenAddr()); err != nil {
+			fmt.Fprintln(os.Stderr, "unhealthy:", err)
+			os.Exit(1)
+		}
 		return
 	}
 	// Initialize structured logging via slog
@@ -60,6 +69,10 @@ func main() {
 	store, err := config.Open(dataDir)
 	if err != nil {
 		slog.Error("cannot open the data directory", "dir", dataDir, "error", err)
+		os.Exit(1)
+	}
+	if err := checkWritable(dataDir); err != nil {
+		slog.Error("cannot write to the data directory", "error", err)
 		os.Exit(1)
 	}
 	slog.Info("data directory", "dir", dataDir)
@@ -128,6 +141,7 @@ func main() {
 		Version:           version,
 		Events:            problems,
 		SetupCode:         setupCode,
+		LANAddress:        lanAddressFrom(os.Getenv("MT_LAN_ADDRESS")),
 	})
 	if err != nil {
 		slog.Error("server configuration failed", "error", err)
@@ -356,6 +370,59 @@ func listenAddr() string {
 		return ":" + port
 	}
 	return defaultListen
+}
+
+// checkWritable makes sure this user can write to dir, and says how to fix
+// it otherwise (a folder mounted into the container belongs to someone else).
+func checkWritable(dir string) error {
+	f, err := os.CreateTemp(dir, ".write-check-*")
+	if err != nil {
+		uid, gid := os.Getuid(), os.Getgid()
+		return fmt.Errorf("%s is not writable by uid %d: give it to that user (chown -R %d:%d %s) or run Moviestracker as its owner: %w",
+			dir, uid, uid, gid, dir, err)
+	}
+	name := f.Name()
+	_ = f.Close()
+	return os.Remove(name)
+}
+
+// lanAddressFrom reads MT_LAN_ADDRESS, the address TVs and phones use to
+// reach this machine in links made while it is opened as localhost: empty
+// finds it (nil), "off" keeps localhost (the container image: its own
+// address is not the host's), anything else is that address.
+func lanAddressFrom(value string) func() string {
+	value = strings.TrimSpace(value)
+	switch value {
+	case "":
+		return nil
+	case "off":
+		return func() string { return "" }
+	default:
+		return func() string { return value }
+	}
+}
+
+// checkHealth asks the server listening on listen (MT_LISTEN) for /healthz,
+// from this machine: the container health check.
+func checkHealth(listen string) error {
+	host, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		return err
+	}
+	if host == "" || net.ParseIP(host).IsUnspecified() {
+		host = "127.0.0.1"
+	}
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get("http://" + net.JoinHostPort(host, port) + "/healthz")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64))
+	if resp.StatusCode != http.StatusOK || !strings.HasPrefix(string(body), "ok") {
+		return fmt.Errorf("/healthz answered %d %q", resp.StatusCode, body)
+	}
+	return nil
 }
 
 // portSuffix returns the ":port" part of a listen address.

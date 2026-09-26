@@ -12,7 +12,6 @@
 bin
 dist
 tmp
-moviestracker_*
 installTorrServerMac.sh
 node_modules
 coverage.out

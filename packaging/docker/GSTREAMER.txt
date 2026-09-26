@@ -1,0 +1,26 @@
+GStreamer in the Moviestracker image
+====================================
+
+TorrServer converts MKV files, AC3/DTS audio and HEVC video for the browser
+with GStreamer, which it loads at run time. The image installs GStreamer and
+its plugins, unmodified, from Debian 13 (trixie):
+
+  libgstreamer1.0-0, libgstreamer-plugins-base1.0-0,
+  gstreamer1.0-plugins-base, gstreamer1.0-plugins-base-apps,
+  gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad,
+  gstreamer1.0-plugins-ugly, gstreamer1.0-libav, gstreamer1.0-tools
+  and the libraries Debian installs with them.
+
+GStreamer itself is licensed under the GNU Lesser General Public License
+v2.1 or later. Some plugins and the libraries they use have other licences,
+among them the GNU GPL (for example x264 in gstreamer1.0-plugins-ugly, and
+FFmpeg as Debian builds it for gstreamer1.0-libav). The licence of every
+package in the image is in /usr/share/doc/<package>/copyright.
+
+Their complete source code is available from Debian, for the exact versions
+in the image (dpkg -l lists them):
+
+  https://sources.debian.org/
+  https://snapshot.debian.org/
+
+or with `apt-get source <package>` on a Debian 13 system.

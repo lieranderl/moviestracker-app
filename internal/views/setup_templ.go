@@ -77,7 +77,7 @@ func Setup(askCode bool) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<span class=\"sr-only\">Setup code</span> <input type=\"text\" required autocomplete=\"one-time-code\" autocapitalize=\"characters\" spellcheck=\"false\" maxlength=\"32\" placeholder=\"XXXX-XXXX\" class=\"grow font-mono\" data-bind:setup-code></label><p class=\"text-xs text-base-content/60\">You are setting up from another device, so Moviestracker asks for the code it printed when it started. Find it in its log: <code class=\"font-mono\">sudo journalctl -u moviestracker</code>, <code class=\"font-mono\">docker logs &lt;container&gt;</code> or the terminal it runs in. On the machine itself, open <code class=\"font-mono\">http://localhost:8095</code> instead: no code needed.</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<span class=\"sr-only\">Setup code</span> <input type=\"text\" required autocomplete=\"one-time-code\" autocapitalize=\"characters\" spellcheck=\"false\" maxlength=\"32\" placeholder=\"XXXX-XXXX\" class=\"grow font-mono\" data-bind:setup-code></label><p class=\"text-xs text-base-content/60\">You are setting up from another device, so Moviestracker asks for the code it printed when it started. Find it in its log: <code class=\"font-mono\">docker compose logs moviestracker</code> (or <code class=\"font-mono\">docker logs &lt;container&gt;</code>), or the terminal it runs in. On the machine itself, open <code class=\"font-mono\">http://localhost:8095</code> instead: no code needed.</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

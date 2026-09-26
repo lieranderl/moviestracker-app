@@ -39,14 +39,17 @@ func TestDockerBuildsNeverSeeSecretsOrLocalData(t *testing.T) {
 		".worktrees/feature/.tmdb-shared-key",
 		"bin/server",
 		"installTorrServerMac.sh",
-		"moviestracker_v1.0.0_linux_amd64/moviestracker",
 		".claude/settings.local.json",
 	} {
 		if !ignored(path) {
 			t.Errorf(".dockerignore lets %s into the build", path)
 		}
 	}
-	for _, path := range []string{"go.mod", "cmd/server/main.go", "internal/views/layout.templ", "static/datastar.js", "frontend/app.css"} {
+	// What the image is built from, and the licences and TorrServer pin it carries.
+	for _, path := range []string{
+		"go.mod", "cmd/server/main.go", "internal/views/layout.templ", "static/datastar.js", "frontend/app.css",
+		"LICENSE", "NOTICE", "packaging/docker/GSTREAMER.txt", "scripts/fetch-torrserver.sh", "scripts/torrserver.lock",
+	} {
 		if ignored(path) {
 			t.Errorf(".dockerignore leaves out %s, which the build needs", path)
 		}

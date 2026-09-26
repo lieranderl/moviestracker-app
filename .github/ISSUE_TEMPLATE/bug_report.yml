@@ -34,8 +34,8 @@ body:
       label: How is it installed?
       options:
         - macOS app (DMG)
-        - Linux (install.sh)
-        - Container
+        - Windows app (installer)
+        - Docker (Linux, NAS, home server)
         - Built from source
     validations:
       required: true
@@ -43,7 +43,7 @@ body:
     id: system
     attributes:
       label: System
-      placeholder: macOS 26.1 on Apple Silicon / Ubuntu 24.04 on a Raspberry Pi 5
+      placeholder: macOS 26.1 on Apple Silicon / Windows 11 / Docker 28 on a Synology NAS (arm64)
   - type: input
     id: browser
     attributes:
@@ -54,5 +54,5 @@ body:
     attributes:
       label: Logs
       description: |
-        macOS: menu bar icon → Show Logs. Linux: `sudo journalctl -u moviestracker -n 200`.
+        macOS: menu bar icon → Show Logs. Windows: tray icon → Show Logs. Docker: `docker compose logs --tail 200 moviestracker`.
       render: text

@@ -311,6 +311,10 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 			statusCode:     http.StatusOK,
 		}
 		next.ServeHTTP(rw, r)
+		// Health checks (Docker's every 30 seconds) are logged only when failing.
+		if (r.URL.Path == "/healthz" || r.URL.Path == "/readyz") && rw.statusCode == http.StatusOK {
+			return
+		}
 
 		slog.Info("http request",
 			"method", r.Method,

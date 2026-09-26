@@ -1,5 +1,4 @@
-// The Linux archive and the Mac app; scripts/ci/windows-install-e2e.ps1
-// checks the Windows installer.
+// The Mac app is built and checked on macOS.
 
 //go:build unix
 

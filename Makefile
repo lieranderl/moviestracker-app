@@ -12,8 +12,8 @@ CONTAINER_TOOL ?= $(shell command -v docker 2>/dev/null || command -v container 
 CONTAINER_NAME ?= moviestracker-app
 CONTAINER_PORT ?= 8095
 
-.PHONY: all help torrserver release dmg winapp assets templ templ-check assets-check lint test security coverage ci build run dev clean \
-	docker-build docker-smoke container-build container-run container-smoke container-stop
+.PHONY: all help torrserver dmg winapp assets templ templ-check assets-check lint test security coverage ci build run dev clean \
+	docker-build docker-smoke container-run container-stop
 
 all: ci
 
@@ -28,17 +28,14 @@ help:
 	@echo "  make ci              Run the complete CI quality gate"
 	@echo "  make build           Build the self-contained binary at bin/server"
 	@echo "  make torrserver      Download the pinned TorrServer to bin/torrserver"
-	@echo "  make release VERSION=v0.1.0  Build the Linux archives (and the DMG on a Mac) into dist/"
 	@echo "  make dmg VERSION=v0.1.0      Build only Moviestracker.app and its DMG (macOS)"
 	@echo "  make winapp VERSION=v0.1.0   Build the Windows installer (Windows, Inno Setup 7)"
 	@echo "  make run             Run locally over HTTP with secure cookies disabled"
 	@echo "  make dev             Run Air locally with secure cookies disabled"
-	@echo "  make docker-build    Build container image using docker or container CLI"
-	@echo "  make docker-smoke    Run read-only container health smoke test"
-	@echo "  make container-build Build image using Apple container CLI"
-	@echo "  make container-run   Run image on port 8095 with Apple container CLI"
-	@echo "  make container-smoke Run smoke test using Apple container CLI"
-	@echo "  make container-stop  Stop running Apple container instance"
+	@echo "  make docker-build    Build the Linux image (docker, or Apple's container CLI)"
+	@echo "  make docker-smoke    Build and test the image end to end with compose.yaml (Docker)"
+	@echo "  make container-run   Run the image on port 8095 with Apple's container CLI"
+	@echo "  make container-stop  Stop it"
 
 node_modules: package.json bun.lock
 	$(BUN) install --frozen-lockfile
@@ -57,7 +54,7 @@ assets-check: node_modules
 	git diff --exit-code -- static/app.css static/player.js static/theme.js internal/views/icons_gen.go
 
 lint: templ-check assets-check
-	@if command -v shellcheck >/dev/null; then shellcheck scripts/*.sh scripts/ci/*.sh packaging/install.sh macos/install-gstreamer.sh; else echo "shellcheck not installed: shell scripts not checked"; fi
+	@if command -v shellcheck >/dev/null; then shellcheck scripts/*.sh scripts/ci/*.sh macos/install-gstreamer.sh; else echo "shellcheck not installed: shell scripts not checked"; fi
 	$(ACTIONLINT)
 	$(GO) vet ./...
 	$(GO) tool staticcheck ./...
@@ -88,61 +85,27 @@ build: lint
 ci: assets-check lint test security build
 
 docker-build:
-	$(CONTAINER_TOOL) build -t moviestracker:local .
+	$(CONTAINER_TOOL) build --build-arg VERSION=$(or $(VERSION),dev) -t moviestracker:local .
 
-docker-smoke: docker-build
-	@name=moviestracker-smoke; \
-	tool=$$(basename "$(CONTAINER_TOOL)"); \
-	$$tool rm -f $$name >/dev/null 2>&1 || true; \
-	trap '$$tool rm -f $$name >/dev/null 2>&1 || true' EXIT; \
-	if [ "$$tool" = "container" ]; then \
-		$$tool run -d --name $$name --read-only --cap-drop ALL \
-			--tmpfs /data -e MT_LISTEN=:$(CONTAINER_PORT) -p 127.0.0.1:$(CONTAINER_PORT):$(CONTAINER_PORT) \
-			moviestracker:local >/dev/null; \
-		port=$(CONTAINER_PORT); \
-	else \
-		$$tool run -d --name $$name --read-only --cap-drop=ALL \
-			--security-opt=no-new-privileges --tmpfs /data \
-			-p 127.0.0.1::8095 moviestracker:local >/dev/null; \
-		port=$$($$tool port $$name 8095/tcp | sed 's/.*://'); \
-	fi; \
-	for attempt in $$(seq 1 30); do \
-		body=$$(curl -fsS "http://127.0.0.1:$$port/healthz" 2>/dev/null) && \
-			test "$$body" = "ok" && exit 0; \
-		sleep 1; \
-	done; \
-	$$tool logs $$name; \
-	exit 1
+# The image end to end, as CI runs it: scripts/ci/docker-e2e.sh (Docker and
+# Compose, port 8095 free).
+docker-smoke:
+	scripts/ci/docker-e2e.sh
 
-container-build:
-	container build -t moviestracker:local .
-
-container-run:
+# Apple's container CLI mounts new volumes owned by root: hand the volume to
+# the image's user (uid 1000) first. Docker does that by itself.
+container-run: docker-build
 	@name=$(CONTAINER_NAME); \
 	env_arg=$$(test -f .env && echo "--env-file .env" || true); \
 	container rm -f $$name >/dev/null 2>&1 || true; \
-	container run -d --name $$name --read-only --cap-drop ALL \
-		$$env_arg \
-		--tmpfs /data -e MT_LISTEN=:$(CONTAINER_PORT) -p 127.0.0.1:$(CONTAINER_PORT):$(CONTAINER_PORT) \
-		moviestracker:local; \
-	echo "Container running at http://127.0.0.1:$(CONTAINER_PORT)"
-
-container-smoke: container-build
-	@name=moviestracker-smoke; \
-	container rm -f $$name >/dev/null 2>&1 || true; \
-	trap 'container rm -f $$name >/dev/null 2>&1 || true' EXIT; \
-	container run -d --name $$name --read-only --cap-drop ALL \
-		--tmpfs /data -e MT_LISTEN=:$(CONTAINER_PORT) -p 127.0.0.1:$(CONTAINER_PORT):$(CONTAINER_PORT) \
-		moviestracker:local >/dev/null; \
-	for attempt in $$(seq 1 30); do \
-		body=$$(curl -fsS "http://127.0.0.1:$(CONTAINER_PORT)/healthz" 2>/dev/null) && \
-			test "$$body" = "ok" && echo "Health check passed: $$body" && exit 0; \
-		sleep 1; \
-	done; \
-	container logs $$name; \
-	exit 1
+	container volume create $$name-data >/dev/null 2>&1 || true; \
+	container run --rm --user 0 --entrypoint chown -v $$name-data:/data moviestracker:local 1000:1000 /data; \
+	container run -d --name $$name --read-only --tmpfs /tmp $$env_arg \
+		-v $$name-data:/data -p 127.0.0.1:$(CONTAINER_PORT):8095 moviestracker:local; \
+	echo "Moviestracker running at http://127.0.0.1:$(CONTAINER_PORT) (setup code: container logs $$name)"
 
 container-stop:
+	container stop $(CONTAINER_NAME) 2>/dev/null || true
 	container rm -f $(CONTAINER_NAME) 2>/dev/null || true
 
 # Development keeps its accounts and keys apart from a real install, and runs
@@ -152,12 +115,6 @@ DEV_ENV = MT_DATA_DIR=$(DEV_DATA_DIR) $(if $(wildcard bin/torrserver),MT_TORRSER
 
 torrserver: bin/torrserver
 
-# A release in dist/: Linux archives (amd64, arm64) and, on a Mac, the
-# Moviestracker DMG, with checksums.txt:
-#   make release VERSION=v0.1.0
-release:
-	@test -n "$(VERSION)" || (echo "usage: make release VERSION=v0.1.0" && exit 1)
-	scripts/release.sh $(VERSION)
 
 # Only the Mac app and its DMG:  make dmg VERSION=v0.1.0
 dmg:

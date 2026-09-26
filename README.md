@@ -25,8 +25,8 @@ anywhere.
 > only for content you have the right to access. This product uses the TMDB
 > API but is not endorsed or certified by TMDB.
 
-Previews for [Windows](#windows-preview) and [Linux](#linux-preview) work the
-same way.
+There is a [Windows](#windows-preview) preview too, and on Linux, a NAS or a
+home server it runs [in Docker](#linux-nas-and-home-servers-docker).
 
 ## Install on your Mac
 
@@ -120,27 +120,6 @@ Everything Moviestracker keeps is in
 - Still stuck? [Open an issue](https://github.com/lieranderl/moviestracker-app/issues/new/choose)
   with the version (in the page footer) and the relevant part of the log.
 
-## Linux (preview)
-
-Linux builds for amd64 and arm64 (Raspberry Pi 4/5) install as a systemd
-service with the same features, minus the menu bar icon:
-
-```bash
-tar xzf moviestracker_<version>_linux_<arch>.tar.gz
-cd moviestracker_<version>_linux_<arch>
-sudo ./install.sh
-```
-
-The installer starts the service at boot, offers to install GStreamer with
-your package manager, and prints the address to open. A browser on another
-device needs the one-time setup code it shows to create the first account.
-Running a newer archive's `install.sh` upgrades in place.
-`sudo /usr/local/lib/moviestracker/uninstall.sh` removes it (add `--purge` to
-delete accounts and settings too). Logs: `journalctl -u moviestracker`.
-
-Details, the container image and all settings are in
-[docs/CONFIGURATION.md](docs/CONFIGURATION.md).
-
 ## Windows (preview)
 
 You need 64-bit Windows 10 or 11. Download
@@ -174,6 +153,59 @@ uninstall and quit.
 - **Where things are:** the programs in
   `%LOCALAPPDATA%\Programs\Moviestracker`, accounts, settings, TorrServer's
   data and the log (`moviestracker.log`) in `%LOCALAPPDATA%\Moviestracker`.
+
+## Linux, NAS and home servers (Docker)
+
+On Linux, a NAS (Synology, QNAP, Unraid, TrueNAS…) or a home server,
+Moviestracker runs in Docker. The image is for `linux/amd64` and
+`linux/arm64` (Raspberry Pi 4/5, most NAS boxes) and has everything: it runs
+its own TorrServer with GStreamer, so MKV files play in the browser.
+
+1. Save [compose.yaml](compose.yaml) in a folder, then start it:
+
+   ```bash
+   docker compose up -d
+   ```
+
+2. Find the one-time setup code in its log:
+
+   ```bash
+   docker compose logs moviestracker
+   ```
+
+3. Open `http://<the server's address>:8095`, enter the code and create the
+   administrator account.
+
+Without Compose:
+
+```bash
+docker run -d --name moviestracker --restart unless-stopped -p 8095:8095 \
+  -v moviestracker-data:/data --read-only --tmpfs /tmp --cap-drop ALL \
+  --security-opt no-new-privileges --stop-timeout 30 \
+  ghcr.io/lieranderl/moviestracker:latest
+```
+
+- **Your data:** accounts, settings and TorrServer's torrent list live in the
+  `/data` volume and survive updates. To use a folder of your own instead
+  (`./moviestracker:/data`), give it to uid 1000 (`sudo chown 1000:1000
+  moviestracker`), or set `user:` in `compose.yaml` to the folder's owner.
+- **Only port 8095** is published. TorrServer stays inside the container,
+  behind a password Moviestracker generates.
+- **Names and links:** Moviestracker answers to IP addresses and `localhost`.
+  To use a name such as `http://nas.local:8095`, add it to `MT_HOSTNAMES` in
+  `compose.yaml`. If you open it as `localhost`, set `MT_LAN_ADDRESS` to the
+  server's address, so links for TVs and phones point there.
+- **Your own TorrServer** (advanced): set `TORRSERVER_URL`, or choose it in
+  **Settings → Sources**. The bundled one then stays off.
+- **Update:** `docker compose pull && docker compose up -d`.
+- **Uninstall:** `docker compose down` keeps the data volume; add `-v` to
+  delete it too.
+- **Logs:** `docker compose logs moviestracker`. `docker compose ps` shows
+  whether it is healthy.
+
+HDR-to-SDR conversion needs TorrServer's `hdrtonemap` plugin, which only its
+Windows build has. The other conversions work the same as in the apps. All
+settings are in [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
 ## Where the data comes from
 

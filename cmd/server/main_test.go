@@ -3,9 +3,15 @@ package main
 import (
 	"crypto/rand"
 	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -115,6 +121,78 @@ func TestTheServerNoticesWhenTheAppClosesItsInput(t *testing.T) {
 	case <-closed:
 	case <-time.After(time.Second):
 		t.Fatal("the closed input was not noticed")
+	}
+}
+
+// The container's health check runs `moviestracker --health`: the image has
+// no curl.
+func TestTheHealthCheckAsksTheRunningServer(t *testing.T) {
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/healthz" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer up.Close()
+	_, port, _ := net.SplitHostPort(up.Listener.Addr().String())
+	for _, listen := range []string{":" + port, "0.0.0.0:" + port, "127.0.0.1:" + port} {
+		if err := checkHealth(listen); err != nil {
+			t.Errorf("checkHealth(%q) with the server up: %v", listen, err)
+		}
+	}
+
+	up.Close()
+	if err := checkHealth(":" + port); err == nil {
+		t.Error("checkHealth reports healthy with nothing listening")
+	}
+	sick := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "starting", http.StatusServiceUnavailable)
+	}))
+	defer sick.Close()
+	_, port, _ = net.SplitHostPort(sick.Listener.Addr().String())
+	if err := checkHealth(":" + port); err == nil {
+		t.Error("checkHealth reports healthy for a failing /healthz")
+	}
+}
+
+// Links for TVs replace "localhost" with this machine's network address. In a
+// container that is the container's own address, so the image turns the
+// guess off and MT_LAN_ADDRESS can name the host's address instead.
+func TestTheAddressForOtherDevicesCanBeSetOrTurnedOff(t *testing.T) {
+	if lanAddressFrom("") != nil {
+		t.Error("an empty MT_LAN_ADDRESS should keep the automatic address")
+	}
+	if got := lanAddressFrom("off")(); got != "" {
+		t.Errorf("MT_LAN_ADDRESS=off gives %q, want no address", got)
+	}
+	if got := lanAddressFrom(" 192.168.1.20 ")(); got != "192.168.1.20" {
+		t.Errorf("MT_LAN_ADDRESS=192.168.1.20 gives %q", got)
+	}
+}
+
+// A NAS folder mounted at /data that the container's user cannot write to
+// is the usual first-run mistake: the error names the user and the fix.
+func TestADataDirectoryItCannotWriteIsExplained(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Getuid() == 0 {
+		t.Skip("needs Unix permissions and a user they apply to")
+	}
+	dir := filepath.Join(t.TempDir(), "data")
+	if err := os.Mkdir(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) }) // #nosec G302 -- lets the test clean up
+	err := checkWritable(dir)
+	if err == nil {
+		t.Fatal("checkWritable accepts a read-only directory")
+	}
+	for _, want := range []string{dir, "uid " + strconv.Itoa(os.Getuid()), "chown"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error %q does not mention %q", err, want)
+		}
+	}
+	if err := checkWritable(t.TempDir()); err != nil {
+		t.Errorf("checkWritable refuses a writable directory: %v", err)
 	}
 }
 

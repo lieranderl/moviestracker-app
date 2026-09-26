@@ -27,7 +27,7 @@ templ Setup(askCode bool) {
 						</label>
 						<p class="text-xs text-base-content/60">
 							You are setting up from another device, so Moviestracker asks for the code it printed when it started. Find it in its log:
-							<code class="font-mono">sudo journalctl -u moviestracker</code>, <code class="font-mono">docker logs &lt;container&gt;</code>
+							<code class="font-mono">docker compose logs moviestracker</code> (or <code class="font-mono">docker logs &lt;container&gt;</code>),
 							or the terminal it runs in. On the machine itself, open <code class="font-mono">http://localhost:8095</code> instead: no code needed.
 						</p>
 					}

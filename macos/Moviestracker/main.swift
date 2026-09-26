@@ -284,8 +284,8 @@ func moveToApplications() -> Bool {
 
 // MARK: - Earlier installs
 
-/// takeOverLaunchAgent removes the service an earlier install.sh set up; its
-/// settings and data are in the same folder and stay.
+/// takeOverLaunchAgent removes the launchd service of an earlier command-line
+/// install (before the app); its settings and data are in the same folder and stay.
 func takeOverLaunchAgent() {
     let label = "app.moviestracker"
     let plist = home.appendingPathComponent("Library/LaunchAgents/\(label).plist")

@@ -39,3 +39,25 @@ func TestTheRequestLogLeavesOutShareLinkTokens(t *testing.T) {
 		}
 	}
 }
+
+// Docker asks /healthz every 30 seconds: passing probes would bury the log.
+func TestPassingHealthProbesAreNotLogged(t *testing.T) {
+	var logged bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logged, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
+	status := http.StatusOK
+	handler := handlers.LoggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(status) }))
+	for _, path := range []string{"/healthz", "/readyz"} {
+		handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, path, nil))
+	}
+	if logged.Len() != 0 {
+		t.Errorf("passing health probes were logged:\n%s", logged.String())
+	}
+	status = http.StatusServiceUnavailable
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	if !strings.Contains(logged.String(), "path=/readyz") {
+		t.Errorf("a failing probe was not logged:\n%s", logged.String())
+	}
+}

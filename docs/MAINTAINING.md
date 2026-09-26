@@ -28,10 +28,11 @@ after making it public.
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `ci.yml` | pull requests, pushes to `main`, called by releases | `make ci` (generated files, lint, race tests, govulncheck, gosec, build) and the TorrServer API contract; gitleaks over the whole history; macOS tests and a real DMG build; the Linux install, upgrade, uninstall and purge on a real systemd machine; Windows tests, a real installer build, and its install, upgrade, quit, uninstall and purge; the container image's smoke test |
+| `ci.yml` | pull requests, pushes to `main`, called by releases | `make ci` (generated files, lint, race tests, govulncheck, gosec, build) and the TorrServer API contract; gitleaks over the whole history; macOS tests and a real DMG build; Windows tests, a real installer build, and its install, upgrade, quit, uninstall and purge; the Docker image end to end with `compose.yaml` (`scripts/ci/docker-e2e.sh`: TorrServer and GStreamer, setup, persistence, shutdown, licences) and its linux/arm64 build |
 | `pr.yml` | pull requests | Conventional Commit titles; dependency review (public repository) |
 | `codeql.yml` | pull requests, `main`, weekly | CodeQL for Go, JavaScript and the workflows (public repository) |
-| `release.yml` | `v*` tags | CI, then Linux archives, the DMG and the Windows installer in parallel, checksums, build provenance (public repository), and a **draft** release |
+| `release.yml` | `v*` tags | CI, then in parallel the Docker image for linux/amd64 and linux/arm64 (pushed to `ghcr.io/lieranderl/moviestracker:<version>` with SBOM and provenance), the DMG and the Windows installer; checksums, build provenance (public repository), and a **draft** release |
+| `docker-latest.yml` | a release is published | Points the image's `latest` and `MAJOR.MINOR` tags at the published version (not for pre-releases) |
 
 Every action is pinned to a commit SHA with its version in a comment;
 Dependabot updates the pins, Go modules, Bun tools and the Docker base images
@@ -45,7 +46,7 @@ free minutes run short.
 
 | Secret | Used by | What |
 | --- | --- | --- |
-| `MT_SHARED_TMDB_KEY` | `release.yml` | The read-only TMDB token built into releases. Without it, releases work but users must add their own key. |
+| `MT_SHARED_TMDB_KEY` | `release.yml` | The read-only TMDB token built into releases (the Docker image gets it as a build secret, so the image history does not show it). Without it, releases work but users must add their own key. |
 
 Set it with `scripts/github-setup.sh` (from the git-ignored
 `.tmdb-shared-key`) or `gh secret set MT_SHARED_TMDB_KEY`. To rotate it,
@@ -66,15 +67,23 @@ and `v1.2.0-rc.1` for pre-releases.
    git push origin v0.3.0
    ```
 
-3. The release workflow runs CI, builds the Linux archives (amd64, arm64),
-   the DMG and the Windows installer, and drafts a GitHub release with the files, `checksums.txt` and
+3. The release workflow runs CI, pushes the Docker image
+   `ghcr.io/lieranderl/moviestracker:<version>` (amd64, arm64), builds the
+   DMG and the Windows installer, and drafts a GitHub release with the files, `checksums.txt` and
    notes generated from the merged pull requests.
 4. Check the draft: install the DMG on a Mac (and the installer on Windows),
    read the notes. Then publish.
+5. Publishing the release (not a pre-release) moves the image's `latest`
+   tag to it.
 
-To build locally instead: `make release VERSION=v0.3.0` (Linux archives, and
-the DMG on a Mac), `make dmg VERSION=v0.3.0`, or `make winapp VERSION=v0.3.0`
-on Windows.
+The image's package on GitHub (`ghcr.io/lieranderl/moviestracker`) starts
+private, like the repository: when the repository goes public, make the
+package public too (Package settings → Change visibility), or `docker pull`
+asks for a login.
+
+To build locally instead: `make dmg VERSION=v0.3.0` on a Mac,
+`make winapp VERSION=v0.3.0` on Windows, and `make docker-build VERSION=v0.3.0`
+for the image (`make docker-smoke` tests it).
 
 ### Signing the Mac app
 
@@ -97,7 +106,10 @@ directive signs the uninstaller too.
 ## Dependencies
 
 - Go modules and tools are pinned in `go.mod`; `go tool` runs the tools.
-- TorrServer is pinned by version and SHA-256 in `scripts/torrserver.lock`.
+- TorrServer is pinned by version and SHA-256 in `scripts/torrserver.lock`
+  (the Docker image too).
+- The Docker base images are pinned by tag and digest in the `Dockerfile`;
+  GStreamer in the image is Debian 13's.
 - GStreamer for the Mac app is pinned in `macos/install-gstreamer.sh`; on
   Windows it comes inside the pinned TorrServer.
 - Inno Setup, which builds the Windows installer in CI, is pinned by version

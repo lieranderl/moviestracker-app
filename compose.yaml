@@ -1,0 +1,42 @@
+# Moviestracker on a Linux server, NAS or home server:
+#
+#   docker compose up -d
+#   docker compose logs moviestracker     the setup code for the first account
+#
+# Then open http://<this machine>:8095. Moviestracker runs its bundled
+# TorrServer (with GStreamer, so MKV plays in the browser) inside the
+# container; only port 8095 is published.
+services:
+  moviestracker:
+    image: ghcr.io/lieranderl/moviestracker:latest
+    container_name: moviestracker
+    restart: unless-stopped
+    ports:
+      - "8095:8095"
+    volumes:
+      # Accounts, settings, TorrServer's database and settings. A folder of
+      # your own works too (./moviestracker:/data): it must belong to uid 1000,
+      # or set `user:` below to its owner.
+      - moviestracker-data:/data
+    environment:
+      # The address TVs and phones use to reach this machine (for example
+      # 192.168.1.20), for the links Moviestracker makes when you open it as
+      # http://localhost:8095. "off" keeps the address you opened it with.
+      MT_LAN_ADDRESS: "off"
+      # Names besides IP addresses it answers to, such as your NAS's name.
+      # MT_HOSTNAMES: "nas.local,nas"
+      # Use your own TorrServer instead of the bundled one (advanced).
+      # TORRSERVER_URL: "http://192.168.1.30:8090"
+    # user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Moviestracker closes open pages, then stops TorrServer.
+    stop_grace_period: 30s
+
+volumes:
+  moviestracker-data:
