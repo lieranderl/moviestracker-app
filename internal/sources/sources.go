@@ -56,16 +56,23 @@ func (c Connector) CheckTMDB(ctx context.Context, key string) error {
 // always finds releases for it.
 var probeQuery = jacred.Query{Title: "Начало", OriginalTitle: "Inception", Year: 2010}
 
-// CheckJacRed runs a test search and returns how many releases it found.
-func (c Connector) CheckJacRed(ctx context.Context, baseURL, apiKey string) (int, error) {
+// CheckJacRed runs a test search and returns how many releases it found,
+// and how many searches the key has left today (-1 when JacRed does not
+// say: it has no daily limit).
+func (c Connector) CheckJacRed(ctx context.Context, baseURL, apiKey string) (found, left int, err error) {
 	if err := validHTTPURL(baseURL); err != nil {
-		return 0, err
+		return 0, -1, err
 	}
-	results, err := jacred.NewClient(baseURL, jacred.WithAPIKey(apiKey)).Search(ctx, probeQuery)
+	client := jacred.NewClient(baseURL, jacred.WithAPIKey(apiKey))
+	results, err := client.Search(ctx, probeQuery)
 	if err != nil {
-		return 0, err
+		return 0, -1, err
 	}
-	return len(results), nil
+	left = -1
+	if n, _, ok := client.Quota(); ok {
+		left = n
+	}
+	return len(results), left, nil
 }
 
 func (c Connector) tmdb(key string) *tmdb.Client {

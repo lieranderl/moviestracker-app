@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/jacred"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
@@ -377,5 +378,26 @@ func TestTorrServerStatusReportsVersionOrOffline(t *testing.T) {
 	offline := newMediaServer(t, &fakeTMDBDetails{}, &fakeJacRed{}, "http://127.0.0.1:1")
 	if body := get(t, offline, "/api/torrserver/status", true).Body.String(); !strings.Contains(body, "Offline") {
 		t.Errorf("offline status = %q, want Offline", body)
+	}
+}
+
+// From 9 Oct 2026 jacred.su answers only with a key, and a personal key has
+// a daily limit: the title page says which, and what to do.
+func TestTorrentSearchSaysWhenJacRedWantsAKeyOrItsLimitIsReached(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want []string
+	}{
+		{jacred.ErrKeyNeeded, []string{"JacRed needs a key", "Settings → Sources"}},
+		{&jacred.LimitError{Retry: 3 * time.Hour}, []string{"used up", "about 3 hours"}},
+		{&jacred.LimitError{Retry: 20 * time.Minute}, []string{"used up", "20 minutes"}},
+	} {
+		server := newMediaServer(t, &fakeTMDBDetails{movies: map[int]*tmdb.MovieDetails{27205: inception}}, &fakeJacRed{err: tc.err}, "")
+		body := get(t, server, "/api/torrents?type=movie&id=27205", true).Body.String()
+		for _, want := range tc.want {
+			if !strings.Contains(body, want) {
+				t.Errorf("%v: page lacks %q:\n%s", tc.err, want, body)
+			}
+		}
 	}
 }

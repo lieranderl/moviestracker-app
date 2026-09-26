@@ -12,6 +12,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/config"
 	"github.com/lieranderl/moviestracker-app/internal/engine"
+	"github.com/lieranderl/moviestracker-app/internal/jacred"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
 	"github.com/lieranderl/moviestracker-app/internal/views"
@@ -250,11 +251,19 @@ func (s *Server) handleSaveJacRed(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), sourceCheckTimeout)
 	defer cancel()
-	found, err := s.connector.CheckJacRed(ctx, baseURL, apiKey)
+	found, left, err := s.connector.CheckJacRed(ctx, baseURL, apiKey)
 	if err != nil {
 		slog.Warn("jacred test search failed", "url", baseURL, "error", err)
+		if errors.Is(err, jacred.ErrKeyNeeded) {
+			status(failed("%s needs a valid key, so nothing was saved. For jacred.su, create one under «Мой ключ» at jacred.su/account and paste it here.", baseURL))
+			return
+		}
 		status(failed("The test search at %s failed, so it was not saved: %v", baseURL, err))
 		return
+	}
+	quota := ""
+	if left >= 0 {
+		quota = fmt.Sprintf(" The key has %d %s left today.", left, plural(left, "search", "searches"))
 	}
 	if err := s.saveSources(func(st *config.State) {
 		st.Sources.JacRedURL, st.Sources.JacRedAPIKey = baseURL, apiKey
@@ -264,10 +273,10 @@ func (s *Server) handleSaveJacRed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if found == 0 {
-		status(succeeded("Saved. JacRed answered, but the test search found no releases; it may still be indexing."))
+		status(succeeded("Saved. JacRed answered, but the test search found no releases; it may still be indexing.%s", quota))
 		return
 	}
-	status(succeeded("Saved. The test search found %d %s.", found, plural(found, "release", "releases")))
+	status(succeeded("Saved. The test search found %d %s.%s", found, plural(found, "release", "releases"), quota))
 }
 
 // handleSaveIMDb switches IMDb ratings on or off. The rating service is

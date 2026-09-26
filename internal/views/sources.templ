@@ -10,6 +10,7 @@ const (
 	tmdbAPIPageURL  = "https://www.themoviedb.org/settings/api"
 	jacredRepoURL   = "https://github.com/jacred-fdb/jacred" // #nosec G101 -- "JacRed" is a service name, not a credential
 	jacredPublicURL = "https://jacred.su"                    // #nosec G101 -- "JacRed" is a service name, not a credential
+	jacredKeyURL    = "https://jacred.su/account"            // #nosec G101 -- where jacred.su hands out keys, not a credential
 )
 
 // SourcesView is what the Sources settings show. Keys are never included:
@@ -214,12 +215,24 @@ templ tmdbSharedNote() {
 templ JacRedSource(v SourcesView, st SourceStatus) {
 	@sourceCard("source-jacred", "magnet", "JacRed — torrent search") {
 		<p class="text-sm text-base-content/70">
-			Releases for a title are found with JacRed. The public instance at
-			<a href={ templ.SafeURL(jacredPublicURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">jacred.su</a>
-			needs no key. If it is slow or blocked where you are, run your own with
+			Releases for a title are found with JacRed: the public instance at
+			<a href={ templ.SafeURL(jacredPublicURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">jacred.su</a>,
+			or your own, run with
 			<a href={ templ.SafeURL(jacredRepoURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">jacred-fdb/jacred</a>
-			(Docker or Linux, port 9117) and enter its address.
+			(Docker or Linux, port 9117) if jacred.su is slow or blocked where you are.
 		</p>
+		<div role="note" class="alert alert-soft alert-info text-sm items-start">
+			@Icon("key-round", "size-4 mt-0.5")
+			<div class="space-y-1">
+				<p class="font-semibold">From 9 October 2026, jacred.su searches need a free personal key.</p>
+				<p>
+					Sign in at
+					<a href={ templ.SafeURL(jacredKeyURL) } target="_blank" rel="noopener noreferrer" class="link">jacred.su/account</a>,
+					create one under «Мой ключ» and paste it below. A personal key allows 100 searches a day; each title
+					whose sources you open uses one, and a repeat within an hour is free.
+				</p>
+			</div>
+		</div>
 		if v.JacRedEnv != "" {
 			@envNote(v.JacRedEnv)
 		} else {
@@ -239,7 +252,7 @@ templ JacRedSource(v SourcesView, st SourceStatus) {
 						if v.JacRedKeySet {
 							placeholder="A key is saved — leave empty to keep it"
 						} else {
-							placeholder="API key (only for private instances)"
+							placeholder="Your jacred.su key, or a private instance's"
 						}
 						data-bind:jacred-api-key
 					/>

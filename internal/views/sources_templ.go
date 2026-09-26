@@ -18,6 +18,7 @@ const (
 	tmdbAPIPageURL  = "https://www.themoviedb.org/settings/api"
 	jacredRepoURL   = "https://github.com/jacred-fdb/jacred" // #nosec G101 -- "JacRed" is a service name, not a credential
 	jacredPublicURL = "https://jacred.su"                    // #nosec G101 -- "JacRed" is a service name, not a credential
+	jacredKeyURL    = "https://jacred.su/account"            // #nosec G101 -- where jacred.su hands out keys, not a credential
 )
 
 // SourcesView is what the Sources settings show. Keys are never included:
@@ -215,7 +216,7 @@ func sourceCard(id, icon, title string) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(id)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 93, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 94, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {
@@ -232,7 +233,7 @@ func sourceCard(id, icon, title string) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 97, Col: 11}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 98, Col: 11}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -316,7 +317,7 @@ func sourceStatus(st SourceStatus) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(st.Message)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 112, Col: 21}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 113, Col: 21}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -367,7 +368,7 @@ func envNote(name string) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 120, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 121, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -499,7 +500,7 @@ func TMDBSource(v SourcesView, st SourceStatus) templ.Component {
 				var templ_7745c5c3_Var14 templ.SafeURL
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(tmdbSignupURL))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 161, Col: 72}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 162, Col: 72}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -512,7 +513,7 @@ func TMDBSource(v SourcesView, st SourceStatus) templ.Component {
 				var templ_7745c5c3_Var15 templ.SafeURL
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(tmdbAPIPageURL))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 162, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 163, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 				if templ_7745c5c3_Err != nil {
@@ -646,33 +647,54 @@ func JacRedSource(v SourcesView, st SourceStatus) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<p class=\"text-sm text-base-content/70\">Releases for a title are found with JacRed. The public instance at <a href=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<p class=\"text-sm text-base-content/70\">Releases for a title are found with JacRed: the public instance at <a href=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var19 templ.SafeURL
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(jacredPublicURL))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 218, Col: 43}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 219, Col: 43}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"link link-primary\">jacred.su</a> needs no key. If it is slow or blocked where you are, run your own with <a href=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"link link-primary\">jacred.su</a>, or your own, run with <a href=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var20 templ.SafeURL
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(jacredRepoURL))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 220, Col: 41}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 221, Col: 41}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"link link-primary\">jacred-fdb/jacred</a> (Docker or Linux, port 9117) and enter its address.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"link link-primary\">jacred-fdb/jacred</a> (Docker or Linux, port 9117) if jacred.su is slow or blocked where you are.</p><div role=\"note\" class=\"alert alert-soft alert-info text-sm items-start\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = Icon("key-round", "size-4 mt-0.5").Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<div class=\"space-y-1\"><p class=\"font-semibold\">From 9 October 2026, jacred.su searches need a free personal key.</p><p>Sign in at <a href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var21 templ.SafeURL
+			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(jacredKeyURL))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 230, Col: 42}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"link\">jacred.su/account</a>, create one under «Мой ключ» and paste it below. A personal key allows 100 searches a day; each title whose sources you open uses one, and a repeat within an hour is free.</p></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -682,20 +704,20 @@ func JacRedSource(v SourcesView, st SourceStatus) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<form class=\"space-y-3\" data-signals=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<form class=\"space-y-3\" data-signals=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var21 string
-				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.JSONString(map[string]string{"jacredUrl": v.JacRedURL, "jacredApiKey": ""}))
+				var templ_7745c5c3_Var22 string
+				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.JSONString(map[string]string{"jacredUrl": v.JacRedURL, "jacredApiKey": ""}))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 226, Col: 123}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 239, Col: 123}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "\" data-indicator:jacred-saving data-on:submit=\"@post('/api/settings/sources/jacred', {filterSignals: {include: /^jacred(Url|ApiKey)$/}})\"><label class=\"input w-full\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "\" data-indicator:jacred-saving data-on:submit=\"@post('/api/settings/sources/jacred', {filterSignals: {include: /^jacred(Url|ApiKey)$/}})\"><label class=\"input w-full\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -703,7 +725,7 @@ func JacRedSource(v SourcesView, st SourceStatus) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<span class=\"sr-only\">JacRed address</span> <input type=\"url\" required placeholder=\"https://jacred.su\" class=\"grow font-mono\" data-bind:jacred-url></label> <label class=\"input w-full\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "<span class=\"sr-only\">JacRed address</span> <input type=\"url\" required placeholder=\"https://jacred.su\" class=\"grow font-mono\" data-bind:jacred-url></label> <label class=\"input w-full\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -711,27 +733,27 @@ func JacRedSource(v SourcesView, st SourceStatus) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "<span class=\"sr-only\">JacRed API key</span> <input type=\"password\" autocomplete=\"off\" class=\"grow font-mono\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "<span class=\"sr-only\">JacRed API key</span> <input type=\"password\" autocomplete=\"off\" class=\"grow font-mono\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if v.JacRedKeySet {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, " placeholder=\"A key is saved — leave empty to keep it\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, " placeholder=\"A key is saved — leave empty to keep it\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, " placeholder=\"API key (only for private instances)\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, " placeholder=\"Your jacred.su key, or a private instance's\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, " data-bind:jacred-api-key></label> <button type=\"submit\" class=\"btn btn-primary\" data-attr:disabled=\"$jacredSaving\"><span class=\"loading loading-spinner loading-xs hidden\" data-class:hidden=\"!$jacredSaving\"></span> Test search and save</button></form>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, " data-bind:jacred-api-key></label> <button type=\"submit\" class=\"btn btn-primary\" data-attr:disabled=\"$jacredSaving\"><span class=\"loading loading-spinner loading-xs hidden\" data-class:hidden=\"!$jacredSaving\"></span> Test search and save</button></form>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, " ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, " ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -767,12 +789,12 @@ func TorrServerSource(v SourcesView, st SourceStatus) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var22 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var22 == nil {
-			templ_7745c5c3_Var22 = templ.NopComponent
+		templ_7745c5c3_Var23 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var23 == nil {
+			templ_7745c5c3_Var23 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var23 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var24 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -784,7 +806,7 @@ func TorrServerSource(v SourcesView, st SourceStatus) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<p class=\"text-sm text-base-content/70\">TorrServer downloads and streams the torrents you play. Moviestracker can run it for you, hidden behind Moviestracker, or use one you already run.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<p class=\"text-sm text-base-content/70\">TorrServer downloads and streams the torrents you play. Moviestracker can run it for you, hidden behind Moviestracker, or use one you already run.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -794,40 +816,40 @@ func TorrServerSource(v SourcesView, st SourceStatus) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "<form class=\"space-y-4\" data-signals=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "<form class=\"space-y-4\" data-signals=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var24 string
-				templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.JSONString(map[string]string{"torrserverMode": v.Engine.Mode, "torrserverUrl": v.TorrServerURL, "torrserverUser": v.TorrServerUser, "torrserverPassword": ""}))
+				var templ_7745c5c3_Var25 string
+				templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.JSONString(map[string]string{"torrserverMode": v.Engine.Mode, "torrserverUrl": v.TorrServerURL, "torrserverUser": v.TorrServerUser, "torrserverPassword": ""}))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 270, Col: 183}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 283, Col: 183}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "\" data-indicator:torrserver-saving data-on:submit=\"@post('/api/settings/sources/torrserver', {filterSignals: {include: /^torrserver(Mode|Url|User|Password)$/}})\"><div class=\"space-y-2\" role=\"radiogroup\" aria-label=\"Where TorrServer runs\"><label class=\"flex items-start gap-3 cursor-pointer rounded-box bg-base-100 border border-base-content/10 p-3\"><input type=\"radio\" name=\"torrserver-mode\" value=\"managed\" class=\"radio radio-primary mt-0.5\" data-bind:torrserver-mode")
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var25)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if !v.Engine.Available {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, " disabled")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "> <span class=\"space-y-1\"><span class=\"block text-sm font-semibold\">Managed by Moviestracker</span> <span class=\"block text-xs text-base-content/70\">Recommended. Moviestracker starts TorrServer, restarts it if it stops, and keeps it off your network.</span> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "\" data-indicator:torrserver-saving data-on:submit=\"@post('/api/settings/sources/torrserver', {filterSignals: {include: /^torrserver(Mode|Url|User|Password)$/}})\"><div class=\"space-y-2\" role=\"radiogroup\" aria-label=\"Where TorrServer runs\"><label class=\"flex items-start gap-3 cursor-pointer rounded-box bg-base-100 border border-base-content/10 p-3\"><input type=\"radio\" name=\"torrserver-mode\" value=\"managed\" class=\"radio radio-primary mt-0.5\" data-bind:torrserver-mode")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if !v.Engine.Available {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "<span class=\"block text-xs text-warning\">The TorrServer program was not found: run <code class=\"font-mono\">make torrserver</code> or put a <code class=\"font-mono\">torrserver</code> program next to Moviestracker.</span>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, " disabled")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "</span></label> <label class=\"flex items-start gap-3 cursor-pointer rounded-box bg-base-100 border border-base-content/10 p-3\"><input type=\"radio\" name=\"torrserver-mode\" value=\"external\" class=\"radio radio-primary mt-0.5\" data-bind:torrserver-mode> <span class=\"space-y-1\"><span class=\"block text-sm font-semibold\">A TorrServer I already run</span> <span class=\"block text-xs text-base-content/70\">On this computer, a NAS or an Android TV box.</span></span></label></div><div class=\"space-y-3\" data-show=\"$torrserverMode === 'external'\"><label class=\"input w-full\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "> <span class=\"space-y-1\"><span class=\"block text-sm font-semibold\">Managed by Moviestracker</span> <span class=\"block text-xs text-base-content/70\">Recommended. Moviestracker starts TorrServer, restarts it if it stops, and keeps it off your network.</span> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if !v.Engine.Available {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "<span class=\"block text-xs text-warning\">The TorrServer program was not found: run <code class=\"font-mono\">make torrserver</code> or put a <code class=\"font-mono\">torrserver</code> program next to Moviestracker.</span>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "</span></label> <label class=\"flex items-start gap-3 cursor-pointer rounded-box bg-base-100 border border-base-content/10 p-3\"><input type=\"radio\" name=\"torrserver-mode\" value=\"external\" class=\"radio radio-primary mt-0.5\" data-bind:torrserver-mode> <span class=\"space-y-1\"><span class=\"block text-sm font-semibold\">A TorrServer I already run</span> <span class=\"block text-xs text-base-content/70\">On this computer, a NAS or an Android TV box.</span></span></label></div><div class=\"space-y-3\" data-show=\"$torrserverMode === 'external'\"><label class=\"input w-full\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -835,7 +857,7 @@ func TorrServerSource(v SourcesView, st SourceStatus) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "<span class=\"sr-only\">TorrServer address</span> <input type=\"url\" placeholder=\"http://127.0.0.1:8090\" class=\"grow font-mono\" data-bind:torrserver-url></label><div class=\"grid gap-3 sm:grid-cols-2\"><label class=\"input w-full\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<span class=\"sr-only\">TorrServer address</span> <input type=\"url\" placeholder=\"http://127.0.0.1:8090\" class=\"grow font-mono\" data-bind:torrserver-url></label><div class=\"grid gap-3 sm:grid-cols-2\"><label class=\"input w-full\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -843,7 +865,7 @@ func TorrServerSource(v SourcesView, st SourceStatus) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "<span class=\"sr-only\">TorrServer username</span> <input type=\"text\" autocomplete=\"off\" placeholder=\"Username (if it asks for one)\" class=\"grow\" data-bind:torrserver-user></label> <label class=\"input w-full\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "<span class=\"sr-only\">TorrServer username</span> <input type=\"text\" autocomplete=\"off\" placeholder=\"Username (if it asks for one)\" class=\"grow\" data-bind:torrserver-user></label> <label class=\"input w-full\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -851,22 +873,22 @@ func TorrServerSource(v SourcesView, st SourceStatus) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<span class=\"sr-only\">TorrServer password</span> <input type=\"password\" autocomplete=\"off\" class=\"grow\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "<span class=\"sr-only\">TorrServer password</span> <input type=\"password\" autocomplete=\"off\" class=\"grow\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if v.TorrServerPassSet {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, " placeholder=\"A password is saved — leave empty to keep it\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, " placeholder=\"A password is saved — leave empty to keep it\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, " placeholder=\"Password\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, " placeholder=\"Password\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, " data-bind:torrserver-password></label></div><p class=\"text-xs text-base-content/60\">Only for a TorrServer started with <code class=\"font-mono\">--httpauth</code>: the login from its <code class=\"font-mono\">accs.db</code>. Moviestracker keeps it in its data folder and never shows the password again.</p></div><button type=\"submit\" class=\"btn btn-primary\" data-attr:disabled=\"$torrserverSaving\"><span class=\"loading loading-spinner loading-xs hidden\" data-class:hidden=\"!$torrserverSaving\"></span> Connect and save</button></form>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, " data-bind:torrserver-password></label></div><p class=\"text-xs text-base-content/60\">Only for a TorrServer started with <code class=\"font-mono\">--httpauth</code>: the login from its <code class=\"font-mono\">accs.db</code>. Moviestracker keeps it in its data folder and never shows the password again.</p></div><button type=\"submit\" class=\"btn btn-primary\" data-attr:disabled=\"$torrserverSaving\"><span class=\"loading loading-spinner loading-xs hidden\" data-class:hidden=\"!$torrserverSaving\"></span> Connect and save</button></form>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -877,7 +899,7 @@ func TorrServerSource(v SourcesView, st SourceStatus) templ.Component {
 					}
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, " ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, " ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -887,7 +909,7 @@ func TorrServerSource(v SourcesView, st SourceStatus) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = sourceCard("source-torrserver", "server", "TorrServer — streaming").Render(templ.WithChildren(ctx, templ_7745c5c3_Var23), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = sourceCard("source-torrserver", "server", "TorrServer — streaming").Render(templ.WithChildren(ctx, templ_7745c5c3_Var24), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -912,65 +934,65 @@ func engineStatus(e EngineView) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var25 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var25 == nil {
-			templ_7745c5c3_Var25 = templ.NopComponent
+		templ_7745c5c3_Var26 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var26 == nil {
+			templ_7745c5c3_Var26 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "<div class=\"flex flex-wrap items-center justify-between gap-3 rounded-box bg-base-100 border border-base-content/10 p-3\"><div class=\"flex items-center gap-2 text-sm\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "<div class=\"flex flex-wrap items-center justify-between gap-3 rounded-box bg-base-100 border border-base-content/10 p-3\"><div class=\"flex items-center gap-2 text-sm\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		switch e.State {
 		case "running":
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "<span class=\"status status-success\" aria-hidden=\"true\"></span> <span>Running TorrServer <span class=\"font-mono\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var26 string
-			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(e.Version)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 351, Col: 65}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "</span></span> ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		case "starting", "restarting":
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "<span class=\"status status-warning animate-pulse\" aria-hidden=\"true\"></span> <span>Starting TorrServer…</span> ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		default:
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "<span class=\"status status-error\" aria-hidden=\"true\"></span> <span>TorrServer is not running</span> ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		if e.Restarts > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "<span class=\"badge badge-sm badge-ghost\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "<span class=\"status status-success\" aria-hidden=\"true\"></span> <span>Running TorrServer <span class=\"font-mono\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var27 string
-			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d restarts", e.Restarts))
+			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(e.Version)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 360, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 364, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, "</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "</span></span> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		case "starting", "restarting":
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "<span class=\"status status-warning animate-pulse\" aria-hidden=\"true\"></span> <span>Starting TorrServer…</span> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		default:
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, "<span class=\"status status-error\" aria-hidden=\"true\"></span> <span>TorrServer is not running</span> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "</div><button type=\"button\" class=\"btn btn-sm btn-outline\" data-indicator:engine-restarting data-attr:disabled=\"$engineRestarting\" data-on:click=\"@post('/api/settings/engine/restart', {filterSignals: {include: /^$/}})\"><span class=\"loading loading-spinner loading-xs hidden\" data-class:hidden=\"!$engineRestarting\"></span>")
+		if e.Restarts > 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "<span class=\"badge badge-sm badge-ghost\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var28 string
+			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d restarts", e.Restarts))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 373, Col: 85}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "</span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "</div><button type=\"button\" class=\"btn btn-sm btn-outline\" data-indicator:engine-restarting data-attr:disabled=\"$engineRestarting\" data-on:click=\"@post('/api/settings/engine/restart', {filterSignals: {include: /^$/}})\"><span class=\"loading loading-spinner loading-xs hidden\" data-class:hidden=\"!$engineRestarting\"></span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -978,30 +1000,30 @@ func engineStatus(e EngineView) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "Restart</button> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "Restart</button> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if e.LastError != "" && e.State != "running" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "<p class=\"w-full text-xs text-error\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "<p class=\"w-full text-xs text-error\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var28 string
-			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(e.LastError)
+			var templ_7745c5c3_Var29 string
+			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(e.LastError)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 369, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 382, Col: 53}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1026,12 +1048,12 @@ func IMDbSource(v SourcesView, st SourceStatus) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var29 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var29 == nil {
-			templ_7745c5c3_Var29 = templ.NopComponent
+		templ_7745c5c3_Var30 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var30 == nil {
+			templ_7745c5c3_Var30 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var30 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var31 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -1043,7 +1065,7 @@ func IMDbSource(v SourcesView, st SourceStatus) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "<p class=\"text-sm text-base-content/70\">Title pages show IMDb ratings from a small public rating service. Ratings are hidden when it is off or unreachable.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "<p class=\"text-sm text-base-content/70\">Title pages show IMDb ratings from a small public rating service. Ratings are hidden when it is off or unreachable.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1053,25 +1075,25 @@ func IMDbSource(v SourcesView, st SourceStatus) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "<form class=\"space-y-3\" data-signals=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, "<form class=\"space-y-3\" data-signals=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var31 string
-				templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.JSONString(map[string]any{"imdbOn": v.IMDbOn}))
+				var templ_7745c5c3_Var32 string
+				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.JSONString(map[string]any{"imdbOn": v.IMDbOn}))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 383, Col: 94}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/sources.templ`, Line: 396, Col: 94}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "\" data-on:submit=\"@post('/api/settings/sources/imdb', {filterSignals: {include: /^imdbOn$/}})\"><label class=\"label cursor-pointer gap-3\"><input type=\"checkbox\" class=\"toggle toggle-primary\" data-bind:imdb-on> <span class=\"text-sm\">Show IMDb ratings</span></label> <button type=\"submit\" class=\"btn btn-primary\">Save</button></form>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 89, "\" data-on:submit=\"@post('/api/settings/sources/imdb', {filterSignals: {include: /^imdbOn$/}})\"><label class=\"label cursor-pointer gap-3\"><input type=\"checkbox\" class=\"toggle toggle-primary\" data-bind:imdb-on> <span class=\"text-sm\">Show IMDb ratings</span></label> <button type=\"submit\" class=\"btn btn-primary\">Save</button></form>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, " ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, " ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1081,7 +1103,7 @@ func IMDbSource(v SourcesView, st SourceStatus) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = sourceCard("source-imdb", "star", "IMDb ratings").Render(templ.WithChildren(ctx, templ_7745c5c3_Var30), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = sourceCard("source-imdb", "star", "IMDb ratings").Render(templ.WithChildren(ctx, templ_7745c5c3_Var31), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
