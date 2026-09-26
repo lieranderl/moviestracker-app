@@ -89,9 +89,10 @@ type app struct {
 func (a *app) ready() {
 	systray.SetIcon(icon)
 	systray.SetTooltip("Moviestracker")
+	st := a.state() // before a.mu: state takes it too
 	a.mu.Lock()
 	a.items = map[tray.ItemID]*systray.MenuItem{}
-	for _, it := range tray.Menu(a.state()) {
+	for _, it := range tray.Menu(st) {
 		var m *systray.MenuItem
 		if it.ID == tray.StartAtLogin {
 			m = systray.AddMenuItemCheckbox(it.Title, "", it.Checked)
@@ -110,6 +111,7 @@ func (a *app) ready() {
 		}
 	}
 	a.mu.Unlock()
+	tray.Logf(a.dataDir, "tray menu ready")
 	a.refresh()
 }
 
@@ -141,8 +143,8 @@ func (a *app) state() tray.MenuState {
 func (a *app) refresh() {
 	st := a.state()
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	if a.items == nil {
+		a.mu.Unlock()
 		return
 	}
 	for _, it := range tray.Menu(st) {
@@ -165,6 +167,7 @@ func (a *app) refresh() {
 		}
 	}
 	systray.SetTooltip(tray.Menu(st)[1].Title)
+	a.mu.Unlock()
 	if st.Status.State == tray.Running && firstRun(a.dataDir) {
 		shellOpen(localURL)
 	}
