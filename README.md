@@ -207,6 +207,33 @@ HDR-to-SDR conversion needs TorrServer's `hdrtonemap` plugin, which only its
 Windows build has. The other conversions work the same as in the apps. All
 settings are in [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
+## TorrServer apps: TorrServe, Lampa
+
+TorrServer apps, such as TorrServe on an Android TV or Lampa, can use the
+TorrServer Moviestracker runs, on the Mac, on Windows and in Docker. They see
+the same torrents: what you save in Moviestracker shows up in the app, and the
+other way round.
+
+1. In **Settings → Other apps**, switch on **Open TorrServer to other apps**.
+2. Under **Logins for apps**, make a login for the TV or app (for example
+   *Living room TV*). Its password is shown once: enter it in the app then.
+3. In the app, add the address the page shows, such as
+   `http://192.168.1.20:8090`, with that username and password.
+
+- Apps can play, add and remove torrents. TorrServer's settings stay
+  Moviestracker's, and apps cannot stop it.
+- Video players the app hands a stream to need no login, as with TorrServer
+  itself, but only for torrents already saved.
+- Only devices on your home network (and your
+  [Tailscale](https://tailscale.com) network) get in. **Also allow from the
+  internet** opens it further. Logins then travel unencrypted, so for access
+  away from home a VPN such as Tailscale or WireGuard is the safer way.
+- Removing a login in **Settings → Other apps** signs that app out at once.
+- Port 8090 is the one TorrServer apps suggest. If a TorrServer of its own
+  already uses it, stop that one, or choose another port with
+  `MT_TORRSERVER_LISTEN`. In Docker, publish the port too (`"8090:8090"`, in
+  `compose.yaml`).
+
 ## Where the data comes from
 
 - **TMDB** for titles, images, cast and trailers: Moviestracker's shared key

@@ -19,6 +19,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/config"
 	"github.com/lieranderl/moviestracker-app/internal/engine"
 	"github.com/lieranderl/moviestracker-app/internal/events"
+	"github.com/lieranderl/moviestracker-app/internal/gateway"
 	"github.com/lieranderl/moviestracker-app/internal/gstinstall"
 	"github.com/lieranderl/moviestracker-app/internal/live"
 	"github.com/lieranderl/moviestracker-app/internal/sources"
@@ -62,9 +63,11 @@ type Server struct {
 	sampler         *stats.Sampler                    // this machine, for the dashboard
 	startedAt       time.Time
 	version         string
-	hlsOutputs      hlsOutputCache // what GStreamer serves, as seen by the stream proxy
-	setupCode       string         // lets another device create the first admin
-	titles          titleLookups   // torrents whose titles were looked up on TMDB
+	hlsOutputs      hlsOutputCache         // what GStreamer serves, as seen by the stream proxy
+	setupCode       string                 // lets another device create the first admin
+	titles          titleLookups           // torrents whose titles were looked up on TMDB
+	appsPort        *gateway.Port          // other apps' door to TorrServer; nil without one
+	appsProblem     atomic.Pointer[string] // why the apps port did not open at startup
 }
 
 // NewServer initializes all HTTP routes and returns the configured Server.
@@ -103,7 +106,9 @@ func NewServer(cfg Config) (*Server, error) {
 		engine:          cfg.Engine,
 		gst:             cfg.GStreamer,
 		setupCode:       normalizeSetupCode(cfg.SetupCode),
+		appsPort:        cfg.AppsPort,
 	}
+	s.openAppsPort()
 	signer, err := linkSigner(cfg.Store)
 	if err != nil {
 		return nil, err
@@ -208,6 +213,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/gstreamer/dismiss", s.handleGStreamerDismiss)
 	s.mux.HandleFunc("GET /api/gstreamer", s.handleGStreamerStream)
 	s.mux.HandleFunc("POST /api/settings/security/cancel-links", s.handleCancelLinks)
+	s.mux.HandleFunc("POST /api/settings/apps", s.handleSwitchApps)
+	s.mux.HandleFunc("POST /api/settings/apps/logins", s.handleAddAppLogin)
+	s.mux.HandleFunc("POST /api/settings/apps/logins/{user}/revoke", s.handleRevokeAppLogin)
 	s.mux.HandleFunc("POST /api/settings/users", s.handleCreateUser)
 	s.mux.HandleFunc("POST /api/settings/users/{username}/role/{role}", s.handleUserAction)
 	s.mux.HandleFunc("POST /api/settings/users/{username}/{action}", s.handleUserAction)
@@ -326,8 +334,10 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 }
 
 // logPath is a request path as logs show it: a share link's token, which
-// works for anyone holding it, is left out.
+// works for anyone holding it, is left out, and line breaks are shown
+// encoded, as they were sent.
 func logPath(path string) string {
+	path = strings.ReplaceAll(strings.ReplaceAll(path, "\r", "%0D"), "\n", "%0A")
 	if rest, ok := strings.CutPrefix(path, "/s/"); ok {
 		if _, file, found := strings.Cut(rest, "/"); found {
 			return "/s/…/" + file

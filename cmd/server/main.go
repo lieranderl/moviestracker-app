@@ -24,6 +24,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/config"
 	"github.com/lieranderl/moviestracker-app/internal/engine"
 	"github.com/lieranderl/moviestracker-app/internal/events"
+	"github.com/lieranderl/moviestracker-app/internal/gateway"
 	"github.com/lieranderl/moviestracker-app/internal/gstinstall"
 	"github.com/lieranderl/moviestracker-app/internal/handlers"
 	"github.com/lieranderl/moviestracker-app/internal/sources"
@@ -118,6 +119,16 @@ func main() {
 		}
 	}
 
+	// Other apps (TorrServe, Lampa) reach TorrServer here once an admin
+	// turns it on in Settings → Other apps; nothing listens until then.
+	appsPort := gateway.NewPort(appsListenAddr(), gateway.New(gateway.Config{
+		Store: store,
+		Upstream: func() gateway.Upstream {
+			url, user, password := torrMgr.Endpoint()
+			return gateway.Upstream{URL: url, User: user, Password: password}
+		},
+	}))
+
 	server, err := handlers.NewServer(handlers.Config{
 		Sessions:          sessions,
 		Accounts:          accounts,
@@ -142,6 +153,7 @@ func main() {
 		Events:            problems,
 		SetupCode:         setupCode,
 		LANAddress:        lanAddressFrom(os.Getenv("MT_LAN_ADDRESS")),
+		AppsPort:          appsPort,
 	})
 	if err != nil {
 		slog.Error("server configuration failed", "error", err)
@@ -206,6 +218,7 @@ func main() {
 			slog.Error("http server shutdown failed", "error", err)
 		}
 
+		_ = appsPort.Close()
 		// Close background stores cleanly
 		server.Close()
 		if sup != nil {
@@ -370,6 +383,18 @@ func listenAddr() string {
 		return ":" + port
 	}
 	return defaultListen
+}
+
+// defaultAppsListen is where other apps find TorrServer: 8090 is the port
+// TorrServe and Lampa suggest.
+const defaultAppsListen = ":8090"
+
+// appsListenAddr is MT_TORRSERVER_LISTEN (host:port), else :8090.
+func appsListenAddr() string {
+	if addr := strings.TrimSpace(os.Getenv("MT_TORRSERVER_LISTEN")); addr != "" {
+		return addr
+	}
+	return defaultAppsListen
 }
 
 // checkWritable makes sure this user can write to dir, and says how to fix

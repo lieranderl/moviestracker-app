@@ -41,6 +41,25 @@ type State struct {
 	// Titles are the movies and series TorrServer's torrents belong to, by
 	// lowercase info hash, so the TorrServer page links to their pages.
 	Titles map[string]TitleRef `json:"titles,omitempty"`
+	// Gateway opens TorrServer to other apps (TorrServe, Lampa).
+	Gateway Gateway `json:"gateway,omitzero"`
+}
+
+// Gateway is TorrServer's door for other apps: off until an admin turns it
+// on, and then for the home network unless Internet is on too.
+type Gateway struct {
+	Enabled  bool       `json:"enabled,omitempty"`
+	Internet bool       `json:"internet,omitempty"`
+	Logins   []AppLogin `json:"logins,omitempty"`
+}
+
+// AppLogin is the login one app uses. Only the bcrypt hash of its random
+// password is kept.
+type AppLogin struct {
+	Name         string    `json:"name"`
+	User         string    `json:"user"`
+	PasswordHash string    `json:"passwordHash"`
+	CreatedAt    time.Time `json:"createdAt"`
 }
 
 // TitleRef names a TMDB title: Kind is "movie" or "tv".
@@ -202,5 +221,6 @@ func (st State) clone() State {
 	c := st
 	c.Users = append([]User(nil), st.Users...)
 	c.Sessions = append([]Session(nil), st.Sessions...)
+	c.Gateway.Logins = append([]AppLogin(nil), st.Gateway.Logins...)
 	return c
 }

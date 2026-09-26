@@ -941,6 +941,14 @@ func (m *Manager) SetEndpoint(raw, user, password string) error {
 	return nil
 }
 
+// Endpoint is the current TorrServer's address and login, for requests
+// passed on to it (the gateway for other apps).
+func (m *Manager) Endpoint() (url, user, password string) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.activeURL, m.user, m.password
+}
+
 // Credentials are the Basic credentials of the current TorrServer, for
 // requests made outside Client (the stream proxy).
 func (m *Manager) Credentials() (user, password string) {

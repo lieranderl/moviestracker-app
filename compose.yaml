@@ -13,6 +13,9 @@ services:
     restart: unless-stopped
     ports:
       - "8095:8095"
+      # TorrServer for TorrServe, Lampa and other TorrServer apps, once it is
+      # switched on in Settings → Other apps.
+      # - "8090:8090"
     volumes:
       # Accounts, settings, TorrServer's database and settings. A folder of
       # your own works too (./moviestracker:/data): it must belong to uid 1000,

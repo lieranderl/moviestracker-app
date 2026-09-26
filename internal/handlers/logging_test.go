@@ -61,3 +61,19 @@ func TestPassingHealthProbesAreNotLogged(t *testing.T) {
 		t.Errorf("a failing probe was not logged:\n%s", logged.String())
 	}
 }
+
+// A path can carry encoded line breaks: the log shows them encoded again, as
+// they were sent, so no request can start a log line of its own.
+func TestLineBreaksInPathsCannotForgeLogLines(t *testing.T) {
+	var logged bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logged, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
+	handler := handlers.LoggingMiddleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/movie%0D%0Alevel=ERROR", nil))
+
+	if out := logged.String(); !strings.Contains(out, "/movie%0D%0Alevel=ERROR") || strings.Count(out, "\n") != 1 {
+		t.Errorf("the log shows the path as:\n%s", out)
+	}
+}
