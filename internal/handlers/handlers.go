@@ -334,8 +334,10 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 }
 
 // logPath is a request path as logs show it: a share link's token, which
-// works for anyone holding it, is left out.
+// works for anyone holding it, is left out, and line breaks are shown
+// encoded, as they were sent.
 func logPath(path string) string {
+	path = strings.ReplaceAll(strings.ReplaceAll(path, "\r", "%0D"), "\n", "%0A")
 	if rest, ok := strings.CutPrefix(path, "/s/"); ok {
 		if _, file, found := strings.Cut(rest, "/"); found {
 			return "/s/…/" + file
