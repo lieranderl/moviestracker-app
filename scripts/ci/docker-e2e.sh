@@ -133,7 +133,10 @@ engine_password="$(in_container cat /data/engine/accs.db)"
 step "TorrServe and Lampa reach TorrServer on port 8090 with a login of their own"
 jar="$work/cookies"
 action() { curl -fsS -b "$jar" -c "$jar" -X POST "$base$1" -H 'Content-Type: application/json' -H 'Datastar-Request: true' --data "$2"; }
+# As on the sign-in page: accept the disclaimer, then sign in.
+action /api/consent '{"accepted":true}' >/dev/null
 action /api/login "{\"username\":\"e2e\",\"password\":\"$password\"}" >/dev/null
+grep -q datastar_session "$jar" || fail "the administrator could not sign in"
 action /api/settings/apps '{"appsOn":true,"appsInternet":false}' | grep -q "is open" || fail "Other apps did not switch on"
 created="$(action /api/settings/apps/logins '{"appName":"Living room TV"}')"
 app_password="$(printf '%s' "$created" | grep -oE '[2-9a-hj-km-np-z]{4}-[2-9a-hj-km-np-z]{4}-[2-9a-hj-km-np-z]{4}' | head -n 1)"
