@@ -11,7 +11,7 @@ import (
 )
 
 // mediaPageSignals is the client state shared by the movie and TV pages.
-const mediaPageSignals = `{ videoOpen: false, videoKey: '', videoTitle: '', torrMagnet: '', sending: false, q: 'all', trackers: [], toast: '', toastError: false }`
+const mediaPageSignals = `{ videoOpen: false, videoKey: '', videoTitle: '', torrMagnet: '', sending: false, trackers: [], voices: [], toast: '', toastError: false }`
 
 // videoClick opens the trailer dialog for any element carrying data-video.
 // Keys and names travel in data-* attributes, never inside the expression.
@@ -352,14 +352,21 @@ if (b.dataset.action === 'send') {
 }
 
 // SourcesSearch is the Datastar expression that (re)runs the JacRed search
-// for a title with the current $sort (and $sourceSeason for series). It is
-// built only from server ints, never from upstream text.
+// for a title with the current $sort, the qualities ($qual) and HDR ($hdr)
+// picked, and $sourceSeason for series. It is built only from server ints,
+// never from upstream text.
 func SourcesSearch(mediaType string, id int) string {
 	season := ""
 	if mediaType == "tv" {
 		season = " + '&season=' + $sourceSeason"
 	}
-	return fmt.Sprintf("$sourcesRequested = true; @get('/api/torrents?type=%s&id=%d&sort=' + $sort%s, {filterSignals: {include: /^$/}})", mediaType, id, season)
+	return fmt.Sprintf("$sourcesRequested = true; @get('/api/torrents?type=%s&id=%d&sort=' + $sort%s + '&quality=' + $qual.filter(Boolean).join(',') + ($hdr ? '&hdr=1' : ''), {filterSignals: {include: /^$/}})", mediaType, id, season)
+}
+
+// researchSources searches again with search (see SourcesSearch) once
+// sources were asked for: when the season or a search filter changes.
+func researchSources(search string) string {
+	return "if ($sourcesRequested) { " + search + " }"
 }
 
 // TorrentAddURL is the endpoint that sends a release of a title to TorrServer.
@@ -369,9 +376,9 @@ func TorrentAddURL(mediaType string, id int) string {
 
 func sourcesSignals(mediaType string, selected int) string {
 	if mediaType == "tv" {
-		return fmt.Sprintf("{ sort: 'seeders', sourcesRequested: false, sourcesLoading: false, sourceSeason: '%d' }", selected)
+		return fmt.Sprintf("{ sort: 'seeders', qual: [], hdr: false, sourcesRequested: false, sourcesLoading: false, sourceSeason: '%d' }", selected)
 	}
-	return "{ sort: 'seeders', sourcesRequested: false, sourcesLoading: false }"
+	return "{ sort: 'seeders', qual: [], hdr: false, sourcesRequested: false, sourcesLoading: false }"
 }
 
 // sourcesSection searches JacRed only when the user asks; series search one
@@ -390,13 +397,14 @@ templ sourcesSection(mediaType string, id int, seasons []tmdb.SeasonSummary, sel
 					class="select select-sm w-auto"
 					aria-label="Season to search"
 					data-bind:source-season
-					data-on:change={ "$sourcesRequested && (" + SourcesSearch(mediaType, id) + ")" }
+					data-on:change={ researchSources(SourcesSearch(mediaType, id)) }
 				>
 					for _, s := range seasons {
 						<option value={ fmt.Sprint(s.Number) } selected?={ s.Number == selected }>{ seasonLabel(s) }</option>
 					}
 				</select>
 			}
+			@searchFilters(SourcesSearch(mediaType, id))
 			<button type="button" class="btn btn-primary btn-sm gap-1.5" data-on:click={ SourcesSearch(mediaType, id) } data-indicator:sources-loading data-attr:disabled="$sourcesLoading">
 				<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$sourcesLoading"></span>
 				<span data-class:hidden="$sourcesLoading">
@@ -412,6 +420,34 @@ templ sourcesSection(mediaType string, id int, seasons []tmdb.SeasonSummary, sel
 			<div id="torrent-results"></div>
 		</div>
 	</section>
+}
+
+// searchQualities are the qualities JacRed files releases under, as picked
+// before a search.
+var searchQualities = []struct {
+	Value int
+	Label string
+}{{2160, "4K"}, {1080, "1080p"}, {720, "720p"}, {480, "SD"}}
+
+// searchFilters are picked before searching and sent to JacRed: any
+// qualities (none is all) and HDR only. Changing one searches again once
+// sources were asked for.
+templ searchFilters(search string) {
+	<div class="flex flex-wrap items-center gap-2" data-on:change={ researchSources(search) }>
+		<div role="group" aria-label="Search for qualities" class="join">
+			for _, q := range searchQualities {
+				<label class="btn btn-sm join-item has-checked:btn-primary has-focus-visible:outline-2 has-focus-visible:outline-primary">
+					<input type="checkbox" class="sr-only" value={ fmt.Sprint(q.Value) } data-bind="qual"/>
+					{ q.Label }
+				</label>
+			}
+		</div>
+		<label class="btn btn-sm gap-1.5 has-checked:btn-secondary has-focus-visible:outline-2 has-focus-visible:outline-secondary">
+			<input type="checkbox" class="sr-only" data-bind:hdr/>
+			@Icon("sun", "size-4")
+			HDR only
+		</label>
+	</div>
 }
 
 // TorrServerStatus is patched by /api/torrserver/status. version == "" and
@@ -456,16 +492,6 @@ templ TorrentSearchError(message string) {
 	</div>
 }
 
-var qualityOrder = []string{"4K", "1080p", "720p", "SD"}
-
-func qualityCounts(results []jacred.Result) map[string]int {
-	counts := make(map[string]int, len(qualityOrder))
-	for _, r := range results {
-		counts[r.QualityLabel()]++
-	}
-	return counts
-}
-
 func qualityTone(label string) string {
 	switch label {
 	case "4K":
@@ -506,6 +532,33 @@ func trackerCounts(results []jacred.Result) []trackerCount {
 	return out
 }
 
+// maxVoices is how many voices the filter offers: the commonest.
+const maxVoices = 12
+
+// voiceCounts counts releases per voice, commonest first. A name with "|"
+// is left out: rows list their voices joined by it.
+func voiceCounts(results []jacred.Result) []trackerCount {
+	counts := map[string]int{}
+	for _, r := range results {
+		for _, v := range r.Voices {
+			if v = strings.TrimSpace(v); v != "" && !strings.Contains(v, "|") {
+				counts[v]++
+			}
+		}
+	}
+	out := make([]trackerCount, 0, len(counts))
+	for name, n := range counts {
+		out = append(out, trackerCount{name, n})
+	}
+	slices.SortFunc(out, func(a, b trackerCount) int {
+		if a.Count != b.Count {
+			return b.Count - a.Count
+		}
+		return strings.Compare(a.Name, b.Name)
+	})
+	return out[:min(len(out), maxVoices)]
+}
+
 // trackerNames are how people write the trackers JacRed searches.
 var trackerNames = map[string]string{
 	"knaben": "Knaben", "bitru": "BitRu", "rutor": "Rutor", "rutracker": "RuTracker", "kinozal": "Kinozal",
@@ -536,21 +589,9 @@ templ TorrentResults(results []jacred.Result, sort, search string) {
 				<span>No releases found on JacRed for this title.</span>
 			</div>
 		} else {
-			{{ counts := qualityCounts(results) }}
 			<div class="flex flex-wrap items-center justify-between gap-3">
-			<div role="tablist" aria-label="Filter by quality" class="tabs tabs-box tabs-sm w-fit">
-				<button type="button" role="tab" class="tab tab-active" data-class="{ 'tab-active': $q === 'all' }" data-on:click="$q = 'all'">
-					All <span class="badge badge-xs ml-1.5">{ fmt.Sprint(len(results)) }</span>
-				</button>
-				for _, label := range qualityOrder {
-					if counts[label] > 0 {
-						<button type="button" role="tab" class="tab" data-class={ fmt.Sprintf("{ 'tab-active': $q === '%s' }", label) } data-on:click={ fmt.Sprintf("$q = '%s'", label) }>
-							{ label } <span class="badge badge-xs ml-1.5">{ fmt.Sprint(counts[label]) }</span>
-						</button>
-					}
-				}
-			</div>
 			@trackerFilter(results)
+			@voiceFilter(results)
 			<div class="join" role="group" aria-label="Sort releases">
 				for _, o := range sortOptions {
 					<button
@@ -598,11 +639,38 @@ templ trackerFilter(results []jacred.Result) {
 	}
 }
 
+// voiceFilter picks which voices' (dubbing's) releases show, the commonest
+// first: any number, or all when none is picked. Like tracker names, voice
+// names come from JacRed and stay in values and data attributes.
+templ voiceFilter(results []jacred.Result) {
+	{{ voices := voiceCounts(results) }}
+	if len(voices) > 1 {
+		<div role="group" aria-label="Filter by voice" class="basis-full order-last flex flex-wrap items-center gap-2">
+			<span class="text-xs font-medium text-base-content/60 mr-1">Voices</span>
+			<button type="button" class="btn btn-xs sm:btn-sm gap-1.5" data-class="{ 'btn-primary': !$voices.some(Boolean) }" data-on:click="$voices = $voices.map(() => '')">
+				All
+			</button>
+			for _, v := range voices {
+				<label class="btn btn-xs sm:btn-sm gap-1.5 has-checked:btn-primary has-focus-visible:outline-2 has-focus-visible:outline-primary">
+					<input type="checkbox" class="sr-only" value={ v.Name } data-bind="voices"/>
+					{ v.Name }
+					<span class="badge badge-xs">{ fmt.Sprint(v.Count) }</span>
+				</label>
+			}
+		</div>
+	}
+}
+
+// rowShown is whether a release row matches the tracker and voice filters.
+const rowShown = `(!$trackers.some(Boolean) || $trackers.includes(el.dataset.tracker)) && ` +
+	`(!$voices.some(Boolean) || el.dataset.voices.split('|').some(v => v && $voices.includes(v)))`
+
 templ torrentRow(r jacred.Result) {
 	<li
 		class="list-row items-center gap-3 sm:gap-4"
 		data-tracker={ r.Tracker }
-		data-show={ fmt.Sprintf("($q === 'all' || $q === '%s') && (!$trackers.some(Boolean) || $trackers.includes(el.dataset.tracker))", r.QualityLabel()) }
+		data-voices={ strings.Join(r.Voices, "|") }
+		data-show={ rowShown }
 	>
 		<div class="flex flex-col items-center gap-1 w-14">
 			<span class={ "badge badge-sm font-bold whitespace-nowrap", qualityTone(r.QualityLabel()) }>{ r.QualityLabel() }</span>

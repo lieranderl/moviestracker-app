@@ -401,3 +401,34 @@ func TestTorrentSearchSaysWhenJacRedWantsAKeyOrItsLimitIsReached(t *testing.T) {
 		}
 	}
 }
+
+// The qualities and HDR picked before searching go to JacRed; anything else
+// in ?quality= is ignored.
+func TestTorrentSearchAsksForThePickedQualitiesAndHDR(t *testing.T) {
+	jr := &fakeJacRed{}
+	server := newMediaServer(t, &fakeTMDBDetails{movies: map[int]*tmdb.MovieDetails{27205: inception}}, jr, "")
+	get(t, server, "/api/torrents?type=movie&id=27205&quality=2160,1080,999,x&hdr=1", true)
+	if len(jr.queries) != 1 {
+		t.Fatalf("queries = %+v", jr.queries)
+	}
+	q := jr.queries[0]
+	if fmt.Sprint(q.Qualities) != "[2160 1080]" || !q.HDR {
+		t.Errorf("query = %+v, want qualities [2160 1080] and HDR", q)
+	}
+}
+
+// Quality and HDR are picked before searching: JacRed filters them, and
+// changing them searches again.
+func TestSourcesOfferQualityAndHDRBeforeSearching(t *testing.T) {
+	server := newMediaServer(t, &fakeTMDBDetails{movies: map[int]*tmdb.MovieDetails{27205: inception}}, &fakeJacRed{}, "")
+	body := html.UnescapeString(get(t, server, "/movie/27205", true).Body.String())
+	for _, want := range []string{
+		`aria-label="Search for qualities"`, `value="2160"`, `value="1080"`, `value="720"`, `value="480"`,
+		`data-bind="qual"`, `data-bind:hdr`, "HDR only",
+		`data-on:change="if ($sourcesRequested) { $sourcesRequested = true; @get(`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("sources lack %q", want)
+		}
+	}
+}

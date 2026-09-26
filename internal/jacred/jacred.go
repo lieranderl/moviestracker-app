@@ -75,6 +75,26 @@ type Query struct {
 	// SeasonYear is the season's own air year; season packs are often dated
 	// by it rather than by the show's first year.
 	SeasonYear int
+	// Qualities, when set, keeps releases of these qualities only: 2160,
+	// 1080, 720 or 480 (SD).
+	Qualities []int
+	// HDR, when set, keeps HDR releases only.
+	HDR bool
+}
+
+// qualityOf is the quality a release is filed under: 2160, 1080, 720 or
+// 480 (SD), as JacRed's quality filter names them.
+func qualityOf(q int) int {
+	switch {
+	case q >= 2160:
+		return 2160
+	case q >= 1080:
+		return 1080
+	case q >= 720:
+		return 720
+	default:
+		return 480
+	}
 }
 
 func (q Query) primary() string {
@@ -261,7 +281,7 @@ func (c *Client) Search(ctx context.Context, q Query) ([]Result, error) {
 	if term == "" {
 		return nil, nil
 	}
-	key := strings.ToLower(fmt.Sprintf("%s\x00%s\x00%d\x00%d\x00%d", term, strings.TrimSpace(q.Title), q.Year, q.Season, q.SeasonYear))
+	key := strings.ToLower(fmt.Sprintf("%s\x00%s\x00%d\x00%d\x00%d\x00%v\x00%t", term, strings.TrimSpace(q.Title), q.Year, q.Season, q.SeasonYear, q.Qualities, q.HDR))
 	if results, ok := c.cached(key); ok {
 		return results, nil
 	}
@@ -300,6 +320,13 @@ func (c *Client) request(ctx context.Context, term string, q Query) (*http.Reque
 		params := url.Values{"query": {term}, "limit": {strconv.Itoa(apiPageSize)}}
 		if q.Season > 0 {
 			params.Set("season", strconv.Itoa(q.Season))
+		}
+		// The API filters one quality; several are filtered here instead.
+		if len(q.Qualities) == 1 {
+			params.Set("quality", strconv.Itoa(q.Qualities[0]))
+		}
+		if q.HDR {
+			params.Set("videotype", "hdr")
 		}
 		target = c.baseURL + apiSearchPath + "?" + params.Encode()
 	} else {
@@ -449,8 +476,20 @@ func safeSourceURL(raw string) bool {
 	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != ""
 }
 
-// matches reports whether a release belongs to the queried title (and season).
+// matches reports whether a release belongs to the queried title (and
+// season), in the qualities and video type asked for.
 func (q Query) matches(r rawResult) bool {
+	if q.HDR && !strings.EqualFold(r.VideoType, "hdr") {
+		return false
+	}
+	if len(q.Qualities) > 0 && !slices.Contains(q.Qualities, qualityOf(r.Quality)) {
+		return false
+	}
+	return q.belongs(r)
+}
+
+// belongs reports whether a release is of the queried title (and season).
+func (q Query) belongs(r rawResult) bool {
 	if q.Season > 0 {
 		// Defense in depth: instances that ignore ?season= still get filtered.
 		if len(r.Seasons) > 0 && !slices.Contains(r.Seasons, q.Season) {

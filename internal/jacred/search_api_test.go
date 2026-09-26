@@ -148,3 +148,56 @@ func TestRefusedSearchesAreNotCached(t *testing.T) {
 		t.Fatalf("second search = %d results, %v", len(results), err)
 	}
 }
+
+// One quality, or HDR, is filtered by JacRed, which then returns all of them
+// instead of the best-seeded 120 of everything. Several qualities are one
+// search (the API takes one), filtered here.
+func TestQualityAndHDRNarrowTheSearch(t *testing.T) {
+	for _, tc := range []struct {
+		q         Query
+		quality   string
+		videotype string
+		want      []string
+	}{
+		{Query{Qualities: []int{2160}}, "2160", "", []string{"kinozal"}},
+		{Query{Qualities: []int{480, 2160}}, "", "", []string{"rutracker", "kinozal"}},
+		{Query{HDR: true}, "", "hdr", []string{"kinozal"}},
+		{Query{Qualities: []int{480}, HDR: true}, "480", "hdr", nil},
+	} {
+		var got url.Values
+		client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			got = r.URL.Query()
+			_, _ = w.Write([]byte(searchAPIJSON))
+		}, WithSearchAPI())
+		tc.q.OriginalTitle, tc.q.Year = "Inception", 2010
+		results, err := client.Search(context.Background(), tc.q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Get("quality") != tc.quality || got.Get("videotype") != tc.videotype {
+			t.Errorf("%+v asked quality=%q videotype=%q", tc.q, got.Get("quality"), got.Get("videotype"))
+		}
+		var trackers []string
+		for _, r := range results {
+			trackers = append(trackers, r.Tracker)
+		}
+		if strings.Join(trackers, ",") != strings.Join(tc.want, ",") {
+			t.Errorf("%+v kept %v, want %v", tc.q, trackers, tc.want)
+		}
+	}
+}
+
+// A different quality is a different search, not the cached one.
+func TestQualityIsPartOfTheCachedSearch(t *testing.T) {
+	calls := 0
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		_, _ = w.Write([]byte(searchAPIJSON))
+	}, WithSearchAPI())
+	for _, q := range []Query{{OriginalTitle: "Inception"}, {OriginalTitle: "Inception", Qualities: []int{2160}}, {OriginalTitle: "Inception", HDR: true}} {
+		_, _ = client.Search(context.Background(), q)
+	}
+	if calls != 3 {
+		t.Errorf("%d searches, want 3", calls)
+	}
+}

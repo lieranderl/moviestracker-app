@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -174,6 +175,21 @@ func sortParam(r *http.Request) string {
 	}
 }
 
+// qualitiesParam reads ?quality=2160,1080: the qualities JacRed files
+// releases under, anything else dropped.
+func qualitiesParam(r *http.Request) []int {
+	var out []int
+	for v := range strings.SplitSeq(r.URL.Query().Get("quality"), ",") {
+		switch n, _ := strconv.Atoi(v); n {
+		case 2160, 1080, 720, 480:
+			if !slices.Contains(out, n) {
+				out = append(out, n)
+			}
+		}
+	}
+	return out
+}
+
 // scopeToSeason narrows a series search to ?season=N, dated by the show's
 // first year and the season's own air year.
 func scopeToSeason(title *titleInfo, r *http.Request) bool {
@@ -222,6 +238,7 @@ func (s *Server) handleTorrentSearch(w http.ResponseWriter, r *http.Request) {
 		patchTorrentError(r, sse, "Torrent search is not configured on this server.")
 		return
 	}
+	title.query.Qualities, title.query.HDR = qualitiesParam(r), r.URL.Query().Get("hdr") == "1"
 	results, err := s.clients().Torrents.Search(ctx, title.query)
 	if err != nil {
 		slog.Warn("jacred search failed", "title", title.label, "error", err)
