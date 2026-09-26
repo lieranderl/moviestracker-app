@@ -43,3 +43,19 @@ jobs:
       - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           category: /language:${{ matrix.language }}
+          output: sarif-results
+          upload: never
+      # templ writes *_templ.go; its generated code trips quality queries (a
+      # "useless assignment" per component) that no one can fix by hand.
+      # paths-ignore does not apply to Go, a compiled language, so the
+      # results for those files are dropped before the upload instead.
+      - name: Leave out templ's generated code
+        run: |
+          for f in sarif-results/*.sarif; do
+            jq '(.runs[].results) |= map(select(all(.locations[]?; (.physicalLocation.artifactLocation.uri // "") | endswith("_templ.go") | not)))' "$f" >"$f.tmp"
+            mv "$f.tmp" "$f"
+          done
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: sarif-results
+          category: /language:${{ matrix.language }}
