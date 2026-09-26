@@ -25,6 +25,8 @@ services:
   moviestracker:
     image: $image
     container_name: $project
+    ports:
+      - "8090:8090"
 EOF
 cleanup() {
   "${compose[@]}" down --volumes >/dev/null 2>&1 || true
@@ -88,7 +90,9 @@ step "Start with compose.yaml"
 wait_healthy
 [ "$(in_container moviestracker --health && echo ok)" = ok ] || fail "moviestracker --health fails"
 published="$(docker port "$project" | sed 's/ ->.*//' | sort -u | tr '\n' ' ')"
-[ "$published" = "8095/tcp " ] || fail "published ports: $published (want only 8095/tcp)"
+[ "$published" = "8090/tcp 8095/tcp " ] || fail "published ports: $published (want 8095/tcp, and 8090/tcp from the test's override)"
+[ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8090/echo)" = 000 ] ||
+  fail "TorrServer for other apps answers before anyone switched it on"
 
 step "Moviestracker runs the bundled TorrServer on loopback, all as uid 1000"
 port="$(engine_port "$project")"
@@ -125,6 +129,23 @@ curl -fsS -X POST "$base/api/setup" -H 'Content-Type: application/json' -H 'Data
   --data "{\"accepted\":true,\"username\":\"e2e\",\"password\":\"$password\",\"setupCode\":\"$code\"}" >/dev/null
 [ "$(location /setup)" = "$base/login" ] || fail "setup did not create the administrator"
 engine_password="$(in_container cat /data/engine/accs.db)"
+
+step "TorrServe and Lampa reach TorrServer on port 8090 with a login of their own"
+jar="$work/cookies"
+action() { curl -fsS -b "$jar" -c "$jar" -X POST "$base$1" -H 'Content-Type: application/json' -H 'Datastar-Request: true' --data "$2"; }
+action /api/login "{\"username\":\"e2e\",\"password\":\"$password\"}" >/dev/null
+action /api/settings/apps '{"appsOn":true,"appsInternet":false}' | grep -q "is open" || fail "Other apps did not switch on"
+created="$(action /api/settings/apps/logins '{"appName":"Living room TV"}')"
+app_password="$(printf '%s' "$created" | grep -oE '[2-9a-hj-km-np-z]{4}-[2-9a-hj-km-np-z]{4}-[2-9a-hj-km-np-z]{4}' | head -n 1)"
+[ -n "$app_password" ] || fail "no password for the new app login"
+apps=http://127.0.0.1:8090
+[ "$(curl -fsS -u "livingroomtv:$app_password" $apps/echo)" = "$(awk '$1 == "version" {print $2}' "$root/scripts/torrserver.lock")" ] ||
+  fail "an app with its login does not reach the bundled TorrServer"
+[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST $apps/torrents --data '{"action":"list"}')" = 401 ] ||
+  fail "TorrServer answers apps without a login"
+[ "$(curl -s -o /dev/null -w '%{http_code}' -u "livingroomtv:$app_password" $apps/shutdown)" = 403 ] ||
+  fail "an app can stop TorrServer"
+engine_get /echo >/dev/null || fail "TorrServer stopped"
 
 step "Stopping is graceful and quick"
 started=$(date +%s)

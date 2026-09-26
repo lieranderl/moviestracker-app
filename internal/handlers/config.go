@@ -9,6 +9,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/config"
 	"github.com/lieranderl/moviestracker-app/internal/engine"
 	"github.com/lieranderl/moviestracker-app/internal/events"
+	"github.com/lieranderl/moviestracker-app/internal/gateway"
 	"github.com/lieranderl/moviestracker-app/internal/gstinstall"
 	"github.com/lieranderl/moviestracker-app/internal/imdb"
 	"github.com/lieranderl/moviestracker-app/internal/jacred"
@@ -57,6 +58,9 @@ type Config struct {
 	StreamIdle time.Duration
 	// Version is Moviestracker's version, shown on the dashboard.
 	Version string
+	// AppsPort is the gateway's port, where other apps (TorrServe, Lampa)
+	// reach TorrServer once an admin turns it on; nil hides Other apps.
+	AppsPort *gateway.Port
 	// LANAddress returns this machine's address on the local network, used in
 	// links copied while browsing via localhost; nil finds it from the
 	// default route.

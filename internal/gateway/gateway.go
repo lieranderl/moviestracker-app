@@ -50,7 +50,13 @@ type Gateway struct {
 	mu      sync.Mutex
 	saved   map[string]time.Time // info hash → until when it counts as saved
 	guesses *guessLimiter
+	// mark is sent with every request passed on: one that comes back is
+	// the gateway's own, so TorrServer's address is the gateway.
+	mark string
 }
+
+// markHeader carries the gateway's mark.
+const markHeader = "X-Moviestracker-Gateway"
 
 // savedFor is how long a torrent found in TorrServer's list is taken as
 // saved: a player asks for many pieces of the same file.
@@ -58,7 +64,7 @@ const savedFor = time.Minute
 
 // New returns the gateway for cfg.
 func New(cfg Config) *Gateway {
-	g := &Gateway{cfg: cfg, client: &http.Client{Timeout: 10 * time.Second}, saved: map[string]time.Time{}, guesses: newGuessLimiter()}
+	g := &Gateway{cfg: cfg, client: &http.Client{Timeout: 10 * time.Second}, saved: map[string]time.Time{}, guesses: newGuessLimiter(), mark: rand.Text()}
 	g.proxy = &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			up := cfg.Upstream()
@@ -69,6 +75,7 @@ func New(cfg Config) *Gateway {
 			pr.SetURL(target)
 			pr.Out.Host = target.Host
 			pr.Out.SetBasicAuth(up.User, up.Password)
+			pr.Out.Header.Set(markHeader, g.mark)
 		},
 		// Streams go out as TorrServer sends them, not buffered.
 		FlushInterval: -1,
@@ -77,6 +84,10 @@ func New(cfg Config) *Gateway {
 }
 
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if subtle.ConstantTimeCompare([]byte(r.Header.Get(markHeader)), []byte(g.mark)) == 1 {
+		http.Error(w, "Moviestracker's TorrServer address is this port itself: start that TorrServer, or choose another in Settings → Sources.", http.StatusLoopDetected)
+		return
+	}
 	addr, ok := clientAddr(r.RemoteAddr)
 	if !ok || (!atHome(addr) && !g.cfg.Store.State().Gateway.Internet) {
 		http.Error(w, "Moviestracker lets apps in from the home network only (Settings → Other apps).", http.StatusForbidden)
@@ -255,6 +266,7 @@ func (g *Gateway) inTorrServer(ctx context.Context, hash string) bool {
 		return false
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(markHeader, g.mark)
 	req.SetBasicAuth(up.User, up.Password)
 	resp, err := g.client.Do(req)
 	if err != nil {

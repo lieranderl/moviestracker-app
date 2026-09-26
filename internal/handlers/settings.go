@@ -44,6 +44,12 @@ func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 		templ.Handler(views.SettingsPage(user, s.gstreamerView(ctx))).ServeHTTP(w, r)
 	case "security":
 		templ.Handler(views.SecurityPage(user, views.SourceStatus{})).ServeHTTP(w, r)
+	case "apps":
+		if s.appsPort == nil {
+			http.NotFound(w, r)
+			return
+		}
+		templ.Handler(views.AppsPage(user, s.appsView(r), views.SourceStatus{})).ServeHTTP(w, r)
 	case "users":
 		templ.Handler(views.UsersPage(user, s.usersView(user))).ServeHTTP(w, r)
 	default:

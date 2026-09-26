@@ -31,6 +31,7 @@ Everything is set in the browser under Settings → Sources and kept in the data
 | --- | --- | --- |
 | `MT_LISTEN` | `:8095` | Listen address; the default serves every network interface so TVs and phones can connect |
 | `MT_DATA_DIR` | `moviestracker` in the user config directory | Where accounts, sessions and sources are kept (the Mac app sets `~/Library/Application Support/moviestracker`, the Windows tray app `%LOCALAPPDATA%\Moviestracker`) |
+| `MT_TORRSERVER_LISTEN` | `:8090` | Where TorrServer apps (TorrServe, Lampa) connect once **Settings → Other apps** is on; nothing listens there until then |
 | `MT_LAN_ADDRESS` | *(empty: found)* | The address TVs and phones use to reach this machine, put in links made while Moviestracker is opened as `localhost`; `off` keeps `localhost` (the Docker image's default) |
 | `MT_HOSTNAMES` | *(empty)* | Extra hostnames to answer to (comma-separated) besides IP addresses, `localhost` and `<hostname>.local` |
 | `MT_SECURE_COOKIES` | `false` | Secure cookies and HSTS, for HTTPS setups |
@@ -50,7 +51,7 @@ Streaming is local, but discovery needs outbound internet access to TMDB (`api.t
 
 The image (`ghcr.io/lieranderl/moviestracker`, linux/amd64 and linux/arm64) is how Moviestracker runs on Linux, a NAS or a home server; [compose.yaml](../compose.yaml) runs it. It holds `moviestracker`, TorrServer's GStreamer build (pinned in `scripts/torrserver.lock`) and Debian 13's GStreamer 1.26 with the plugin sets TorrServer lists.
 
-- **Processes:** `tini` (PID 1) runs `moviestracker`, which runs TorrServer on `127.0.0.1` behind generated credentials and restarts it if it stops, as the native apps do. Everything runs as uid 1000. Only port 8095 is published.
+- **Processes:** `tini` (PID 1) runs `moviestracker`, which runs TorrServer on `127.0.0.1` behind generated credentials and restarts it if it stops, as the native apps do. Everything runs as uid 1000. Only port 8095 is published; publish 8090 as well for TorrServer apps (Settings → Other apps).
 - **Storage:** `/data` is the only volume: `moviestracker.json` (accounts, sessions, sources) and `engine/` (TorrServer's database, settings and log). The root filesystem can be read-only; GStreamer's plugin registry goes to `/tmp`, a tmpfs. A bind-mounted folder must be writable by uid 1000 (or run the container as its owner with `user:`); otherwise Moviestracker stops with a message saying so.
 - **Health and shutdown:** `moviestracker --health` asks `/healthz` (the image's `HEALTHCHECK`; passing probes are not logged). `SIGTERM` closes open pages, then stops TorrServer; allow 30 seconds (`stop_grace_period`).
 - **Setup:** a browser reaching the container through Docker's network is never "this machine", so the first account needs the setup code from `docker compose logs moviestracker`.

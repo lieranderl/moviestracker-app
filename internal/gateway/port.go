@@ -87,6 +87,15 @@ func (p *Port) Addr() string {
 	return p.ln.Addr().String()
 }
 
+// Number is the port number apps connect to: the one listened on while
+// open, else the configured one.
+func (p *Port) Number() string {
+	if addr := p.Addr(); addr != "" {
+		return portOf(addr)
+	}
+	return portOf(p.addr)
+}
+
 func portOf(addr string) string {
 	if _, port, err := net.SplitHostPort(addr); err == nil {
 		return port

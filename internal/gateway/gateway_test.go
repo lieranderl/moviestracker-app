@@ -313,3 +313,46 @@ func TestGuessingLoginsIsCutShort(t *testing.T) {
 		t.Errorf("another device is locked out too: %d", rec.Code)
 	}
 }
+
+// With "a TorrServer I already run" at the default 127.0.0.1:8090 and
+// nothing there, the gateway on port 8090 would be its own upstream.
+func TestTheGatewayNeverPassesRequestsToItself(t *testing.T) {
+	store, err := config.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var self string
+	g := gateway.New(gateway.Config{Store: store, Upstream: func() gateway.Upstream {
+		return gateway.Upstream{URL: self, User: "moviestracker", Password: "engine-secret"}
+	}})
+	front := httptest.NewServer(g)
+	t.Cleanup(front.Close)
+	self = front.URL
+	login, password, err := gateway.NewLogin("TV", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = store.Update(func(st *config.State) error { st.Gateway.Logins = []config.AppLogin{login}; return nil })
+
+	req, _ := http.NewRequest(http.MethodGet, front.URL+"/echo", nil)
+	req.SetBasicAuth(login.User, password)
+	done := make(chan int, 1)
+	go func() {
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Error(err)
+			done <- 0
+			return
+		}
+		_ = resp.Body.Close()
+		done <- resp.StatusCode
+	}()
+	select {
+	case code := <-done:
+		if code != http.StatusLoopDetected {
+			t.Errorf("a gateway in front of itself answered %d, want 508", code)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the gateway keeps passing the request to itself")
+	}
+}
