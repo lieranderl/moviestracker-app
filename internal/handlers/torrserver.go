@@ -560,6 +560,39 @@ func (s *Server) handleTorrServerPlaylist(w http.ResponseWriter, r *http.Request
 	_, _ = w.Write([]byte(playlist)) // #nosec G705 -- a text/x-mpegurl download
 }
 
+// handleTorrServerQueue gives the player a torrent's videos, in order: the
+// playlist menu and $_queue, which Next and the end of a file follow. A
+// torrent it cannot load has an empty playlist.
+func (s *Server) handleTorrServerQueue(w http.ResponseWriter, r *http.Request) {
+	if s.userFromRequest(r) == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	hash := strings.ToLower(r.URL.Query().Get("hash"))
+	if !isHexHash(hash) {
+		http.Error(w, "Missing hash parameter", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	var videos []torrserver.FileStat
+	if torrent, err := s.torrServer.Client().TorrentStats(ctx, hash); err != nil {
+		slog.Warn("playlist: torrent stats failed", "hash", hash, "error", err)
+	} else {
+		videos = torrent.VideoFiles()
+	}
+
+	sse := datastar.NewSSE(w, r)
+	if err := sse.PatchElementTempl(views.TorrPlaylist(videos)); err != nil {
+		logSSEError(r, "patch playlist", err)
+		return
+	}
+	if err := sse.MarshalAndPatchSignals(map[string]any{"_queue": views.PlayQueue(s.streamLinks(), hash, videos), "_queueHash": hash}); err != nil {
+		logSSEError(r, "patch playlist signals", err)
+	}
+}
+
 // handleTorrServerPlayerStats patches the stats row (and, with gst=1, the
 // media info) under the player. With stream=true it keeps them current from
 // the shared player topic, which also keeps TorrServer's GStreamer pipeline

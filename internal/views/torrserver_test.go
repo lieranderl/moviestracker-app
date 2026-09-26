@@ -444,15 +444,52 @@ func TestSeveralVideosCanBePlayedInARowOrAsAPlaylist(t *testing.T) {
 			t.Errorf("no %s playlist of all files", kind)
 		}
 	}
-	all := regexp.MustCompile(`<button[^>]*data-action="playall"[^>]*>`).FindString(out)
+	all := regexp.MustCompile(`(?s)<button[^>]*data-action="play"[^>]*>(?:\s*<svg.*?</svg>)?\s*Play all`).FindString(out)
 	if all == "" {
 		t.Fatal("no Play all button")
 	}
-	if !strings.Contains(all, `"index":1`) || !strings.Contains(all, `"index":3`) || strings.Contains(all, `"index":2`) {
-		t.Errorf("Play all should queue the videos only, in order: %s", all)
+	if !strings.Contains(all, `data-index="1"`) || !strings.Contains(all, `data-kind="hls"`) {
+		t.Errorf("Play all should start the first video, converted when it can be: %s", all)
 	}
-	if !strings.Contains(out, "data-on:ended=") || !strings.Contains(out, `aria-label="Next file"`) {
-		t.Error("the player should go on to the next file, by itself and on demand")
+	for _, want := range []string{
+		"data-on:ended=", `aria-label="Next file"`,
+		"@get('/api/torrserver/queue?hash=' + encodeURIComponent($activeHash)",
+		`id="torr-playlist"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the player should follow the torrent's playlist: lacks %q", want)
+		}
+	}
+}
+
+// The playlist menu lists the torrent's videos, marking the one playing.
+func TestThePlaylistMenuListsTheVideos(t *testing.T) {
+	out := html.UnescapeString(render(t, views.TorrPlaylist([]torrserver.FileStat{{ID: 1, Path: "Show/e01.mkv"}, {ID: 3, Path: "Show/e02.mkv"}})))
+	for _, want := range []string{`aria-label="Playlist"`, `data-at="0"`, `data-at="1"`, "$activeFileIndex === 3", "2. e02.mkv"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("playlist menu lacks %q:\n%s", want, out)
+		}
+	}
+	if one := render(t, views.TorrPlaylist([]torrserver.FileStat{{ID: 1, Path: "movie.mkv"}})); strings.Contains(one, "data-at") {
+		t.Error("one video needs no playlist menu")
+	}
+}
+
+// Fullscreen hides the header: the title shows over the video instead.
+func TestFullscreenShowsWhatIsPlaying(t *testing.T) {
+	out := torrPage(t, true)
+	if !regexp.MustCompile(`(?s)<div[^>]*data-show="\$_fs"[^>]*>\s*<p[^>]*>\s*<span data-text="\$streamTitle">`).MatchString(out) {
+		t.Error("fullscreen should show the playing file's title")
+	}
+}
+
+// ↑ and ↓ turn the volume up and down, like the wheel.
+func TestArrowKeysTurnTheVolume(t *testing.T) {
+	out := torrPage(t, true)
+	for _, want := range []string{"case 'ArrowUp': turn(0.05)", "case 'ArrowDown': turn(-0.05)"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("player keys lack %q", want)
+		}
 	}
 }
 
@@ -481,11 +518,13 @@ func TestAPlayerThatDidNotOpenIsExplained(t *testing.T) {
 	}
 }
 
-// Scrolling over the video turns the volume up (wheel up) or down.
+// Scrolling over the video turns the volume up (wheel or fingers up) or
+// down, following Macs' inverted "natural" scrolling.
 func TestScrollingOverTheVideoChangesTheVolume(t *testing.T) {
 	out := torrPage(t, true)
 	wheel := regexp.MustCompile(`data-ref:_player[^<]*data-on:wheel="([^"]*)"`).FindStringSubmatch(out)
-	if wheel == nil || !strings.Contains(wheel[1], "evt.deltaY") || !strings.Contains(wheel[1], ".volume =") {
+	if wheel == nil || !strings.Contains(wheel[1], "evt.deltaY") || !strings.Contains(wheel[1], ".volume =") ||
+		!strings.Contains(wheel[1], "webkitDirectionInvertedFromDevice ?? (") { // ?? cannot mix with && unparenthesised
 		t.Errorf("the player does not turn the volume with the wheel: %v", wheel)
 	}
 }

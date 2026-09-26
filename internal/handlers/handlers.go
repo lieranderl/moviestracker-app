@@ -236,6 +236,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/torrserver/probe", s.handleTorrServerProbe)
 	s.mux.HandleFunc("GET /api/torrserver/tracks", s.handleTorrServerTracks)
 	s.mux.HandleFunc("GET /api/torrserver/playlist", s.handleTorrServerPlaylist)
+	s.mux.HandleFunc("GET /api/torrserver/queue", s.handleTorrServerQueue)
 	s.mux.HandleFunc("GET /api/torrserver/player-stats", s.handleTorrServerPlayerStats)
 	s.mux.HandleFunc("GET /api/torrserver/status", s.handleTorrServerStatus)
 	s.mux.HandleFunc("GET /api/torrserver/torrent-stats", s.handleTorrentStats)
