@@ -49,3 +49,39 @@ func TestTrackerNamesNeverEnterDatastarExpressions(t *testing.T) {
 		}
 	}
 }
+
+// The search carries the qualities and HDR picked before it.
+func TestTheSourcesSearchSendsThePickedQualitiesAndHDR(t *testing.T) {
+	search := views.SourcesSearch("movie", 27205)
+	for _, want := range []string{"'&quality=' + $qual.filter(Boolean).join(',')", "($hdr ? '&hdr=1' : '')"} {
+		if !strings.Contains(search, want) {
+			t.Errorf("search %q lacks %q", search, want)
+		}
+	}
+}
+
+// Results filter by the voices (dubbing) they carry, any number of them;
+// quality is picked before searching, so there are no quality tabs.
+func TestReleasesCanBeFilteredByVoice(t *testing.T) {
+	rs := []jacred.Result{
+		{Tracker: "rutracker", Title: "A", Voices: []string{"Дубляж", "LostFilm"}},
+		{Tracker: "kinozal", Title: "B", Voices: []string{"Дубляж"}},
+		{Tracker: "rutor", Title: "C"},
+	}
+	out := html.UnescapeString(render(t, views.TorrentResults(rs, "seeders", "")))
+	dub, lost := strings.Index(out, `value="Дубляж"`), strings.Index(out, `value="LostFilm"`)
+	if dub < 0 || lost < 0 || dub > lost {
+		t.Errorf("voice toggles missing or not commonest first (%d, %d)", dub, lost)
+	}
+	for _, want := range []string{
+		`aria-label="Filter by voice"`, `data-bind="voices"`, `data-voices="Дубляж|LostFilm"`,
+		"el.dataset.voices.split('|').some(v => v && $voices.includes(v))",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("results lack %q", want)
+		}
+	}
+	if strings.Contains(out, `aria-label="Filter by quality"`) || strings.Contains(out, "$q ===") {
+		t.Error("the quality tabs should be gone: quality is picked before searching")
+	}
+}

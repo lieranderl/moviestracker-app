@@ -476,3 +476,29 @@ func freePort(t *testing.T) int {
 	defer func() { _ = ln.Close() }()
 	return ln.Addr().(*net.TCPAddr).Port
 }
+
+// The settings check says when JacRed wants a key, and how many searches
+// the key has left today.
+func TestTheJacRedCheckExplainsKeysAndTheDailyLimit(t *testing.T) {
+	refusing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer refusing.Close()
+	counting := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-RateLimit-Remaining", "97")
+		_, _ = w.Write([]byte(`[{"tracker":"rutor","url":"https://rutor.info/torrent/1","title":"Inception 2010","sid":12,` +
+			`"magnet":"magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&dn=a","relased":2010,"quality":1080}]`))
+	}))
+	defer counting.Close()
+	l := newLocal(t, withAdmin(t))
+	admin := l.admin(t)
+
+	rr := l.action(t, "/api/settings/sources/jacred", `{"jacredUrl":"`+refusing.URL+`","jacredApiKey":"wrong"}`, admin)
+	if body := rr.Body.String(); !strings.Contains(body, "needs a valid key") || l.store.State().Sources.JacRedAPIKey == "wrong" {
+		t.Errorf("a refused key should be explained and not saved:\n%s", body)
+	}
+	rr = l.action(t, "/api/settings/sources/jacred", `{"jacredUrl":"`+counting.URL+`","jacredApiKey":"mine"}`, admin)
+	if body := rr.Body.String(); !strings.Contains(body, "97 searches left today") {
+		t.Errorf("the check should say how many searches are left:\n%s", body)
+	}
+}

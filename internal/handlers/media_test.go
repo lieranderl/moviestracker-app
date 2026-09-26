@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/jacred"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
@@ -377,5 +378,57 @@ func TestTorrServerStatusReportsVersionOrOffline(t *testing.T) {
 	offline := newMediaServer(t, &fakeTMDBDetails{}, &fakeJacRed{}, "http://127.0.0.1:1")
 	if body := get(t, offline, "/api/torrserver/status", true).Body.String(); !strings.Contains(body, "Offline") {
 		t.Errorf("offline status = %q, want Offline", body)
+	}
+}
+
+// From 9 Oct 2026 jacred.su answers only with a key, and a personal key has
+// a daily limit: the title page says which, and what to do.
+func TestTorrentSearchSaysWhenJacRedWantsAKeyOrItsLimitIsReached(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want []string
+	}{
+		{jacred.ErrKeyNeeded, []string{"JacRed needs a key", "Settings → Sources"}},
+		{&jacred.LimitError{Retry: 3 * time.Hour}, []string{"used up", "about 3 hours"}},
+		{&jacred.LimitError{Retry: 20 * time.Minute}, []string{"used up", "20 minutes"}},
+	} {
+		server := newMediaServer(t, &fakeTMDBDetails{movies: map[int]*tmdb.MovieDetails{27205: inception}}, &fakeJacRed{err: tc.err}, "")
+		body := get(t, server, "/api/torrents?type=movie&id=27205", true).Body.String()
+		for _, want := range tc.want {
+			if !strings.Contains(body, want) {
+				t.Errorf("%v: page lacks %q:\n%s", tc.err, want, body)
+			}
+		}
+	}
+}
+
+// The qualities and HDR picked before searching go to JacRed; anything else
+// in ?quality= is ignored.
+func TestTorrentSearchAsksForThePickedQualitiesAndHDR(t *testing.T) {
+	jr := &fakeJacRed{}
+	server := newMediaServer(t, &fakeTMDBDetails{movies: map[int]*tmdb.MovieDetails{27205: inception}}, jr, "")
+	get(t, server, "/api/torrents?type=movie&id=27205&quality=2160,1080,999,x&hdr=1", true)
+	if len(jr.queries) != 1 {
+		t.Fatalf("queries = %+v", jr.queries)
+	}
+	q := jr.queries[0]
+	if fmt.Sprint(q.Qualities) != "[2160 1080]" || !q.HDR {
+		t.Errorf("query = %+v, want qualities [2160 1080] and HDR", q)
+	}
+}
+
+// Quality and HDR are picked before searching: JacRed filters them, and
+// changing them searches again.
+func TestSourcesOfferQualityAndHDRBeforeSearching(t *testing.T) {
+	server := newMediaServer(t, &fakeTMDBDetails{movies: map[int]*tmdb.MovieDetails{27205: inception}}, &fakeJacRed{}, "")
+	body := html.UnescapeString(get(t, server, "/movie/27205", true).Body.String())
+	for _, want := range []string{
+		`aria-label="Search for qualities"`, `value="2160"`, `value="1080"`, `value="720"`, `value="480"`,
+		`data-bind="qual"`, `data-bind:hdr`, "HDR only",
+		`data-on:change="if ($sourcesRequested) { $sourcesRequested = true; @get(`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("sources lack %q", want)
+		}
 	}
 }

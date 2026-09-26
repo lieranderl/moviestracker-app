@@ -4,8 +4,10 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -173,6 +175,21 @@ func sortParam(r *http.Request) string {
 	}
 }
 
+// qualitiesParam reads ?quality=2160,1080: the qualities JacRed files
+// releases under, anything else dropped.
+func qualitiesParam(r *http.Request) []int {
+	var out []int
+	for v := range strings.SplitSeq(r.URL.Query().Get("quality"), ",") {
+		switch n, _ := strconv.Atoi(v); n {
+		case 2160, 1080, 720, 480:
+			if !slices.Contains(out, n) {
+				out = append(out, n)
+			}
+		}
+	}
+	return out
+}
+
 // scopeToSeason narrows a series search to ?season=N, dated by the show's
 // first year and the season's own air year.
 func scopeToSeason(title *titleInfo, r *http.Request) bool {
@@ -221,16 +238,47 @@ func (s *Server) handleTorrentSearch(w http.ResponseWriter, r *http.Request) {
 		patchTorrentError(r, sse, "Torrent search is not configured on this server.")
 		return
 	}
+	title.query.Qualities, title.query.HDR = qualitiesParam(r), r.URL.Query().Get("hdr") == "1"
 	results, err := s.clients().Torrents.Search(ctx, title.query)
 	if err != nil {
 		slog.Warn("jacred search failed", "title", title.label, "error", err)
-		patchTorrentError(r, sse, "JacRed is not responding right now. Please try again later.")
+		patchTorrentError(r, sse, jacredProblem(err))
 		return
 	}
 	sort := sortParam(r)
 	search := views.SourcesSearch(mediaType, title.id)
 	if err := sse.PatchElementTempl(views.TorrentResults(jacred.Sort(results, sort), sort, search)); err != nil {
 		logSSEError(r, "patch torrent results", err)
+	}
+}
+
+// jacredProblem says why a JacRed search failed, and what to do about it.
+func jacredProblem(err error) string {
+	var limit *jacred.LimitError
+	switch {
+	case errors.Is(err, jacred.ErrKeyNeeded):
+		return "JacRed needs a key to search. An administrator adds a free one in Settings → Sources."
+	case errors.Is(err, jacred.ErrBlocked):
+		return "JacRed has blocked the account of this server's key. An administrator can check it at jacred.su."
+	case errors.As(err, &limit):
+		if limit.Retry <= 0 {
+			return "Today's JacRed searches are used up. Please try again later."
+		}
+		return "Today's JacRed searches are used up. Please try again in " + waitText(limit.Retry) + "."
+	default:
+		return "JacRed is not responding right now. Please try again later."
+	}
+}
+
+// waitText says a wait the way people do: "20 minutes", "about 3 hours".
+func waitText(d time.Duration) string {
+	switch {
+	case d >= 90*time.Minute:
+		return fmt.Sprintf("about %d hours", int(d.Round(time.Hour)/time.Hour))
+	case d >= 50*time.Minute:
+		return "about an hour"
+	default:
+		return fmt.Sprintf("%d minutes", max(1, int(d.Round(time.Minute)/time.Minute)))
 	}
 }
 
