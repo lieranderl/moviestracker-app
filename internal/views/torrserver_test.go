@@ -386,3 +386,21 @@ func TestDirectAndHLSExplainThemselvesWithTooltips(t *testing.T) {
 		}
 	}
 }
+
+// A stream the browser cannot decode (the player reports torr-unplayable,
+// naming the format) says so over the video and points to the players that
+// can, instead of leaving the player black.
+func TestThePlayerExplainsAStreamThisBrowserCannotPlay(t *testing.T) {
+	out := torrPage(t, true)
+	for _, want := range []string{
+		`data-on:torr-unplayable="$_unplayable = evt.detail"`,
+		`data-show="$_unplayable"`,
+		`data-text="$_unplayable"`,
+		"This browser cannot play",
+		"VLC, IINA, Infuse",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("player lacks %q", want)
+		}
+	}
+}

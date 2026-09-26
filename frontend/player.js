@@ -50,6 +50,34 @@ const saveSubPref = (track) => {
 
 const notifySubtitle = (id) => videoEl()?.dispatchEvent(new CustomEvent("torr-subtitle", { detail: id }));
 
+// A stream the browser cannot decode is reported to Datastar as a
+// torr-unplayable event naming what it cannot play ("" once a stream starts),
+// so the player says so instead of staying black.
+const notifyUnplayable = (what) => videoEl()?.dispatchEvent(new CustomEvent("torr-unplayable", { detail: what }));
+
+const aacProfiles = { 1: "AAC Main", 2: "AAC LC", 3: "AAC SSR", 4: "AAC LTP", 5: "HE-AAC", 29: "HE-AAC v2" };
+
+// describeCodec names an HLS CODECS entry for people: "mp4a.40.1" is
+// "the AAC Main audio".
+const describeCodec = (codec) => {
+  const c = codec.toLowerCase();
+  if (c.startsWith("mp4a.40.")) return `the ${aacProfiles[c.split(".")[2]] ?? "AAC"} audio`;
+  if (c === "ac-3") return "the Dolby Digital (AC-3) audio";
+  if (c === "ec-3") return "the Dolby Digital Plus audio";
+  if (c.startsWith("hvc1") || c.startsWith("hev1")) return "the HEVC video";
+  if (c.startsWith("dvh1") || c.startsWith("dvhe")) return "the Dolby Vision video";
+  if (c.startsWith("av01")) return "the AV1 video";
+  if (c.startsWith("vp09")) return "the VP9 video";
+  if (c.startsWith("avc1") || c.startsWith("avc3")) return "the H.264 video";
+  return `the ${codec} format`;
+};
+
+// unsupportedPart is what of these codecs this browser cannot decode.
+const unsupportedPart = (codecs) => {
+  const refused = codecs.find((c) => !window.MediaSource?.isTypeSupported(`video/mp4; codecs="${c}"`));
+  return refused ? describeCodec(refused) : "the video or audio format";
+};
+
 window.setSubtitleTrack = (id) => {
   if (currentHls) {
     currentHls.subtitleTrack = id;
@@ -83,10 +111,15 @@ window.playHlsVideo = (url) => {
   const resumeAt = video.currentSrc || currentHls ? video.currentTime : 0;
   destroyHls();
   currentUrl = url;
+  notifyUnplayable("");
 
   if (url.includes(".m3u8") && Hls.isSupported()) {
     const hls = new Hls({ enableWorker: true, lowLatencyMode: true, startPosition: resumeAt > 0 ? resumeAt : -1 });
     currentHls = hls;
+    let codecs = [];
+    hls.on(Hls.Events.MANIFEST_LOADED, (_, data) => {
+      codecs = [...new Set(data.levels.flatMap((l) => [l.videoCodec, l.audioCodec]).filter(Boolean))];
+    });
     hls.loadSource(url);
     hls.attachMedia(video);
     hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
@@ -101,6 +134,15 @@ window.playHlsVideo = (url) => {
     });
     hls.on(Hls.Events.ERROR, (_, data) => {
       if (!data.fatal) return;
+      if (
+        data.details === Hls.ErrorDetails.MANIFEST_INCOMPATIBLE_CODECS_ERROR ||
+        data.details === Hls.ErrorDetails.BUFFER_INCOMPATIBLE_CODECS_ERROR
+      ) {
+        // Retrying cannot help: this browser does not decode the stream.
+        if (hls === currentHls) notifyUnplayable(unsupportedPart(codecs));
+        destroyHls();
+        return;
+      }
       if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
       else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
       else destroyHls();
@@ -110,6 +152,15 @@ window.playHlsVideo = (url) => {
     if (resumeAt > 0) {
       video.addEventListener("loadedmetadata", () => (video.currentTime = resumeAt), { once: true });
     }
+    video.addEventListener(
+      "error",
+      () => {
+        if (currentUrl === url && video.error?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+          notifyUnplayable("the video or audio format");
+        }
+      },
+      { once: true },
+    );
     video.src = url;
     video.play().catch(() => {});
   }
@@ -123,6 +174,7 @@ window.stopHlsVideo = () => {
     video.load();
   }
   destroyHls();
+  notifyUnplayable("");
 };
 
 // Copies a stream/magnet/playlist link. Resolves to true on success so the
