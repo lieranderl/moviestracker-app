@@ -256,9 +256,15 @@ The **TorrServer** page lists your torrents. Each file has two ways to watch:
 - **HLS**, converted by GStreamer as it plays: it plays in any browser, on
   phones and on TVs, and lets you pick the audio track.
 
+HLS needs a TorrServer with GStreamer. The Windows installer and the Docker
+image have it; on a Mac, install it once
+([Play MKV files in the browser](#play-mkv-files-in-the-browser)). With your
+own TorrServer, it depends on that build. Without GStreamer, only Direct is
+offered, and the HLS playlist and audio picker are hidden.
+
 Each has ▶ to play it here and 🔗 to copy its link for another device. A
 torrent with several videos (a season, say) also has **Play all** and a
-**Direct .m3u8** and **HLS .m3u8** playlist of all of them.
+**Direct .m3u8** and (with GStreamer) **HLS .m3u8** playlist of all of them.
 
 In the player:
 
