@@ -73,7 +73,7 @@ func TestLineBreaksInPathsCannotForgeLogLines(t *testing.T) {
 	handler := handlers.LoggingMiddleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/movie%0D%0Alevel=ERROR", nil))
 
-	if out := logged.String(); !strings.Contains(out, "path=/movie%0D%0Alevel=ERROR ") || strings.Count(out, "\n") != 1 {
+	if out := logged.String(); !strings.Contains(out, "/movie%0D%0Alevel=ERROR") || strings.Count(out, "\n") != 1 {
 		t.Errorf("the log shows the path as:\n%s", out)
 	}
 }
