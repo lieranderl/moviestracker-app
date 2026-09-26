@@ -26,8 +26,9 @@ changing it (it updates what exists).
     (`ci.yml`'s last job, green only when every CI job is), **Title follows
     Conventional Commits** and **Dependency review** (`pr.yml`), and no new
     CodeQL errors or high-severity alerts;
-  - no deletion, force-push or merge commits (linear history), signed
-    commits only.
+  - no deletion, force-push or merge commits (linear history). Commits on
+    branches need no signature: the squash merge makes a new commit that
+    GitHub signs.
   - No approval is required while there is one maintainer: with more, raise
     `required_approving_review_count` to 1 and turn on code owner review.
   - In an emergency an admin can switch the ruleset off in Settings → Rules,

@@ -75,9 +75,11 @@ actions=15368
 check() { printf '{"context":"%s","integration_id":%d}' "$1" "$actions"; }
 
 # Nobody bypasses it, admins included: every change is a pull request with CI
-# green, squash-merged (GitHub signs the commit). No approval is required while
-# there is one maintainer: raise required_approving_review_count (and turn on
-# require_code_owner_review) when there are more.
+# green, squash-merged, so GitHub makes and signs every commit on main (a
+# required_signatures rule would also demand signed commits on every branch).
+# No approval is required while there is one maintainer: raise
+# required_approving_review_count (and turn on require_code_owner_review) when
+# there are more.
 say "Ruleset: main"
 ruleset main "$(
   cat <<JSON
@@ -91,7 +93,6 @@ ruleset main "$(
     {"type": "deletion"},
     {"type": "non_fast_forward"},
     {"type": "required_linear_history"},
-    {"type": "required_signatures"},
     {"type": "pull_request", "parameters": {
       "required_approving_review_count": 0,
       "dismiss_stale_reviews_on_push": true,
