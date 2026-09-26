@@ -53,8 +53,7 @@ changing it (it updates what exists).
 | `ci.yml` | pull requests, pushes to `main`, called by releases | `make ci` (generated files, lint, race tests, govulncheck, gosec, build) and the TorrServer API contract; gitleaks over the whole history; macOS tests and a real DMG build; Windows tests, a real installer build, and its install, upgrade, quit, uninstall and purge; the Docker image end to end with `compose.yaml` (`scripts/ci/docker-e2e.sh`: TorrServer and GStreamer, setup, persistence, shutdown, licences) on amd64 and on native arm64 runners; zizmor over the workflows; **CI passed** when all of them are green |
 | `pr.yml` | pull requests | Conventional Commit titles; dependency review (vulnerable or AGPL-incompatible dependencies); labels from the title; auto-merge for Dependabot's minor and patch updates |
 | `codeql.yml` | pull requests, `main`, weekly | CodeQL for Go, JavaScript and the workflows |
-| `release.yml` | `v*` tags | Checks the tag is on `main`, runs CI, then in parallel the Docker image for linux/amd64 and linux/arm64 (pushed to `ghcr.io/lieranderl/moviestracker:<version>` with SBOM and signed provenance), the DMG and the Windows installer; checksums, signed build provenance, and a **draft** release |
-| `docker-latest.yml` | a release is published | Points the image's `latest` and `MAJOR.MINOR` tags at the published version (not for pre-releases) |
+| `release.yml` | `v*` tags | Checks the tag is on `main`, runs CI, then in parallel the Docker image for linux/amd64 and linux/arm64 (pushed to `ghcr.io/lieranderl/moviestracker` as `<version>`, `MAJOR.MINOR` and `latest`, or only `<version>` for a pre-release, with SBOM and signed provenance), the DMG and the Windows installer; checksums, signed build provenance, and a **draft** release |
 
 Every action is pinned to a commit SHA with its version in a comment;
 Dependabot updates the pins, Go modules, Bun tools and the Docker base images
@@ -101,8 +100,10 @@ major (minor while the version is `0.x`).
 4. Check the draft: install the DMG on a Mac (and the installer on Windows),
    read the notes. Then publish. Releases are immutable: once published,
    neither the files nor the tag can change.
-5. Publishing the release (not a pre-release) moves the image's `latest`
-   tag to it.
+
+The Docker image is out as soon as the workflow runs, draft or not:
+`latest` and `MAJOR.MINOR` point at it (pre-releases get only their own
+version), so `docker compose pull` gets it at once.
 
 A release that fails or turns out wrong is not repaired in place: fix it on
 `main` through a pull request and release the next patch version. Anyone can

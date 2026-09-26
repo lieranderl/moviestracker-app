@@ -67,14 +67,16 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      # Only the version tag here: `latest` and `1.2` move when the draft is
-      # published (docker-latest.yml).
+      # 1.2.3, 1.2 and latest; a pre-release (v1.3.0-rc.1) gets its own
+      # version only, so `latest` stays on the last release.
       - id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ghcr.io/${{ github.repository_owner }}/moviestracker
-          flavor: latest=false
-          tags: type=semver,pattern={{version}}
+          flavor: latest=auto
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
       - name: Build and push, with SBOM and provenance
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
