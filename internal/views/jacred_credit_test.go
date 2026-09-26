@@ -10,7 +10,9 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/views"
 )
 
-const jacredCredit = `href="https://jacred.su/"` // #nosec G101 -- "JacRed" is a service name, not a credential
+// jacredCredit is the credit Moviestracker's jacred.su project asks for
+// beside the results: its referral link, which counts the visits it brings.
+const jacredCredit = `href="https://jacred.su/r/c2abc53e-233f-42ad-9f6a-e12f2eeaef9c"` // #nosec G101 -- a referral link, not a credential
 
 func TestTitleSourcesCreditJacRedWithALink(t *testing.T) {
 	for name, c := range map[string]string{

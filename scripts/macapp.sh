@@ -10,6 +10,8 @@
 #                    already fetched (skips the download; used by tests)
 #   MT_SHARED_TMDB_KEY  the shared TMDB key built in, used when a user has no key
 #                    of their own (default: the git-ignored .tmdb-shared-key file)
+#   MT_SHARED_JACRED_KEY  Moviestracker's jacred.su project key, used for jacred.su
+#                    without a key of one's own (default: .jacred-shared-key)
 #
 # The app is signed ad hoc, not with a Developer ID: macOS asks to confirm the
 # first launch in System Settings → Privacy & Security.
@@ -19,8 +21,8 @@ version="${1:?usage: macapp.sh <version>}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 dist="${DIST:-$root/dist}"
 ts_version="$(awk '$1 == "version" {print $2}' "$root/scripts/torrserver.lock")"
-# shellcheck source=scripts/shared-tmdb-key.sh
-. "$root/scripts/shared-tmdb-key.sh"
+# shellcheck source=scripts/shared-keys.sh
+. "$root/scripts/shared-keys.sh"
 
 mkdir -p "$dist"
 work="$(mktemp -d)"
@@ -42,7 +44,7 @@ torrserver_file() { # <asset name> <dest> [target]
 echo "Building Moviestracker.app $version"
 for arch in arm64 amd64; do
   CGO_ENABLED=0 GOOS=darwin GOARCH="$arch" go build -C "$root" -trimpath \
-    -ldflags "-s -w -X main.version=$version -X main.sharedTMDBKey=$shared_tmdb_key" -o "$work/moviestracker-$arch" ./cmd/server
+    -ldflags "-s -w -X main.version=$version -X main.sharedTMDBKey=$shared_tmdb_key -X main.sharedJacRedKey=$shared_jacred_key" -o "$work/moviestracker-$arch" ./cmd/server
   torrserver_file "TorrServer-gst-darwin-$arch" "$work/torrserver-$arch" "darwin/$arch"
 done
 lipo -create -output "$contents/MacOS/moviestracker-server" "$work/moviestracker-arm64" "$work/moviestracker-amd64"

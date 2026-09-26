@@ -6,9 +6,10 @@
 #   docker build -t moviestracker:local .
 #   docker compose up -d          (compose.yaml)
 #
-# Release builds pass --build-arg VERSION=v1.2.3 and the shared TMDB key as a
-# build secret (never an argument, which the image history would keep):
-#   --secret id=tmdb_key,env=MT_SHARED_TMDB_KEY
+# Release builds pass --build-arg VERSION=v1.2.3 and the shared TMDB and
+# JacRed keys as build secrets (never arguments, which the image history
+# would keep):
+#   --secret id=tmdb_key,env=MT_SHARED_TMDB_KEY --secret id=jacred_key,env=MT_SHARED_JACRED_KEY
 
 # The build stages run on the build machine and cross-compile for the target.
 FROM --platform=$BUILDPLATFORM oven/bun:1.4.2@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1630f0546895 AS assets
@@ -31,9 +32,11 @@ ARG TARGETOS TARGETARCH
 ARG VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=secret,id=tmdb_key,required=false \
+    --mount=type=secret,id=jacred_key,required=false \
     key="" && if [ -f /run/secrets/tmdb_key ]; then key="$(tr -d '[:space:]' </run/secrets/tmdb_key)"; fi && \
+    jkey="" && if [ -f /run/secrets/jacred_key ]; then jkey="$(tr -d '[:space:]' </run/secrets/jacred_key)"; fi && \
     CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" go build -trimpath \
-      -ldflags "-s -w -X main.version=$VERSION -X main.sharedTMDBKey=$key" \
+      -ldflags "-s -w -X main.version=$VERSION -X main.sharedTMDBKey=$key -X main.sharedJacRedKey=$jkey" \
       -o /out/bin/moviestracker ./cmd/server
 # TorrServer's GStreamer build for the target CPU, pinned and checked against
 # scripts/torrserver.lock, with its licence and source link.

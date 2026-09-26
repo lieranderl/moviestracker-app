@@ -39,6 +39,11 @@ var version = "dev"
 // no other key.
 var sharedTMDBKey string
 
+// sharedJacRedKey is Moviestracker's jacred.su project key (unlimited
+// searches), carried by release builds like sharedTMDBKey and used for
+// jacred.su when there is no other key.
+var sharedJacRedKey string
+
 func main() {
 	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-version") {
 		fmt.Println("moviestracker " + version)
@@ -86,6 +91,7 @@ func main() {
 
 	env := config.EnvFrom(os.Getenv)
 	env.SharedTMDBKey = sharedTMDBKey
+	env.SharedJacRedKey = sharedJacRedKey
 	effective := env.Apply(store.State())
 	connector := sources.Connector{Health: sources.NewHealth()}
 	clients := connector.Connect(effective.Sources)

@@ -65,7 +65,9 @@ func (s *Server) sourcesView() views.SourcesView {
 		TMDBCanShare:      s.env.SharedTMDBKey != "",
 		TMDBEnv:           envName(s.env.TMDBKey != "", "TMDB_API_KEY"),
 		JacRedURL:         eff.Sources.JacRedURL,
-		JacRedKeySet:      eff.Sources.JacRedAPIKey != "",
+		JacRedKeySet:      st.Sources.JacRedAPIKey != "" || s.env.JacRedAPIKey != "",
+		JacRedShared:      s.env.UsesSharedJacRedKey(st),
+		JacRedCanShare:    s.env.SharedJacRedKey != "",
 		JacRedEnv:         jacredEnv,
 		IMDbOn:            !eff.Sources.IMDbOff,
 		IMDbEnv:           envName(s.env.IMDbURL != "", "IMDB_SERVICE_URL"),
@@ -249,9 +251,15 @@ func (s *Server) handleSaveJacRed(w http.ResponseWriter, r *http.Request) {
 	if saved := s.store.State().Sources; apiKey == "" && baseURL == saved.JacRedURL {
 		apiKey = saved.JacRedAPIKey
 	}
+	// Without a key of one's own, jacred.su is checked with Moviestracker's
+	// project key, which is never saved as one's own.
+	checkKey := apiKey
+	if checkKey == "" && config.IsJacredSu(baseURL) {
+		checkKey = s.env.SharedJacRedKey
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), sourceCheckTimeout)
 	defer cancel()
-	found, left, err := s.connector.CheckJacRed(ctx, baseURL, apiKey)
+	found, left, err := s.connector.CheckJacRed(ctx, baseURL, checkKey)
 	if err != nil {
 		slog.Warn("jacred test search failed", "url", baseURL, "error", err)
 		if errors.Is(err, jacred.ErrKeyNeeded) {
@@ -277,6 +285,30 @@ func (s *Server) handleSaveJacRed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	status(succeeded("Saved. The test search found %d %s.%s", found, plural(found, "release", "releases"), quota))
+}
+
+// handleUseSharedJacRed forgets the saved JacRed key, so jacred.su searches
+// run on Moviestracker's project key.
+func (s *Server) handleUseSharedJacRed(w http.ResponseWriter, r *http.Request) {
+	var sig struct{}
+	if !s.sourceAction(w, r, s.sourcesView().JacRedEnv, &sig) {
+		return
+	}
+	status := func(st views.SourceStatus) {
+		patchSource(w, r, views.JacRedSource(s.sourcesView(), st), map[string]any{"jacredApiKey": ""})
+	}
+	if s.env.SharedJacRedKey == "" {
+		status(failed("This Moviestracker has no JacRed key of its own."))
+		return
+	}
+	if err := s.saveSources(func(st *config.State) {
+		st.Sources.JacRedURL, st.Sources.JacRedAPIKey = config.DefaultJacRedURL, ""
+	}); err != nil {
+		slog.Error("forget jacred key failed", "error", err)
+		status(failed(saveFailed))
+		return
+	}
+	status(succeeded("Moviestracker's JacRed key is in use again: unlimited searches on jacred.su."))
 }
 
 // handleSaveIMDb switches IMDb ratings on or off. The rating service is

@@ -135,3 +135,35 @@ func TestTheSharedTMDBKeyIsUsedOnlyWithoutAnOwnKey(t *testing.T) {
 		})
 	}
 }
+
+// Moviestracker's JacRed project key is used for jacred.su only, and only
+// without a key of one's own: it never goes to another JacRed.
+func TestTheSharedJacRedKeyIsUsedOnlyForJacredSuWithoutAnOwnKey(t *testing.T) {
+	for _, tc := range []struct {
+		name, env, url, stored, want string
+		shared                       bool
+	}{
+		{"nothing set", "", "https://jacred.su", "", "project-key", true},
+		{"the search API's address", "", "https://api.jacred.su/", "", "project-key", true},
+		{"a key saved in Sources", "", "https://jacred.su", "own-key", "own-key", false},
+		{"JACRED_APIKEY", "dev-key", "https://jacred.su", "own-key", "dev-key", false},
+		{"a private JacRed", "", "http://nas:9117", "", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			env := config.EnvFrom(func(name string) string {
+				if name == "JACRED_APIKEY" {
+					return tc.env
+				}
+				return ""
+			})
+			env.SharedJacRedKey = "project-key" // #nosec G101 -- a test fixture
+			st := config.State{Sources: config.Sources{JacRedURL: tc.url, JacRedAPIKey: tc.stored}}
+			if got := env.Apply(st).Sources.JacRedAPIKey; got != tc.want {
+				t.Errorf("JacRed key in use = %q, want %q", got, tc.want)
+			}
+			if got := env.UsesSharedJacRedKey(st); got != tc.shared {
+				t.Errorf("UsesSharedJacRedKey() = %v, want %v", got, tc.shared)
+			}
+		})
+	}
+}

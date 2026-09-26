@@ -8,7 +8,7 @@ import (
 )
 
 // The Dockerfile copies the whole source folder into its build stage, so
-// the shared TMDB key, local data and releases must never be sent along.
+// the shared TMDB and JacRed keys, local data and releases must never be sent along.
 func TestDockerBuildsNeverSeeSecretsOrLocalData(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".dockerignore"))
 	if err != nil {
@@ -32,6 +32,7 @@ func TestDockerBuildsNeverSeeSecretsOrLocalData(t *testing.T) {
 	}
 	for _, path := range []string{
 		".tmdb-shared-key",
+		".jacred-shared-key",
 		".env",
 		".env.local",
 		".devdata/state.json",

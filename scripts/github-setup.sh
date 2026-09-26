@@ -16,6 +16,7 @@
 # - immutable releases: a published release's files and tag stay as they are
 # - the `release` environment, which only v* tags can use, with the
 #   MT_SHARED_TMDB_KEY secret from .tmdb-shared-key when present
+#   JACRED_APIKEY secret (jacred.su project key) from .jacred-shared-key when present
 set -euo pipefail
 
 repo="${1:-lieranderl/moviestracker-app}"
@@ -160,6 +161,18 @@ fi
 if gh secret list --repo "$repo" --json name --jq '.[].name' | grep -qx MT_SHARED_TMDB_KEY; then
   say "  removing the repository-wide MT_SHARED_TMDB_KEY"
   gh secret delete MT_SHARED_TMDB_KEY --repo "$repo"
+fi
+
+if [ -f "$root/.jacred-shared-key" ]; then
+  say "Secret: JACRED_APIKEY in the release environment (from .jacred-shared-key)"
+  tr -d '[:space:]' <"$root/.jacred-shared-key" | gh secret set JACRED_APIKEY --env release --repo "$repo"
+else
+  say "No .jacred-shared-key: set JACRED_APIKEY (Moviestracker's jacred.su project key) yourself for releases to carry it:"
+  say "  gh secret set JACRED_APIKEY --env release --repo $repo"
+fi
+if gh secret list --repo "$repo" --json name --jq '.[].name' | grep -qx JACRED_APIKEY; then
+  say "  removing the repository-wide JACRED_APIKEY"
+  gh secret delete JACRED_APIKEY --repo "$repo"
 fi
 
 say "Done: https://github.com/$repo/settings"

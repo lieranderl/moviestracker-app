@@ -14,8 +14,12 @@ const TMDBDisclaimer = "This product uses the TMDB API but is not endorsed or ce
 const (
 	tmdbHomeURL     = "https://www.themoviedb.org/"
 	torrentIndexURL = "https://jacred.su/"
-	torrServerURL   = "https://github.com/YouROK/TorrServer"
-	gstreamerURL    = "https://gstreamer.freedesktop.org/"
+	// jacredReferralURL is Moviestracker's jacred.su project link, which the
+	// project's terms ask to show beside the results ("search is powered by
+	// JacRed"); jacred.su counts the visits it brings.
+	jacredReferralURL = "https://jacred.su/r/c2abc53e-233f-42ad-9f6a-e12f2eeaef9c" // #nosec G101 -- a public referral link, not a credential
+	torrServerURL     = "https://github.com/YouROK/TorrServer"
+	gstreamerURL      = "https://gstreamer.freedesktop.org/"
 	// SourceURL is where Moviestracker's source code is. AGPL-3.0 section 13
 	// asks every copy, modified ones included, to offer its source to the
 	// people who use it over the network: a fork links its own source here.
@@ -102,7 +106,7 @@ func footer(showVersion bool) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(TMDBDisclaimer)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/footer.templ`, Line: 36, Col: 47}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/footer.templ`, Line: 40, Col: 47}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -148,7 +152,7 @@ func footer(showVersion bool) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/footer.templ`, Line: 51, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/footer.templ`, Line: 55, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -195,7 +199,7 @@ func externalLink(href templ.SafeURL, label string) templ.Component {
 		var templ_7745c5c3_Var6 templ.SafeURL
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinURLErrs(href)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/footer.templ`, Line: 58, Col: 15}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/footer.templ`, Line: 62, Col: 15}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -208,7 +212,7 @@ func externalLink(href templ.SafeURL, label string) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/footer.templ`, Line: 59, Col: 9}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/footer.templ`, Line: 63, Col: 9}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -253,9 +257,9 @@ func JacRedCredit() templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 templ.SafeURL
-		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinURLErrs(torrentIndexURL)
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinURLErrs(jacredReferralURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/footer.templ`, Line: 67, Col: 26}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/footer.templ`, Line: 71, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {

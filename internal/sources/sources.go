@@ -6,6 +6,7 @@ package sources
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 
 	"github.com/lieranderl/moviestracker-app/internal/config"
@@ -27,6 +28,8 @@ type Clients struct {
 // real services; tests point TMDBBaseURL at a fake.
 type Connector struct {
 	TMDBBaseURL string
+	// JacRedHTTP, when set, carries JacRed's requests (tests record them).
+	JacRedHTTP *http.Client
 	// Health, when set, records the outcome of every call the clients make.
 	Health *Health
 }
@@ -39,7 +42,7 @@ func (c Connector) Connect(src config.Sources) Clients {
 		out.Catalog, out.Details = client, client
 	}
 	if src.JacRedURL != "" {
-		out.Torrents = watchedJacRed{c: jacred.NewClient(src.JacRedURL, jacred.WithAPIKey(src.JacRedAPIKey)), h: c.Health}
+		out.Torrents = watchedJacRed{c: c.jacred(src.JacRedURL, src.JacRedAPIKey), h: c.Health}
 	}
 	if src.IMDbURL != "" && !src.IMDbOff {
 		out.IMDb = watchedIMDb{c: imdb.NewClient(src.IMDbURL), h: c.Health}
@@ -63,7 +66,7 @@ func (c Connector) CheckJacRed(ctx context.Context, baseURL, apiKey string) (fou
 	if err := validHTTPURL(baseURL); err != nil {
 		return 0, -1, err
 	}
-	client := jacred.NewClient(baseURL, jacred.WithAPIKey(apiKey))
+	client := c.jacred(baseURL, apiKey)
 	results, err := client.Search(ctx, probeQuery)
 	if err != nil {
 		return 0, -1, err
@@ -73,6 +76,10 @@ func (c Connector) CheckJacRed(ctx context.Context, baseURL, apiKey string) (fou
 		left = n
 	}
 	return len(results), left, nil
+}
+
+func (c Connector) jacred(baseURL, key string) *jacred.Client {
+	return jacred.NewClient(baseURL, jacred.WithAPIKey(key), jacred.WithHTTPClient(c.JacRedHTTP))
 }
 
 func (c Connector) tmdb(key string) *tmdb.Client {

@@ -3,7 +3,8 @@ name: Release
 # Push a version tag on a commit of main to release (docs/MAINTAINING.md):
 #   git tag -a v1.2.3 -m "Moviestracker v1.2.3" origin/main && git push origin v1.2.3
 # The release is created as a draft: check it, then publish it on GitHub.
-# Jobs that use the shared TMDB key run in the `release` environment, whose
+# Jobs that use the shared TMDB and JacRed keys (secrets MT_SHARED_TMDB_KEY
+# and JACRED_APIKEY) run in the `release` environment, whose
 # secrets only v* tags can reach. Release builds use no caches, so nothing a
 # pull request run left behind can end up in them.
 on:
@@ -86,7 +87,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
           build-args: VERSION=${{ github.ref_name }}
-          secrets: tmdb_key=${{ secrets.MT_SHARED_TMDB_KEY }}
+          secrets: |
+            tmdb_key=${{ secrets.MT_SHARED_TMDB_KEY }}
+            jacred_key=${{ secrets.JACRED_APIKEY }}
           provenance: mode=max
           sbom: true
       # `gh attestation verify oci://ghcr.io/lieranderl/moviestracker:<version> -R lieranderl/moviestracker-app`
@@ -113,6 +116,7 @@ jobs:
       - name: Build Moviestracker.app (Apple Silicon and Intel) and its DMG
         env:
           MT_SHARED_TMDB_KEY: ${{ secrets.MT_SHARED_TMDB_KEY }}
+          MT_SHARED_JACRED_KEY: ${{ secrets.JACRED_APIKEY }}
           VERSION: ${{ github.ref_name }}
         run: scripts/macapp.sh "$VERSION"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -141,6 +145,7 @@ jobs:
         shell: bash
         env:
           MT_SHARED_TMDB_KEY: ${{ secrets.MT_SHARED_TMDB_KEY }}
+          MT_SHARED_JACRED_KEY: ${{ secrets.JACRED_APIKEY }}
           VERSION: ${{ github.ref_name }}
         run: scripts/winapp.sh "$VERSION"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -16,6 +16,8 @@
 #                    already fetched (skips the download)
 #   MT_SHARED_TMDB_KEY  the shared TMDB key built in, used when a user has no key
 #                    of their own (default: the git-ignored .tmdb-shared-key file)
+#   MT_SHARED_JACRED_KEY  Moviestracker's jacred.su project key, used for jacred.su
+#                    without a key of one's own (default: .jacred-shared-key)
 #
 # The programs are not signed: Windows SmartScreen asks to confirm the first
 # run of a downloaded installer ("More info" → "Run anyway").
@@ -25,8 +27,8 @@ version="${1:?usage: winapp.sh <version>}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 dist="${DIST:-$root/dist}"
 ts_version="$(awk '$1 == "version" {print $2}' "$root/scripts/torrserver.lock")"
-# shellcheck source=scripts/shared-tmdb-key.sh
-. "$root/scripts/shared-tmdb-key.sh"
+# shellcheck source=scripts/shared-keys.sh
+. "$root/scripts/shared-keys.sh"
 # Windows wants a numeric version: v1.2.3-rc.1 → 1.2.3.
 numeric="${version#v}"
 numeric="${numeric%%[-+]*}"
@@ -41,7 +43,7 @@ mkdir -p "$stage/licenses"
 
 echo "Building the Windows programs $version"
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -C "$root" -trimpath \
-  -ldflags "-s -w -X main.version=$version -X main.sharedTMDBKey=$shared_tmdb_key" \
+  -ldflags "-s -w -X main.version=$version -X main.sharedTMDBKey=$shared_tmdb_key -X main.sharedJacRedKey=$shared_jacred_key" \
   -o "$stage/moviestracker-server.exe" ./cmd/server
 # The tray app's icon, version and manifest (a GUI program, sharp on high-DPI
 # screens) go in as a Windows resource the Go linker picks up.

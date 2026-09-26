@@ -16,6 +16,7 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 image="${IMAGE:-moviestracker:e2e}"
 key="e2e-shared-tmdb-key-$$"
+jacred_key="e2e-shared-jacred-key-$$"
 base=http://127.0.0.1:8095
 work="$(mktemp -d)"
 project=moviestracker-e2e
@@ -65,12 +66,16 @@ commands() {
 # engine_port is the API port of the bundled TorrServer in container $1.
 engine_port() { commands "$1" | sed -n 's|^/usr/local/bin/torrserver .*--port \([0-9]*\).*|\1|p' | head -n 1; }
 
-step "Build the image (the shared TMDB key as a build secret)"
+step "Build the image (the shared TMDB and JacRed keys as build secrets)"
 if [ -z "${IMAGE:-}" ]; then
-  MT_SHARED_TMDB_KEY="$key" docker build --secret id=tmdb_key,env=MT_SHARED_TMDB_KEY \
+  MT_SHARED_TMDB_KEY="$key" MT_SHARED_JACRED_KEY="$jacred_key" docker build \
+    --secret id=tmdb_key,env=MT_SHARED_TMDB_KEY --secret id=jacred_key,env=MT_SHARED_JACRED_KEY \
     --build-arg VERSION=v0.0.0-e2e -t "$image" "$root"
   docker run --rm --entrypoint grep "$image" -q "$key" /usr/local/bin/moviestracker ||
     fail "the binary lacks the shared TMDB key it was built with"
+  docker run --rm --entrypoint grep "$image" -q "$jacred_key" /usr/local/bin/moviestracker ||
+    fail "the binary lacks the shared JacRed key it was built with"
+  docker history --no-trunc "$image" | grep -q "$jacred_key" && fail "the image history holds the shared JacRed key"
   [ "$(docker run --rm "$image" --version)" = "moviestracker v0.0.0-e2e" ] || fail "the image does not know its version"
   docker history --no-trunc "$image" | grep -q "$key" && fail "the image history holds the shared TMDB key"
 fi

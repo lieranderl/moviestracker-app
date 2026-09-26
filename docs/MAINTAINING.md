@@ -68,11 +68,15 @@ builds use no caches.
 | Secret | Used by | What |
 | --- | --- | --- |
 | `MT_SHARED_TMDB_KEY` | `release.yml` | The read-only TMDB token built into releases (the Docker image gets it as a build secret, so the image history does not show it). Without it, releases work but users must add their own key. |
+| `JACRED_APIKEY` | `release.yml` | Moviestracker's jacred.su project key (unlimited searches), built into releases the same way and used for jacred.su only, when a user has no key of their own. Without it, users need a personal jacred.su key (100 searches a day). The project's terms ask for its referral link beside the results: `JacRedCredit` in `internal/views/footer.templ`. |
 
-It lives in the `release` environment, which only `v*` tags can use, so
-pull requests and branches never see it. Set it with
-`scripts/github-setup.sh` (from the git-ignored `.tmdb-shared-key`) or
-`gh secret set MT_SHARED_TMDB_KEY --env release`. To rotate it,
+They live in the `release` environment, which only `v*` tags can use, so
+pull requests and branches never see them. Set them with
+`scripts/github-setup.sh` (from the git-ignored `.tmdb-shared-key` and
+`.jacred-shared-key`) or `gh secret set MT_SHARED_TMDB_KEY --env release`
+and `gh secret set JACRED_APIKEY --env release`. To rotate the JacRed key,
+create a new one for the project at jacred.su, update the secret, release,
+then revoke the old one. To rotate it,
 create a new read-only token for the Moviestracker TMDB account, update the
 secret, release, then revoke the old token.
 

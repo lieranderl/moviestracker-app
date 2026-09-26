@@ -23,7 +23,9 @@ type SourcesView struct {
 	TMDBShared    bool // no key of one's own: Moviestracker's shared key is in use
 	TMDBCanShare  bool // this build has a shared key to go back to
 	JacRedURL     string
-	JacRedKeySet  bool
+	JacRedKeySet  bool // a key of one's own is saved (or JACRED_APIKEY)
+	JacRedShared  bool // jacred.su runs on Moviestracker's project key
+	JacRedCanShare bool // this build has that key to go back to
 	JacRedEnv     string
 	IMDbOn        bool
 	IMDbEnv       string
@@ -221,18 +223,40 @@ templ JacRedSource(v SourcesView, st SourceStatus) {
 			<a href={ templ.SafeURL(jacredRepoURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">jacred-fdb/jacred</a>
 			(Docker or Linux, port 9117) if jacred.su is slow or blocked where you are.
 		</p>
-		<div role="note" class="alert alert-soft alert-info text-sm items-start">
-			@Icon("key-round", "size-4 mt-0.5")
-			<div class="space-y-1">
-				<p class="font-semibold">From 9 October 2026, jacred.su searches need a free personal key.</p>
-				<p>
-					Sign in at
-					<a href={ templ.SafeURL(jacredKeyURL) } target="_blank" rel="noopener noreferrer" class="link">jacred.su/account</a>,
-					create one under «Мой ключ» and paste it below. A personal key allows 100 searches a day; each title
-					whose sources you open uses one, and a repeat within an hour is free.
-				</p>
+		if v.JacRedEnv == "" && v.JacRedShared {
+			<div role="status" class="alert alert-soft alert-success text-sm items-start">
+				@Icon("badge-check", "size-4 mt-0.5")
+				<div class="space-y-1">
+					<p class="font-semibold">Moviestracker's JacRed key is in use: unlimited searches on jacred.su, nothing to set up.</p>
+					<p>You can use a key of your own instead: paste it below.</p>
+				</div>
 			</div>
-		</div>
+		} else if v.JacRedEnv == "" && v.JacRedCanShare && v.JacRedKeySet {
+			<div class="flex flex-wrap items-center justify-between gap-3 rounded-box bg-base-100 border border-base-content/10 p-3 text-sm">
+				<span class="flex items-center gap-2">
+					@Icon("key-round", "size-4 text-success")
+					Your own JacRed key is in use.
+				</span>
+				<button type="button" class="btn btn-ghost btn-sm" data-on:click="@post('/api/settings/sources/jacred/shared')">
+					@Icon("undo-2", "size-4")
+					Use Moviestracker's key instead
+				</button>
+			</div>
+		}
+if !v.JacRedShared && !v.JacRedCanShare {
+					<div role="note" class="alert alert-soft alert-info text-sm items-start">
+				@Icon("key-round", "size-4 mt-0.5")
+				<div class="space-y-1">
+					<p class="font-semibold">From 9 October 2026, jacred.su searches need a free personal key.</p>
+					<p>
+						Sign in at
+						<a href={ templ.SafeURL(jacredKeyURL) } target="_blank" rel="noopener noreferrer" class="link">jacred.su/account</a>,
+						create one under «Мой ключ» and paste it below. A personal key allows 100 searches a day; each title
+						whose sources you open uses one, and a repeat within an hour is free.
+					</p>
+				</div>
+			</div>
+		}
 		if v.JacRedEnv != "" {
 			@envNote(v.JacRedEnv)
 		} else {
