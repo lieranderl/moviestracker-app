@@ -145,13 +145,44 @@ templ sectionHeading(title, subtitle string) {
 	</header>
 }
 
+// carousel scrolls its items sideways: swiped on touch screens, with back
+// and forward buttons where there is a mouse, which has no sideways scroll.
+templ carousel() {
+	<div class="relative group/carousel">
+		<ul class="carousel carousel-start w-[calc(100%+2rem)] gap-4 scroll-smooth scroll-px-4 -mx-4 px-4 -mt-3 pt-3 -mb-5 pb-8">
+			{ children... }
+		</ul>
+		@carouselButton(false)
+		@carouselButton(true)
+	</div>
+}
+
+// carouselButton scrolls its carousel most of a view back or forward.
+templ carouselButton(forward bool) {
+	{{
+		label, icon, side, sign := "Scroll back", "chevron-left", "-left-3", "-"
+		if forward {
+			label, icon, side, sign = "Scroll forward", "chevron-right", "-right-3", ""
+		}
+	}}
+	<button
+		type="button"
+		class={ "hidden pointer-fine:inline-flex btn btn-circle absolute top-1/2 -translate-y-1/2 z-10 bg-base-100/90 border-base-content/10 shadow-lg opacity-0 transition-opacity group-hover/carousel:opacity-100 focus-visible:opacity-100", side }
+		aria-label={ label }
+		title={ label }
+		data-on:click={ "const ul = el.parentElement.querySelector('.carousel'); ul.scrollBy({left: " + sign + "0.8 * ul.clientWidth})" }
+	>
+		@Icon(icon, "size-5")
+	</button>
+}
+
 // rail is a horizontally scrolling carousel section; items are the children.
 templ rail(id, title, subtitle string) {
 	<section id={ id } class="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-4" aria-label={ title }>
 		@sectionHeading(title, subtitle)
-		<ul class="carousel carousel-start w-[calc(100%+2rem)] gap-4 scroll-smooth scroll-px-4 -mx-4 px-4 -mt-3 pt-3 -mb-5 pb-8">
+		@carousel() {
 			{ children... }
-		</ul>
+		}
 	</section>
 }
 

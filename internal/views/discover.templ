@@ -56,13 +56,13 @@ templ DiscoverRailLoaded(d DiscoverRail, items []tmdb.MediaItem) {
 	} else {
 		<section id={ d.id() } class="space-y-4" aria-label={ d.Title }>
 			@discoverHeader(d)
-			<ul class="carousel carousel-start w-[calc(100%+2rem)] gap-4 scroll-smooth scroll-px-4 -mx-4 px-4 -mt-3 pt-3 -mb-5 pb-8">
+			@carousel() {
 				for _, item := range items {
 					<li class="carousel-item">
 						@MediaCard(item)
 					</li>
 				}
-			</ul>
+			}
 		</section>
 	}
 }
