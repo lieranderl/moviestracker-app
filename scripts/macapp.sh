@@ -135,5 +135,19 @@ Right-click → Open no longer skips this check on macOS 15 and newer.
 HELP
 dmg="$dist/Moviestracker-$version.dmg"
 rm -f "$dmg"
-hdiutil create -quiet -volname "Moviestracker" -srcfolder "$work/dmg" -format UDZO "$dmg"
+# hdiutil now and then fails with "Resource busy" (a disk image service still
+# busy, often on CI runners): try again a few times, and show why it failed.
+for attempt in 1 2 3 4 5; do
+  if hdiutil create -volname "Moviestracker" -srcfolder "$work/dmg" -format UDZO "$dmg" >"$work/hdiutil.log" 2>&1; then
+    break
+  fi
+  cat "$work/hdiutil.log" >&2
+  rm -f "$dmg"
+  if [ "$attempt" = 5 ]; then
+    echo "error: could not create $dmg" >&2
+    exit 1
+  fi
+  echo "hdiutil create failed (attempt $attempt of 5), trying again in $((attempt * 5))s" >&2
+  sleep $((attempt * 5))
+done
 echo "$dmg"
