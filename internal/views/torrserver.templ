@@ -21,11 +21,12 @@ func torrPageSignals(gst, canRemove bool, linkOrigin string) string {
 	streamBase: '', playKind: 'direct', playNonce: 0, audioTrack: -1, mediaInfoOpen: false, subTrack: -1,
 	_seekHint: '', _seekSum: 0, _seekAt: 0, _zone: '',
 	_paused: true, _time: 0, _dur: 0, _vol: 1, _muted: false, _fs: false, _idle: false, _waiting: false, _seeking: false, _unplayable: '',
+	_queue: [], _queueAt: 0,
 	_audioMenu: false, _subMenu: false, audioLang: localStorage.getItem('torrAudioLang') || '',
 	addModalOpen: false,
 	probeOpen: false, probeHash: '', probeIndex: 1, probeLoading: false,
 	confirmOpen: false, confirmHash: '', confirmName: '',
-	filterQuery: '', toast: ''
+	filterQuery: '', toast: '', toastError: false
 }`, gst, canRemove, origin)
 }
 
@@ -39,15 +40,21 @@ const d = btn.dataset
 const hash = encodeURIComponent(d.hash)
 switch (d.action) {
 	case 'play':
+		$_queue = []; $_queueAt = 0
 		$streamCleanUrl = d.clean || ''; $streamHlsUrl = d.hls || ''; $streamTitle = d.title; $activeHash = d.hash; $activeFileIndex = +d.index
 		$playKind = d.kind === 'hls' && $gst ? 'hls' : 'direct'
 		` + torrStartPlay + `
+		break
+	case 'playall':
+		$_queue = JSON.parse(d.queue); $_queueAt = 0; $activeHash = d.hash
+		$playKind = $gst ? 'hls' : 'direct'
+		` + torrPlayQueued + `
 		break
 	case 'probe':
 		$probeHash = d.hash; $probeIndex = +d.index; $probeOpen = true
 		break
 	case 'copy':
-		window.copyLink(d.url, $linkOrigin).then(ok => { $toast = ok ? d.msg : 'Copy failed' })
+		window.copyLink(d.url, $linkOrigin).then(ok => { $toastError = !ok; $toast = ok ? d.msg : 'Copy failed' })
 		break
 	case 'files':
 		@post('/api/torrserver/files?hash=' + hash, {filterSignals: {include: /^$/}})
@@ -78,6 +85,40 @@ const torrStartPlay = `{
 		$audioTrack = 0
 	}
 }`
+
+// torrPlayQueued plays the queue's current file ($_queueAt), in the
+// stream kind already chosen.
+const torrPlayQueued = `{
+	const f = $_queue[$_queueAt]
+	$streamCleanUrl = f.clean; $streamHlsUrl = f.hls; $streamTitle = f.title; $activeFileIndex = f.index
+	` + torrStartPlay + `
+}`
+
+// torrPlayNext goes on to the queue's next file, if there is one: when a file
+// ends, or on Next.
+const torrPlayNext = `if ($_queueAt < $_queue.length - 1) {
+	$_queueAt++
+	` + torrPlayQueued + `
+}`
+
+// torrWheelVolume turns the volume up as the wheel scrolls up, down as it
+// scrolls down: 5% a mouse notch, finer on a trackpad.
+const torrWheelVolume = `if (!evt.deltaY) return
+evt.preventDefault()
+const px = evt.deltaMode ? evt.deltaY * 40 : evt.deltaY
+const v = $_video
+v.muted = false
+v.volume = Math.round(Math.min(1, Math.max(0, v.volume - Math.max(-0.05, Math.min(0.05, px / 2000)))) * 100) / 100
+$_idle = false`
+
+// onMac is true in a Mac's browser, where IINA runs.
+const onMac = `/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints < 2`
+
+// openPlayer opens the file in an external player and says so when the
+// browser could not: it has no handler for the player's links.
+func openPlayer(player, name string) string {
+	return fmt.Sprintf(`window.openInPlayer('%s', $streamCleanUrl, $linkOrigin).then(opened => opened || ($toastError = true, $toast = '%s did not open: is it installed? Copy the Direct link and open it there instead'))`, player, name)
+}
 
 // torrPlayback (re)starts the stream once the audio track is known: right
 // after the tracks response on play, and again whenever the picker changes it.
@@ -154,8 +195,9 @@ evt.preventDefault()
 $_idle = false
 `
 
-// toastAutoHide clears the toast 3s after the last change to $toast.
-const toastAutoHide = `$toast && ($toast = '')`
+// toastAutoHide clears the toast (and its error tone) 3s after the last
+// change to $toast.
+const toastAutoHide = `$toast && ($toast = '', $toastError = false)`
 
 // playAttrs carries what the player needs to play one file.
 func playAttrs(hash string, index int, title, clean, hls string) templ.Attributes {
@@ -163,6 +205,24 @@ func playAttrs(hash string, index int, title, clean, hls string) templ.Attribute
 		"data-hash": hash, "data-index": fmt.Sprint(index), "data-title": title,
 		"data-clean": clean, "data-hls": hls,
 	}
+}
+
+// queued is one file of Play all.
+type queued struct {
+	Index int    `json:"index"`
+	Title string `json:"title"`
+	Clean string `json:"clean"`
+	HLS   string `json:"hls"`
+}
+
+// playQueue is what Play all plays: files, in order, as JSON.
+func playQueue(links StreamLinks, hash string, files []torrserver.FileStat) string {
+	q := make([]queued, len(files))
+	for i, f := range files {
+		q[i] = queued{Index: f.ID, Title: f.Path, Clean: links.Direct(hash, f), HLS: links.HLS(hash, f)}
+	}
+	b, _ := json.Marshal(q)
+	return string(b)
 }
 
 // playlistPath downloads a torrent's .m3u8 of kind "direct" or "hls".
@@ -375,14 +435,8 @@ templ TorrServerListFragment(links StreamLinks, torrents []torrserver.Torrent) {
 templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 	{{
 		name := t.DisplayName()
-		mainFile := torrserver.FileStat{ID: 1}
-		if mainVideo := torrserver.MainVideoFile(t.FileStats); mainVideo != nil && mainVideo.ID > 0 {
-			mainFile = *mainVideo
-		}
-		mainIndex := mainFile.ID
-		mainClean := links.Direct(t.Hash, mainFile)
-		mainHLS := links.HLS(t.Hash, mainFile)
-		videoCount := len(t.VideoFiles())
+		videos := t.VideoFiles()
+		videoCount := len(videos)
 		page, pageLabel, pageIcon := titlePage(links, t.Hash)
 	}}
 	<article
@@ -433,8 +487,6 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 					</div>
 				</div>
 				<div class="flex flex-wrap items-center gap-2 shrink-0 self-end @2xl:self-center">
-					@streamGroup("direct", mainClean, playlistPath(t.Hash, "direct"), playAttrs(t.Hash, mainIndex, name, mainClean, mainHLS), false)
-					@streamGroup("hls", mainHLS, playlistPath(t.Hash, "hls"), playAttrs(t.Hash, mainIndex, name, mainClean, mainHLS), false)
 					if page != "" {
 						<a href={ templ.SafeURL(page) } class="btn btn-ghost btn-sm btn-circle text-primary" title={ pageLabel } aria-label={ pageLabel }>
 							@Icon(pageIcon, "size-4")
@@ -481,6 +533,7 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 				<details
 					id={ "torr-files-details-" + t.Hash }
 					data-preserve-attr="open"
+					open?={ videoCount <= 1 }
 					class="collapse collapse-arrow bg-base-100/50 border border-base-content/10 mt-auto"
 				>
 					<summary class="collapse-title text-xs sm:text-sm font-semibold flex items-center gap-2 py-2.5 min-h-0">
@@ -497,10 +550,25 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 							}
 						</ul>
 						<div class="mt-3 pt-3 border-t border-base-content/10 flex flex-wrap items-center justify-between gap-2 text-xs">
-							<span class="text-base-content/60">Playlist of all files</span>
-							<div class="flex flex-wrap items-center gap-2">
-								@playlistButton("direct", playlistPath(t.Hash, "direct"))
-								@playlistButton("hls", playlistPath(t.Hash, "hls"))
+							if videoCount > 1 {
+								<span class="text-base-content/60">{ fmt.Sprintf("All %d videos", videoCount) }</span>
+							}
+							<div class="flex flex-wrap items-center gap-2 ml-auto">
+								if videoCount > 1 {
+									<button
+										type="button"
+										data-action="playall"
+										data-hash={ t.Hash }
+										data-queue={ playQueue(links, t.Hash, videos) }
+										class="btn btn-xs btn-primary gap-1.5"
+										title="Play every video here, one after the other"
+									>
+										@Icon("list-video", "size-3")
+										Play all
+									</button>
+									@playlistButton("direct", playlistPath(t.Hash, "direct"))
+									@playlistButton("hls", playlistPath(t.Hash, "hls"))
+								}
 								<button
 									type="button"
 									data-action="files"
@@ -581,8 +649,8 @@ templ torrentFileRow(links StreamLinks, hash string, f torrserver.FileStat) {
 			if isVideo {
 				{{ play = playAttrs(hash, f.ID, f.Path, clean, hls) }}
 			}
-			@streamGroup("direct", clean, "", play, true)
-			@streamGroup("hls", hls, "", play, true)
+			@streamGroup("direct", clean, play)
+			@streamGroup("hls", hls, play)
 		</div>
 	</li>
 }
@@ -632,8 +700,13 @@ templ torrToast() {
 		data-on-signal-patch__debounce.3s={ toastAutoHide }
 		data-on-signal-patch-filter="{ include: /^toast$/ }"
 	>
-		<div class="alert alert-success shadow-xl text-sm">
-			@Icon("circle-check", "size-4")
+		<div class="alert alert-success shadow-xl text-sm" data-class="{ 'alert-success': !$toastError, 'alert-error': $toastError }">
+			<span class="contents" data-show="!$toastError">
+				@Icon("circle-check", "size-4")
+			</span>
+			<span class="contents" data-show="$toastError">
+				@Icon("triangle-alert", "size-4")
+			</span>
 			<span data-text="$toast"></span>
 		</div>
 	</div>
@@ -661,6 +734,7 @@ templ torrPlayerModal() {
 			data-ref:_player
 			data-on:pointermove="$_idle = false"
 			data-on:pointermove__debounce.3s="$_idle = true"
+			data-on:wheel={ torrWheelVolume }
 			data-on:keydown__window={ torrPlayerKeys }
 			data-on:fullscreenchange="$_fs = document.fullscreenElement === el"
 			data-on-interval__duration.250ms="$_seekHint && Date.now() - $_seekAt > 700 && ($_seekHint = '')"
@@ -678,6 +752,7 @@ templ torrPlayerModal() {
 				data-on:dblclick={ torrVideoDoubleTap }
 				data-on:play="$_paused = false"
 				data-on:pause="$_paused = true"
+				data-on:ended={ torrPlayNext }
 				data-on:waiting="$_waiting = true"
 				data-on:playing="$_waiting = false"
 				data-on:canplay="$_waiting = false"
@@ -695,7 +770,7 @@ templ torrPlayerModal() {
 				<div class="max-w-md text-center space-y-2 text-base-100">
 					@Icon("circle-alert", "size-8 mx-auto text-warning")
 					<p class="font-semibold">This browser cannot play <span data-text="$_unplayable"></span> of this file.</p>
-					<p class="text-sm opacity-80">Copy its Direct link below for VLC, IINA, Infuse or your TV, which play it as it is.</p>
+					<p class="text-sm opacity-80">Copy its Direct link below for VLC, another player or your TV, which play it as it is.</p>
 				</div>
 			</div>
 			<!--
@@ -742,6 +817,16 @@ templ torrPlayerModal() {
 						<span data-show="!$_paused">
 							@Icon("pause", "size-5")
 						</span>
+					</button>
+					<button
+						type="button"
+						class="btn btn-ghost btn-sm btn-square text-primary-content"
+						aria-label="Next file"
+						title="Next file"
+						data-show="$_queueAt < $_queue.length - 1"
+						data-on:click={ torrPlayNext }
+					>
+						@Icon("skip-forward", "size-5")
 					</button>
 					<button type="button" class="btn btn-ghost btn-sm btn-square text-primary-content" aria-label="Mute" data-on:click="$_video.muted = !$_video.muted">
 						<span data-show="!$_muted">
@@ -794,7 +879,7 @@ templ torrPlayerModal() {
 		<div class="mt-4 flex flex-wrap items-center gap-2 pt-3 border-t border-base-content/10">
 			<div role="group" aria-label="Direct: the original file" class="w-full flex flex-wrap items-center gap-2" data-show="$streamCleanUrl">
 				<span class="badge badge-sm badge-primary badge-soft font-bold w-14 justify-center">Direct</span>
-				<button type="button" data-on:click="window.copyLink($streamCleanUrl, $linkOrigin).then(ok => { $toast = ok ? 'Direct link copied' : 'Copy failed' })" class="btn btn-xs btn-outline btn-primary gap-1.5">
+				<button type="button" data-on:click="window.copyLink($streamCleanUrl, $linkOrigin).then(ok => { $toastError = !ok; $toast = ok ? 'Direct link copied' : 'Copy failed' })" class="btn btn-xs btn-outline btn-primary gap-1.5">
 					@Icon("link", "size-3.5")
 					Copy link
 				</button>
@@ -802,19 +887,19 @@ templ torrPlayerModal() {
 					@Icon("download", "size-3.5")
 					.m3u8
 				</a>
-				<button type="button" data-on:click="window.openInPlayer('vlc', $streamCleanUrl, $linkOrigin)" class="btn btn-xs btn-outline btn-primary gap-1.5" title="Open the original file in VLC">
+				<button type="button" data-on:click={ openPlayer("vlc", "VLC") } class="btn btn-xs btn-outline btn-primary gap-1.5" title="Open the original file in VLC">
 					@Icon("external-link", "size-3.5")
 					VLC
 				</button>
-				<button type="button" data-on:click="window.openInPlayer('iina', $streamCleanUrl, $linkOrigin)" class="btn btn-xs btn-outline btn-primary gap-1.5" title="Open the original file in IINA (macOS)">
+				<button type="button" data-on:click={ openPlayer("iina", "IINA") } data-show={ onMac } class="btn btn-xs btn-outline btn-primary gap-1.5" title="Open the original file in IINA">
 					@Icon("external-link", "size-3.5")
 					IINA
 				</button>
-				<span class="text-xs text-base-content/60">The original file, full quality. For VLC, IINA, Infuse and TVs.</span>
+				<span class="text-xs text-base-content/60">The original file, full quality. For VLC and other players, and TVs.</span>
 			</div>
 			<div role="group" aria-label="HLS: converted by GStreamer" class="w-full flex flex-wrap items-center gap-2" data-show="$gst">
 				<span class="badge badge-sm badge-secondary badge-soft font-bold w-14 justify-center">HLS</span>
-				<button type="button" data-on:click="window.copyLink($streamHlsUrl, $linkOrigin).then(ok => { $toast = ok ? 'HLS link copied' : 'Copy failed' })" class="btn btn-xs btn-outline btn-secondary gap-1.5">
+				<button type="button" data-on:click="window.copyLink($streamHlsUrl, $linkOrigin).then(ok => { $toastError = !ok; $toast = ok ? 'HLS link copied' : 'Copy failed' })" class="btn btn-xs btn-outline btn-secondary gap-1.5">
 					@Icon("link", "size-3.5")
 					Copy link
 				</button>
@@ -822,7 +907,7 @@ templ torrPlayerModal() {
 					@Icon("download", "size-3.5")
 					.m3u8
 				</a>
-				<span class="text-xs text-base-content/60">Converted by GStreamer as it plays. For Safari, iPhone, Apple TV and TV browsers.</span>
+				<span class="text-xs text-base-content/60">Converted by GStreamer as it plays. Plays in any browser, on phones and TVs.</span>
 			</div>
 			<div class="w-full flex flex-wrap items-center gap-2 pt-2 border-t border-base-content/10" data-show="$gst">
 			<button
@@ -1225,17 +1310,17 @@ func alertClass(alertType string) string {
 
 // What Direct and HLS are, in the tooltips and the explainer above the list.
 const (
-	directHelp = "The original file, full quality: for VLC, IINA, Infuse and TVs"
-	hlsHelp    = "Converted by GStreamer as it plays: for Safari, iPhone, Apple TV and TV browsers"
+	directHelp = "The original file, full quality: for VLC and other players, and TVs"
+	hlsHelp    = "Converted by GStreamer as it plays: plays in any browser, on phones and TVs"
 )
 
 // streamKindsLegend explains, once above the list, the two ways to watch
 // that every card, file and the player offer; tooltips repeat it on hover.
 templ streamKindsLegend() {
 	<div id="stream-kinds" class="grid gap-3 sm:grid-cols-2">
-		@streamKind("Direct", "The original file", "The original file, full quality. For VLC, IINA, Infuse and TVs.", "file-play", false)
+		@streamKind("Direct", "The original file", "The original file, full quality. For VLC and other players, and TVs.", "file-play", false)
 		<div class="contents" data-show="$gst">
-			@streamKind("HLS", "Converted as it plays", "Converted by GStreamer as it plays. For Safari, iPhone, Apple TV and TV browsers.", "monitor-play", true)
+			@streamKind("HLS", "Converted as it plays", "Converted by GStreamer as it plays. Plays in any browser, on phones and TVs.", "monitor-play", true)
 		</div>
 	</div>
 }
@@ -1255,11 +1340,10 @@ templ streamKind(label, title, text, icon string, hls bool) {
 	</div>
 }
 
-// streamGroup is one way to watch a file outside the browser, labelled and
-// coloured the same everywhere: Direct (primary) or HLS (secondary, only
-// with GStreamer). play, when set, adds a Play of that kind in the browser;
-// playlist, when set, adds the torrent's .m3u8 of that kind.
-templ streamGroup(kind, link, playlist string, play templ.Attributes, compact bool) {
+// streamGroup is one way to watch a file, labelled and coloured the same
+// everywhere: Direct (primary) or HLS (secondary, only with GStreamer).
+// play, when set, adds a Play of that kind in the browser.
+templ streamGroup(kind, link string, play templ.Attributes) {
 	{{
 		hls := kind == "hls"
 		label, aria, help, msg := "Direct", "Direct: the original file", directHelp, "Direct link copied"
@@ -1276,27 +1360,21 @@ templ streamGroup(kind, link, playlist string, play templ.Attributes, compact bo
 			data-show="$gst"
 		}
 		data-tip={ help }
-		class={ "tooltip flex items-center rounded-field border",
-			templ.KV("tooltip-bottom", !compact), templ.KV("tooltip-left", compact),
+		class={ "tooltip tooltip-left flex items-center rounded-field border",
 			templ.KV("tooltip-primary border-primary/30 bg-primary/5", !hls), templ.KV("tooltip-secondary border-secondary/30 bg-secondary/5", hls) }
 	>
-		<span class={ "pl-2 pr-1 font-bold uppercase tracking-wide cursor-help", templ.KV("text-[9px]", compact), templ.KV("text-[10px]", !compact),
-			templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }>{ label }</span>
+		<span class={ "pl-2 pr-1 text-[9px] font-bold uppercase tracking-wide cursor-help", templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }>{ label }</span>
 		if play != nil {
 			<button
 				type="button"
 				data-action="play"
 				data-kind={ kind }
 				{ play... }
-				class={ "btn gap-1 shadow-none", templ.KV("btn-xs btn-square", compact), templ.KV("btn-sm", !compact),
-					templ.KV("btn-primary", !hls), templ.KV("btn-secondary", hls) }
+				class={ "btn btn-xs btn-square shadow-none", templ.KV("btn-primary", !hls), templ.KV("btn-secondary", hls) }
 				aria-label={ "Play " + label }
 				title={ playHelp }
 			>
 				@Icon("play", "size-3.5")
-				if !compact {
-					Play
-				}
 			</button>
 		}
 		<button
@@ -1304,26 +1382,11 @@ templ streamGroup(kind, link, playlist string, play templ.Attributes, compact bo
 			data-action="copy"
 			data-url={ link }
 			data-msg={ msg }
-			class={ "btn btn-ghost gap-1", templ.KV("btn-xs btn-square", compact), templ.KV("btn-sm", !compact),
-				templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }
+			class={ "btn btn-ghost btn-xs btn-square", templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }
 			aria-label={ "Copy " + label + " link" }
 		>
 			@Icon("link", "size-3.5")
-			if !compact {
-				<span class="hidden sm:inline">Link</span>
-			}
 		</button>
-		if playlist != "" {
-			<a
-				href={ templ.SafeURL(playlist) }
-				download
-				class={ "btn btn-ghost btn-sm gap-1", templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }
-				aria-label={ "Download " + label + " playlist" }
-			>
-				@Icon("download", "size-3.5")
-				<span class="hidden sm:inline">.m3u8</span>
-			</a>
-		}
 	</div>
 }
 

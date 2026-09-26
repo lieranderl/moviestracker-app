@@ -85,7 +85,7 @@ templ TorrServerGuide(echo torrserver.EchoInfo, engine string, canInstallGStream
 							Play right here with the GStreamer build
 						</h2>
 						<p class="text-sm text-base-content/70 leading-relaxed max-w-3xl">
-							TorrServer { echo.Version } is running without GStreamer. It still streams to external players such as VLC or IINA:
+							TorrServer { echo.Version } is running without GStreamer. It still streams to external players such as VLC:
 							use the Link and Playlist buttons on a torrent. To play in the browser, switch to the GStreamer build of TorrServer.
 						</p>
 					</header>
@@ -181,7 +181,7 @@ templ gstreamerWhy() {
 		<div class="collapse-content space-y-4">
 			@gstreamerBenefitList()
 			<p class="text-xs text-base-content/60">
-				Without it, TorrServer still streams, but only to external players such as VLC or IINA.
+				Without it, TorrServer still streams, but only to external players such as VLC.
 				<a href={ templ.SafeURL(torrServerGstURL) } target="_blank" rel="noopener noreferrer" class="link">More about the GStreamer build</a>
 			</p>
 		</div>

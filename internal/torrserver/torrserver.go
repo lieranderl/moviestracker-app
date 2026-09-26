@@ -58,24 +58,6 @@ func FormatBytes(bytes int64) string {
 	return fmt.Sprintf("%.2f %s", float64(bytes)/float64(div), units[exp])
 }
 
-// MainVideoFile picks the largest video file in the torrent to serve as the default playback target.
-func MainVideoFile(files []FileStat) *FileStat {
-	var best *FileStat
-	for i := range files {
-		f := &files[i]
-		if !IsVideoFile(f.Path) {
-			continue
-		}
-		if best == nil || f.Length > best.Length {
-			best = f
-		}
-	}
-	if best == nil && len(files) > 0 {
-		return &files[0]
-	}
-	return best
-}
-
 // ErrUnauthorized is TorrServer refusing the login (or asking for one).
 var ErrUnauthorized = errors.New("TorrServer refused the login")
 

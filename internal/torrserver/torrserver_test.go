@@ -248,11 +248,6 @@ func TestTorrServerHelpers(t *testing.T) {
 		{ID: 2, Path: "movie.mkv", Length: 5000},
 		{ID: 3, Path: "sub.srt", Length: 10},
 	}
-	main := torrserver.MainVideoFile(files)
-	if main == nil || main.ID != 2 {
-		t.Fatalf("expected main video to be movie.mkv (ID 2), got %+v", main)
-	}
-
 	torr := torrserver.Torrent{
 		Hash:       "abc123hash",
 		Title:      "Dune Part Two",
