@@ -28,10 +28,10 @@ after making it public.
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `ci.yml` | pull requests, pushes to `main`, called by releases | `make ci` (generated files, lint, race tests, govulncheck, gosec, build) and the TorrServer API contract; gitleaks over the whole history; macOS tests and a real DMG build; the Linux install, upgrade, uninstall and purge on a real systemd machine; the container image's smoke test |
+| `ci.yml` | pull requests, pushes to `main`, called by releases | `make ci` (generated files, lint, race tests, govulncheck, gosec, build) and the TorrServer API contract; gitleaks over the whole history; macOS tests and a real DMG build; the Linux install, upgrade, uninstall and purge on a real systemd machine; Windows tests, a real installer build, and its install, upgrade, quit, uninstall and purge; the container image's smoke test |
 | `pr.yml` | pull requests | Conventional Commit titles; dependency review (public repository) |
 | `codeql.yml` | pull requests, `main`, weekly | CodeQL for Go, JavaScript and the workflows (public repository) |
-| `release.yml` | `v*` tags | CI, then Linux archives and the DMG in parallel, checksums, build provenance (public repository), and a **draft** release |
+| `release.yml` | `v*` tags | CI, then Linux archives, the DMG and the Windows installer in parallel, checksums, build provenance (public repository), and a **draft** release |
 
 Every action is pinned to a commit SHA with its version in a comment;
 Dependabot updates the pins, Go modules, Bun tools and the Docker base images
@@ -66,13 +66,15 @@ and `v1.2.0-rc.1` for pre-releases.
    git push origin v0.3.0
    ```
 
-3. The release workflow runs CI, builds the Linux archives (amd64, arm64) and
-   the DMG, and drafts a GitHub release with the files, `checksums.txt` and
+3. The release workflow runs CI, builds the Linux archives (amd64, arm64),
+   the DMG and the Windows installer, and drafts a GitHub release with the files, `checksums.txt` and
    notes generated from the merged pull requests.
-4. Check the draft: install the DMG on a Mac, read the notes. Then publish.
+4. Check the draft: install the DMG on a Mac (and the installer on Windows),
+   read the notes. Then publish.
 
 To build locally instead: `make release VERSION=v0.3.0` (Linux archives, and
-the DMG on a Mac) or `make dmg VERSION=v0.3.0`.
+the DMG on a Mac), `make dmg VERSION=v0.3.0`, or `make winapp VERSION=v0.3.0`
+on Windows.
 
 ### Signing the Mac app
 
@@ -83,11 +85,23 @@ the release workflow should notarize the DMG with `xcrun notarytool` and
 staple it, using the certificate and an App Store Connect API key stored as
 secrets.
 
+### Signing the Windows installer
+
+The installer and programs are unsigned, so SmartScreen asks users to confirm
+("More info" → "Run anyway") until a download builds reputation. With a code
+signing certificate (or Azure Trusted Signing), `scripts/winapp.sh` should
+sign `Moviestracker.exe`, `moviestracker-server.exe` and the installer with
+`signtool sign /fd sha256 /tr <timestamp server>`; Inno Setup's `SignTool`
+directive signs the uninstaller too.
+
 ## Dependencies
 
 - Go modules and tools are pinned in `go.mod`; `go tool` runs the tools.
 - TorrServer is pinned by version and SHA-256 in `scripts/torrserver.lock`.
-- GStreamer for the Mac app is pinned in `macos/install-gstreamer.sh`.
+- GStreamer for the Mac app is pinned in `macos/install-gstreamer.sh`; on
+  Windows it comes inside the pinned TorrServer.
+- Inno Setup, which builds the Windows installer in CI, is pinned by version
+  and SHA-256 in `scripts/ci/install-inno-setup.ps1`.
 - Frontend tools are pinned in `package.json` and `bun.lock`.
 
 Updating TorrServer or GStreamer means updating the pin and its checksums

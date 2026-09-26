@@ -20,10 +20,12 @@ Bundled in the program (static/ and the files generated from frontend/):
 
 Go modules are listed in go.mod; each keeps its own license.
 
-The macOS app and Linux archives include TorrServer (https://github.com/YouROK/TorrServer),
-an unmodified separate program licensed under the GNU General Public License v3.
-Moviestracker runs it as its own process and talks to it over HTTP; its license
-and a link to its source travel with it.
+The macOS app, the Linux archives and the Windows installer include TorrServer
+(https://github.com/YouROK/TorrServer), an unmodified separate program licensed
+under the GNU General Public License v3. Moviestracker runs it as its own process
+and talks to it over HTTP; its license and a link to its source travel with it.
+TorrServer's Windows build carries a GStreamer runtime (LGPL) inside, which it
+unpacks on first use; TorrServer's repository has its sources and build script.
 
 The macOS app can download GStreamer (https://gstreamer.freedesktop.org), licensed
 under the GNU Lesser General Public License, from its official site at the user's

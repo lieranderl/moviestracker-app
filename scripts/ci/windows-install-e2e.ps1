@@ -44,7 +44,9 @@ function Healthy {
 function Running($name) { [bool](Get-Process -Name $name -ErrorAction SilentlyContinue) }
 
 function Install {
-  $p = Start-Process -FilePath $Setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/TASKS=startup' -Wait -PassThru
+  # Not Start-Process -Wait: it also waits for the tray app Setup starts.
+  $p = Start-Process -FilePath $Setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/TASKS=startup' -PassThru
+  if (-not $p.WaitForExit(300000)) { Fail 'the installer did not finish' }
   if ($p.ExitCode -ne 0) { Fail "the installer exited with $($p.ExitCode)" }
   # Setup starts the tray app, which starts the server.
   Wait-Until 'Moviestracker answers' { Healthy }
@@ -54,7 +56,7 @@ function Install {
 # returns at once: wait until the programs are gone.
 function Uninstall([string[]] $extra) {
   $arguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') + $extra
-  Start-Process -FilePath (Join-Path $app 'unins000.exe') -ArgumentList $arguments -Wait
+  Start-Process -FilePath (Join-Path $app 'unins000.exe') -ArgumentList $arguments | Out-Null
   Wait-Until 'the uninstaller has finished' { -not (Test-Path $app) }
 }
 
@@ -100,7 +102,8 @@ Install
 if ((Location '/setup') -ne "$base/login") { Fail 'the upgrade lost the administrator' }
 
 Step 'Quit stops Moviestracker, its server and TorrServer'
-$p = Start-Process -FilePath (Join-Path $app 'Moviestracker.exe') -ArgumentList '--quit' -Wait -PassThru
+$p = Start-Process -FilePath (Join-Path $app 'Moviestracker.exe') -ArgumentList '--quit' -PassThru
+if (-not $p.WaitForExit(60000)) { Fail '--quit did not return' }
 if ($p.ExitCode -ne 0) { Fail "--quit exited with $($p.ExitCode)" }
 foreach ($name in $programs) { if (Running $name) { Fail "$name still runs after Quit" } }
 if (Healthy) { Fail 'something still answers on 8095' }

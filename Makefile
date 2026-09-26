@@ -12,7 +12,7 @@ CONTAINER_TOOL ?= $(shell command -v docker 2>/dev/null || command -v container 
 CONTAINER_NAME ?= moviestracker-app
 CONTAINER_PORT ?= 8095
 
-.PHONY: all help torrserver release dmg assets templ templ-check assets-check lint test security coverage ci build run dev clean \
+.PHONY: all help torrserver release dmg winapp assets templ templ-check assets-check lint test security coverage ci build run dev clean \
 	docker-build docker-smoke container-build container-run container-smoke container-stop
 
 all: ci
@@ -30,6 +30,7 @@ help:
 	@echo "  make torrserver      Download the pinned TorrServer to bin/torrserver"
 	@echo "  make release VERSION=v0.1.0  Build the Linux archives (and the DMG on a Mac) into dist/"
 	@echo "  make dmg VERSION=v0.1.0      Build only Moviestracker.app and its DMG (macOS)"
+	@echo "  make winapp VERSION=v0.1.0   Build the Windows installer (Windows, Inno Setup 7)"
 	@echo "  make run             Run locally over HTTP with secure cookies disabled"
 	@echo "  make dev             Run Air locally with secure cookies disabled"
 	@echo "  make docker-build    Build container image using docker or container CLI"
@@ -162,6 +163,11 @@ release:
 dmg:
 	@test -n "$(VERSION)" || (echo "usage: make dmg VERSION=v0.1.0" && exit 1)
 	scripts/macapp.sh $(VERSION)
+
+# The Windows installer (on Windows, with Inno Setup 7):  make winapp VERSION=v0.1.0
+winapp:
+	@test -n "$(VERSION)" || (echo "usage: make winapp VERSION=v0.1.0" && exit 1)
+	scripts/winapp.sh $(VERSION)
 
 bin/torrserver: scripts/torrserver.lock
 	scripts/fetch-torrserver.sh $@

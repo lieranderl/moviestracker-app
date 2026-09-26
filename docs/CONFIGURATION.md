@@ -30,10 +30,10 @@ Everything is set in the browser under Settings → Sources and kept in the data
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `MT_LISTEN` | `:8095` | Listen address; the default serves every network interface so TVs and phones can connect |
-| `MT_DATA_DIR` | `moviestracker` in the user config directory | Where accounts, sessions and sources are kept |
+| `MT_DATA_DIR` | `moviestracker` in the user config directory | Where accounts, sessions and sources are kept (the Mac app sets `~/Library/Application Support/moviestracker`, the Windows tray app `%LOCALAPPDATA%\Moviestracker`) |
 | `MT_HOSTNAMES` | *(empty)* | Extra hostnames to answer to (comma-separated) besides IP addresses, `localhost` and `<hostname>.local` |
 | `MT_SECURE_COOKIES` | `false` | Secure cookies and HSTS, for HTTPS setups |
-| `MT_TORRSERVER_BIN` | *(empty)* | TorrServer program for managed mode; otherwise `torrserver` next to Moviestracker or `<data dir>/engine/bin/torrserver` |
+| `MT_TORRSERVER_BIN` | *(empty)* | TorrServer program for managed mode; otherwise `torrserver` (`torrserver.exe` on Windows) next to Moviestracker or `<data dir>/engine/bin/torrserver` |
 | `MT_GSTREAMER_SCRIPT` | *(empty)* | macOS: the GStreamer install script for development runs; the app uses the one in its bundle |
 | `TMDB_API_KEY`, `JACRED_URL`, `JACRED_APIKEY`, `IMDB_SERVICE_URL`, `TORRSERVER_URL` | *(empty)* | Override the matching Sources setting and make it read-only |
 | `TORRSERVER_USER`, `TORRSERVER_PASSWORD` | *(empty)* | Login for an existing TorrServer started with `--httpauth` (also settable in Sources) |
@@ -62,5 +62,7 @@ make release VERSION=v0.1.0
 ```
 
 writes `dist/` with the Linux archives (amd64, arm64), `Moviestracker-<version>.dmg` when run on a Mac, and `checksums.txt`. `make dmg VERSION=v0.1.0` builds only the Mac app (`scripts/macapp.sh`): universal `moviestracker-server` and `torrserver` joined with `lipo`, the Swift menu bar app from `macos/Moviestracker/main.swift` (Command Line Tools are enough), icons drawn from Lucide's clapperboard by `macos/icon.swift`, all signed ad hoc. Each TorrServer build is downloaded and checked against the SHA-256 in `scripts/torrserver.lock`; its GPL-3.0 license and source link travel with it.
+
+`make winapp VERSION=v0.1.0` builds the Windows installer (`scripts/winapp.sh`, in Git Bash on Windows): `moviestracker-server.exe`, the tray app `Moviestracker.exe` from `cmd/tray` (Go, [fyne.io/systray](https://github.com/fyne-io/systray); its portable part is `internal/tray`), and TorrServer's `TorrServer-gst-windows-amd64.exe`, which carries GStreamer inside. [Inno Setup 7](https://jrsoftware.org/isinfo.php) packs them with `packaging/windows/moviestracker.iss` into `Moviestracker-Setup-<version>-x64.exe`, a per-user install without administrator rights. The programs build anywhere (`GOOS=windows`); only the installer needs Windows. `scripts/windows-icon.sh` redraws the tray and program icon, `cmd/tray/moviestracker.ico`, on a Mac.
 
 Official releases are built by GitHub Actions when a version tag is pushed; see [MAINTAINING.md](MAINTAINING.md).

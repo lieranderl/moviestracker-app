@@ -114,14 +114,15 @@ The application follows a clean 3-tier server-rendered hypermedia architecture:
 
 The project is layered:
 
-- `cmd/server`: process configuration, HTTP lifecycle, and graceful shutdown (10s grace period)
+- `cmd/server`: process configuration, HTTP lifecycle, and graceful shutdown (10s grace period); it also stops when the app that started it goes away (`MT_PARENT_PID` from the Mac app, `MT_STOP_WITH_STDIN` from the Windows tray app)
+- `cmd/tray` (Windows only): the tray app `Moviestracker.exe`; `internal/tray` is its portable part (runs and restarts the server, the menu) and is tested on every OS
 - `internal/config`: the data directory's state file (accounts, sessions, sources, TorrServer address), written atomically with owner-only permissions; environment overrides
 - `internal/auth`: local accounts (bcrypt) and sessions that survive restarts (only token hashes are stored)
 - `internal/sources`: builds the TMDB/JacRed/IMDb clients from the saved sources and checks new ones before saving
 - `internal/handlers`: routing, setup gate, request validation, middleware (host allowlist, CSRF), SSE admission control (ceiling 128 streams with 429 Retry-After), and health probes (`/healthz`, `/readyz`)
 - `internal/tmdb`: resilient media catalog provider with coalesced caching (10m TTL), cold ceiling of 9 requests (7 hero slides), stale fallback, and an 8s deadline; movie, TV, season, person and search details fetched in one `append_to_response` call each through a bounded, coalescing TTL cache
 - `internal/jacred`: JacRed torrent search (year filter, unsafe-link rejection, info-hash dedupe, 5m cache)
-- `internal/engine`: runs TorrServer as a supervised child process (loopback only, generated credentials, restart with backoff)
+- `internal/engine`: runs TorrServer as a supervised child process (loopback only, generated credentials, restart with backoff); it ends with Moviestracker (Linux: parent-death signal, Windows: a job object)
 - `internal/streamlink`: signs the stream links external players open
 - `internal/live`: shared pollers behind every live view (one TorrServer call per topic, whatever the number of open pages)
 - `internal/streams`: playback sessions seen by the stream proxy, for the dashboard

@@ -25,6 +25,9 @@ anywhere.
 > only for content you have the right to access. This product uses the TMDB
 > API but is not endorsed or certified by TMDB.
 
+Previews for [Windows](#windows-preview) and [Linux](#linux-preview) work the
+same way.
+
 ## Install on your Mac
 
 You need macOS 13 Ventura or newer, on Apple Silicon or Intel.
@@ -137,6 +140,40 @@ delete accounts and settings too). Logs: `journalctl -u moviestracker`.
 
 Details, the container image and all settings are in
 [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
+## Windows (preview)
+
+You need 64-bit Windows 10 or 11. Download
+`Moviestracker-Setup-<version>-x64.exe` from the
+[latest release](https://github.com/lieranderl/moviestracker-app/releases/latest)
+and run it. It installs for your Windows account only and needs no
+administrator rights.
+
+1. The installer is not signed yet, so Windows SmartScreen may say it
+   "protected your PC". Click **More info**, then **Run anyway**.
+2. Keep **Start Moviestracker when I sign in** ticked, and finish. A
+   clapperboard icon appears in the taskbar's notification area, and the
+   setup page opens in your browser.
+3. The first time Moviestracker and TorrServer start, Windows Firewall asks
+   whether to allow them. Allow **private networks**, so your TV and phone
+   can reach them.
+
+MKV files play in the browser straight away: TorrServer's Windows build
+carries GStreamer inside, so there is nothing else to install. The first MKV
+takes a few extra seconds while TorrServer unpacks it.
+
+The tray icon's menu (click the clapperboard) has the same items as the
+Mac's menu bar icon: open Moviestracker, the dashboard, the address for TVs
+and phones (click to copy), start when you sign in, logs, restart,
+uninstall and quit.
+
+- **Update:** run the newer installer. Accounts and settings stay.
+- **Uninstall:** choose **Uninstall Moviestracker…** in the tray menu, or
+  remove it in **Settings → Apps → Installed apps**. It asks whether to
+  delete your accounts and settings too.
+- **Where things are:** the programs in
+  `%LOCALAPPDATA%\Programs\Moviestracker`, accounts, settings, TorrServer's
+  data and the log (`moviestracker.log`) in `%LOCALAPPDATA%\Moviestracker`.
 
 ## Where the data comes from
 
