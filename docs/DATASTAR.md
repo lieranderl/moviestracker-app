@@ -73,8 +73,14 @@ This document outlines Datastar v1.0 reactive patterns, Server-Sent Events (SSE)
 - **localStorage persistence**: seed signals from storage in `data-signals` (never-throwing expressions, e.g. `split('\n')` rather than `JSON.parse`), persist with a `data-effect`, and let the server be the writer: handlers patch `$torrServers`/`$torrActive` and the effect saves them.
 - **Minimal request payloads**: `@post` sends every signal by default; scope it with `{filterSignals: {include: /^newServerUrl$/}}` (or `/^$/` for none).
 
-## 9. SSE Patterns in Moviestracker
-- **Two-phase stream on request** (`/api/torrents`): nothing is searched until the user presses Find sources (series pick a season, sent as `$sourceSeason`). The handler patches a searching skeleton immediately, then replaces `#torrent-results` with results or an explanation. Sort buttons set `$sort` and re-run the same `@get`, which JacRed's cache answers instantly; the server sorts.
+## 9. Expression Pitfalls
+- **Statements inside `&&`**: `$a && (x = 1; @get(...))` is not valid JavaScript, and a syntax error in an attribute fails silently at runtime. Use `if ($a) { x = 1; @get(...) }` whenever the right side has more than one statement.
+- **`??` with `&&` or `||`**: `a ?? b && c` is a syntax error; write `a ?? (b && c)`.
+- Tests assert on rendered attributes, not on whether the browser can run them: check new expressions in a browser (the console names the failing expression).
+
+## 10. SSE Patterns in Moviestracker
+- **Two-phase stream on request** (`/api/torrents`): nothing is searched until the user presses Find sources (series pick a season, sent as `$sourceSeason`). The handler patches a searching skeleton immediately, then replaces `#torrent-results` with results or an explanation. Sort buttons set `$sort` and re-run the same `@get`, which JacRed's cache answers instantly; the server sorts. Quality and HDR are picked before the search (`$qual`, a checkbox group bound to one array, and `$hdr`) and go into the URL (`&quality=2160,1080&hdr=1`); changing them, or the season, searches again with `if ($sourcesRequested) { … }`. Tracker and voice filters work on the rendered rows (`$trackers`, `$voices`, names kept in `data-*` attributes, never in expressions).
+- **Server-rendered menu + signals** (`/api/torrserver/queue`): when the player opens on a torrent (a `data-effect` on `$playerOpen && $activeHash`), the server patches the Playlist menu (`#torr-playlist`) and the `$_queue` / `$_queueHash` signals. Datastar has no client-side loop, so lists are rendered on the server; Next and the video's `ended` event read `$_queue`.
 - **Fan-in stream** (`/api/discover`): the home page renders skeleton rails under one `data-init`; the handler fetches every TMDB list concurrently and patches each rail by id as its list arrives (failed lists collapse to an empty hidden section).
 - **Action → region + signals** (`/api/torrents/add`): one response patches a new `#torr-activity` card (whose own `data-init` opens a stats stream) and the `$toast`/`$toastError` signals.
 - **Patch-on-change stream** (`/api/torrserver/torrent-stats`): render every tick, send only when the HTML differs, stop on disconnect or timeout.

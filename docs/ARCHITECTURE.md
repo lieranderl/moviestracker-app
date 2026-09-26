@@ -54,6 +54,11 @@ The application follows a clean 3-tier server-rendered hypermedia architecture:
   - Every live view (the TorrServer list, a title's download card, the player's stats and media info) subscribes to shared topics instead of polling: `engine` (every 5s), `torrents` (2s) and `player:<hash>` (1s, which also sends the GStreamer heartbeat).
   - One goroutine polls a topic while anyone watches it and stops 30s after the last viewer leaves; subscribers are told only when the snapshot changes (one-slot mailbox, newest wins) and a new or reconnecting stream starts from the current snapshot, so reconnects never reach TorrServer.
   - The player opens one stats stream with `data-effect`; changing file or audio track reopens it and closing the player sends `stop=1`.
+- **TorrServer page player (`/torrserver`)**:
+  - Each file plays as Direct (the original, streamed as is) or HLS (TorrServer's GStreamer conversion, with an audio-track pick); cards have no Play of their own, only their files do.
+  - Opening the player on a torrent asks `/api/torrserver/queue` for its videos: the server patches the Playlist menu and the `$_queue` signal, which the video's `ended` event and Next follow; Play all starts the first video.
+  - Keyboard (Space/K, arrows, M, F) and wheel volume are Datastar handlers on the player; the wheel follows Macs' inverted "natural" scrolling (`webkitDirectionInvertedFromDevice`, else assumed on a Mac). In fullscreen a top bar shows the title and its place in the playlist.
+  - VLC and IINA open through their URL schemes (`frontend/player.js`); browsers do not say whether that worked, so a page that keeps the focus for 1.5s reports that the player did not open.
 - **Dashboard (`/dashboard`)**:
   - One SSE stream keeps six cards current from shared topics: `engine`, `torrents` (whose poller also keeps 2-minute speed histories for the sparklines), `plays` (sessions from the stream proxy), `system` (gopsutil every 5s; TorrServer storage settings and folder sizes at most every minute) and `sources` (outcome of real TMDB/JacRed/IMDb calls, recorded by wrappers around their clients).
   - Playback sessions (`internal/streams`) are keyed by device and torrent; direct streams report the byte range read, HLS the segment requested; a session ends 30s after its last request unless a response is still being sent.
@@ -112,7 +117,7 @@ The project is layered:
 
 - `cmd/server`: process configuration, HTTP lifecycle, and graceful shutdown (10s grace period); it also stops when the app that started it goes away (`MT_PARENT_PID` from the Mac app, `MT_STOP_WITH_STDIN` from the Windows tray app)
 - `cmd/tray` (Windows only): the tray app `Moviestracker.exe`; `internal/tray` is its portable part (runs and restarts the server, the menu) and is tested on every OS
-- `internal/config`: the data directory's state file (accounts, sessions, sources, TorrServer address), written atomically with owner-only permissions; environment overrides
+- `internal/config`: the data directory's state file (accounts, sessions, sources, TorrServer address), written atomically with owner-only permissions; environment overrides and the keys built into releases. `Store.State()` returns a snapshot sharing no slice or map with the stored state, so pages can read it while `Update` runs
 - `internal/auth`: local accounts (bcrypt) and sessions that survive restarts (only token hashes are stored)
 - `internal/sources`: builds the TMDB/JacRed/IMDb clients from the saved sources and checks new ones before saving
 - `internal/handlers`: routing, setup gate, request validation, middleware (host allowlist, CSRF), SSE admission control (ceiling 128 streams with 429 Retry-After), and health probes (`/healthz`, `/readyz`)
@@ -124,5 +129,5 @@ The project is layered:
 - `internal/streams`: playback sessions seen by the stream proxy, for the dashboard
 - `internal/stats`: torrent totals, sparkline histories and machine stats (gopsutil)
 - `internal/torrserver`: TorrServer client and HLS stream proxy
-- `internal/views`: Templ pages and patchable fragments
+- `internal/views`: Templ pages and patchable fragments; carousels share one `carousel` component with back/forward buttons for mouse screens (`pointer-fine`)
 - `frontend` and `static`: pinned asset sources and generated embedded assets

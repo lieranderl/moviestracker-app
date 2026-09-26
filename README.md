@@ -15,8 +15,10 @@ anywhere.
 
 - **Discover:** trending movies and series, trailers, cast and crew, seasons
   and episodes, recommendations, IMDb ratings, and live search.
-- **Play anywhere:** in any browser, including Safari and iPhone, or send a link
-  or playlist to VLC, IINA, Infuse or a smart TV on your network.
+- **Find sources:** choose the quality (4K to SD) and HDR before searching,
+  then narrow the releases by tracker and voice (dubbing).
+- **Play anywhere:** in any browser, on phones and TVs, a whole season in a
+  row; or send a link or playlist to VLC or a smart TV on your network.
 - **Share the house:** accounts for the family (administrators and viewers)
   and a live dashboard of what is playing and on which device.
 - **Works with TorrServer apps:** TorrServe on an Android TV, Lampa and other
@@ -78,28 +80,16 @@ on **Settings → Sources** (or the menu's **Set Up Browser Playback**), click
 146 MB, checked against a pinned checksum) into Moviestracker's own folder.
 No Homebrew, Terminal or password is needed, and it is removed with the app.
 
-Without GStreamer, MKV files still play in VLC, IINA, Infuse and on TVs
+Without GStreamer, MKV files still play in VLC and other players, and on TVs,
 through stream links.
-
-A few files use audio or video browsers cannot decode at all, such as the
-rare AAC Main audio: the player then says what it cannot play, and the
-file's **Direct** link plays in VLC, IINA, Infuse or on a TV.
 
 ### Watch on a TV, phone or tablet
 
 The menu shows your Mac's address for other devices, for example
 `http://192.168.1.20:8095`. Click it to copy it, then open it in the browser on
-your phone or tablet, or on your TV. On the TorrServer page every file has:
-
-- **Play**, to watch in the browser;
-- **Link**, a stream link for VLC, IINA, Infuse or a TV's player;
-- **.m3u8**, a playlist of the whole torrent for those players.
-
-Choose **Direct** for the original file (best quality, for VLC and TVs) or
-**HLS** for a stream converted as it plays (for Safari, iPhone and Apple TV).
-Links work for 7 days; **Settings → Security** cancels all of them at once.
-
-Other devices on your network can open Moviestracker only with an account.
+your phone or tablet, or on your TV. Other devices on your network can open
+Moviestracker only with an account. [Finding sources and watching](#finding-sources-and-watching)
+explains the rest.
 
 ### The menu bar icon
 
@@ -139,6 +129,11 @@ Everything Moviestracker keeps is in
   asks.
 - **Search shows nothing.** The shared TMDB key may be busy: add your own free
   key in **Settings → Sources**.
+- **Sources say "JacRed needs a key"** or that today's searches are used up:
+  that is a build without Moviestracker's JacRed key (built from source, for
+  example), or a personal key's 100 searches a day. Update to the latest
+  release, or press **Use Moviestracker's key instead** in
+  **Settings → Sources**.
 - Still stuck? [Open an issue](https://github.com/lieranderl/moviestracker-app/issues/new/choose)
   with the version (in the page footer) and the relevant part of the log.
 
@@ -196,7 +191,8 @@ its own TorrServer with GStreamer, so MKV files play in the browser.
    ```
 
 3. Open `http://<the server's address>:8095`, enter the code and create the
-   administrator account.
+   administrator account. Then see
+   [Finding sources and watching](#finding-sources-and-watching).
 
 Without Compose:
 
@@ -229,6 +225,64 @@ docker run -d --name moviestracker --restart unless-stopped -p 8095:8095 \
 HDR-to-SDR conversion needs TorrServer's `hdrtonemap` plugin, which only its
 Windows build has. The other conversions work the same as in the apps. All
 settings are in [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
+## Finding sources and watching
+
+The same on a Mac, on Windows and in Docker, in any browser.
+
+### Find sources
+
+On a movie or series page, go to **Sources**:
+
+1. Choose the qualities you want (**4K**, **1080p**, **720p**, **SD**; none
+   means all) and, if you like, **HDR only**. For a series, pick the season.
+2. Press **Find sources**. Nothing is searched before that. Changing a
+   quality, HDR or the season searches again.
+3. Sort by **Seeders**, **Newest** or **Size**, and narrow the list by
+   **tracker** and **voice** (the dubbing or voice-over), any number of each.
+4. **TorrServer** sends a release to your TorrServer, ready to play; the
+   magnet button copies its magnet link.
+
+Search is powered by [JacRed](https://jacred.su). Releases carry
+Moviestracker's own JacRed key, with unlimited searches, so there is nothing
+to set up.
+
+### Watch
+
+The **TorrServer** page lists your torrents. Each file has two ways to watch:
+
+- **Direct**, the original file at full quality, for VLC, other players and
+  TVs;
+- **HLS**, converted by GStreamer as it plays: it plays in any browser, on
+  phones and on TVs, and lets you pick the audio track.
+
+HLS needs a TorrServer with GStreamer. The Windows installer and the Docker
+image have it; on a Mac, install it once
+([Play MKV files in the browser](#play-mkv-files-in-the-browser)). With your
+own TorrServer, it depends on that build. Without GStreamer, only Direct is
+offered, and the HLS playlist and audio picker are hidden.
+
+Each has ▶ to play it here and 🔗 to copy its link for another device. A
+torrent with several videos (a season, say) also has **Play all** and a
+**Direct .m3u8** and (with GStreamer) **HLS .m3u8** playlist of all of them.
+
+In the player:
+
+- **Playlist** (in the control bar) lists the torrent's videos; the next one
+  starts when one ends, and **Next** skips ahead;
+- in fullscreen, the file's name and its place in the list show at the top;
+- **Space** or **K** plays and pauses, **←** / **→** skip 10 seconds, **↑** / **↓**
+  and the mouse wheel or trackpad change the volume, **M** mutes, **F** goes
+  fullscreen; double-tap the left or right of the video to skip 10 seconds;
+- **VLC** (and **IINA** on a Mac) open the original file in that player. If
+  nothing opens, the page says so: the player is probably not installed, and
+  the copied link works in any other.
+
+A few files use audio or video browsers cannot decode at all, such as the
+rare AAC Main audio: the player then says what it cannot play, and the file's
+**Direct** link plays in VLC or on a TV.
+
+Links work for 7 days; **Settings → Security** cancels all of them at once.
 
 ## TorrServer apps: TorrServe, Lampa
 
