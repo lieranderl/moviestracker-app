@@ -132,3 +132,5 @@ if (Test-Path $data) { Fail "$data is left behind after /PURGE" }
 if (Healthy) { Fail 'something still answers on 8095' }
 
 Write-Host "`nThe Windows install, upgrade, quit, uninstall and purge all work."
+# The last check expects curl to fail; that is not the result of this script.
+exit 0
