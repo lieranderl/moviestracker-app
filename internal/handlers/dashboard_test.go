@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -176,7 +177,11 @@ func TestTheDashboardKeepsTheAppApartFromTheMachine(t *testing.T) {
 		}
 	}
 	machine := section(t, body, "dash-system")
-	for _, want := range []string{"This machine", "CPU", " cores", "Load", "Memory", " of ", "free of"} {
+	wants := []string{"This machine", "CPU", " cores", "Memory", " of ", "free of"}
+	if runtime.GOOS != "windows" { // Windows has no load averages, only an estimate that starts at zero
+		wants = append(wants, "Load")
+	}
+	for _, want := range wants {
 		if !strings.Contains(machine, want) {
 			t.Errorf("machine card lacks %q", want)
 		}
