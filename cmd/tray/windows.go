@@ -72,6 +72,19 @@ func quitRunning(timeout time.Duration) int {
 	return 1
 }
 
+// waitForTaskbar waits until the taskbar, which shows tray icons, exists;
+// false when it did not appear in time.
+func waitForTaskbar(timeout time.Duration) bool {
+	for deadline := time.Now().Add(timeout); ; time.Sleep(time.Second) {
+		if w, _, _ := findWindow.Call(uintptr(unsafe.Pointer(windows.StringToUTF16Ptr("Shell_TrayWnd"))), 0); w != 0 { // #nosec G103 -- a Win32 string argument
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+	}
+}
+
 // shellOpen opens a web address in the browser, or a file in its app.
 func shellOpen(target string) {
 	_ = windows.ShellExecute(0, windows.StringToUTF16Ptr("open"), windows.StringToUTF16Ptr(target), nil, nil, windows.SW_SHOWNORMAL)
@@ -118,6 +131,7 @@ func setStartAtSignIn(exe string, on bool) error {
 var (
 	user32           = windows.NewLazySystemDLL("user32.dll")
 	kernel32         = windows.NewLazySystemDLL("kernel32.dll")
+	findWindow       = user32.NewProc("FindWindowW")
 	openClipboard    = user32.NewProc("OpenClipboard")
 	emptyClipboard   = user32.NewProc("EmptyClipboard")
 	setClipboardData = user32.NewProc("SetClipboardData")

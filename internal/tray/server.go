@@ -308,6 +308,16 @@ func RotateLog(dataDir string) {
 	}
 }
 
+// LogWriter writes each line given to it to the log, like Logf.
+func LogWriter(dataDir string) io.Writer { return logWriter(dataDir) }
+
+type logWriter string
+
+func (dir logWriter) Write(p []byte) (int, error) {
+	Logf(string(dir), "%s", strings.TrimRight(string(p), "\n"))
+	return len(p), nil
+}
+
 // Logf adds a line from the tray app to the log.
 func Logf(dataDir, format string, args ...any) {
 	f, err := os.OpenFile(LogPath(dataDir), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)

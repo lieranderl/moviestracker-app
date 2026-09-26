@@ -11,6 +11,7 @@ package main
 
 import (
 	_ "embed"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -59,6 +60,19 @@ func main() {
 		OnChange: func(tray.Status) { a.refresh() },
 	})
 	tray.Logf(dataDir, "Moviestracker %s starting on Windows from %s", version, exe)
+	// The tray library reports its problems with the log package.
+	log.SetFlags(0)
+	log.SetOutput(tray.LogWriter(dataDir))
+
+	// Moviestracker runs whether or not its icon can be shown.
+	go a.whenAskedToQuit()
+	go a.followTheNetwork()
+	a.server.Start()
+	// At sign-in the taskbar may not be there yet, and an icon added too
+	// early never shows.
+	if !waitForTaskbar(2 * time.Minute) {
+		tray.Logf(dataDir, "no taskbar: running without the tray icon")
+	}
 	systray.Run(a.ready, a.exit)
 }
 
@@ -96,23 +110,22 @@ func (a *app) ready() {
 		}
 	}
 	a.mu.Unlock()
-
-	go a.whenAskedToQuit()
-	go func() {
-		// The network address changes when the computer changes networks.
-		for ; ; time.Sleep(30 * time.Second) {
-			lan := tray.LANAddress()
-			a.mu.Lock()
-			changed := lan != a.lan
-			a.lan = lan
-			a.mu.Unlock()
-			if changed {
-				a.refresh()
-			}
-		}
-	}()
-	a.server.Start()
 	a.refresh()
+}
+
+// followTheNetwork keeps the address for TVs and phones current: it changes
+// when the computer changes networks.
+func (a *app) followTheNetwork() {
+	for ; ; time.Sleep(30 * time.Second) {
+		lan := tray.LANAddress()
+		a.mu.Lock()
+		changed := lan != a.lan
+		a.lan = lan
+		a.mu.Unlock()
+		if changed {
+			a.refresh()
+		}
+	}
 }
 
 // state is what the menu shows now.
@@ -204,6 +217,8 @@ func (a *app) quit() {
 		tray.Logf(a.dataDir, "quitting")
 		a.server.Stop()
 		systray.Quit()
+		// Without an icon (no taskbar) the tray library does not return.
+		time.AfterFunc(3*time.Second, func() { os.Exit(0) })
 	})
 }
 
