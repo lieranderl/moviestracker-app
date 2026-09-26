@@ -202,7 +202,10 @@ window.copyLink = async (path, origin) => {
   }
 };
 
-// Launches an external player via its URL scheme.
+// Launches an external player via its URL scheme. Resolves to whether it
+// opened: browsers give no answer, but a player that opens (or the browser's
+// "Open VLC?" prompt) takes the focus from this page, and a link nothing
+// handles leaves it where it was.
 window.openInPlayer = (player, streamPath, origin) => {
   const fullUrl = absoluteUrl(streamPath, origin);
   const targets = {
@@ -210,5 +213,17 @@ window.openInPlayer = (player, streamPath, origin) => {
     iina: `iina://weblink?url=${encodeURIComponent(fullUrl)}`,
     potplayer: `potplayer://${fullUrl}`,
   };
-  if (targets[player]) window.location.href = targets[player];
+  if (!targets[player]) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    let left = false;
+    const away = () => (left = true);
+    window.addEventListener("blur", away);
+    document.addEventListener("visibilitychange", away);
+    window.location.href = targets[player];
+    setTimeout(() => {
+      window.removeEventListener("blur", away);
+      document.removeEventListener("visibilitychange", away);
+      resolve(left || !document.hasFocus());
+    }, 1500);
+  });
 };

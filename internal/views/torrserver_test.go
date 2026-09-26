@@ -31,21 +31,21 @@ func TestDirectAndHLSLinksAreLabelledAndKeptApart(t *testing.T) {
 	out := torrPage(t, true)
 	for _, want := range []string{
 		`aria-label="Direct: the original file"`, `aria-label="HLS: converted by GStreamer"`,
-		"For VLC, IINA, Infuse and TVs", "For Safari, iPhone, Apple TV",
+		"For VLC and other players, and TVs", "Plays in any browser, on phones and TVs",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("page lacks %q", want)
 		}
 	}
-	if n := strings.Count(out, `data-url="/s/hash1.1/movie.mkv"`); n < 2 {
-		t.Errorf("direct link copy on the card and the file row: found %d", n)
+	if n := strings.Count(out, `data-url="/s/hash1.1/movie.mkv"`); n != 1 {
+		t.Errorf("direct link copy once, on the file row: found %d", n)
 	}
-	if n := strings.Count(out, `data-url="/s/hash1.1/hls/master.m3u8"`); n < 2 {
-		t.Errorf("HLS link copy on the card and the file row: found %d", n)
+	if n := strings.Count(out, `data-url="/s/hash1.1/hls/master.m3u8"`); n != 1 {
+		t.Errorf("HLS link copy once, on the file row: found %d", n)
 	}
 	for _, kind := range []string{"direct", "hls"} {
-		if !strings.Contains(out, "/api/torrserver/playlist?hash=hash1&kind="+kind) {
-			t.Errorf("no %s playlist download", kind)
+		if !strings.Contains(out, "'/api/torrserver/playlist?hash=' + encodeURIComponent($activeHash) + '&kind="+kind) {
+			t.Errorf("the player lacks the %s playlist download", kind)
 		}
 	}
 	if !strings.Contains(out, `data-clean="/s/hash1.1/movie.mkv"`) || !strings.Contains(out, `data-hls="/s/hash1.1/hls/master.m3u8"`) {
@@ -69,8 +69,8 @@ func TestHLSControlsShowOnlyWithGStreamer(t *testing.T) {
 	}
 	out := torrPage(t, true)
 	hls := regexp.MustCompile(`<[a-z]+[^>]*(?:aria-label="HLS: converted by GStreamer"|data-action="probe")[^>]*>`).FindAllString(out, -1)
-	if len(hls) < 4 {
-		t.Fatalf("expected HLS groups on card, file row, footer, player and a probe button; found %d", len(hls))
+	if len(hls) < 3 {
+		t.Fatalf("expected HLS groups on the file row and the player and a probe button; found %d", len(hls))
 	}
 	for _, m := range hls {
 		if !strings.Contains(m, `data-show="$gst"`) {
@@ -318,8 +318,8 @@ func TestEachStreamKindHasItsOwnPlayButtonAndThePlayerSwitchesBetweenThem(t *tes
 		}
 		kinds[m[1]]++
 	}
-	if kinds["direct"] < 2 || kinds["hls"] < 2 {
-		t.Errorf("want Direct and HLS play on the card and the file row, got %v", kinds)
+	if kinds["direct"] != 1 || kinds["hls"] != 1 {
+		t.Errorf("want Direct and HLS play on the file row, got %v", kinds)
 	}
 	// The HLS play sits inside the HLS group, which needs GStreamer.
 	group := regexp.MustCompile(`(?s)<div role="group" aria-label="HLS: converted by GStreamer"[^>]*>.*?</div>`).FindString(out)
@@ -351,34 +351,13 @@ func TestTheMacAppsTorrServerOffersGStreamerInsteadOfAnotherBuild(t *testing.T) 
 	}
 }
 
-func TestDirectAndHLSExplainThemselvesWithTooltips(t *testing.T) {
+// Direct and HLS are explained once, above the list: the buttons of each
+// file and the player's switch carry no tooltips over the list.
+func TestDirectAndHLSAreExplainedOnceAboveTheList(t *testing.T) {
 	out := torrPage(t, true)
-	for _, tip := range []string{
-		`data-tip="The original file, full quality: for VLC, IINA, Infuse and TVs"`,
-		`data-tip="Converted by GStreamer as it plays: for Safari, iPhone, Apple TV and TV browsers"`,
-	} {
-		if n := strings.Count(out, tip); n < 3 {
-			t.Errorf("%s shown %d times, want on the card, the file row and the player", tip, n)
-		}
+	if strings.Contains(out, "data-tip=") || regexp.MustCompile(`class="[^"]*\btooltip\b`).MatchString(out) {
+		t.Error("Direct and HLS should have no tooltips")
 	}
-	// The whole Direct or HLS group explains itself, in its own colour.
-	// (The player's link rows spell it out next to them instead.)
-	groups := regexp.MustCompile(`<div role="group" aria-label="(?:Direct|HLS): [^"]*"[^>]*rounded-field[^>]*>`).FindAllString(out, -1)
-	if len(groups) < 4 {
-		t.Errorf("found %d Direct/HLS groups, want the card's and the file row's", len(groups))
-	}
-	for _, g := range groups {
-		if !strings.Contains(g, "data-tip=") || !regexp.MustCompile(`tooltip-(primary|secondary)`).MatchString(g) {
-			t.Errorf("stream group without a coloured tooltip: %s", g)
-		}
-	}
-	for _, label := range []string{`aria-label="Play Direct"`, `aria-label="Play HLS"`} {
-		sw := regexp.MustCompile(`<button[^>]*join-item[^>]*` + label + `[^>]*>|<button[^>]*` + label + `[^>]*join-item[^>]*>`).FindString(out)
-		if !strings.Contains(sw, "tooltip") || !strings.Contains(sw, "data-tip=") {
-			t.Errorf("the player's switch lacks a tooltip: %s", sw)
-		}
-	}
-	// On phones there is no hover: the list starts with a visible explainer.
 	legend := regexp.MustCompile(`(?s)<div id="stream-kinds".*?</div>\s*</div>\s*</div>`).FindString(out)
 	for _, want := range []string{"Direct", "The original file, full quality", "HLS", "Converted by GStreamer as it plays"} {
 		if !strings.Contains(legend, want) {
@@ -397,10 +376,134 @@ func TestThePlayerExplainsAStreamThisBrowserCannotPlay(t *testing.T) {
 		`data-show="$_unplayable"`,
 		`data-text="$_unplayable"`,
 		"This browser cannot play",
-		"VLC, IINA, Infuse",
+		"for VLC, another player or your TV",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("player lacks %q", want)
 		}
+	}
+}
+
+func torrPageWith(t *testing.T, files ...torrserver.FileStat) string {
+	t.Helper()
+	torrents := []torrserver.Torrent{{Hash: "hash1", Title: "Show", FileStats: files}}
+	return html.UnescapeString(render(t, views.TorrServer(testUser, "http://nas:8090", "http://192.168.1.20:8095", testLinks, torrserver.EchoInfo{Version: "1.0", GSTAvailable: true}, torrents, views.GStreamerSetup{})))
+}
+
+// A torrent is played from its files: the card itself has no second set of
+// Play and link buttons for its main file.
+func TestTorrentsArePlayedFromTheirFiles(t *testing.T) {
+	out := torrPage(t, true)
+	card := regexp.MustCompile(`(?s)<article id="torr-card-hash1".*?<details`).FindString(out)
+	if card == "" {
+		t.Fatal("no torrent card")
+	}
+	if strings.Contains(card, `data-action="play"`) || strings.Contains(card, "data-url=\"/s/") {
+		t.Errorf("the card repeats its file's Play and link buttons:\n%s", card)
+	}
+	if !regexp.MustCompile(`<details[^>]*id="torr-files-details-hash1"[^>]*open`).MatchString(out) {
+		t.Error("a torrent of one video should show its file, and so its Play buttons, open")
+	}
+}
+
+// With one video there is nothing to put in a playlist; with several, the
+// playlists of all files download and the browser can play them in a row.
+func TestSeveralVideosCanBePlayedInARowOrAsAPlaylist(t *testing.T) {
+	one := torrPage(t, true)
+	if strings.Contains(one, "/api/torrserver/playlist?hash=hash1&kind=direct\" download aria-label") || strings.Contains(one, `data-action="playall"`) {
+		t.Error("a single video offers a playlist of all files")
+	}
+	out := torrPageWith(t,
+		torrserver.FileStat{ID: 1, Path: "Show/e01.mkv", Length: 1 << 30},
+		torrserver.FileStat{ID: 2, Path: "Show/e01.srt", Length: 1 << 10},
+		torrserver.FileStat{ID: 3, Path: "Show/e02.mkv", Length: 1 << 30},
+	)
+	for _, kind := range []string{"direct", "hls"} {
+		if !strings.Contains(out, "/api/torrserver/playlist?hash=hash1&kind="+kind) {
+			t.Errorf("no %s playlist of all files", kind)
+		}
+	}
+	all := regexp.MustCompile(`(?s)<button[^>]*data-action="play"[^>]*>(?:\s*<svg.*?</svg>)?\s*Play all`).FindString(out)
+	if all == "" {
+		t.Fatal("no Play all button")
+	}
+	if !strings.Contains(all, `data-index="1"`) || !strings.Contains(all, `data-kind="hls"`) {
+		t.Errorf("Play all should start the first video, converted when it can be: %s", all)
+	}
+	for _, want := range []string{
+		"data-on:ended=", `aria-label="Next file"`,
+		"@get('/api/torrserver/queue?hash=' + encodeURIComponent($activeHash)",
+		`id="torr-playlist"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the player should follow the torrent's playlist: lacks %q", want)
+		}
+	}
+}
+
+// The playlist menu lists the torrent's videos, marking the one playing.
+func TestThePlaylistMenuListsTheVideos(t *testing.T) {
+	out := html.UnescapeString(render(t, views.TorrPlaylist([]torrserver.FileStat{{ID: 1, Path: "Show/e01.mkv"}, {ID: 3, Path: "Show/e02.mkv"}})))
+	for _, want := range []string{`aria-label="Playlist"`, `data-at="0"`, `data-at="1"`, "$activeFileIndex === 3", "2. e02.mkv"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("playlist menu lacks %q:\n%s", want, out)
+		}
+	}
+	if one := render(t, views.TorrPlaylist([]torrserver.FileStat{{ID: 1, Path: "movie.mkv"}})); strings.Contains(one, "data-at") {
+		t.Error("one video needs no playlist menu")
+	}
+}
+
+// Fullscreen hides the header: the title shows over the video instead.
+func TestFullscreenShowsWhatIsPlaying(t *testing.T) {
+	out := torrPage(t, true)
+	if !regexp.MustCompile(`(?s)<div[^>]*data-show="\$_fs"[^>]*>\s*<p[^>]*>\s*<span data-text="\$streamTitle">`).MatchString(out) {
+		t.Error("fullscreen should show the playing file's title")
+	}
+}
+
+// ↑ and ↓ turn the volume up and down, like the wheel.
+func TestArrowKeysTurnTheVolume(t *testing.T) {
+	out := torrPage(t, true)
+	for _, want := range []string{"case 'ArrowUp': turn(0.05)", "case 'ArrowDown': turn(-0.05)"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("player keys lack %q", want)
+		}
+	}
+}
+
+// Moviestracker runs on Macs, Windows PCs and home servers: its help names
+// no platform's browser or player as the way to watch.
+func TestStreamHelpSpeaksForEveryPlatform(t *testing.T) {
+	out := torrPage(t, true)
+	for _, mac := range []string{"Safari", "iPhone", "Apple TV", "(macOS)"} {
+		if strings.Contains(out, mac) {
+			t.Errorf("the page tells people %q", mac)
+		}
+	}
+	if !regexp.MustCompile(`openInPlayer\('iina'[^"]*"\s+data-show="[^"]*Macintosh`).MatchString(out) {
+		t.Error("IINA, a Mac player, should be offered on Macs only")
+	}
+}
+
+// Browsers open vlc:// and iina:// links silently or not at all: when the
+// player did not open, the page says so.
+func TestAPlayerThatDidNotOpenIsExplained(t *testing.T) {
+	out := torrPage(t, true)
+	for _, player := range []string{"vlc", "iina"} {
+		if !regexp.MustCompile(`window\.openInPlayer\('` + player + `'[^"]*\.then\(opened => opened \|\| \(\$toastError = true, \$toast = '[^']*did not open`).MatchString(out) {
+			t.Errorf("opening %s says nothing when it does not open", player)
+		}
+	}
+}
+
+// Scrolling over the video turns the volume up (wheel or fingers up) or
+// down, following Macs' inverted "natural" scrolling.
+func TestScrollingOverTheVideoChangesTheVolume(t *testing.T) {
+	out := torrPage(t, true)
+	wheel := regexp.MustCompile(`data-ref:_player[^<]*data-on:wheel="([^"]*)"`).FindStringSubmatch(out)
+	if wheel == nil || !strings.Contains(wheel[1], "evt.deltaY") || !strings.Contains(wheel[1], ".volume =") ||
+		!strings.Contains(wheel[1], "webkitDirectionInvertedFromDevice ?? (") { // ?? cannot mix with && unparenthesised
+		t.Errorf("the player does not turn the volume with the wheel: %v", wheel)
 	}
 }

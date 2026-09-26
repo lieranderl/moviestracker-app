@@ -190,7 +190,7 @@ func TorrServerGuide(echo torrserver.EchoInfo, engine string, canInstallGStreame
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, " is running without GStreamer. It still streams to external players such as VLC or IINA: use the Link and Playlist buttons on a torrent. To play in the browser, switch to the GStreamer build of TorrServer.</p></header>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, " is running without GStreamer. It still streams to external players such as VLC: use the Link and Playlist buttons on a torrent. To play in the browser, switch to the GStreamer build of TorrServer.</p></header>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -656,7 +656,7 @@ func gstreamerWhy() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<p class=\"text-xs text-base-content/60\">Without it, TorrServer still streams, but only to external players such as VLC or IINA. <a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<p class=\"text-xs text-base-content/60\">Without it, TorrServer still streams, but only to external players such as VLC. <a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
