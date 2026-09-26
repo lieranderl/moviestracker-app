@@ -202,6 +202,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/logout", s.handleLogout)
 	s.mux.HandleFunc("POST /api/settings/sources/tmdb", s.handleSaveTMDB)
 	s.mux.HandleFunc("POST /api/settings/sources/tmdb/shared", s.handleUseSharedTMDB)
+	s.mux.HandleFunc("POST /api/settings/sources/jacred/shared", s.handleUseSharedJacRed)
 	s.mux.HandleFunc("POST /api/settings/sources/jacred", s.handleSaveJacRed)
 	s.mux.HandleFunc("POST /api/settings/sources/imdb", s.handleSaveIMDb)
 	s.mux.HandleFunc("POST /api/settings/sources/torrserver", s.handleSaveTorrServer)

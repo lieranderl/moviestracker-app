@@ -6,6 +6,10 @@ const TMDBDisclaimer = "This product uses the TMDB API but is not endorsed or ce
 const (
 	tmdbHomeURL     = "https://www.themoviedb.org/"
 	torrentIndexURL = "https://jacred.su/"
+	// jacredReferralURL is Moviestracker's jacred.su project link, which the
+	// project's terms ask to show beside the results ("search is powered by
+	// JacRed"); jacred.su counts the visits it brings.
+	jacredReferralURL = "https://jacred.su/r/c2abc53e-233f-42ad-9f6a-e12f2eeaef9c" // #nosec G101 -- a public referral link, not a credential
 	torrServerURL   = "https://github.com/YouROK/TorrServer"
 	gstreamerURL    = "https://gstreamer.freedesktop.org/"
 	// SourceURL is where Moviestracker's source code is. AGPL-3.0 section 13
@@ -64,7 +68,7 @@ templ externalLink(href templ.SafeURL, label string) {
 
 // JacRedCredit credits JacRed, which finds the releases, beside them.
 templ JacRedCredit() {
-	<a href={ torrentIndexURL } target="_blank" rel="noopener noreferrer" class="badge badge-primary badge-soft gap-1.5 hover:badge-outline shrink-0 whitespace-nowrap">
+	<a href={ jacredReferralURL } target="_blank" rel="noopener noreferrer" class="badge badge-primary badge-soft gap-1.5 hover:badge-outline shrink-0 whitespace-nowrap">
 		@Icon("magnet", "size-3.5")
 		Search is powered by JacRed
 		@Icon("external-link", "size-3")

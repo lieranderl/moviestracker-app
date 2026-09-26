@@ -1,6 +1,9 @@
 package config
 
-import "strings"
+import (
+	"net/url"
+	"strings"
+)
 
 // Env holds the environment variables that override stored sources, for
 // development and scripted installs. A non-empty field is an override: the
@@ -16,6 +19,27 @@ type Env struct {
 	// SharedTMDBKey is the key built into release builds, used when there is
 	// no other. It is never shown.
 	SharedTMDBKey string
+	// SharedJacRedKey is Moviestracker's jacred.su project key (unlimited
+	// searches), built into release builds and used for jacred.su when
+	// there is no other key. It is never shown, nor sent to another JacRed.
+	SharedJacRedKey string
+}
+
+// UsesSharedJacRedKey reports whether JacRed searches run on the shared
+// key: st's JacRed is jacred.su, with no JACRED_APIKEY and no key saved.
+func (e Env) UsesSharedJacRedKey(st State) bool {
+	url := st.Sources.JacRedURL
+	if e.JacRedURL != "" {
+		url = e.JacRedURL
+	}
+	return e.SharedJacRedKey != "" && e.JacRedAPIKey == "" && st.Sources.JacRedAPIKey == "" && IsJacredSu(url)
+}
+
+// IsJacredSu reports whether raw is the public jacred.su (or its search
+// API's address), which the shared key is for.
+func IsJacredSu(raw string) bool {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && (u.Host == "jacred.su" || u.Host == "api.jacred.su")
 }
 
 // UsesSharedTMDBKey reports whether TMDB runs on the shared key: no
@@ -40,6 +64,7 @@ func EnvFrom(getenv func(string) string) Env {
 
 // Apply returns st with the overrides in effect.
 func (e Env) Apply(st State) State {
+	sharedJacRed := e.UsesSharedJacRedKey(st)
 	override := func(dst *string, v string) {
 		if v != "" {
 			*dst = v
@@ -54,6 +79,9 @@ func (e Env) Apply(st State) State {
 	override(&st.TorrServer.Password, e.TorrServerPassword)
 	if st.Sources.TMDBKey == "" {
 		st.Sources.TMDBKey = e.SharedTMDBKey
+	}
+	if sharedJacRed {
+		st.Sources.JacRedAPIKey = e.SharedJacRedKey
 	}
 	return st
 }

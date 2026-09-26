@@ -262,10 +262,10 @@ other way round.
 - **TMDB** for titles, images, cast and trailers: Moviestracker's shared key
   works out of the box, or add your own free key.
 - **JacRed** for finding sources: the public [jacred.su](https://jacred.su),
-  or your own [JacRed](https://github.com/jacred-fdb/jacred). From 9 October
-  2026 jacred.su needs a free personal key (100 searches a day): create one
-  under «Мой ключ» at [jacred.su/account](https://jacred.su/account) and paste
-  it in **Settings → Sources**.
+  or your own [JacRed](https://github.com/jacred-fdb/jacred). jacred.su needs
+  a key from 9 October 2026: releases carry Moviestracker's own (unlimited),
+  so nothing to set up; you can use a personal key from
+  [jacred.su/account](https://jacred.su/account) instead.
 - **IMDb ratings** from a small rating service; they can be switched off.
 - **TorrServer** does the streaming, inside the app or one you already run
   (on a NAS, for example).

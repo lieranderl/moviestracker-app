@@ -5,6 +5,7 @@
 .claude
 .worktrees
 .tmdb-shared-key
+.jacred-shared-key
 .env
 .env.*
 !.env.example
