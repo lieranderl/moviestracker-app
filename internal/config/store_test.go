@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -165,5 +166,46 @@ func TestTheSharedJacRedKeyIsUsedOnlyForJacredSuWithoutAnOwnKey(t *testing.T) {
 				t.Errorf("UsesSharedJacRedKey() = %v, want %v", got, tc.shared)
 			}
 		})
+	}
+}
+
+// A state read from the store is a snapshot: later updates never change it,
+// so pages can read it while a background task saves titles.
+func TestAStateReadEarlierIsNotChangedByLaterUpdates(t *testing.T) {
+	store, err := config.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Update(func(st *config.State) error {
+		st.Titles = map[string]config.TitleRef{"aaa": {Kind: "movie", ID: 1}}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := store.State().Titles
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := range 50 {
+			_ = store.Update(func(st *config.State) error {
+				st.Titles[fmt.Sprintf("h%d", i)] = config.TitleRef{Kind: "tv", ID: i + 1}
+				return nil
+			})
+		}
+	}()
+	for reading := true; reading; {
+		select {
+		case <-done:
+			reading = false
+		default:
+			_ = snapshot["aaa"] // a page rendering, as the updates go on
+		}
+	}
+	if len(snapshot) != 1 {
+		t.Errorf("the earlier snapshot has %d titles, want the 1 it was read with", len(snapshot))
+	}
+	if n := len(store.State().Titles); n != 51 {
+		t.Errorf("the store has %d titles, want 51", n)
 	}
 }
