@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"sync"
@@ -217,10 +218,14 @@ func (s *Store) write(st State) error {
 	return nil
 }
 
+// clone copies st deeply enough that neither copy's slices and maps are
+// the other's: State hands out snapshots that pages read while Update
+// changes the next state.
 func (st State) clone() State {
 	c := st
 	c.Users = append([]User(nil), st.Users...)
 	c.Sessions = append([]Session(nil), st.Sessions...)
 	c.Gateway.Logins = append([]AppLogin(nil), st.Gateway.Logins...)
+	c.Titles = maps.Clone(st.Titles)
 	return c
 }
