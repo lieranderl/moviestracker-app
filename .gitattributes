@@ -1,0 +1,6 @@
+# Every text file keeps LF line endings, also in a Windows checkout: the shell
+# scripts run in Git Bash on Windows, and the tests compare text byte for byte.
+* text=auto eol=lf
+*.ico binary
+*.png binary
+*.woff2 binary

@@ -3,14 +3,19 @@ package engine_test
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/lieranderl/moviestracker-app/internal/engine"
 )
 
 func TestTheTorrServerProgramIsFoundWhereAnInstallPutsIt(t *testing.T) {
-	appDir, dataDir, custom := t.TempDir(), t.TempDir(), filepath.Join(t.TempDir(), "ts")
-	executable := filepath.Join(appDir, "moviestracker")
+	exe := "" // Windows programs end in .exe and have no execute bit.
+	if runtime.GOOS == "windows" {
+		exe = ".exe"
+	}
+	appDir, dataDir, custom := t.TempDir(), t.TempDir(), filepath.Join(t.TempDir(), "ts"+exe)
+	executable := filepath.Join(appDir, "moviestracker"+exe)
 	place := func(path string) {
 		t.Helper()
 		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
@@ -26,12 +31,12 @@ func TestTheTorrServerProgramIsFoundWhereAnInstallPutsIt(t *testing.T) {
 	if got := find(); got != "" {
 		t.Fatalf("FindBinary() with nothing installed = %q, want empty", got)
 	}
-	inData := filepath.Join(dataDir, "engine", "bin", "torrserver")
+	inData := filepath.Join(dataDir, "engine", "bin", "torrserver"+exe)
 	place(inData)
 	if got := find(); got != inData {
 		t.Errorf("FindBinary() = %q, want the data directory copy %q", got, inData)
 	}
-	beside := filepath.Join(appDir, "torrserver")
+	beside := filepath.Join(appDir, "torrserver"+exe)
 	place(beside)
 	if got := find(); got != beside {
 		t.Errorf("FindBinary() = %q, want the program next to moviestracker %q", got, beside)

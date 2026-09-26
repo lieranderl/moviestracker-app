@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -22,7 +23,25 @@ import (
 
 func TestMain(m *testing.M) {
 	enginetest.RunFakeIfRequested()
+	holdEngineIfRequested()
 	os.Exit(m.Run())
+}
+
+// holderEnv makes the test binary a stand-in for Moviestracker: it runs an
+// engine in the directory and on the port given ("dir|port") until killed.
+const holderEnv = "ENGINE_TEST_HOLDER"
+
+func holdEngineIfRequested() {
+	dir, port, ok := strings.Cut(os.Getenv(holderEnv), "|")
+	if !ok {
+		return
+	}
+	n, _ := strconv.Atoi(port)
+	sup := engine.New(engine.Config{Binary: os.Args[0], Dir: dir, Port: n, Env: []string{enginetest.FakeEnv + "=1", holderEnv + "="}})
+	if err := sup.Start(context.Background()); err != nil {
+		os.Exit(4)
+	}
+	select {}
 }
 
 func freePort(t *testing.T) int {
@@ -90,18 +109,62 @@ func TestTheEngineRunsOnLoopbackBehindGeneratedCredentials(t *testing.T) {
 		t.Errorf("engine with credentials: %d, want 200", code)
 	}
 	info, err := os.Stat(filepath.Join(dir, "accs.db"))
-	if err != nil || info.Mode().Perm() != 0o600 {
-		t.Errorf("accs.db: %v, mode %v; want 0600", err, info.Mode().Perm())
+	if err != nil {
+		t.Errorf("accs.db: %v", err)
+	} else if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 { // Windows has no Unix modes
+		t.Errorf("accs.db mode %v; want 0600", info.Mode().Perm())
 	}
 
+	started := time.Now()
 	if err := sup.Stop(); err != nil {
 		t.Fatalf("Stop(): %v", err)
+	}
+	if took := time.Since(started); took > 5*time.Second {
+		t.Errorf("Stop() took %s; the engine should stop when asked, not be killed after a timeout", took)
 	}
 	if code := get(t, url, user, pass); code != 0 {
 		t.Errorf("engine still answers after Stop (%d)", code)
 	}
 	if st := sup.Status(); st.State != engine.Stopped {
 		t.Errorf("state after Stop = %q, want stopped", st.State)
+	}
+}
+
+func TestTheEngineStopsWhenMoviestrackerIsKilled(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("macOS cannot tie a child to its parent; the next start replaces a left engine")
+	}
+	port := freePort(t)
+	holder := exec.Command(os.Args[0], "-test.run=^$") // #nosec G204 G702 -- this test binary
+	holder.Env = append(os.Environ(), holderEnv+"="+t.TempDir()+"|"+strconv.Itoa(port))
+	if err := holder.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = holder.Process.Kill() })
+	url := "http://127.0.0.1:" + strconv.Itoa(port)
+	answers := func() bool {
+		resp, err := http.Get(url + "/echo") // #nosec G107 -- loopback test server
+		if err == nil {
+			_ = resp.Body.Close()
+		}
+		return err == nil
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for !answers() {
+		if time.Now().After(deadline) {
+			t.Fatal("the engine never started")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	_ = holder.Process.Kill()
+	_ = holder.Wait()
+	deadline = time.Now().Add(5 * time.Second)
+	for answers() {
+		if time.Now().After(deadline) {
+			t.Fatal("the engine still runs after Moviestracker was killed")
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 

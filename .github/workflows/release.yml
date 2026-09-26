@@ -69,9 +69,36 @@ jobs:
           path: dist/*.dmg
           if-no-files-found: error
 
+  windows:
+    name: Windows installer
+    needs: ci
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Install Inno Setup
+        run: scripts/ci/install-inno-setup.ps1
+      - name: Build Moviestracker-Setup (x64) with the pinned TorrServer
+        shell: bash
+        env:
+          MT_SHARED_TMDB_KEY: ${{ secrets.MT_SHARED_TMDB_KEY }}
+          VERSION: ${{ github.ref_name }}
+        run: scripts/winapp.sh "$VERSION"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows
+          path: dist/*.exe
+          if-no-files-found: error
+
   publish:
     name: Draft the GitHub release
-    needs: [linux, macos]
+    needs: [linux, macos, windows]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -88,7 +115,7 @@ jobs:
           merge-multiple: true
       - name: Checksums
         working-directory: dist
-        run: sha256sum -- *.tar.gz *.dmg | tee checksums.txt
+        run: sha256sum -- *.tar.gz *.dmg *.exe | tee checksums.txt
       # Artifact attestations need a public repository (or GitHub Enterprise).
       - name: Build provenance
         if: ${{ !github.event.repository.private }}
@@ -97,6 +124,7 @@ jobs:
           subject-path: |
             dist/*.tar.gz
             dist/*.dmg
+            dist/*.exe
       - name: Create the draft release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -105,4 +133,4 @@ jobs:
           prerelease=()
           case "$TAG" in *-*) prerelease=(--prerelease) ;; esac
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --generate-notes \
-            --title "Moviestracker $TAG" "${prerelease[@]}" dist/*.tar.gz dist/*.dmg dist/checksums.txt
+            --title "Moviestracker $TAG" "${prerelease[@]}" dist/*.tar.gz dist/*.dmg dist/*.exe dist/checksums.txt

@@ -94,6 +94,7 @@ type Supervisor struct {
 // run is one launch of the engine and the goroutine watching it.
 type run struct {
 	cmd    *exec.Cmd
+	port   int
 	exited chan struct{} // closed when the process has exited
 	stop   chan struct{} // closed by Stop
 	done   chan struct{} // closed when the watcher has finished
@@ -199,7 +200,8 @@ func (s *Supervisor) firstStart(ctx context.Context) {
 	}
 }
 
-// Stop ends the engine: SIGTERM, then a kill after 10 seconds.
+// Stop ends the engine: SIGTERM (a /shutdown request on Windows), then a kill
+// after 10 seconds.
 func (s *Supervisor) Stop() error {
 	s.mu.Lock()
 	r := s.run
@@ -252,7 +254,8 @@ func (s *Supervisor) launch(ctx context.Context, stop <-chan struct{}) (*run, er
 		_ = out.Close()
 		return nil, fmt.Errorf("start TorrServer: %w", err)
 	}
-	r := &run{cmd: cmd, exited: make(chan struct{}), stop: make(chan struct{}), done: make(chan struct{})}
+	tieToMoviestracker(cmd.Process)
+	r := &run{cmd: cmd, port: port, exited: make(chan struct{}), stop: make(chan struct{}), done: make(chan struct{})}
 	go func() {
 		_ = cmd.Wait()
 		_ = out.Close()
@@ -261,7 +264,7 @@ func (s *Supervisor) launch(ctx context.Context, stop <-chan struct{}) (*run, er
 
 	version, err := s.waitReady(ctx, port, r.exited, stop)
 	if err != nil {
-		terminate(r)
+		s.terminate(r)
 		return nil, err
 	}
 	s.mu.Lock()
@@ -306,7 +309,7 @@ func (s *Supervisor) watch(r *run) {
 	for {
 		select {
 		case <-stop:
-			terminate(r)
+			s.terminate(r)
 			close(r.done)
 			return
 		case <-r.exited:
@@ -332,7 +335,7 @@ func (s *Supervisor) watch(r *run) {
 			next, err := s.launch(context.Background(), stop)
 			if err == nil {
 				// Keep r (and its channels) as the handle Stop knows about.
-				r.cmd, r.exited = next.cmd, next.exited
+				r.cmd, r.port, r.exited = next.cmd, next.port, next.exited
 				break
 			}
 			s.mu.Lock()
@@ -344,13 +347,18 @@ func (s *Supervisor) watch(r *run) {
 }
 
 // terminate stops the process of r: SIGTERM, then a kill after 10 seconds.
-func terminate(r *run) {
+// Where there is no SIGTERM (Windows), it asks the engine to shut down.
+func (s *Supervisor) terminate(r *run) {
 	select {
 	case <-r.exited:
 		return
 	default:
 	}
-	_ = r.cmd.Process.Signal(syscall.SIGTERM)
+	if err := r.cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		s.shutdown(ctx, r.port)
+		cancel()
+	}
 	select {
 	case <-r.exited:
 	case <-time.After(10 * time.Second):

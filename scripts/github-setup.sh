@@ -88,6 +88,7 @@ main_rules=$(
         $(check "Secret scan (whole history)"),
         $(check "Tests and Mac app (macOS)"),
         $(check "Linux install, upgrade, uninstall (systemd)"),
+        $(check "Windows tests, installer, install and uninstall"),
         $(check "Container image"),
         $(check "Title follows Conventional Commits")
       ]

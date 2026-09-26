@@ -1,3 +1,7 @@
+// The installer runs the macOS app's shell script; Windows has none.
+
+//go:build unix
+
 package gstinstall_test
 
 import (

@@ -1,3 +1,8 @@
+// The Linux archive and the Mac app; scripts/ci/windows-install-e2e.ps1
+// checks the Windows installer.
+
+//go:build unix
+
 package packaging_test
 
 import (

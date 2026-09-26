@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"io"
 	"os"
 	"regexp"
 	"slices"
@@ -93,6 +94,27 @@ func TestTheServerNoticesWhenTheAppThatStartedItIsGone(t *testing.T) {
 	case <-parentGone(os.Getppid()+1_000_000, 10*time.Millisecond):
 	case <-time.After(time.Second):
 		t.Fatal("a launcher that is no longer the parent was not noticed")
+	}
+}
+
+// The Windows tray app holds the server's standard input open: when the app
+// quits, or is killed, the input closes and the server stops.
+func TestTheServerNoticesWhenTheAppClosesItsInput(t *testing.T) {
+	r, w := io.Pipe()
+	closed := inputClosed(r)
+	if _, err := w.Write([]byte("anything\n")); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-closed:
+		t.Fatal("reported closed while the app holds the input open")
+	case <-time.After(100 * time.Millisecond):
+	}
+	_ = w.Close()
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("the closed input was not noticed")
 	}
 }
 

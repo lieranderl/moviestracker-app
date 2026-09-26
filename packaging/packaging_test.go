@@ -1,3 +1,8 @@
+// The Linux archive and the Mac app; scripts/ci/windows-install-e2e.ps1
+// checks the Windows installer.
+
+//go:build unix
+
 // Package packaging_test checks the release, install and Mac app scripts by
 // running them: a Linux archive installed into a temporary prefix on a
 // sandboxed "Linux" PATH, and the Mac app and its DMG. Fake TorrServer
@@ -22,15 +27,6 @@ const version = "v0.0.0-test"
 
 // testSharedTMDBKey stands in for the shared TMDB key release builds carry.
 const testSharedTMDBKey = "test-shared-tmdb-key" // #nosec G101 -- a test fixture
-
-func repoRoot(t *testing.T) string {
-	t.Helper()
-	root, err := filepath.Abs("..")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return root
-}
 
 func run(t *testing.T, dir string, env []string, name string, args ...string) string {
 	t.Helper()

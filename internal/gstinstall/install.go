@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -169,9 +168,7 @@ func (i *Installer) Dismiss() {
 
 func (i *Installer) run() {
 	cmd := exec.CommandContext(i.ctx, i.script, i.root) // #nosec G204 -- Moviestracker's own install script
-	// Its own process group, so stopping it stops its curl too.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) }
+	stopsWithItsChildren(cmd)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	err := cmd.Run()

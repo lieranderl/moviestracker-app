@@ -106,6 +106,34 @@ jobs:
       - name: Install, set up, upgrade, uninstall and purge it
         run: scripts/ci/linux-install-e2e.sh dist/moviestracker_v0.0.0-ci_linux_amd64.tar.gz
 
+  windows:
+    name: Windows tests, installer, install and uninstall
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Tests on Windows
+        run: go test -count=1 ./...
+      - name: Install Inno Setup
+        run: scripts/ci/install-inno-setup.ps1
+      - name: Build the installer as a release would (no shared TMDB key)
+        shell: bash
+        run: scripts/winapp.sh v0.0.0-ci
+      - name: Install, set up, upgrade, quit, uninstall and purge it
+        run: scripts/ci/windows-install-e2e.ps1 dist/Moviestracker-Setup-v0.0.0-ci-x64.exe
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Moviestracker-windows-${{ github.sha }}
+          path: dist/*.exe
+          retention-days: 7
+          if-no-files-found: error
+
   container:
     name: Container image
     runs-on: ubuntu-latest

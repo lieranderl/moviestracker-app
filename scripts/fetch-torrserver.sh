@@ -4,6 +4,7 @@
 #
 #   fetch-torrserver.sh [dest]            the GStreamer build for this machine
 #   TS_TARGET=linux/arm64 fetch-torrserver.sh dest   … for another platform
+#                                         (windows/amd64: the .exe with GStreamer inside)
 #   fetch-torrserver.sh --license dest    TorrServer's licence at the pinned tag
 set -euo pipefail
 
@@ -22,7 +23,8 @@ else
     case "$(uname -s)" in
       Darwin) os=darwin ;;
       Linux) os=linux ;;
-      *) echo "unsupported OS: $(uname -s) (macOS and Linux only)" >&2; exit 1 ;;
+      MINGW* | MSYS* | CYGWIN*) os=windows ;;
+      *) echo "unsupported OS: $(uname -s)" >&2; exit 1 ;;
     esac
     case "$(uname -m)" in
       x86_64 | amd64) arch=amd64 ;;
@@ -32,6 +34,8 @@ else
     target="$os/$arch"
   fi
   asset="TorrServer-gst-${target%/*}-${target#*/}"
+  # Windows' build carries GStreamer inside (embed_gstlib).
+  [ "${target%/*}" = windows ] && asset="$asset.exe"
   url="https://github.com/YouROK/TorrServer/releases/download/$version/$asset"
 fi
 

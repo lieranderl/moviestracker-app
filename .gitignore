@@ -7,6 +7,8 @@ coverage.out
 *.test
 /server
 /moviestracker
+# Windows resources scripts/winapp.sh makes for the tray app while it builds
+*.syso
 # Release archives unpacked in the source folder
 /moviestracker_*/
 

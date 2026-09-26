@@ -168,6 +168,16 @@ func main() {
 			sigChan <- syscall.SIGTERM
 		}()
 	}
+	// Started by the Windows tray app, which holds our input open: Windows
+	// has no signals to stop a program with, and the input also closes when
+	// the app is killed.
+	if envBool("MT_STOP_WITH_STDIN", false) {
+		go func() {
+			<-inputClosed(os.Stdin)
+			slog.Info("the app that started Moviestracker closed its input")
+			sigChan <- syscall.SIGTERM
+		}()
+	}
 
 	go func() {
 		<-sigChan
@@ -433,6 +443,17 @@ func loadDotEnv() {
 			_ = os.Setenv(key, val)
 		}
 	}
+}
+
+// inputClosed is closed when in reaches its end (or fails): the program
+// that holds its other end has closed it or is gone.
+func inputClosed(in io.Reader) <-chan struct{} {
+	closed := make(chan struct{})
+	go func() {
+		defer close(closed)
+		_, _ = io.Copy(io.Discard, in)
+	}()
+	return closed
 }
 
 // parentGone is closed once this process's parent is no longer pid: the

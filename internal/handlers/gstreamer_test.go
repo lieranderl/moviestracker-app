@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,9 @@ import (
 // run by a script that downloads slowly until the test ends.
 func withGStreamerDownload(t *testing.T) localOption {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("the GStreamer download is part of the macOS app; Windows' TorrServer carries GStreamer")
+	}
 	dir := t.TempDir()
 	script := filepath.Join(dir, "install-gstreamer.sh")
 	body := `#!/bin/sh
