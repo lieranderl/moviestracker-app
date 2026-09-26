@@ -334,11 +334,17 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// logValue is a value from a request as logs show it: line breaks encoded,
+// so it cannot start a log line of its own.
+func logValue(v string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(v, "\r", "%0D"), "\n", "%0A")
+}
+
 // logPath is a request path as logs show it: a share link's token, which
 // works for anyone holding it, is left out, and line breaks are shown
 // encoded, as they were sent.
 func logPath(path string) string {
-	path = strings.ReplaceAll(strings.ReplaceAll(path, "\r", "%0D"), "\n", "%0A")
+	path = logValue(path)
 	if rest, ok := strings.CutPrefix(path, "/s/"); ok {
 		if _, file, found := strings.Cut(rest, "/"); found {
 			return "/s/…/" + file

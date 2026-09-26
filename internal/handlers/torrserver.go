@@ -578,7 +578,8 @@ func (s *Server) handleTorrServerQueue(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	var videos []torrserver.FileStat
 	if torrent, err := s.torrServer.Client().TorrentStats(ctx, hash); err != nil {
-		slog.Warn("playlist: torrent stats failed", "hash", hash, "error", err)
+		// hash is 40 hex digits by now; logValue still keeps line breaks out.
+		slog.Warn("playlist: torrent stats failed", "hash", logValue(hash), "error", logValue(err.Error()))
 	} else {
 		videos = torrent.VideoFiles()
 	}
