@@ -112,7 +112,7 @@ func (s *Server) gstreamerView(ctx context.Context) views.SettingsSection {
 }
 
 const noToneMapper = "This GStreamer has no HDR tone mapper (TorrServer looks for an element called hdrtonemap, " +
-	"which the official GStreamer for macOS does not include), so HDR files stream as HDR."
+	"which only its Windows build includes), so HDR files stream as HDR."
 
 func sectionView(sec settingsSection, saveURL string) views.SettingsSection {
 	v := views.SettingsSection{ID: sec.ID, Title: sec.Title, Icon: sec.Icon, Intro: sec.Intro, SaveURL: saveURL, Values: map[string]any{}}
