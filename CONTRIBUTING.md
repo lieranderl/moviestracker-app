@@ -10,7 +10,9 @@ Please be kind: see the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Development setup
 
-You need macOS or Linux with:
+You need macOS or Linux (the Windows installer is built on Windows, with Git
+Bash and Inno Setup: `make winapp`; CI builds and tests it on every pull
+request) with:
 
 - Go (the version in `go.mod`), and Bun (the version in `package.json`)
 - Air for hot reload (`go install github.com/air-verse/air@latest`), optional
