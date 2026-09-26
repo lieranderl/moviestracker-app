@@ -1,7 +1,11 @@
 name: Release
 
-# Push a version tag on main to release:  git tag v1.2.3 && git push origin v1.2.3
+# Push a version tag on a commit of main to release (docs/MAINTAINING.md):
+#   git tag -a v1.2.3 -m "Moviestracker v1.2.3" origin/main && git push origin v1.2.3
 # The release is created as a draft: check it, then publish it on GitHub.
+# Jobs that use the shared TMDB key run in the `release` environment, whose
+# secrets only v* tags can reach. Release builds use no caches, so nothing a
+# pull request run left behind can end up in them.
 on:
   push:
     tags:
@@ -16,8 +20,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    name: The tag is on main
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Only reviewed commits are released
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$TAG is not on main: tag a commit that reached main through a pull request."
+            exit 1
+          fi
+
   ci:
     name: CI
+    needs: verify
     uses: ./.github/workflows/ci.yml
 
   docker:
@@ -25,9 +48,12 @@ jobs:
     needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    environment: release
     permissions:
       contents: read
       packages: write # push to ghcr.io
+      id-token: write # sign the image's build provenance
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -50,6 +76,7 @@ jobs:
           flavor: latest=false
           tags: type=semver,pattern={{version}}
       - name: Build and push, with SBOM and provenance
+        id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
@@ -62,14 +89,19 @@ jobs:
           secrets: tmdb_key=${{ secrets.MT_SHARED_TMDB_KEY }}
           provenance: mode=max
           sbom: true
-          cache-from: type=gha,scope=docker-release
-          cache-to: type=gha,mode=max,scope=docker-release
+      # `gh attestation verify oci://ghcr.io/lieranderl/moviestracker:<version> -R lieranderl/moviestracker-app`
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ghcr.io/${{ github.repository_owner }}/moviestracker
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
 
   macos:
     name: Mac app (DMG)
     needs: ci
     runs-on: macos-latest
     timeout-minutes: 30
+    environment: release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -77,7 +109,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          cache-dependency-path: go.sum
+          cache: false
       - name: Build Moviestracker.app (Apple Silicon and Intel) and its DMG
         env:
           MT_SHARED_TMDB_KEY: ${{ secrets.MT_SHARED_TMDB_KEY }}
@@ -94,6 +126,7 @@ jobs:
     needs: ci
     runs-on: windows-latest
     timeout-minutes: 30
+    environment: release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -101,7 +134,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          cache-dependency-path: go.sum
+          cache: false
       - name: Install Inno Setup
         run: scripts/ci/install-inno-setup.ps1
       - name: Build Moviestracker-Setup (x64) with the pinned TorrServer
@@ -136,9 +169,8 @@ jobs:
       - name: Checksums
         working-directory: dist
         run: sha256sum -- *.dmg *.exe | tee checksums.txt
-      # Artifact attestations need a public repository (or GitHub Enterprise).
+      # `gh attestation verify <file> -R lieranderl/moviestracker-app`
       - name: Build provenance
-        if: ${{ !github.event.repository.private }}
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |

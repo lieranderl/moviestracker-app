@@ -6,7 +6,7 @@
 
 ## How it was tested
 
-<!-- Tests added or changed, and what you checked by hand (browser, macOS app, Linux install). -->
+<!-- Tests added or changed, and what you checked by hand (browser, macOS app, Windows installer, Docker image). -->
 
 ## Checklist
 

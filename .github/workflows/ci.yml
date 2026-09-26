@@ -118,8 +118,18 @@ jobs:
           if-no-files-found: error
 
   docker:
-    name: Docker image (compose, TorrServer, GStreamer)
-    runs-on: ubuntu-latest
+    name: Docker image (${{ matrix.arch }})
+    # Each architecture on its own CPU, so linux/arm64 (Raspberry Pi, most NAS
+    # boxes) runs the same end-to-end test, not just a build under emulation.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: linux/amd64
+            runner: ubuntu-latest
+          - arch: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -127,17 +137,34 @@ jobs:
           persist-credentials: false
       - name: Build and test the image end to end with compose.yaml
         run: scripts/ci/docker-e2e.sh
-      # The arm64 image (Raspberry Pi, most NAS boxes) builds too; releases
-      # push both.
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+
+  workflows:
+    name: Workflow security (zizmor)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          platforms: arm64
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - name: Build for linux/arm64
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+          persist-credentials: false
+      # Template injection, over-broad tokens, cache poisoning in releases,
+      # unpinned or impostor actions (.github/zizmor.yml).
+      - uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
         with:
-          context: .
-          platforms: linux/arm64
-          push: false
-          cache-from: type=gha,scope=docker-arm64
-          cache-to: type=gha,mode=max,scope=docker-arm64
+          advanced-security: false
+          version: 1.30.1
+
+  # The one check the main ruleset requires: it passes only when every job
+  # above did, so jobs can be added or renamed without touching the ruleset.
+  passed:
+    name: CI passed
+    if: ${{ always() }}
+    needs: [quality, secrets, macos, windows, docker, workflows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Every job succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: $RESULTS"
+          for result in $RESULTS; do [ "$result" = success ] || exit 1; done

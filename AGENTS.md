@@ -26,7 +26,7 @@ Every task follows the four-step loop:
 1. **Plan**: Align on the approach and agreed test seams before writing code.
 2. **Execute**: Implement via vertical slices following TDD.
 3. **Test**: Run unit tests, race detector, and linters.
-4. **Commit**: Create focused, verified commits.
+4. **Commit**: Create focused, verified commits on a branch (`feat/…`, `fix/…`), never on `main`: push it and open a pull request titled as a Conventional Commit (`gh pr create`). `main` is protected; pull requests are squash-merged once CI passes (`gh pr merge --auto --squash`).
 
 ## Plan Mode
 - Make the plan extremely concise. Sacrifice grammar for the sake of concision.

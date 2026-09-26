@@ -1,10 +1,13 @@
 # Weekly dependency updates, grouped so minor and patch bumps arrive as one
-# pull request per ecosystem. Security updates are not grouped or delayed.
+# pull request per ecosystem, for versions out at least a week (a hijacked
+# release is usually caught by then). Security updates are not grouped or
+# delayed. Minor and patch updates merge themselves once CI passes (pr.yml).
 version: 2
 updates:
   - package-ecosystem: gomod
     directory: /
     schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 7 }
     labels: [dependencies, go]
     commit-message: { prefix: "build(deps)" }
     groups:
@@ -14,6 +17,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 7 }
     labels: [dependencies, ci]
     commit-message: { prefix: "ci(deps)" }
     groups:
@@ -23,6 +27,7 @@ updates:
   - package-ecosystem: bun
     directory: /
     schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 7 }
     labels: [dependencies, frontend]
     commit-message: { prefix: "build(deps)" }
     groups:
@@ -32,5 +37,6 @@ updates:
   - package-ecosystem: docker
     directory: /
     schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 7 }
     labels: [dependencies, docker]
     commit-message: { prefix: "build(deps)" }

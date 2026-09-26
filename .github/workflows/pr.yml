@@ -41,3 +41,47 @@ jobs:
           comment-summary-in-pr: on-failure
           # Licenses a dependency of an AGPL-3.0 program cannot have.
           deny-licenses: GPL-2.0-only, LGPL-2.0-only, SSPL-1.0, BUSL-1.1, CC-BY-NC-4.0, CC-BY-NC-SA-4.0
+
+  labels:
+    name: Label for the release notes
+    # Fork pull requests get a read-only token: a maintainer labels those.
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      pull-requests: write
+    steps:
+      # feat → feature, fix → fix, "!" → breaking-change (.github/release.yml
+      # groups the notes by these labels).
+      - name: Label from the title
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: ${{ github.event.pull_request.title }}
+          PR: ${{ github.event.pull_request.html_url }}
+        run: |
+          type="$(printf '%s' "$TITLE" | sed -nE 's/^([a-z]+)(\([^)]*\))?(!?): .*/\1\3/p')"
+          want() { case "$1" in feature) [[ "$type" == feat* ]] ;; fix) [[ "$type" == fix* ]] ;; breaking-change) [[ "$type" == *! ]] ;; esac; }
+          args=()
+          for label in feature fix breaking-change; do
+            if want "$label"; then args+=(--add-label "$label"); else args+=(--remove-label "$label"); fi
+          done
+          gh pr edit "$PR" "${args[@]}"
+
+  dependabot:
+    name: Auto-merge minor and patch updates
+    if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+      # Merges once every required check passes; major updates wait for a person.
+      - name: Merge when CI passes
+        if: ${{ contains(fromJSON('["version-update:semver-patch", "version-update:semver-minor"]'), steps.meta.outputs.update-type) }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR"
