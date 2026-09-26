@@ -351,34 +351,13 @@ func TestTheMacAppsTorrServerOffersGStreamerInsteadOfAnotherBuild(t *testing.T) 
 	}
 }
 
-func TestDirectAndHLSExplainThemselvesWithTooltips(t *testing.T) {
+// Direct and HLS are explained once, above the list: the buttons of each
+// file and the player's switch carry no tooltips over the list.
+func TestDirectAndHLSAreExplainedOnceAboveTheList(t *testing.T) {
 	out := torrPage(t, true)
-	for _, tip := range []string{
-		`data-tip="The original file, full quality: for VLC and other players, and TVs"`,
-		`data-tip="Converted by GStreamer as it plays: plays in any browser, on phones and TVs"`,
-	} {
-		if n := strings.Count(out, tip); n < 2 {
-			t.Errorf("%s shown %d times, want on the file row and the player", tip, n)
-		}
+	if strings.Contains(out, "data-tip=") || regexp.MustCompile(`class="[^"]*\btooltip\b`).MatchString(out) {
+		t.Error("Direct and HLS should have no tooltips")
 	}
-	// The whole Direct or HLS group explains itself, in its own colour.
-	// (The player's link rows spell it out next to them instead.)
-	groups := regexp.MustCompile(`<div role="group" aria-label="(?:Direct|HLS): [^"]*"[^>]*rounded-field[^>]*>`).FindAllString(out, -1)
-	if len(groups) < 2 {
-		t.Errorf("found %d Direct/HLS groups, want the file row's", len(groups))
-	}
-	for _, g := range groups {
-		if !strings.Contains(g, "data-tip=") || !regexp.MustCompile(`tooltip-(primary|secondary)`).MatchString(g) {
-			t.Errorf("stream group without a coloured tooltip: %s", g)
-		}
-	}
-	for _, label := range []string{`aria-label="Play Direct"`, `aria-label="Play HLS"`} {
-		sw := regexp.MustCompile(`<button[^>]*join-item[^>]*` + label + `[^>]*>|<button[^>]*` + label + `[^>]*join-item[^>]*>`).FindString(out)
-		if !strings.Contains(sw, "tooltip") || !strings.Contains(sw, "data-tip=") {
-			t.Errorf("the player's switch lacks a tooltip: %s", sw)
-		}
-	}
-	// On phones there is no hover: the list starts with a visible explainer.
 	legend := regexp.MustCompile(`(?s)<div id="stream-kinds".*?</div>\s*</div>\s*</div>`).FindString(out)
 	for _, want := range []string{"Direct", "The original file, full quality", "HLS", "Converted by GStreamer as it plays"} {
 		if !strings.Contains(legend, want) {

@@ -1357,14 +1357,8 @@ func alertClass(alertType string) string {
 	}
 }
 
-// What Direct and HLS are, in the tooltips and the explainer above the list.
-const (
-	directHelp = "The original file, full quality: for VLC and other players, and TVs"
-	hlsHelp    = "Converted by GStreamer as it plays: plays in any browser, on phones and TVs"
-)
-
 // streamKindsLegend explains, once above the list, the two ways to watch
-// that every card, file and the player offer; tooltips repeat it on hover.
+// that every file and the player offer.
 templ streamKindsLegend() {
 	<div id="stream-kinds" class="grid gap-3 sm:grid-cols-2">
 		@streamKind("Direct", "The original file", "The original file, full quality. For VLC and other players, and TVs.", "file-play", false)
@@ -1395,10 +1389,10 @@ templ streamKind(label, title, text, icon string, hls bool) {
 templ streamGroup(kind, link string, play templ.Attributes) {
 	{{
 		hls := kind == "hls"
-		label, aria, help, msg := "Direct", "Direct: the original file", directHelp, "Direct link copied"
+		label, aria, msg := "Direct", "Direct: the original file", "Direct link copied"
 		playHelp := "Play the original file here. Browsers can't play every format: if it stays black or silent, use HLS or VLC"
 		if hls {
-			label, aria, help, msg = "HLS", "HLS: converted by GStreamer", hlsHelp, "HLS link copied"
+			label, aria, msg = "HLS", "HLS: converted by GStreamer", "HLS link copied"
 			playHelp = "Play here, converted by GStreamer: works in every browser, picks audio tracks"
 		}
 	}}
@@ -1408,11 +1402,10 @@ templ streamGroup(kind, link string, play templ.Attributes) {
 		if hls {
 			data-show="$gst"
 		}
-		data-tip={ help }
-		class={ "tooltip tooltip-left flex items-center rounded-field border",
-			templ.KV("tooltip-primary border-primary/30 bg-primary/5", !hls), templ.KV("tooltip-secondary border-secondary/30 bg-secondary/5", hls) }
+		class={ "flex items-center rounded-field border",
+			templ.KV("border-primary/30 bg-primary/5", !hls), templ.KV("border-secondary/30 bg-secondary/5", hls) }
 	>
-		<span class={ "pl-2 pr-1 text-[9px] font-bold uppercase tracking-wide cursor-help", templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }>{ label }</span>
+		<span class={ "pl-2 pr-1 text-[9px] font-bold uppercase tracking-wide", templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }>{ label }</span>
 		if play != nil {
 			<button
 				type="button"
@@ -1484,19 +1477,17 @@ templ playKindSwitch() {
 	<div role="group" aria-label="Stream" class="join shrink-0">
 		<button
 			type="button"
-			class="tooltip tooltip-right tooltip-primary btn btn-xs join-item font-bold"
+			class="btn btn-xs join-item font-bold"
 			data-class="{ 'btn-primary': $playKind === 'direct' }"
 			aria-label="Play Direct"
-			data-tip={ directHelp }
 			data-on:click={ "if ($playKind !== 'direct') { $playKind = 'direct'\n" + torrStartPlay + "\n}" }
 		>Direct</button>
 		<button
 			type="button"
-			class="tooltip tooltip-right tooltip-secondary btn btn-xs join-item font-bold"
+			class="btn btn-xs join-item font-bold"
 			data-class="{ 'btn-secondary': $playKind === 'hls' }"
 			data-show="$gst"
 			aria-label="Play HLS"
-			data-tip={ hlsHelp }
 			data-on:click={ "if ($playKind !== 'hls') { $playKind = 'hls'\n" + torrStartPlay + "\n}" }
 		>HLS</button>
 	</div>
