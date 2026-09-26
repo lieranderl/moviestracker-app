@@ -52,7 +52,7 @@ func (s *Server) handleMovieIMDbRating(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			rating, err := s.clients().IMDb.GetRating(ctx, imdbID)
 			if err != nil {
-				slog.Warn("failed to fetch imdb rating", "imdb_id", imdbID, "error", err)
+				slog.Warn("failed to fetch imdb rating", "imdb_id", logValue(imdbID), "error", logError(err))
 				results <- imdbRatingResult{target: target}
 				return
 			}

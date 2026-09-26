@@ -6,7 +6,7 @@
 // Usage: bun run icons
 import { icons } from "lucide";
 import * as simpleIcons from "simple-icons";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const viewsDir = "internal/views";
@@ -78,7 +78,14 @@ ${brandEntries.join("\n")}
 `;
 
 // Write only on change so file watchers (Air) do not loop on regeneration.
-if (!existsSync(outFile) || readFileSync(outFile, "utf8") !== out) {
+// The file is read, not first checked for: missing counts as changed.
+let current = null;
+try {
+  current = readFileSync(outFile, "utf8");
+} catch (err) {
+  if (err.code !== "ENOENT") throw err;
+}
+if (current !== out) {
   writeFileSync(outFile, out);
   console.log(`icons: wrote ${names.size} icons and ${brands.size} brand logos to ${outFile}`);
 }

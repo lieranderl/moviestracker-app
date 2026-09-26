@@ -341,6 +341,15 @@ func logValue(v string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(v, "\r", "%0D"), "\n", "%0A")
 }
 
+// logError is an error as logs show it: it can quote request values (a
+// hash, an address), so its line breaks are encoded like logValue's.
+func logError(err error) string {
+	if err == nil {
+		return ""
+	}
+	return logValue(err.Error())
+}
+
 // logPath is a request path as logs show it: a share link's token, which
 // works for anyone holding it, is left out, and line breaks are shown
 // encoded, as they were sent.

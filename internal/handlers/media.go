@@ -63,7 +63,7 @@ func renderMediaError(w http.ResponseWriter, r *http.Request, user *auth.User, e
 	if errors.Is(err, tmdb.ErrNotFound) {
 		status, heading, message = http.StatusNotFound, "Title not found", "TMDB has no entry for this address."
 	} else {
-		slog.Warn("tmdb details lookup failed", "path", r.URL.Path, "error", err)
+		slog.Warn("tmdb details lookup failed", "path", logPath(r.URL.Path), "error", logError(err))
 	}
 	templ.Handler(views.MediaError(user, heading, message), templ.WithStatus(status)).ServeHTTP(w, r)
 }

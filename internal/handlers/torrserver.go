@@ -244,7 +244,7 @@ func (s *Server) handleTorrServerAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, f := range files {
 		if err := client.UploadTorrent(ctx, f.name, f.data, title); err != nil {
-			slog.Warn("TorrServer did not add a torrent file", "file", f.name, "error", err)
+			slog.Warn("TorrServer did not add a torrent file", "file", logValue(f.name), "error", logError(err))
 			failed = append(failed, f.name)
 			continue
 		}
@@ -361,7 +361,7 @@ func (s *Server) handleTorrServerAction(w http.ResponseWriter, r *http.Request) 
 
 	sse := datastar.NewSSE(w, r)
 	if err != nil {
-		slog.Warn("torrserver action failed", "op", op, "hash", hash, "error", err)
+		slog.Warn("torrserver action failed", "op", logValue(op), "hash", logValue(hash), "error", logError(err))
 		patchTorrAlert(r, sse, failure, "error")
 		return
 	}
@@ -411,7 +411,7 @@ func (s *Server) handleTorrServerFiles(w http.ResponseWriter, r *http.Request) {
 	details, err := client.FetchTorrentFiles(ctx, hash)
 	sse := datastar.NewSSE(w, r)
 	if err != nil {
-		slog.Warn("failed to get torrent files", "hash", hash, "error", err)
+		slog.Warn("failed to get torrent files", "hash", logValue(hash), "error", logError(err))
 		patchTorrAlert(r, sse, "TorrServer could not load the files of this torrent. Try again once it has metadata.", "error")
 		return
 	}
@@ -449,7 +449,7 @@ func (s *Server) handleTorrServerProbe(w http.ResponseWriter, r *http.Request) {
 
 	probe, err := s.torrServer.Client().Probe(ctx, hash, idx)
 	if err != nil {
-		slog.Warn("probe failed", "hash", hash, "index", idx, "error", err)
+		slog.Warn("probe failed", "hash", logValue(hash), "index", idx, "error", logError(err))
 		sse := datastar.NewSSE(w, r)
 		_ = sse.PatchElementTempl(views.TorrServerProbeError("Probe failed or media is still buffering. Try again in a few seconds."))
 		return
@@ -485,7 +485,7 @@ func (s *Server) handleTorrServerTracks(w http.ResponseWriter, r *http.Request) 
 
 	var audio, subs []torrserver.ProbeTrack
 	if probe, err := s.torrServer.Client().Probe(ctx, hash, idx); err != nil {
-		slog.Warn("tracks probe failed", "hash", hash, "index", idx, "error", err)
+		slog.Warn("tracks probe failed", "hash", logValue(hash), "index", idx, "error", logError(err))
 	} else {
 		for _, trk := range probe.Tracks {
 			switch trk.Type {
