@@ -1,0 +1,6 @@
+# zizmor audits the workflows in CI (ci.yml) and with `make lint`.
+rules:
+  # GitHub's `uses: $/…` syntax for local workflows is newer than actionlint,
+  # which rejects it; release.yml keeps `./.github/workflows/ci.yml`.
+  self-repository:
+    disable: true

@@ -4,43 +4,64 @@ How the repository, CI and releases are set up, for maintainers.
 
 ## Branches
 
-Trunk-based: `main` is always releasable, and everything else is a
-short-lived branch merged by pull request.
+Trunk-based: `main` is always releasable, and everything reaches it through a
+short-lived branch and a pull request, maintainers included:
 
-- **Rulesets** (applied by `scripts/github-setup.sh`):
-  - `main` cannot be deleted or force-pushed, and keeps a linear history.
-  - It changes only through pull requests: one approval from a code owner,
-    conversations resolved, all required checks green on an up-to-date
-    branch. Repository admins may merge their own pull requests without an
-    approval (the ruleset's pull-request bypass), still with CI green.
-  - `v*` tags cannot be moved or deleted.
-- **Merging:** squash only; the pull request title (a Conventional Commit)
-  becomes the commit on `main`. Branches are deleted after merge.
-- **Required checks:** the five CI jobs and the pull request title check.
-  Renaming a job means updating `scripts/github-setup.sh` and running it.
+```bash
+git switch -c fix/short-name origin/main
+# … commits, make ci …
+git push -u origin HEAD
+gh pr create --fill --title "fix(scope): what changes for users"
+gh pr merge --auto --squash      # merges itself once the checks pass
+```
 
-GitHub enforces rulesets on public repositories, or on private ones with a
-paid plan. While the repository is private on the free plan, the rules are
-saved but not enforced: keep to them by habit, and run the script again
-after making it public.
+`scripts/github-setup.sh` applies the settings below; run it again after
+changing it (it updates what exists).
+
+- **Ruleset `main`** (nobody bypasses it, admins included):
+  - changes only through pull requests, squash-merged, so each pull request
+    is one commit on `main`, signed by GitHub, titled as a Conventional
+    Commit; conversations must be resolved;
+  - required checks, on a branch up to date with `main`: **CI passed**
+    (`ci.yml`'s last job, green only when every CI job is), **Title follows
+    Conventional Commits** and **Dependency review** (`pr.yml`), and no new
+    CodeQL errors or high-severity alerts;
+  - no deletion, force-push or merge commits (linear history). Commits on
+    branches need no signature: the squash merge makes a new commit that
+    GitHub signs.
+  - No approval is required while there is one maintainer: with more, raise
+    `required_approving_review_count` to 1 and turn on code owner review.
+  - In an emergency an admin can switch the ruleset off in Settings → Rules,
+    push, and switch it on again; prefer a quick pull request.
+- **Merging:** squash only, the pull request title and description become the
+  commit; branches are deleted after merge; auto-merge and "Update branch" are
+  on.
+- **Labels:** `pr.yml` labels pull requests from their title (`feat` →
+  `feature`, `fix` → `fix`, `!` → `breaking-change`), which groups the release
+  notes (`.github/release.yml`). Add `skip-changelog` to leave one out.
+- **Dependabot** opens grouped updates weekly, for versions at least seven
+  days old; minor and patch updates merge themselves once CI passes, major
+  ones wait for a person.
+- **Jobs and required checks:** add or rename CI jobs freely, and list new
+  ones in the `needs` of **CI passed**. Only a new workflow's checks need
+  adding to the ruleset.
 
 ## Workflows
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `ci.yml` | pull requests, pushes to `main`, called by releases | `make ci` (generated files, lint, race tests, govulncheck, gosec, build) and the TorrServer API contract; gitleaks over the whole history; macOS tests and a real DMG build; Windows tests, a real installer build, and its install, upgrade, quit, uninstall and purge; the Docker image end to end with `compose.yaml` (`scripts/ci/docker-e2e.sh`: TorrServer and GStreamer, setup, persistence, shutdown, licences) and its linux/arm64 build |
-| `pr.yml` | pull requests | Conventional Commit titles; dependency review (public repository) |
-| `codeql.yml` | pull requests, `main`, weekly | CodeQL for Go, JavaScript and the workflows (public repository) |
-| `release.yml` | `v*` tags | CI, then in parallel the Docker image for linux/amd64 and linux/arm64 (pushed to `ghcr.io/lieranderl/moviestracker:<version>` with SBOM and provenance), the DMG and the Windows installer; checksums, build provenance (public repository), and a **draft** release |
+| `ci.yml` | pull requests, pushes to `main`, called by releases | `make ci` (generated files, lint, race tests, govulncheck, gosec, build) and the TorrServer API contract; gitleaks over the whole history; macOS tests and a real DMG build; Windows tests, a real installer build, and its install, upgrade, quit, uninstall and purge; the Docker image end to end with `compose.yaml` (`scripts/ci/docker-e2e.sh`: TorrServer and GStreamer, setup, persistence, shutdown, licences) on amd64 and on native arm64 runners; zizmor over the workflows; **CI passed** when all of them are green |
+| `pr.yml` | pull requests | Conventional Commit titles; dependency review (vulnerable or AGPL-incompatible dependencies); labels from the title; auto-merge for Dependabot's minor and patch updates |
+| `codeql.yml` | pull requests, `main`, weekly | CodeQL for Go, JavaScript and the workflows |
+| `release.yml` | `v*` tags | Checks the tag is on `main`, runs CI, then in parallel the Docker image for linux/amd64 and linux/arm64 (pushed to `ghcr.io/lieranderl/moviestracker:<version>` with SBOM and signed provenance), the DMG and the Windows installer; checksums, signed build provenance, and a **draft** release |
 | `docker-latest.yml` | a release is published | Points the image's `latest` and `MAJOR.MINOR` tags at the published version (not for pre-releases) |
 
 Every action is pinned to a commit SHA with its version in a comment;
 Dependabot updates the pins, Go modules, Bun tools and the Docker base images
-weekly. Workflows get a read-only token unless a job needs more.
-
-macOS runners cost ten times the minutes of Linux ones on private
-repositories: the macOS job is the one to drop from pull requests if the
-free minutes run short.
+weekly. Workflows get a read-only token unless a job needs more, and zizmor
+(`make lint` runs it too, with [uv](https://docs.astral.sh/uv/)) checks them
+for template injection, over-broad permissions and cache poisoning. Release
+builds use no caches.
 
 ## Secrets
 
@@ -48,38 +69,53 @@ free minutes run short.
 | --- | --- | --- |
 | `MT_SHARED_TMDB_KEY` | `release.yml` | The read-only TMDB token built into releases (the Docker image gets it as a build secret, so the image history does not show it). Without it, releases work but users must add their own key. |
 
-Set it with `scripts/github-setup.sh` (from the git-ignored
-`.tmdb-shared-key`) or `gh secret set MT_SHARED_TMDB_KEY`. To rotate it,
+It lives in the `release` environment, which only `v*` tags can use, so
+pull requests and branches never see it. Set it with
+`scripts/github-setup.sh` (from the git-ignored `.tmdb-shared-key`) or
+`gh secret set MT_SHARED_TMDB_KEY --env release`. To rotate it,
 create a new read-only token for the Moviestracker TMDB account, update the
 secret, release, then revoke the old token.
 
 ## Releasing
 
 Versions follow [Semantic Versioning](https://semver.org): `vMAJOR.MINOR.PATCH`,
-and `v1.2.0-rc.1` for pre-releases.
+and `v1.2.0-rc.1` for pre-releases. The squash-merged Conventional Commit
+titles tell you which part to bump: `feat` → minor, `fix` → patch, `!` →
+major (minor while the version is `0.x`).
 
 1. Make sure `main` is green and has what you want to ship.
-2. Tag it and push the tag:
+2. Tag the commit on `main` and push the tag (only admins can create `v*`
+   tags, and nobody can move or delete one):
 
    ```bash
-   git switch main && git pull
-   git tag -a v0.3.0 -m "Moviestracker v0.3.0"
+   git fetch origin
+   git tag -a v0.3.0 -m "Moviestracker v0.3.0" origin/main
    git push origin v0.3.0
    ```
 
-3. The release workflow runs CI, pushes the Docker image
-   `ghcr.io/lieranderl/moviestracker:<version>` (amd64, arm64), builds the
-   DMG and the Windows installer, and drafts a GitHub release with the files, `checksums.txt` and
-   notes generated from the merged pull requests.
+3. The release workflow checks that the tag is on `main`, runs CI, pushes the
+   Docker image `ghcr.io/lieranderl/moviestracker:<version>` (amd64, arm64),
+   builds the DMG and the Windows installer, and drafts a GitHub release with
+   the files, `checksums.txt` and notes generated from the merged pull
+   requests.
 4. Check the draft: install the DMG on a Mac (and the installer on Windows),
-   read the notes. Then publish.
+   read the notes. Then publish. Releases are immutable: once published,
+   neither the files nor the tag can change.
 5. Publishing the release (not a pre-release) moves the image's `latest`
    tag to it.
 
-The image's package on GitHub (`ghcr.io/lieranderl/moviestracker`) starts
-private, like the repository: when the repository goes public, make the
-package public too (Package settings → Change visibility), or `docker pull`
-asks for a login.
+A release that fails or turns out wrong is not repaired in place: fix it on
+`main` through a pull request and release the next patch version. Anyone can
+check a download or the image came from this workflow:
+
+```bash
+gh attestation verify Moviestracker-v0.3.0.dmg -R lieranderl/moviestracker-app
+gh attestation verify oci://ghcr.io/lieranderl/moviestracker:0.3.0 -R lieranderl/moviestracker-app
+```
+
+The image's package on GitHub (`ghcr.io/lieranderl/moviestracker`) may start
+private after the first release: make it public (Package settings → Change
+visibility), or `docker pull` asks for a login.
 
 To build locally instead: `make dmg VERSION=v0.3.0` on a Mac,
 `make winapp VERSION=v0.3.0` on Windows, and `make docker-build VERSION=v0.3.0`

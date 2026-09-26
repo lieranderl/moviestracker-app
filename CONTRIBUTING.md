@@ -76,8 +76,10 @@ requests that pass CI.
    (`feat!: …`).
 4. Fill in the template: what changes for users, and how you tested it
    (with screenshots, light and dark, for visible changes).
-5. CI must pass and a maintainer must approve. Conversations must be resolved
-   before merging.
+5. CI must pass (one required check, **CI passed**, sums up every job), the
+   title check and dependency review too, and conversations must be resolved.
+   A maintainer reviews pull requests from contributors before merging.
+   Workflows from first-time contributors run once a maintainer approves them.
 
 Never commit keys, passwords, IP addresses or personal data, including in
 tests and screenshots. CI scans the whole history for secrets.
