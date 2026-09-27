@@ -1,0 +1,103 @@
+package views
+
+import (
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"strings"
+)
+
+// UpdatesView is Settings → Updates.
+type UpdatesView struct {
+	Current string // the running version, "dev" for a development build
+	// Newer is the newer release when Available.
+	Newer     Release
+	Available bool
+	Notes     string // the newer release's page on GitHub
+	Download  string // its file for this platform; "" for Docker
+	Docker    bool   // runs as the Docker image: update with docker pull
+	Checking  bool   // the administrator lets Moviestracker ask GitHub
+}
+
+// imageTag is the Docker image's tag for version: "0.4.0" for "v0.4.0".
+func imageTag(version string) string {
+	return "ghcr.io/lieranderl/moviestracker:" + strings.TrimPrefix(version, "v")
+}
+
+// UpdatesPage tells an administrator about new releases.
+templ UpdatesPage(user *auth.User, v UpdatesView) {
+	@settingsShell(user, "updates", "Updates") {
+		<header class="space-y-2">
+			<h1 class="text-3xl font-bold tracking-tight flex items-center gap-3">
+				@Icon("circle-arrow-up", "size-7 text-primary")
+				Updates
+			</h1>
+			<p class="text-base-content/70 max-w-2xl">
+				if v.Current == "dev" {
+					This is a development build, which does not look for new releases.
+				} else {
+					This is Moviestracker { v.Current }.
+				}
+			</p>
+		</header>
+		@UpdatesCheck(v, SourceStatus{})
+	}
+}
+
+// UpdatesCheck is the patchable card: the newer release, if any, and the
+// switch for checking.
+templ UpdatesCheck(v UpdatesView, st SourceStatus) {
+	@sourceCard("updates-check", "circle-arrow-up", "New releases") {
+		if v.Available {
+			<div role="status" class="alert alert-info alert-soft">
+				@Icon("circle-arrow-up", "size-5")
+				<div class="space-y-1">
+					<p class="font-semibold">Moviestracker { v.Newer.Version } is available</p>
+					if v.Docker {
+						<p class="text-sm">Pull the new image and start it again; your data stays in its volume:</p>
+					} else {
+						<p class="text-sm">Download it and install it over this one; your accounts and settings stay.</p>
+					}
+				</div>
+			</div>
+			if v.Docker {
+				<pre class="bg-base-300 rounded-box p-4 text-sm overflow-x-auto"><code>docker compose pull &amp;&amp; docker compose up -d
+# or, without compose:
+docker pull { imageTag(v.Newer.Version) }</code></pre>
+			}
+			<div class="flex flex-wrap gap-2">
+				if v.Download != "" {
+					<a href={ templ.SafeURL(v.Download) } class="btn btn-primary" rel="noopener">
+						@Icon("download", "size-4")
+						Download { v.Newer.Version }
+					</a>
+				}
+				<a href={ templ.SafeURL(v.Notes) } class="btn btn-ghost" target="_blank" rel="noopener">
+					@Icon("external-link", "size-4")
+					What's new
+				</a>
+			</div>
+		} else if v.Checking && v.Current != "dev" {
+			<p class="text-sm text-base-content/70 flex items-center gap-2">
+				@Icon("circle-check", "size-4 text-success")
+				You have the latest version.
+			</p>
+		}
+		<form
+			data-signals={ templ.JSONString(map[string]bool{"updatesCheck": v.Checking}) }
+			data-indicator:updates-saving
+			data-on:change="@post('/api/settings/updates', {filterSignals: {include: /^updatesCheck$/}})"
+		>
+			<label class="flex items-start gap-3 cursor-pointer">
+				<input type="checkbox" class="toggle toggle-primary mt-0.5" data-bind:updates-check data-attr:disabled="$updatesSaving"/>
+				<span>
+					<span class="block text-sm font-semibold">Look for new releases</span>
+					<span class="block text-sm text-base-content/70">
+						Once a day Moviestracker asks GitHub, where it is released, for the latest version, and tells
+						administrators here, in the menu bar or tray, and at the top of every page. Nothing is downloaded or
+						installed by itself; GitHub sees this machine's internet address.
+					</span>
+				</span>
+			</label>
+		</form>
+		@sourceStatus(st)
+	}
+}

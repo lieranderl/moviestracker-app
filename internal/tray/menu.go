@@ -12,6 +12,7 @@ type ItemID string
 const (
 	VersionLine  ItemID = "version"
 	StatusLine   ItemID = "status"
+	NewRelease   ItemID = "release"
 	Open         ItemID = "open"
 	Dashboard    ItemID = "dashboard"
 	CopyLAN      ItemID = "lan"
@@ -39,6 +40,7 @@ type MenuState struct {
 	Port         int
 	LAN          string // this computer's address on the local network, if any
 	StartAtLogin bool
+	Release      *Release // a newer Moviestracker, if one is out
 }
 
 // Menu is the tray menu for st: the same items the macOS menu bar app has,
@@ -62,6 +64,7 @@ func Menu(st MenuState) []Item {
 	return []Item{
 		{ID: VersionLine, Title: "Moviestracker " + st.Version, Disabled: true},
 		{ID: StatusLine, Title: status, Disabled: true},
+		newRelease(st.Release),
 		{ID: Open, Title: "Open Moviestracker", Disabled: !up},
 		{ID: Dashboard, Title: "Dashboard", Disabled: !up},
 		{ID: CopyLAN, Title: "On a TV or phone: " + LANURL(st.LAN, st.Port) + " (click to copy)", Hidden: st.LAN == ""},
@@ -71,6 +74,15 @@ func Menu(st MenuState) []Item {
 		{ID: Uninstall, Title: "Uninstall Moviestracker…"},
 		{ID: Quit, Title: "Quit Moviestracker"},
 	}
+}
+
+// newRelease is the item that downloads a newer Moviestracker; hidden
+// without one.
+func newRelease(rel *Release) Item {
+	if rel == nil {
+		return Item{ID: NewRelease, Title: "Download a new Moviestracker…", Hidden: true}
+	}
+	return Item{ID: NewRelease, Title: "Download Moviestracker " + rel.Version + "…"}
 }
 
 // LANURL is Moviestracker's address for other devices on the network.

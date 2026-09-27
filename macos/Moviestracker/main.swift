@@ -16,6 +16,35 @@ let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionS
 // No caches or cookies in ~/Library for a health check.
 let session = URLSession(configuration: .ephemeral)
 
+// MARK: - New releases
+
+/// NewRelease is a newer Moviestracker, as the server reports it.
+struct NewRelease: Decodable, Equatable {
+    let version: String
+    let notes: String // its page on GitHub
+    let download: String? // the DMG
+
+    /// page is where the menu item leads: the DMG, or the release's page.
+    var page: URL? { URL(string: download ?? notes) }
+}
+
+/// latestRelease asks the server, which asks GitHub once a day, whether a
+/// newer Moviestracker is out; nil when there is none or it cannot say.
+/// Only GitHub's links are kept, as the menu opens them.
+func latestRelease(_ done: @escaping (NewRelease?) -> Void) {
+    var req = URLRequest(url: localURL.appendingPathComponent("api/update"))
+    req.timeoutInterval = 5
+    session.dataTask(with: req) { data, resp, _ in
+        var rel: NewRelease?
+        if (resp as? HTTPURLResponse)?.statusCode == 200, let data,
+           let r = try? JSONDecoder().decode(NewRelease.self, from: data),
+           r.notes.hasPrefix("https://github.com/"), (r.download ?? "https://github.com/").hasPrefix("https://github.com/") {
+            rel = r
+        }
+        DispatchQueue.main.async { done(rel) }
+    }.resume()
+}
+
 // MARK: - Server
 
 /// Server runs the bundled moviestracker program and restarts it when it
@@ -317,6 +346,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var item: NSStatusItem!
     var gstAtStart: String?
     var gstNow: String?
+    var newRelease: NewRelease?
     var openedOnce = UserDefaults.standard.bool(forKey: "openedOnce")
 
     func applicationDidFinishLaunching(_ note: Notification) {
@@ -348,6 +378,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         server.onChange = { [weak self] in self?.stateChanged() }
         Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { _ in rotateLog() }
+        Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in self?.checkRelease() }
         if !UserDefaults.standard.bool(forKey: "loginItemOffered") && !runningFromDownload {
             UserDefaults.standard.set(true, forKey: "loginItemOffered")
             // Off the main thread: macOS may take its time over a new login item.
@@ -404,7 +435,16 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return .terminateLater
     }
 
+    /// checkRelease updates the menu's offer of a newer Moviestracker.
+    func checkRelease() {
+        latestRelease { rel in
+            if let rel, rel != self.newRelease { appLog("Moviestracker \(rel.version) is available") }
+            self.newRelease = rel
+        }
+    }
+
     func stateChanged() {
+        if server.state == .running { checkRelease() }
         item.button?.appearsDisabled = server.state != .running && server.state != .otherInstance
         if server.state == .running && !openedOnce {
             // The first time: open the setup page.
@@ -426,6 +466,9 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         menu.addItem(disabled("Moviestracker \(appVersion)"))
         menu.addItem(disabled(status))
+        if let rel = newRelease {
+            menu.addItem(action("Download Moviestracker \(rel.version)…", #selector(openRelease)))
+        }
         menu.addItem(.separator())
         menu.addItem(action("Open Moviestracker", #selector(openHome), key: "o"))
         menu.addItem(action("Dashboard", #selector(openDashboard)))
@@ -486,6 +529,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func openHome() { NSWorkspace.shared.open(localURL) }
     @objc func openDashboard() { NSWorkspace.shared.open(localURL.appendingPathComponent("dashboard")) }
+    @objc func openRelease() { if let url = newRelease?.page { NSWorkspace.shared.open(url) } }
     @objc func showLogs() { NSWorkspace.shared.open(logURL) }
     @objc func restart() { server.restart(); gstAtStart = gstNow }
     @objc func quit() { NSApp.terminate(nil) }
