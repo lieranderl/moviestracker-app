@@ -106,3 +106,39 @@ func LANAddress() string {
 	}
 	return addr.IP.String()
 }
+
+// MenuItem is a tray menu item as the tray library has it.
+type MenuItem interface {
+	SetTitle(string)
+	Enable()
+	Disable()
+	Check()
+	Uncheck()
+	Hide()
+	Show()
+}
+
+// Apply shows items in the menu; get returns the tray's item for an ID.
+// Hiding comes last: on Windows, changing an item's title, state or check
+// mark puts it back in the menu, even after Hide.
+func Apply(items []Item, get func(ItemID) MenuItem) {
+	for _, it := range items {
+		m := get(it.ID)
+		m.SetTitle(it.Title)
+		if it.Disabled {
+			m.Disable()
+		} else {
+			m.Enable()
+		}
+		if it.Checked {
+			m.Check()
+		} else {
+			m.Uncheck()
+		}
+		if it.Hidden {
+			m.Hide()
+		} else {
+			m.Show()
+		}
+	}
+}

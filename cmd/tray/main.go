@@ -170,25 +170,7 @@ func (a *app) refresh() {
 		a.mu.Unlock()
 		return
 	}
-	for _, it := range tray.Menu(st) {
-		m := a.items[it.ID]
-		m.SetTitle(it.Title)
-		if it.Disabled {
-			m.Disable()
-		} else {
-			m.Enable()
-		}
-		if it.Hidden {
-			m.Hide()
-		} else {
-			m.Show()
-		}
-		if it.Checked {
-			m.Check()
-		} else {
-			m.Uncheck()
-		}
-	}
+	tray.Apply(tray.Menu(st), func(id tray.ItemID) tray.MenuItem { return a.items[id] })
 	systray.SetTooltip(tray.Menu(st)[1].Title)
 	a.mu.Unlock()
 	if st.Status.State == tray.Running && firstRun(a.dataDir) {
