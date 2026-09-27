@@ -1,0 +1,148 @@
+package views
+
+import (
+	"fmt"
+
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+)
+
+// BrowseList is a home row shown whole at /browse/{Slug}.
+type BrowseList struct {
+	Slug, Title, Subtitle, Icon string
+	Week                        tmdb.List // the list; this week's, for trending
+	Day                         tmdb.List // today's trending; empty for other lists
+}
+
+// BrowseLists are the home page's rows, in page order.
+var BrowseLists = browseLists()
+
+func browseLists() []BrowseList {
+	lists := []BrowseList{
+		{Slug: "trending-movies", Title: "Trending movies", Subtitle: "Top trending films from The Movie Database", Icon: "film", Week: tmdb.TrendingMoviesWeek, Day: tmdb.TrendingMoviesDay},
+		{Slug: "trending-series", Title: "Trending TV series", Subtitle: "Top trending episodic series and releases", Icon: "tv", Week: tmdb.TrendingSeriesWeek, Day: tmdb.TrendingSeriesDay},
+	}
+	for _, d := range DiscoverRails {
+		lists = append(lists, BrowseList{Slug: d.Slug, Title: d.Title, Subtitle: d.Subtitle, Icon: d.Icon, Week: d.List})
+	}
+	return lists
+}
+
+// FindBrowseList is the list at /browse/{slug}.
+func FindBrowseList(slug string) (BrowseList, bool) {
+	for _, l := range BrowseLists {
+		if l.Slug == slug {
+			return l, true
+		}
+	}
+	return BrowseList{}, false
+}
+
+// BrowseView is a browse page, or the next page of it.
+type BrowseView struct {
+	List   BrowseList
+	Today  bool // today's trending rather than this week's
+	Items  []tmdb.MediaItem
+	Next   int  // the page to load on scroll; 0 at the end
+	Failed bool // TMDB did not send the page
+}
+
+// Source is the TMDB list shown.
+func (v BrowseView) Source() tmdb.List {
+	if v.Today {
+		return v.List.Day
+	}
+	return v.List.Week
+}
+
+func (v BrowseView) pageURL(today bool) string {
+	if today {
+		return "/browse/" + v.List.Slug + "?window=day"
+	}
+	return "/browse/" + v.List.Slug
+}
+
+// moreURL fetches page of the list shown.
+func (v BrowseView) moreURL(page int) string {
+	if v.Today {
+		return fmt.Sprintf("@get('/api/browse/%s?window=day&page=%d')", v.List.Slug, page)
+	}
+	return fmt.Sprintf("@get('/api/browse/%s?page=%d')", v.List.Slug, page)
+}
+
+templ allLink(slug, title string) {
+	<a href={ templ.SafeURL("/browse/" + slug) } class="btn btn-ghost btn-sm shrink-0 gap-1" aria-label={ "All " + title }>
+		All
+		@Icon("arrow-right", "size-4")
+	</a>
+}
+
+// BrowsePage is a whole list as a grid of posters, 20 at first and 20 more
+// each time the end of the grid scrolls into view.
+templ BrowsePage(user *auth.User, v BrowseView) {
+	@Layout(v.List.Title) {
+		@Navbar(user)
+		<main class="grow pb-20">
+			<div class="max-w-7xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
+				<header class="flex flex-wrap items-end justify-between gap-4">
+					<div class="min-w-0 space-y-1">
+						<a href="/movies" class="link link-hover text-sm text-base-content/60 inline-flex items-center gap-1">
+							@Icon("arrow-left", "size-4")
+							Home
+						</a>
+						<h1 class="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
+							@Icon(v.List.Icon, "size-6 text-primary")
+							{ v.List.Title }
+						</h1>
+						<p class="text-sm text-base-content/60">{ v.List.Subtitle }</p>
+					</div>
+					if v.List.Day != "" {
+						<nav role="tablist" class="tabs tabs-box tabs-sm" aria-label="Trending over">
+							<a role="tab" href={ templ.SafeURL(v.pageURL(false)) } class={ "tab", templ.KV("tab-active", !v.Today) } aria-selected={ fmt.Sprint(!v.Today) }>This week</a>
+							<a role="tab" href={ templ.SafeURL(v.pageURL(true)) } class={ "tab", templ.KV("tab-active", v.Today) } aria-selected={ fmt.Sprint(v.Today) }>Today</a>
+						</nav>
+					}
+				</header>
+				<ul id="browse-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+					@BrowseItems(v.Items)
+				</ul>
+				@BrowseMore(v)
+			</div>
+		</main>
+		@siteFooter()
+	}
+}
+
+// BrowseItems are grid cells, appended to #browse-grid page by page.
+templ BrowseItems(items []tmdb.MediaItem) {
+	for _, item := range items {
+		<li>
+			@mediaCard(item, "w-full")
+		</li>
+	}
+}
+
+// BrowseMore sits under the grid: it loads the next page when it scrolls
+// into view, says TMDB failed, or that the list ends.
+templ BrowseMore(v BrowseView) {
+	<div id="browse-more" class="flex justify-center py-8">
+		switch {
+			case v.Failed:
+				<div role="alert" class="alert alert-warning alert-soft">
+					@Icon("triangle-alert", "size-5")
+					<span>TMDB did not answer.</span>
+					if v.Next > 1 {
+						<button type="button" class="btn btn-sm" data-on:click={ v.moreURL(v.Next) }>Try again</button>
+					} else {
+						<a href={ templ.SafeURL(v.pageURL(v.Today)) } class="btn btn-sm">Try again</a>
+					}
+				</div>
+			case v.Next > 0:
+				<div data-on-intersect={ v.moreURL(v.Next) }>
+					<span class="loading loading-spinner loading-md text-primary" aria-label="Loading more"></span>
+				</div>
+			default:
+				<p class="text-sm text-base-content/60">That is the whole list.</p>
+		}
+	</div>
+}

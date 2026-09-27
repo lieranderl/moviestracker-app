@@ -26,7 +26,44 @@ type fakeTMDBDetails struct {
 	people  map[int]*tmdb.Person
 	search  map[string]*tmdb.SearchResults
 	lists   map[tmdb.List][]tmdb.MediaItem
-	err     error
+	// pages is each list's page count for ListPage, which makes 20 titles a
+	// page, ids page*100+n; pageItems overrides a page's titles.
+	pages     map[tmdb.List]int
+	pageItems map[tmdb.List]map[int][]tmdb.MediaItem
+	err       error
+
+	mu    sync.Mutex
+	asked []string // "list page" asked of ListPage
+}
+
+func (f *fakeTMDBDetails) ListPage(_ context.Context, list tmdb.List, page int) (tmdb.Page, error) {
+	f.mu.Lock()
+	f.asked = append(f.asked, fmt.Sprintf("%s %d", list, page))
+	f.mu.Unlock()
+	if f.err != nil {
+		return tmdb.Page{}, f.err
+	}
+	total := f.pages[list]
+	if page > total {
+		return tmdb.Page{Page: page, TotalPages: total}, nil
+	}
+	mediaType := "movie"
+	if strings.Contains(string(list), "tv/") {
+		mediaType = "tv"
+	}
+	items, ok := f.pageItems[list][page]
+	if !ok {
+		for n := range 20 {
+			items = append(items, tmdb.MediaItem{ID: page*100 + n, Title: fmt.Sprintf("Title %d", page*100+n), MediaType: mediaType})
+		}
+	}
+	return tmdb.Page{Items: items, Page: page, TotalPages: total}, nil
+}
+
+func (f *fakeTMDBDetails) listsAsked() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.asked...)
 }
 
 func (f *fakeTMDBDetails) List(_ context.Context, list tmdb.List) ([]tmdb.MediaItem, error) {

@@ -40,12 +40,15 @@ templ discoverSection() {
 }
 
 templ discoverHeader(d DiscoverRail) {
-	<header>
-		<h2 class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-			@Icon(d.Icon, "size-5 text-primary")
-			{ d.Title }
-		</h2>
-		<p class="text-sm text-base-content/60">{ d.Subtitle }</p>
+	<header class="flex items-end justify-between gap-4">
+		<div class="min-w-0">
+			<h2 class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
+				@Icon(d.Icon, "size-5 text-primary")
+				{ d.Title }
+			</h2>
+			<p class="text-sm text-base-content/60">{ d.Subtitle }</p>
+		</div>
+		@allLink(d.Slug, d.Title)
 	</header>
 }
 

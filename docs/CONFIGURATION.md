@@ -15,7 +15,8 @@ for running it from source, on a server, or in a container.
 | `/settings/updates` | admin | This version, a newer release if GitHub has one (the DMG or installer to download, or the `docker pull` for the image), and the switch for the daily check |
 | `/settings/users` | admin | Accounts: add viewers or administrators, reset passwords (signs that person out), change roles, delete; the last administrator stays |
 | `/dashboard` | signed in | Live overview: what plays now, in Moviestracker and in other apps (and on which device), torrent totals with sparklines and each active torrent, engine, storage, system and source health |
-| `/movies` | signed in | Home: trending billboard, weekly trending rails, and lazily streamed now playing / popular / top rated rails |
+| `/movies` | signed in | Home: trending billboard, weekly trending rails, and lazily streamed now playing / popular / top rated rails, each with an All link |
+| `/browse/{list}` | signed in | A home rail whole: a poster grid (2–5 columns), 20 titles at a time as the page scrolls; trending lists switch between this week and today (`?window=day`) |
 | `/movie/{id}`, `/tv/{id}` | signed in | Title pages: hero, credits, seasons & episodes (TV), JacRed sources (quality and HDR picked before searching; tracker and voice filters), trailers, recommendations |
 | `/person/{id}` | signed in | Biography, known-for rail, movie/TV filmography |
 | `/search?q=` | signed in | Live multi-search across movies, TV and people; trending discovery when blank |

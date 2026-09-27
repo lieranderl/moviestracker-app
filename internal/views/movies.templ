@@ -43,8 +43,8 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 				@HeroBillboard(movies[:min(len(movies), 5)])
 			}
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 space-y-10 mt-10">
-				@mediaRow("trending-movies", "Trending Movies", "Top trending films from The Movie Database", "film", "text-primary", "badge-primary", "No trending movies available. Please verify TMDB_API_KEY configuration.", movies)
-				@mediaRow("trending-series", "Trending TV Series", "Top trending episodic series and releases", "tv", "text-accent", "badge-accent", "No trending TV series available. Please verify TMDB_API_KEY configuration.", series)
+				@mediaRow("trending-movies", "Trending Movies", "Top trending films from The Movie Database", "film", "text-primary", "badge-primary", "No trending movies available. Please verify TMDB_API_KEY configuration.", movies, discover)
+				@mediaRow("trending-series", "Trending TV Series", "Top trending episodic series and releases", "tv", "text-accent", "badge-accent", "No trending TV series available. Please verify TMDB_API_KEY configuration.", series, discover)
 				if discover {
 					@discoverSection()
 				}
@@ -54,15 +54,22 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 	}
 }
 
-templ mediaRow(id, title, subtitle, icon, iconTone, badgeTone, emptyMsg string, items []tmdb.MediaItem) {
+// mediaRow is a home row; with all, its header links to the whole list at
+// /browse/{id}.
+templ mediaRow(id, title, subtitle, icon, iconTone, badgeTone, emptyMsg string, items []tmdb.MediaItem, all bool) {
 	<section id={ id } class="space-y-4" aria-labelledby={ id + "-title" }>
-		<header>
-			<h2 id={ id + "-title" } class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-				@Icon(icon, "size-5 "+iconTone)
-				{ title }
-				<span class={ "badge badge-sm badge-soft font-semibold", badgeTone }>Weekly</span>
-			</h2>
-			<p class="text-sm text-base-content/60">{ subtitle }</p>
+		<header class="flex items-end justify-between gap-4">
+			<div class="min-w-0">
+				<h2 id={ id + "-title" } class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
+					@Icon(icon, "size-5 "+iconTone)
+					{ title }
+					<span class={ "badge badge-sm badge-soft font-semibold", badgeTone }>Weekly</span>
+				</h2>
+				<p class="text-sm text-base-content/60">{ subtitle }</p>
+			</div>
+			if all {
+				@allLink(id, title)
+			}
 		</header>
 		if len(items) == 0 {
 			<div role="status" class="alert alert-info alert-soft">
@@ -295,7 +302,12 @@ func mediaTypeLabel(mediaType, tvLabel string) string {
 }
 
 templ MediaCard(item tmdb.MediaItem) {
-	<a href={ mediaHref(item) } class="card bg-base-200/60 hover:bg-base-200 border border-base-content/5 w-40 sm:w-48 shadow-md hover:shadow-lg transition duration-300 hover:-translate-y-1.5 group shrink-0 focus-visible:outline-2 focus-visible:outline-primary">
+	@mediaCard(item, "w-40 sm:w-48 shrink-0")
+}
+
+// mediaCard is a title's poster card; size sets its width.
+templ mediaCard(item tmdb.MediaItem, size string) {
+	<a href={ mediaHref(item) } class={ "card bg-base-200/60 hover:bg-base-200 border border-base-content/5 shadow-md hover:shadow-lg transition duration-300 hover:-translate-y-1.5 group focus-visible:outline-2 focus-visible:outline-primary", size }>
 		<figure class="aspect-[2/3] relative bg-base-300">
 			if item.PosterURL() != "" {
 				<img

@@ -149,6 +149,10 @@ func (w watchedTMDB) List(ctx context.Context, list tmdb.List) ([]tmdb.MediaItem
 	return watch(w.h, "TMDB", func() ([]tmdb.MediaItem, error) { return w.c.List(ctx, list) })
 }
 
+func (w watchedTMDB) ListPage(ctx context.Context, list tmdb.List, page int) (tmdb.Page, error) {
+	return watch(w.h, "TMDB", func() (tmdb.Page, error) { return w.c.ListPage(ctx, list, page) })
+}
+
 // watchedJacRed records the health of every JacRed search.
 type watchedJacRed struct {
 	c jacred.Searcher
