@@ -102,6 +102,9 @@ type MovieDetails struct {
 	Videos          []Video
 	Recommendations []MediaItem
 	Similar         []MediaItem
+	// Collection is the series of films the movie belongs to; nil when it
+	// belongs to none, or TMDB did not send it.
+	Collection *Collection
 }
 
 // FormattedRuntime renders minutes as "2h 28m", "45m" or "".
@@ -165,6 +168,9 @@ type rawMovie struct {
 	} `json:"release_dates"`
 	Recommendations tmdbResponse `json:"recommendations"`
 	Similar         tmdbResponse `json:"similar"`
+	Collection      *struct {
+		ID int `json:"id"`
+	} `json:"belongs_to_collection"`
 }
 
 // Movie returns full details for a movie, cached for the client TTL.
@@ -195,6 +201,12 @@ func (c *Client) Movie(ctx context.Context, id int) (*MovieDetails, error) {
 			Similar:         relatedTitles(raw.Similar.Results, "movie"),
 		}
 		m.ImdbID = raw.ImdbID
+		if raw.Collection != nil && raw.Collection.ID > 0 {
+			// The page shows without the collection rather than fail.
+			if col, err := c.collection(ctx, raw.Collection.ID); err == nil && len(col.Parts) > 1 {
+				m.Collection = col
+			}
+		}
 		m.LogoPath = selectLogo(raw.Images.Logos)
 		m.TrailerKey = selectTrailer(raw.Videos.Results)
 		for _, country := range raw.ReleaseDates.Results {

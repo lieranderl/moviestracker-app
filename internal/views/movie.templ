@@ -47,11 +47,32 @@ templ MoviePage(user *auth.User, m *tmdb.MovieDetails) {
 			@sourcesSection("movie", m.ID, nil, 0)
 			@castRail("Cast", m.Cast)
 			@videoRail(m.Videos)
+			@collectionRail(m.Collection, m.ID)
 			@mediaRail("recommendations", "Recommended", m.Recommendations)
 			@mediaRail("similar", "More like this", m.Similar)
 			@trailerModal()
 			@appToast()
 		</main>
 		@siteFooter()
+	}
+}
+
+// collectionRail lists the films of the movie's collection in release
+// order, the movie itself marked.
+templ collectionRail(c *tmdb.Collection, current int) {
+	if c != nil {
+		@rail("collection", c.Name, "") {
+			for _, item := range c.Parts {
+				if item.ID == current {
+					<li class="carousel-item rounded-box ring-2 ring-primary ring-offset-2 ring-offset-base-100" aria-current="page">
+						@MediaCard(item)
+					</li>
+				} else {
+					<li class="carousel-item">
+						@MediaCard(item)
+					</li>
+				}
+			}
+		}
 	}
 }
