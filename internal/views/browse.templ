@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
@@ -160,11 +161,45 @@ func (l BrowseList) homeID() string {
 	return "discover-" + l.Slug
 }
 
-// inView lights up the row's chip in the category bar when half of the row
-// is on screen.
-func inView(id string) templ.Attributes {
-	return templ.Attributes{"data-on-intersect__half": fmt.Sprintf("$homeRow = '%s'", id)}
+// rowsFrom are the ids of the home row with id and the rows below it, as a
+// JavaScript array; rowBefore is the row above it ("" for the first).
+func rowsFrom(id string) (rows, rowBefore string) {
+	var ids []string
+	for _, l := range BrowseLists {
+		if l.homeID() == id || len(ids) > 0 {
+			ids = append(ids, "'"+l.homeID()+"'")
+		} else {
+			rowBefore = l.homeID()
+		}
+	}
+	return "[" + strings.Join(ids, ", ") + "]", rowBefore
 }
+
+// markerTop is how far above its row a row's marker sits: just past the
+// navbar and the category bar, where a row's heading lands after a jump
+// (scroll-mt-32).
+const markerTop = "-top-36"
+
+// rowMarker keeps the category bar on the row under the bars. Its row is
+// current once the marker has scrolled past the top of the screen; while
+// the marker is on screen or below, its row is not, and if it or a row
+// below it is current, the row above becomes current. It reads where it is
+// on load and as the page scrolls (the last scroll too, so a jump such as
+// Home or back to top lands on the right row).
+templ rowMarker(id string) {
+	{{ rows, before := rowsFrom(id) }}
+	{{ place := fmt.Sprintf("el.getBoundingClientRect().top < 0 ? ($homeRow = '%s') : (%s.includes($homeRow) && ($homeRow = '%s'))", id, rows, before) }}
+	<span
+		aria-hidden="true"
+		class={ "absolute inset-x-0 h-px pointer-events-none", markerTop }
+		data-init={ place }
+		data-on:scroll__window__throttle.100ms.trailing={ place }
+	></span>
+}
+
+// chipID is the id of a home row's chip in the category bar: a row that
+// collapses hides its chip too.
+func chipID(rowID string) string { return "chip-" + rowID }
 
 // homeLists are the rows the home page shows: the trending ones, and the
 // discovery rails when TMDB details are set up.
@@ -189,7 +224,12 @@ templ categoryBar(lists []BrowseList, current string) {
 	>
 		<ul class="max-w-7xl mx-auto px-4 sm:px-8 py-2 flex gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:none]">
 			for _, l := range lists {
-				<li class="shrink-0">
+				<li
+					class="shrink-0"
+					if current == "" {
+						id={ chipID(l.homeID()) }
+					}
+				>
 					if current == "" {
 						<a
 							href={ templ.SafeURL("#" + l.homeID()) }
@@ -222,7 +262,7 @@ templ toTopButton() {
 	<a
 		href="#top"
 		data-signals:scrolled-down="window.scrollY > 600"
-		data-on:scroll__window__throttle.150ms="$scrolledDown = window.scrollY > 600"
+		data-on:scroll__window__throttle.150ms.trailing="$scrolledDown = window.scrollY > 600"
 		class="btn btn-circle btn-primary shadow-lg fixed bottom-6 right-6 z-40 transition-opacity duration-300 opacity-0 pointer-events-none"
 		data-class:opacity-0="!$scrolledDown"
 		data-class:pointer-events-none="!$scrolledDown"

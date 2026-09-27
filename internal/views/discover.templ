@@ -27,7 +27,8 @@ func (d DiscoverRail) id() string { return "discover-" + d.Slug }
 templ discoverSection() {
 	<div class="space-y-10" data-init="@get('/api/discover')">
 		for _, d := range DiscoverRails {
-			<section id={ d.id() } class="space-y-4 scroll-mt-32" { inView(d.id())... } aria-busy="true" aria-label={ d.Title }>
+			<section id={ d.id() } class="relative space-y-4 scroll-mt-32" aria-busy="true" aria-label={ d.Title }>
+				@rowMarker(d.id())
 				@discoverHeader(d)
 				<div class="flex gap-4 overflow-hidden pb-3" aria-hidden="true">
 					for range [7]struct{}{} {
@@ -56,8 +57,10 @@ templ discoverHeader(d DiscoverRail) {
 templ DiscoverRailLoaded(d DiscoverRail, items []tmdb.MediaItem) {
 	if len(items) == 0 {
 		<section id={ d.id() } class="hidden"></section>
+		<li id={ chipID(d.id()) } class="hidden"></li>
 	} else {
-		<section id={ d.id() } class="space-y-4 scroll-mt-32" { inView(d.id())... } aria-label={ d.Title }>
+		<section id={ d.id() } class="relative space-y-4 scroll-mt-32" aria-label={ d.Title }>
+			@rowMarker(d.id())
 			@discoverHeader(d)
 			@carousel() {
 				for _, item := range items {

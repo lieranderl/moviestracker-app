@@ -155,9 +155,11 @@ func TestTheHomePageJumpsToEachRowFromABarThatFollowsTheScroll(t *testing.T) {
 	for _, want := range []string{
 		`id="category-bar"`,
 		`href="#trending-movies"`, `href="#trending-series"`, `href="#discover-now-playing"`, `href="#discover-top-rated-series"`,
-		// The row in view lights up its chip.
-		`data-on-intersect__half="$homeRow = 'discover-popular-movies'"`,
+		// A row lights up its chip once it reaches the bars, and the row
+		// above takes it back only when the row returns below them.
+		`data-on:scroll__window__throttle.100ms.trailing="el.getBoundingClientRect().top < 0 ? ($homeRow = 'discover-popular-movies') : (['discover-popular-movies', 'discover-top-rated-movies', 'discover-popular-series', 'discover-top-rated-series'].includes($homeRow) && ($homeRow = 'discover-now-playing'))"`,
 		`data-class:btn-primary="$homeRow == 'discover-popular-movies'"`,
+		`id="chip-discover-popular-movies"`,
 		`href="#top"`, "Back to top",
 	} {
 		if !strings.Contains(body, want) {

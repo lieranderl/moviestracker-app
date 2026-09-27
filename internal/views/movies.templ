@@ -59,7 +59,8 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 // mediaRow is a home row; with all, its header links to the whole list at
 // /browse/{id}.
 templ mediaRow(id, title, subtitle, icon, iconTone, badgeTone, emptyMsg string, items []tmdb.MediaItem, all bool) {
-	<section id={ id } class="space-y-4 scroll-mt-32" aria-labelledby={ id + "-title" } { inView(id)... }>
+	<section id={ id } class="relative space-y-4 scroll-mt-32" aria-labelledby={ id + "-title" }>
+		@rowMarker(id)
 		<header class="flex items-end justify-between gap-4">
 			<div class="min-w-0">
 				<h2 id={ id + "-title" } class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
