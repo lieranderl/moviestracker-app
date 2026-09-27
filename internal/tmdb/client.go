@@ -123,8 +123,10 @@ type Client struct {
 	refreshMu  sync.Mutex
 	cached     *Catalog
 	cacheTTL   time.Duration
-	now        func() time.Time
-	details    *detailCache
+	// collectionWait is how long a movie waits for its collection.
+	collectionWait time.Duration
+	now            func() time.Time
+	details        *detailCache
 }
 
 // Option configures a Client.
@@ -154,6 +156,12 @@ func WithCacheTTL(ttl time.Duration) Option {
 	}
 }
 
+// WithCollectionWait sets how long a movie waits for its collection (2s by
+// default); a later one comes without it.
+func WithCollectionWait(d time.Duration) Option {
+	return func(c *Client) { c.collectionWait = d }
+}
+
 func WithClock(now func() time.Time) Option {
 	return func(c *Client) {
 		if now != nil {
@@ -165,11 +173,12 @@ func WithClock(now func() time.Time) Option {
 // NewClient initializes a TMDB API client.
 func NewClient(apiKey string, opts ...Option) *Client {
 	c := &Client{
-		apiKey:   apiKey,
-		baseURL:  defaultBaseURL,
-		cacheTTL: defaultCacheTTL,
-		now:      time.Now,
-		details:  newDetailCache(defaultDetailCacheSize),
+		apiKey:         apiKey,
+		baseURL:        defaultBaseURL,
+		cacheTTL:       defaultCacheTTL,
+		collectionWait: defaultCollectionWait,
+		now:            time.Now,
+		details:        newDetailCache(defaultDetailCacheSize),
 		httpClient: &http.Client{
 			Timeout: defaultTimeout,
 		},
