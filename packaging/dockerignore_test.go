@@ -33,6 +33,8 @@ func TestDockerBuildsNeverSeeSecretsOrLocalData(t *testing.T) {
 	for _, path := range []string{
 		".tmdb-shared-key",
 		".jacred-shared-key",
+		".pins-app-client-id",
+		".pins-app-key.pem",
 		".env",
 		".env.local",
 		".devdata/state.json",

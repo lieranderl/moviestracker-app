@@ -54,6 +54,7 @@ changing it (it updates what exists).
 | `pr.yml` | pull requests | Conventional Commit titles; dependency review (vulnerable or AGPL-incompatible dependencies); labels from the title; auto-merge for Dependabot's minor and patch updates |
 | `codeql.yml` | pull requests, `main`, weekly | CodeQL for Go, JavaScript and the workflows; results in templ's generated `*_templ.go` are dropped before upload |
 | `release.yml` | `v*` tags | Checks the tag is on `main`, runs CI, then in parallel the Docker image for linux/amd64 and linux/arm64 (pushed to `ghcr.io/lieranderl/moviestracker:<version>` with SBOM and signed provenance), the DMG and the Windows installer; checksums, signed build provenance, and a **draft** release |
+| `pins.yml` | Mondays, or by hand | `scripts/update-pins.sh` moves the TorrServer and GStreamer pins to upstream's latest stable releases once they are a week old, and opens (or refreshes) a pull request from the branch `deps/pins` as the pins app; it waits for a person (see [Dependencies](#dependencies)) |
 | `docker-latest.yml` | a release is published | Points the image's `latest` and `MAJOR.MINOR` tags at the published version (not for pre-releases) |
 
 Every action is pinned to a commit SHA with its version in a comment;
@@ -79,6 +80,26 @@ create a new one for the project at jacred.su, update the secret, release,
 then revoke the old one. To rotate it,
 create a new read-only token for the Moviestracker TMDB account, update the
 secret, release, then revoke the old token.
+
+The `pins` environment, which only `main` can use, holds the pins app that
+opens the weekly pin updates: the variable `PINS_APP_CLIENT_ID` and the secret
+`PINS_APP_PRIVATE_KEY`. Actions may not open pull requests in this
+repository, and pull requests opened with `GITHUB_TOKEN` would not start CI,
+so the app does it. To create it (once):
+
+1. GitHub → Settings → Developer settings → GitHub Apps → **New GitHub App**:
+   any unique name (for example `moviestracker-pins`), this repository as the
+   homepage, **Webhook → Active** off; repository permissions **Contents** and
+   **Pull requests**: *Read and write*; installable **Only on this account**.
+2. On the app's page, copy the **Client ID** into `.pins-app-client-id` and
+   **Generate a private key** into `.pins-app-key.pem` (both git-ignored).
+3. **Install App** → only this repository.
+4. Run `scripts/github-setup.sh`, which stores both in the `pins` environment,
+   then delete the local key; `gh workflow run pins.yml` tries it at once.
+
+To rotate the key, generate a new one on the app's page, set it with
+`gh secret set PINS_APP_PRIVATE_KEY --env pins < new.pem`, and delete the old
+one there.
 
 ## Releasing
 
@@ -158,8 +179,14 @@ directive signs the uninstaller too.
   and SHA-256 in `scripts/ci/install-inno-setup.ps1`.
 - Frontend tools are pinned in `package.json` and `bun.lock`.
 
-Updating TorrServer or GStreamer means updating the pin and its checksums
-together, then checking playback on a Mac.
+`pins.yml` opens a pull request every week one of them has a stable release
+at least a week old (`scripts/update-pins.sh`, which you can also run
+yourself: it takes the SHA-256 GitHub publishes for each TorrServer file and
+the `.sha256sum` beside GStreamer's installer, and skips GStreamer's odd,
+development minor versions). CI builds and tests the apps and the image with
+it; before merging, play an MKV (HLS) and an MP4 (Direct) in the Mac app. The
+next release carries the new versions to everyone; nothing updates them in
+installed apps on its own.
 
 Waiting upstream: TorrServer copies AAC Main audio into HLS unchanged, which
 browsers refuse (the player explains it). The fix is

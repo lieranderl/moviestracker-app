@@ -6,6 +6,8 @@
 .worktrees
 .tmdb-shared-key
 .jacred-shared-key
+.pins-app-client-id
+*.pem
 .env
 .env.*
 !.env.example
