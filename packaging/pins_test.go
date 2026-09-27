@@ -97,7 +97,7 @@ func (u upstream) serve(t *testing.T) *httptest.Server {
 				_, _ = w.Write([]byte(u.gstPkg))
 			}
 		case pkg + ".sha256sum":
-			_, _ = fmt.Fprintf(w, "%s  %s\n", sha(u.gstPkg), pkg)
+			_, _ = fmt.Fprintf(w, "%s  %s\n", sha(u.gstPkg), pkg) // #nosec G705 -- a fake server for the test, answering text/plain
 		default:
 			http.NotFound(w, r)
 		}
@@ -125,7 +125,7 @@ func pinnedRepo(t *testing.T) string {
 		if err := os.MkdirAll(filepath.Join(root, filepath.Dir(f)), 0o750); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(root, f), data, 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(root, f), data, 0o600); err != nil { // #nosec G703 -- the test's own temporary folder
 			t.Fatal(err)
 		}
 	}
