@@ -18,6 +18,7 @@ type DashPulse struct {
 // DashStream is one row of "Now streaming".
 type DashStream struct {
 	Title, Poster, File, Viewer, Client string
+	OtherApp                            bool // played through the port for other apps
 	Kind, Position, Output              string
 	Since, Sent, Peers                  string
 	Delivery, Download                  string // to the player, and the torrent's download
@@ -37,12 +38,22 @@ type DashSwarm struct {
 	Down, Up, Loaded                 string
 	Downloaded, Uploaded             string // since TorrServer connected them
 	DownSpark, UpSpark               []float64
-	Busiest                          []DashBusy
+	Rows                             []DashTorrent // the active torrents, busiest first
 }
 
-// DashBusy is a torrent downloading now.
-type DashBusy struct {
-	Title, Speed, Peers string
+// DashTorrent is one active torrent: how it downloads, and what of it plays.
+type DashTorrent struct {
+	Title, Status, StatusClass string
+	Size, Down, Up, Peers      string
+	Downloaded, Uploaded       string // since TorrServer connected it
+	Buffer                     int
+	Playing                    []DashTorrentPlay
+}
+
+// DashTorrentPlay is a file of a torrent playing now, and who plays it.
+type DashTorrentPlay struct {
+	File, Viewer string
+	OtherApp     bool
 }
 
 // DashDisk is one disk's space.
@@ -230,10 +241,18 @@ templ DashStreamsCard(rows []DashStream) {
 								if s.Output != "" {
 									<span class="badge badge-sm badge-ghost">{ s.Output }</span>
 								}
-								<span class="badge badge-sm badge-ghost gap-1">
-									@Icon("user", "size-3")
-									{ s.Viewer }
-								</span>
+								if s.OtherApp {
+									<span class="badge badge-sm badge-soft badge-secondary gap-1">
+										@Icon("app-window", "size-3")
+										Other app
+									</span>
+								}
+								if s.Viewer != "" {
+									<span class="badge badge-sm badge-ghost gap-1">
+										@Icon("user", "size-3")
+										{ s.Viewer }
+									</span>
+								}
 								<span class="badge badge-sm badge-ghost font-mono">{ s.Client }</span>
 							</div>
 						</div>
@@ -304,7 +323,8 @@ templ DashPlayedCard(rows []DashPlayed) {
 	</section>
 }
 
-// DashSwarmCard shows every torrent's totals and the busiest ones.
+// DashSwarmCard shows every torrent's totals, and each active torrent:
+// how it downloads and what of it plays.
 templ DashSwarmCard(s DashSwarm) {
 	@dashCard("dash-swarm", "activity", "Torrents") {
 		<div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -313,21 +333,46 @@ templ DashSwarmCard(s DashSwarm) {
 			@swarmFigure("Active", fmt.Sprintf("%d / %d", s.Active, s.Torrents), fmt.Sprintf("%d peers · %d seeders", s.Peers, s.Seeders), nil, "")
 			@swarmFigure("Since they started", "↓ "+orDash(s.Downloaded), "↑ "+orDash(s.Uploaded)+" uploaded", nil, "")
 		</div>
-		if len(s.Busiest) > 0 {
-			<div class="space-y-1.5">
-				<h3 class="text-xs font-medium uppercase tracking-wide text-base-content/60">Busiest now</h3>
-				<ul class="space-y-1.5">
-					for _, b := range s.Busiest {
-						<li class="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-4 text-sm">
-							<span class="truncate">{ b.Title }</span>
-							<span class="font-mono tabular-nums">{ b.Speed }</span>
-							<span class="font-mono tabular-nums text-xs text-base-content/60 w-20 text-right">{ b.Peers + " peers" }</span>
-						</li>
-					}
-				</ul>
-			</div>
+		if len(s.Rows) > 0 {
+			<ul class="divide-y divide-base-content/10 border-t border-base-content/10">
+				for _, t := range s.Rows {
+					@dashTorrentRow(t)
+				}
+			</ul>
 		}
 	}
+}
+
+templ dashTorrentRow(t DashTorrent) {
+	<li class="py-3 space-y-2">
+		<div class="flex items-start justify-between gap-3">
+			<p class="font-medium truncate min-w-0">{ t.Title }</p>
+			<span class={ "badge badge-sm shrink-0", t.StatusClass }>{ t.Status }</span>
+		</div>
+		<dl class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
+			@streamFact("Download", t.Down)
+			@streamFact("Upload", t.Up)
+			@streamFact("Peers", t.Peers)
+			@streamFact("Buffer", fmt.Sprintf("%d%%", t.Buffer))
+			@streamFact("Size", t.Size)
+			@streamFact("Downloaded", "↓ "+t.Downloaded)
+			@streamFact("Uploaded", "↑ "+t.Uploaded)
+		</dl>
+		if len(t.Playing) > 0 {
+			<ul class="space-y-1">
+				for _, p := range t.Playing {
+					<li class="flex items-center gap-1.5 text-xs min-w-0">
+						@Icon("play", "size-3 text-primary shrink-0")
+						<span class="font-mono truncate">{ p.File }</span>
+						<span class="text-base-content/60 shrink-0">{ p.Viewer }</span>
+						if p.OtherApp {
+							<span class="badge badge-xs badge-soft badge-secondary shrink-0">Other app</span>
+						}
+					</li>
+				}
+			</ul>
+		}
+	</li>
 }
 
 templ swarmFigure(label, value, note string, spark []float64, stroke string) {

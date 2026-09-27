@@ -21,12 +21,15 @@ const (
 // Request is one proxied request of a player.
 type Request struct {
 	Client string // the device (IP address)
-	Viewer string // who: an account name, or "Shared link"
-	Hash   string
-	File   int // TorrServer file index; 0 when the request does not say (HLS segments)
-	Audio  int // HLS audio track, when the request says
-	Kind   Kind
-	Offset int64 // direct: first byte requested
+	Viewer string // who: an account name, "Shared link", or an other app's name
+	// OtherApp is set when another app (Lampa, a TV) plays through the
+	// port Moviestracker opens for them.
+	OtherApp bool
+	Hash     string
+	File     int // TorrServer file index; 0 when the request does not say (HLS segments)
+	Audio    int // HLS audio track, when the request says
+	Kind     Kind
+	Offset   int64 // direct: first byte requested
 	// Segment is the HLS segment requested; -1 for playlists and init data.
 	Segment int
 	Bytes   int64
@@ -35,6 +38,7 @@ type Request struct {
 // Session is one device playing one torrent.
 type Session struct {
 	Client, Viewer, Hash string
+	OtherApp             bool
 	File, Audio          int
 	Kind                 Kind
 	Started, LastSeen    time.Time
@@ -198,6 +202,7 @@ func (t *Tracker) touch(r Request) *Session {
 	}
 	s.LastSeen = now
 	s.Kind = r.Kind
+	s.OtherApp = r.OtherApp
 	if r.Viewer != "" {
 		s.Viewer = r.Viewer
 	}

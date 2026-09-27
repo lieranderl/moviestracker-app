@@ -662,24 +662,6 @@ type hlsOutputKey struct {
 	index, audio int
 }
 
-// parseHLSTrack reads the ?index=&audio= of a GStreamer stream: file 1 and
-// audio track 0 when absent. It fails on anything but those numbers.
-func parseHLSTrack(q url.Values) (index, audio int, ok bool) {
-	index, audio = 1, 0
-	var err error
-	if v := q.Get("index"); v != "" {
-		if index, err = strconv.Atoi(v); err != nil || index <= 0 {
-			return 0, 0, false
-		}
-	}
-	if v := q.Get("audio"); v != "" {
-		if audio, err = strconv.Atoi(v); err != nil || audio < 0 {
-			return 0, 0, false
-		}
-	}
-	return index, audio, true
-}
-
 // maxHLSOutputs bounds hlsOutputCache: far more files than anyone plays
 // between restarts, yet request parameters cannot grow it without limit.
 const maxHLSOutputs = 256
@@ -755,7 +737,7 @@ func (s *Server) handleTorrServerStreamProxy(w http.ResponseWriter, r *http.Requ
 	if rest, ok := strings.CutPrefix(subpath, "gst/"); ok {
 		hash, file, _ := strings.Cut(rest, "/")
 		play.Hash, play.Kind = strings.ToLower(hash), playback.HLS
-		play.File, play.Audio, play.Segment = hlsPosition(file, r.URL.Query())
+		play.File, play.Audio, play.Segment = playback.HLSPosition(file, r.URL.Query())
 	} else {
 		// TorrServer's /stream also adds torrents (a magnet or a .torrent
 		// address in link, save): only a file of a torrent it has may play.
@@ -854,7 +836,7 @@ func (s *Server) proxyEngine(w http.ResponseWriter, r *http.Request, enginePath,
 	if resp.StatusCode == http.StatusOK && strings.HasSuffix(enginePath, "/master.m3u8") {
 		hash := strings.TrimSuffix(strings.TrimPrefix(enginePath, "gst/"), "/master.m3u8")
 		if query, err := url.ParseQuery(rawQuery); err == nil {
-			if index, audio, ok := parseHLSTrack(query); ok {
+			if index, audio, ok := playback.HLSTrack(query); ok {
 				s.hlsOutputs.store(hlsOutputKey{hash, index, audio}, torrserver.ParseMasterPlaylist(buf.String()))
 			}
 		}
@@ -873,36 +855,9 @@ func (s *Server) playRequest(r *http.Request, viewer string) playback.Request {
 		Client:  clientIP(r, s.trustedProxies),
 		Viewer:  viewer,
 		Kind:    playback.Direct,
-		Offset:  rangeStart(r.Header.Get("Range")),
+		Offset:  playback.RangeStart(r.Header.Get("Range")),
 		Segment: -1,
 	}
-}
-
-// rangeStart is the first byte of a "bytes=N-…" Range header (0 without one).
-func rangeStart(header string) int64 {
-	spec, ok := strings.CutPrefix(header, "bytes=")
-	if !ok {
-		return 0
-	}
-	first, _, _ := strings.Cut(spec, "-")
-	n, _ := strconv.ParseInt(strings.TrimSpace(first), 10, 64)
-	return max(n, 0)
-}
-
-// hlsPosition reads a GStreamer HLS request: the master playlist names the
-// file and audio track, a segment its number (-1 for anything else).
-func hlsPosition(path string, q url.Values) (file, audio, segment int) {
-	segment = -1
-	switch {
-	case path == "master.m3u8":
-		file, audio, _ = parseHLSTrack(q)
-	case strings.HasPrefix(path, "seg/"):
-		name := strings.TrimPrefix(path, "seg/")
-		if n, err := strconv.Atoi(strings.TrimSuffix(name, ".m4s")); err == nil && n >= 0 {
-			segment = n
-		}
-	}
-	return file, audio, segment
 }
 
 // sentCounter counts a stream's bytes for the dashboard as the player reads them.

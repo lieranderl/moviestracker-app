@@ -199,7 +199,7 @@ func (s *Server) handleDashboardStream(w http.ResponseWriter, r *http.Request) {
 			{"pulse", views.DashPulseStrip(dashPulse(plays, people, torrents, system))},
 			{"streams", views.DashStreamsCard(s.dashStreams(plays, torrents.List, system))},
 			{"played", views.DashPlayedCard(played)},
-			{"swarm", views.DashSwarmCard(dashSwarm(torrents))},
+			{"swarm", views.DashSwarmCard(dashSwarm(torrents, plays, system.CacheSize))},
 			{"app", views.DashAppCard(s.dashApp(system, echo, plays))},
 			{"system", views.DashSystemCard(dashMachine(system))},
 			{"people", views.DashPeopleCard(people)},
@@ -217,9 +217,12 @@ func (s *Server) handleDashboardStream(w http.ResponseWriter, r *http.Request) {
 
 // dashPulse is the headline strip.
 func dashPulse(plays []playback.Session, people []views.DashPerson, t torrentsState, sys systemState) views.DashPulse {
-	shared := 0
+	shared, other := 0, 0
 	for _, p := range plays {
-		if p.Viewer == sharedViewer {
+		switch {
+		case p.OtherApp:
+			other++
+		case p.Viewer == sharedViewer:
 			shared++
 		}
 	}
@@ -237,11 +240,16 @@ func dashPulse(plays []playback.Session, people []views.DashPerson, t torrentsSt
 		DownSpark: t.Down, UpSpark: t.Up,
 	}
 	var where []string
-	if inApp := len(plays) - shared; inApp > 0 {
+	if inApp := len(plays) - shared - other; inApp > 0 {
 		where = append(where, fmt.Sprintf("%d in the app", inApp))
 	}
 	if shared > 0 {
 		where = append(where, countOf(shared, "shared link", "shared links"))
+	}
+	if other == 1 {
+		where = append(where, "1 in another app")
+	} else if other > 1 {
+		where = append(where, fmt.Sprintf("%d in other apps", other))
 	}
 	v.PlayingNote = strings.Join(where, " · ")
 	if len(plays) == 0 {
@@ -270,6 +278,7 @@ func (s *Server) dashStreams(plays []playback.Session, list []torrserver.Torrent
 			Title:    t.DisplayName(),
 			Poster:   t.Poster,
 			Viewer:   p.Viewer,
+			OtherApp: p.OtherApp,
 			Client:   p.Client,
 			Since:    humanDuration(time.Since(p.Started)),
 			Sent:     size(p.Bytes),
@@ -334,13 +343,25 @@ func (s *Server) dashPlayed(now time.Time, list []torrserver.Torrent) []views.Da
 		}
 		rows = append(rows, views.DashPlayed{
 			When: p.Started.Format("15:04"), Duration: humanDuration(p.Ended.Sub(p.Started)),
-			Title: title, Viewer: p.Viewer, Device: p.Client, Kind: kind, Sent: size(p.Bytes),
+			Title: title, Viewer: viewerOf(p), Device: p.Client, Kind: kind, Sent: size(p.Bytes),
 		})
 	}
 	return rows
 }
 
-func dashSwarm(t torrentsState) views.DashSwarm {
+// viewerOf names who played p in a line of text: an other app says so.
+func viewerOf(p playback.Session) string {
+	switch {
+	case !p.OtherApp:
+		return p.Viewer
+	case p.Viewer == "":
+		return "Other app"
+	default:
+		return p.Viewer + " (other app)"
+	}
+}
+
+func dashSwarm(t torrentsState, plays []playback.Session, cacheSize int64) views.DashSwarm {
 	totals := stats.TotalsOf(t.List)
 	v := views.DashSwarm{
 		Torrents: totals.Torrents, Active: totals.Active, Peers: totals.Peers, Seeders: totals.Seeders,
@@ -348,11 +369,29 @@ func dashSwarm(t torrentsState) views.DashSwarm {
 		Downloaded: size(totals.Downloaded), Uploaded: size(totals.Uploaded),
 		DownSpark: t.Down, UpSpark: t.Up,
 	}
-	busy := slices.Clone(t.List)
-	busy = slices.DeleteFunc(busy, func(tr torrserver.Torrent) bool { return tr.Download <= 0 })
-	slices.SortFunc(busy, func(a, b torrserver.Torrent) int { return cmp.Compare(b.Download, a.Download) })
-	for _, tr := range busy[:min(len(busy), 3)] {
-		v.Busiest = append(v.Busiest, views.DashBusy{Title: tr.DisplayName(), Speed: speed(tr.Download), Peers: fmt.Sprint(tr.ActivePeers)})
+	active := slices.DeleteFunc(slices.Clone(t.List), func(tr torrserver.Torrent) bool { return tr.Stat < 1 || tr.Stat > 3 })
+	slices.SortStableFunc(active, func(a, b torrserver.Torrent) int { return cmp.Compare(b.Download, a.Download) })
+	for _, tr := range active {
+		row := views.DashTorrent{
+			Title: tr.DisplayName(), Status: tr.StatusLabel(), StatusClass: tr.StatusBadgeClass(),
+			Size: size(tr.TorrentSize), Down: speed(tr.Download), Up: speed(tr.Upload),
+			Peers:      fmt.Sprintf("%d of %d · %d seeders", tr.ActivePeers, tr.TotalPeers, tr.Connected),
+			Downloaded: size(tr.Downloaded), Uploaded: size(tr.Uploaded),
+			Buffer: tr.BufferPercent(cacheSize),
+		}
+		for _, p := range plays {
+			if p.Hash != strings.ToLower(tr.Hash) {
+				continue
+			}
+			file := fmt.Sprintf("File %d", p.File)
+			for _, f := range tr.FileStats {
+				if f.ID == p.File {
+					file = torrserver.StreamFileName(p.Hash, f)
+				}
+			}
+			row.Playing = append(row.Playing, views.DashTorrentPlay{File: file, Viewer: p.Viewer, OtherApp: p.OtherApp})
+		}
+		v.Rows = append(v.Rows, row)
 	}
 	return v
 }

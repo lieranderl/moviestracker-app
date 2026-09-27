@@ -14,6 +14,7 @@ import (
 
 	"github.com/lieranderl/moviestracker-app/internal/config"
 	"github.com/lieranderl/moviestracker-app/internal/gateway"
+	"github.com/lieranderl/moviestracker-app/internal/streams"
 )
 
 // fakeTorrServer answers like a TorrServer started with --httpauth for the
@@ -42,7 +43,11 @@ func newFakeTorrServer(t *testing.T) *fakeTorrServer {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		switch r.URL.Path {
+		path := r.URL.Path
+		if strings.HasPrefix(path, "/stream/") || strings.HasPrefix(path, "/play/") {
+			path = "/stream"
+		}
+		switch path {
 		case "/echo":
 			_, _ = io.WriteString(w, "MatriX.145")
 		case "/torrents":
@@ -80,6 +85,7 @@ type setup struct {
 	engine  *fakeTorrServer
 	store   *config.Store
 	handler http.Handler
+	plays   *streams.Tracker
 }
 
 func newSetup(t *testing.T) *setup {
@@ -89,13 +95,15 @@ func newSetup(t *testing.T) *setup {
 		t.Fatal(err)
 	}
 	engine := newFakeTorrServer(t)
+	plays := streams.New(time.Minute)
 	h := gateway.New(gateway.Config{
 		Store: store,
+		Plays: plays,
 		Upstream: func() gateway.Upstream {
 			return gateway.Upstream{URL: engine.URL, User: "moviestracker", Password: "engine-secret"}
 		},
 	})
-	return &setup{engine: engine, store: store, handler: h}
+	return &setup{engine: engine, store: store, handler: h, plays: plays}
 }
 
 // addLogin creates a login for an app, as an admin would, and returns it.

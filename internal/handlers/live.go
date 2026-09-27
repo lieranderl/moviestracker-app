@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	playback "github.com/lieranderl/moviestracker-app/internal/streams"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -140,7 +141,7 @@ func (s *Server) streamPlayerStats(w http.ResponseWriter, r *http.Request, hash 
 	defer s.releaseSSE()
 	q := r.URL.Query()
 	gst := q.Get("gst") == "1"
-	index, audio, ok := parseHLSTrack(q)
+	index, audio, ok := playback.HLSTrack(q)
 	if !ok {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return

@@ -62,6 +62,8 @@ The application follows a clean 3-tier server-rendered hypermedia architecture:
 - **Dashboard (`/dashboard`)**:
   - One SSE stream keeps six cards current from shared topics: `engine`, `torrents` (whose poller also keeps 2-minute speed histories for the sparklines), `plays` (sessions from the stream proxy), `system` (gopsutil every 5s; TorrServer storage settings and folder sizes at most every minute) and `sources` (outcome of real TMDB/JacRed/IMDb calls, recorded by wrappers around their clients).
   - Playback sessions (`internal/streams`) are keyed by device and torrent; direct streams report the byte range read, HLS the segment requested; a session ends 30s after its last request unless a response is still being sent.
+  - The gateway for other apps feeds the same sessions (one tracker, made in `cmd/server`): `/stream?…&play`, `/play/{hash}/{file}` and `/gst/{hash}/…`, marked as another app's and named after the app's login. A player without a login is credited to the app that last signed in from its address within 10 minutes, else shown as "Other app".
+  - The Torrents card lists each active torrent (TorrServer status 1–3), busiest first: speeds, peers, buffer, size, data since connected, and which of its files play and for whom. It is read-only.
 - **Settings (`internal/handlers/settings_spec.go`)**:
   - Each TorrServer setting is described once (key, label, range, unit, inverted switches, format check) and the page, validation and conversion come from that description. Everything posted is checked before anything is saved.
   - TorrServer replaces its whole settings object on save, so the client reads it as raw JSON fields and writes it back with only the changed fields replaced; settings Moviestracker does not show (Rutor, Torznab, TMDB, MCP, SSL…) and fields of newer TorrServer versions are kept.
@@ -128,7 +130,7 @@ The project is layered:
 - `internal/update`: asks GitHub whether a newer stable release is out, and picks this platform's download
 - `internal/streamlink`: signs the stream links external players open
 - `internal/live`: shared pollers behind every live view (one TorrServer call per topic, whatever the number of open pages)
-- `internal/streams`: playback sessions seen by the stream proxy, for the dashboard
+- `internal/streams`: playback sessions seen by the stream proxy and the gateway for other apps, for the dashboard
 - `internal/stats`: torrent totals, sparkline histories and machine stats (gopsutil)
 - `internal/torrserver`: TorrServer client and HLS stream proxy
 - `internal/views`: Templ pages and patchable fragments; carousels share one `carousel` component with back/forward buttons for mouse screens (`pointer-fine`)

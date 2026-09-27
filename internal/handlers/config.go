@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	playback "github.com/lieranderl/moviestracker-app/internal/streams"
 	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/auth"
@@ -57,6 +58,9 @@ type Config struct {
 	// StreamIdle is how long a playback session lasts after its player's
 	// last request (30s when zero).
 	StreamIdle time.Duration
+	// Plays follows what plays, shared with the port for other apps so the
+	// dashboard shows their streams too; nil makes one, with StreamIdle.
+	Plays *playback.Tracker
 	// Version is Moviestracker's version, shown on the dashboard.
 	Version string
 	// Updates tells whether a newer Moviestracker has been released; nil

@@ -17,6 +17,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httputil"
+	"net/netip"
 	"net/url"
 	"path"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/lieranderl/moviestracker-app/internal/config"
+	"github.com/lieranderl/moviestracker-app/internal/streams"
 )
 
 // Upstream is the TorrServer requests go to, and Moviestracker's login to it.
@@ -39,6 +41,8 @@ type Config struct {
 	Store *config.Store
 	// Upstream is the TorrServer Moviestracker uses now.
 	Upstream func() Upstream
+	// Plays, when set, follows what apps play, for the dashboard.
+	Plays *streams.Tracker
 }
 
 // Gateway is the http.Handler other apps talk to.
@@ -48,8 +52,9 @@ type Gateway struct {
 	client *http.Client
 
 	mu      sync.Mutex
-	saved   map[string]time.Time // info hash → until when it counts as saved
-	signed  map[string]signedIn  // user → the login it last signed in with
+	saved   map[string]time.Time   // info hash → until when it counts as saved
+	signed  map[string]signedIn    // user → the login it last signed in with
+	seen    map[netip.Addr]seenApp // device → the app that last signed in from it
 	guesses *guessLimiter
 	// mark is sent with every request passed on: one that comes back is
 	// the gateway's own, so TorrServer's address is the gateway.
@@ -73,7 +78,7 @@ const savedFor = time.Minute
 
 // New returns the gateway for cfg.
 func New(cfg Config) *Gateway {
-	g := &Gateway{cfg: cfg, client: &http.Client{Timeout: 10 * time.Second}, saved: map[string]time.Time{}, signed: map[string]signedIn{}, guesses: newGuessLimiter(), mark: rand.Text()}
+	g := &Gateway{cfg: cfg, client: &http.Client{Timeout: 10 * time.Second}, saved: map[string]time.Time{}, signed: map[string]signedIn{}, seen: map[netip.Addr]seenApp{}, guesses: newGuessLimiter(), mark: rand.Text()}
 	g.proxy = &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			up := cfg.Upstream()
@@ -127,7 +132,8 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Decide on the path TorrServer will see: "//shutdown" or "/x/../shutdown"
 	// is "/shutdown".
 	r.URL.Path, r.URL.RawPath = path.Clean("/"+r.URL.Path), ""
-	if _, ok := g.login(r); !ok && !g.savedStream(r) {
+	name, signed := g.login(r)
+	if !signed && !g.savedStream(r) {
 		g.guesses.failed(addr, now)
 		w.Header().Set("WWW-Authenticate", `Basic realm="Moviestracker TorrServer"`)
 		http.Error(w, "Sign in with a login from Moviestracker (Settings → Other apps).", http.StatusUnauthorized)
@@ -135,6 +141,16 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if reason := refused(r); reason != "" {
 		http.Error(w, reason, http.StatusForbidden)
+		return
+	}
+	if signed {
+		g.signedInFrom(addr, name, now)
+	}
+	if play, ok := playOf(r); ok && g.cfg.Plays != nil {
+		play.Client, play.Viewer = addr.String(), g.viewer(addr, name, now)
+		c := &counted{ResponseWriter: w, plays: g.cfg.Plays, play: play}
+		g.proxy.ServeHTTP(c, r)
+		c.done()
 		return
 	}
 	g.proxy.ServeHTTP(w, r)
