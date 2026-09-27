@@ -195,6 +195,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /settings/updates", s.handleUpdatesPage)
 	s.mux.HandleFunc("GET /settings/{section}", s.handleSettingsPage)
 	s.mux.HandleFunc("GET /movies", s.handleMoviesPage)
+	s.mux.HandleFunc("GET /browse/{slug}", s.handleBrowsePage)
 	s.mux.HandleFunc("GET /dashboard", s.handleDashboardPage)
 	s.mux.HandleFunc("GET /torrserver", s.handleTorrServerPage)
 	s.mux.HandleFunc("GET /movie/{id}", s.handleMoviePage)
@@ -234,6 +235,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/tv/{id}/season/{season}", s.handleSeason)
 	s.mux.HandleFunc("GET /api/search", s.handleSearchAPI)
 	s.mux.HandleFunc("GET /api/discover", s.handleDiscover)
+	s.mux.HandleFunc("GET /api/browse/{slug}", s.handleBrowseMore)
 	s.mux.HandleFunc("GET /api/torrents", s.handleTorrentSearch)
 	s.mux.HandleFunc("POST /api/torrents/add", s.handleTorrentAdd)
 

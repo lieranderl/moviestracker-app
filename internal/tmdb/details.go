@@ -30,6 +30,7 @@ type DetailsProvider interface {
 	Person(ctx context.Context, id int) (*Person, error)
 	Search(ctx context.Context, query string) (*SearchResults, error)
 	List(ctx context.Context, list List) ([]MediaItem, error)
+	ListPage(ctx context.Context, list List, page int) (Page, error)
 }
 
 // ExternalIDs are a title's or person's profiles on other sites, as
