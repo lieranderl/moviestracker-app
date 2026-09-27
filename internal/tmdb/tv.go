@@ -1,10 +1,12 @@
 package tmdb
 
 import (
+	"cmp"
 	"context"
 	"fmt"
-	"net/url"
 	"slices"
+
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 )
 
 const stillImageBase = "https://image.tmdb.org/t/p/w300"
@@ -158,19 +160,21 @@ type rawTV struct {
 	Images          tmdbImagesResponse           `json:"images"`
 	Recommendations tmdbResponse                 `json:"recommendations"`
 	Similar         tmdbResponse                 `json:"similar"`
+	Translations    translations                 `json:"translations"`
 }
 
 // TV returns full details for a series, cached for the client TTL.
 func (c *Client) TV(ctx context.Context, id int) (*TVDetails, error) {
 	return cached(ctx, c, fmt.Sprintf("tv/%d", id), func(ctx context.Context) (*TVDetails, error) {
 		var raw rawTV
-		query := url.Values{
-			"append_to_response":     {"aggregate_credits,videos,images,content_ratings,external_ids,recommendations,similar,alternative_titles"},
-			"include_image_language": {"en,null"},
-		}
+		query := detailQuery(ctx, "aggregate_credits,videos,images,content_ratings,external_ids,recommendations,similar,alternative_titles")
 		if err := c.getJSON(ctx, fmt.Sprintf("/3/tv/%d", id), query, &raw); err != nil {
 			return nil, err
 		}
+		english := raw.Translations.english()
+		raw.Overview = cmp.Or(raw.Overview, english.Overview)
+		raw.Tagline = cmp.Or(raw.Tagline, english.Tagline)
+		lang := i18n.FromContext(ctx)
 		t := &TVDetails{
 			MediaItem:        raw.mediaItem("tv"),
 			OriginalTitle:    nativeTitle(raw.OriginalName, raw.Language, raw.Countries, raw.AltTitles.Results),
@@ -184,13 +188,13 @@ func (c *Client) TV(ctx context.Context, id int) (*TVDetails, error) {
 			Genres:           raw.Genres,
 			Creators:         raw.CreatedBy,
 			Seasons:          regularSeasonsFirst(raw.Seasons),
-			Videos:           youTubeVideos(raw.Videos.Results),
+			Videos:           youTubeVideos(raw.Videos.Results, lang),
 			Recommendations:  relatedTitles(raw.Recommendations.Results, "tv"),
 			Similar:          relatedTitles(raw.Similar.Results, "tv"),
 		}
 		t.ImdbID = raw.ExternalIDs.IMDb
-		t.LogoPath = selectLogo(raw.Images.Logos)
-		t.TrailerKey = selectTrailer(raw.Videos.Results)
+		t.LogoPath = selectLogo(raw.Images.Logos, lang)
+		t.TrailerKey = selectTrailer(raw.Videos.Results, lang)
 		// episode_run_time is often empty for newer shows; fall back to the
 		// most recent episode's runtime.
 		t.EpisodeRuntime = raw.LastEpisode.Runtime

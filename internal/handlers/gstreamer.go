@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -34,7 +33,7 @@ func (s *Server) gstSetup(user *auth.User, st gstinstall.Status, echo torrserver
 	}
 	if st.Phase == gstinstall.Downloading && st.Total > 0 {
 		v.Percent = int(st.Downloaded * 100 / st.Total)
-		v.Progress = fmt.Sprintf("%s of %s", size(st.Downloaded), size(st.Total))
+		v.Progress = size(st.Downloaded) + " / " + size(st.Total)
 	}
 	return v
 }

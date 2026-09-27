@@ -9,29 +9,30 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
+	"context"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 )
 
-func movieFacts(m *tmdb.MovieDetails) []string {
-	facts := []string{"Movie"}
+func movieFacts(ctx context.Context, m *tmdb.MovieDetails) []string {
+	facts := []string{tr(ctx, "Movie")}
 	if y := m.ReleaseYear(); y != "" {
 		facts = append(facts, y)
 	}
-	if r := m.FormattedRuntime(); r != "" {
+	if r := runtime(ctx, m.Runtime); r != "" {
 		facts = append(facts, r)
 	}
 	return facts
 }
 
-func movieAbout(m *tmdb.MovieDetails) []factItem {
+func movieAbout(ctx context.Context, m *tmdb.MovieDetails) []factItem {
 	return []factItem{
 		{Label: "Directed by", People: m.Directors},
 		{Label: "Written by", People: m.Writers},
 		{Label: "Genres", Value: genreNames(m.Genres)},
-		{Label: "Released", Value: m.ReleaseDate},
-		{Label: "Runtime", Value: m.FormattedRuntime()},
-		{Label: "Status", Value: m.Status},
+		{Label: "Release date", Value: m.ReleaseDate},
+		{Label: "Runtime", Value: runtime(ctx, m.Runtime)},
+		{Label: "Status", Value: tr(ctx, m.Status)},
 		{Label: "Original title", Value: originalTitle(m.OriginalTitle, m.Title)},
 	}
 }
@@ -87,7 +88,7 @@ func MoviePage(user *auth.User, m *tmdb.MovieDetails) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(mediaPageSignals)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movie.templ`, Line: 41, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movie.templ`, Line: 42, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 			if templ_7745c5c3_Err != nil {
@@ -98,9 +99,9 @@ func MoviePage(user *auth.User, m *tmdb.MovieDetails) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var4 string
-			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(videoClick)
+			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(videoClick(ctx))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movie.templ`, Line: 41, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movie.templ`, Line: 42, Col: 92}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 			if templ_7745c5c3_Err != nil {
@@ -122,7 +123,7 @@ func MoviePage(user *auth.User, m *tmdb.MovieDetails) templ.Component {
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = trailerButton(m.TrailerKey, m.Title+" trailer").Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = trailerButton(m.TrailerKey, trf(ctx, "%s trailer", m.Title)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -130,17 +131,17 @@ func MoviePage(user *auth.User, m *tmdb.MovieDetails) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = heroLink("#sources", "magnet", "Find sources").Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = heroLink("#sources", "magnet", tr(ctx, "Find sources")).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = detailHero(m.MediaItem, movieFacts(m), m.Certification, genreNames(m.Genres)).Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = detailHero(m.MediaItem, movieFacts(ctx, m), m.Certification, genreNames(m.Genres)).Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = aboutSection(m.MediaItem, m.Tagline, movieAbout(m), officialLinks("title", m.Links, m.Homepage)).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = aboutSection(m.MediaItem, m.Tagline, movieAbout(ctx, m), officialLinks("title", m.Links, m.Homepage)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -148,7 +149,7 @@ func MoviePage(user *auth.User, m *tmdb.MovieDetails) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = castRail("Cast", m.Cast).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = castRail(tr(ctx, "Cast"), m.Cast).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -160,11 +161,11 @@ func MoviePage(user *auth.User, m *tmdb.MovieDetails) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = mediaRail("recommendations", "Recommended", m.Recommendations).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = mediaRail("recommendations", tr(ctx, "Recommended"), m.Recommendations).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = mediaRail("similar", "More like this", m.Similar).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = mediaRail("similar", tr(ctx, "More like this"), m.Similar).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

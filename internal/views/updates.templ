@@ -24,17 +24,17 @@ func imageTag(version string) string {
 
 // UpdatesPage tells an administrator about new releases.
 templ UpdatesPage(user *auth.User, v UpdatesView) {
-	@settingsShell(user, "updates", "Updates") {
+	@settingsShell(user, "updates", tr(ctx, "Updates")) {
 		<header class="space-y-2">
 			<h1 class="text-3xl font-bold tracking-tight flex items-center gap-3">
 				@Icon("circle-arrow-up", "size-7 text-primary")
-				Updates
+				{ tr(ctx, "Updates") }
 			</h1>
 			<p class="text-base-content/70 max-w-2xl">
 				if v.Current == "dev" {
-					This is a development build, which does not look for new releases.
+					{ tr(ctx, "This is a development build, which does not look for new releases.") }
 				} else {
-					This is Moviestracker { v.Current }.
+					{ trf(ctx, "This is Moviestracker %s.", v.Current) }
 				}
 			</p>
 		</header>
@@ -45,16 +45,16 @@ templ UpdatesPage(user *auth.User, v UpdatesView) {
 // UpdatesCheck is the patchable card: the newer release, if any, and the
 // switch for checking.
 templ UpdatesCheck(v UpdatesView, st SourceStatus) {
-	@sourceCard("updates-check", "circle-arrow-up", "New releases") {
+	@sourceCard("updates-check", "circle-arrow-up", tr(ctx, "New releases")) {
 		if v.Available {
 			<div role="status" class="alert alert-info alert-soft">
 				@Icon("circle-arrow-up", "size-5")
 				<div class="space-y-1">
-					<p class="font-semibold">Moviestracker { v.Newer.Version } is available</p>
+					<p class="font-semibold">{ trf(ctx, "Moviestracker %s is available", v.Newer.Version) }</p>
 					if v.Docker {
-						<p class="text-sm">Pull the new image and start it again; your data stays in its volume:</p>
+						<p class="text-sm">{ tr(ctx, "Pull the new image and start it again; your data stays in its volume:") }</p>
 					} else {
-						<p class="text-sm">Download it and install it over this one; your accounts and settings stay.</p>
+						<p class="text-sm">{ tr(ctx, "Download it and install it over this one; your accounts and settings stay.") }</p>
 					}
 				</div>
 			</div>
@@ -67,18 +67,18 @@ docker pull { imageTag(v.Newer.Version) }</code></pre>
 				if v.Download != "" {
 					<a href={ templ.SafeURL(v.Download) } class="btn btn-primary" rel="noopener">
 						@Icon("download", "size-4")
-						Download { v.Newer.Version }
+						{ trf(ctx, "Download %s", v.Newer.Version) }
 					</a>
 				}
 				<a href={ templ.SafeURL(v.Notes) } class="btn btn-ghost" target="_blank" rel="noopener">
 					@Icon("external-link", "size-4")
-					What's new
+					{ tr(ctx, "What's new") }
 				</a>
 			</div>
 		} else if v.Checking && v.Current != "dev" {
 			<p class="text-sm text-base-content/70 flex items-center gap-2">
 				@Icon("circle-check", "size-4 text-success")
-				You have the latest version.
+				{ tr(ctx, "You have the latest version.") }
 			</p>
 		}
 		<form
@@ -89,12 +89,9 @@ docker pull { imageTag(v.Newer.Version) }</code></pre>
 			<label class="flex items-start gap-3 cursor-pointer">
 				<input type="checkbox" class="toggle toggle-primary mt-0.5" data-bind:updates-check data-attr:disabled="$updatesSaving"/>
 				<span>
-					<span class="block text-sm font-semibold">Look for new releases</span>
+					<span class="block text-sm font-semibold">{ tr(ctx, "Look for new releases") }</span>
 					<span class="block text-sm text-base-content/70">
-						Once a day Moviestracker asks GitHub, where it is released, which version is the newest, and tells
-						administrators here, in the menu bar or tray, and at the top of every page. It is like opening
-						Moviestracker's page on GitHub: nothing about your accounts, library or what you watch is sent, and
-						nothing is downloaded or installed by itself.
+						{ tr(ctx, "Once a day Moviestracker asks GitHub, where it is released, which version is the newest, and tells administrators here, in the menu bar or tray, and at the top of every page. It is like opening Moviestracker's page on GitHub: nothing about your accounts, library or what you watch is sent, and nothing is downloaded or installed by itself.") }
 					</span>
 				</span>
 			</label>

@@ -1,9 +1,9 @@
 package views
 
 import (
+	"context"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
-	"fmt"
 )
 
 // SearchView is the search page model. A blank Query shows discovery rails.
@@ -16,22 +16,22 @@ type SearchView struct {
 }
 
 templ SearchPage(user *auth.User, v SearchView) {
-	@Layout("Search") {
+	@Layout(tr(ctx, "Search")) {
 		@Navbar(user)
 		<main class="grow pb-16">
 			<section class="max-w-7xl mx-auto px-4 sm:px-8 pt-10 pb-4 space-y-4">
-				<h1 class="text-3xl sm:text-4xl font-black tracking-tight">Search</h1>
+				<h1 class="text-3xl sm:text-4xl font-black tracking-tight">{ tr(ctx, "Search") }</h1>
 				<!-- Native GET form (shareable URL, works without JS); typing patches results live -->
 				<form action="/search" method="GET" role="search" class="max-w-2xl">
 					<label class="input input-lg w-full">
 						@Icon("search", "size-5 opacity-60")
-						<span class="sr-only">Search movies, TV series and people</span>
+						<span class="sr-only">{ tr(ctx, "Search movies, TV series and people") }</span>
 						<input
 							type="search"
 							name="q"
 							value={ v.Query }
 							maxlength="100"
-							placeholder="Movies, TV series, people…"
+							placeholder={ tr(ctx, "Movies, TV series, people…") }
 							autocomplete="off"
 							autofocus
 							class="grow"
@@ -61,20 +61,20 @@ templ SearchResults(v SearchView) {
 					</div>
 				</div>
 			case v.Query == "":
-				@mediaRail("trending-movies", "Trending movies", v.TrendingMovies)
-				@mediaRail("trending-series", "Trending series", v.TrendingSeries)
+				@mediaRail("trending-movies", tr(ctx, "Trending movies"), v.TrendingMovies)
+				@mediaRail("trending-series", tr(ctx, "Trending series"), v.TrendingSeries)
 			case v.Results == nil || v.Results.Empty():
 				<p class="max-w-7xl mx-auto px-4 sm:px-8 py-6 text-base-content/70">
-					No matches for <span class="font-semibold">“{ v.Query }”</span>. Try another title or name.
+					{ tr(ctx, "No matches for") } <span class="font-semibold">“{ v.Query }”</span>. { tr(ctx, "Try another title or name.") }
 				</p>
 			default:
-				@mediaRail("movie-results", fmt.Sprintf("Movies · %d", len(v.Results.Movies)), v.Results.Movies)
-				@mediaRail("tv-results", fmt.Sprintf("TV series · %d", len(v.Results.Series)), v.Results.Series)
+				@mediaRail("movie-results", trf(ctx, "Movies · %d", len(v.Results.Movies)), v.Results.Movies)
+				@mediaRail("tv-results", trf(ctx, "TV series · %d", len(v.Results.Series)), v.Results.Series)
 				if len(v.Results.People) > 0 {
-					@rail("people-results", fmt.Sprintf("People · %d", len(v.Results.People)), "") {
+					@rail("people-results", trf(ctx, "People · %d", len(v.Results.People)), "") {
 						for _, p := range v.Results.People {
 							<li class="carousel-item">
-								@personTile(p.ID, p.Name, personSubtitle(p), p.ProfileURL())
+								@personTile(p.ID, p.Name, personSubtitle(ctx, p), p.ProfileURL())
 							</li>
 						}
 					}
@@ -83,9 +83,9 @@ templ SearchResults(v SearchView) {
 	</div>
 }
 
-func personSubtitle(p tmdb.PersonSummary) string {
+func personSubtitle(ctx context.Context, p tmdb.PersonSummary) string {
 	if titles := p.KnownForTitles(); titles != "" {
 		return titles
 	}
-	return p.KnownForDepartment
+	return tr(ctx, p.KnownForDepartment)
 }

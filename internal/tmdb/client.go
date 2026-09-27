@@ -1,6 +1,7 @@
 package tmdb
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -15,6 +16,7 @@ import (
 	"unicode"
 
 	"github.com/lieranderl/moviestracker-app/internal/format"
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 )
 
 var ErrInvalidTimeWindow = errors.New("invalid trending time window")
@@ -121,7 +123,7 @@ type Client struct {
 	httpClient *http.Client
 	cacheMu    sync.RWMutex
 	refreshMu  sync.Mutex
-	cached     *Catalog
+	cached     map[i18n.Lang]*Catalog // by the language it is in
 	cacheTTL   time.Duration
 	// collectionWait is how long a movie waits for its collection.
 	collectionWait time.Duration
@@ -201,21 +203,21 @@ func isTMDBV3Key(key string) bool {
 	return true
 }
 
+// newRequest asks for endpoint in the language ctx carries.
 func (c *Client) newRequest(ctx context.Context, endpoint string) (*http.Request, error) {
-	targetURL := c.baseURL + endpoint
+	u, err := url.Parse(c.baseURL + endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("parse tmdb url: %w", err)
+	}
+	q := u.Query()
+	q.Set("language", i18n.FromContext(ctx).TMDB())
 	isV3 := isTMDBV3Key(c.apiKey)
 	if isV3 {
-		u, err := url.Parse(targetURL)
-		if err != nil {
-			return nil, fmt.Errorf("parse tmdb url: %w", err)
-		}
-		q := u.Query()
 		q.Set("api_key", c.apiKey)
-		u.RawQuery = q.Encode()
-		targetURL = u.String()
 	}
+	u.RawQuery = q.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("create tmdb request: %w", err)
 	}
@@ -323,42 +325,49 @@ func validMediaType(value string) bool {
 	return value == "movie" || value == "tv"
 }
 
+// GetCatalog returns the home page's trending lists in the language ctx
+// carries; each language is cached on its own.
 func (c *Client) GetCatalog(ctx context.Context) (Catalog, error) {
-	c.cacheMu.RLock()
-	if c.cached != nil && c.now().Sub(c.cached.FetchedAt) < c.cacheTTL {
-		catalog := cloneCatalog(*c.cached)
-		c.cacheMu.RUnlock()
+	lang := i18n.FromContext(ctx)
+	if catalog, ok := c.freshCatalog(lang); ok {
 		return catalog, nil
 	}
-	c.cacheMu.RUnlock()
 
 	c.refreshMu.Lock()
 	defer c.refreshMu.Unlock()
-	c.cacheMu.RLock()
-	if c.cached != nil && c.now().Sub(c.cached.FetchedAt) < c.cacheTTL {
-		catalog := cloneCatalog(*c.cached)
-		c.cacheMu.RUnlock()
+	if catalog, ok := c.freshCatalog(lang); ok {
 		return catalog, nil
 	}
-	c.cacheMu.RUnlock()
 
 	catalog, err := c.fetchCatalog(ctx)
 	if err != nil {
 		c.cacheMu.RLock()
-		if c.cached != nil {
-			stale := cloneCatalog(*c.cached)
-			c.cacheMu.RUnlock()
+		defer c.cacheMu.RUnlock()
+		if old := c.cached[lang]; old != nil {
+			stale := cloneCatalog(*old)
 			stale.Stale = true
 			return stale, nil
 		}
-		c.cacheMu.RUnlock()
 		return Catalog{}, err
 	}
 	c.cacheMu.Lock()
+	if c.cached == nil {
+		c.cached = make(map[i18n.Lang]*Catalog, len(i18n.Supported))
+	}
 	stored := cloneCatalog(catalog)
-	c.cached = &stored
+	c.cached[lang] = &stored
 	c.cacheMu.Unlock()
 	return cloneCatalog(catalog), nil
+}
+
+// freshCatalog is lang's cached catalog while it is fresh.
+func (c *Client) freshCatalog(lang i18n.Lang) (Catalog, bool) {
+	c.cacheMu.RLock()
+	defer c.cacheMu.RUnlock()
+	if cached := c.cached[lang]; cached != nil && c.now().Sub(cached.FetchedAt) < c.cacheTTL {
+		return cloneCatalog(*cached), true
+	}
+	return Catalog{}, false
 }
 
 // fetchCatalog retrieves the trending lists once and derives hero candidates from them.
@@ -421,6 +430,7 @@ func (c *Client) fetchDetails(ctx context.Context, mediaType string, id int) (st
 		mediaType = "movie"
 	}
 	query := url.Values{"append_to_response": {"images,videos,external_ids"}}
+	withMediaLanguages(ctx, query)
 	endpoint := fmt.Sprintf("/3/%s/%d?%s", mediaType, id, query.Encode())
 	req, err := c.newRequest(ctx, endpoint)
 	if err != nil {
@@ -438,43 +448,61 @@ func (c *Client) fetchDetails(ctx context.Context, mediaType string, id int) (st
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&data); err != nil {
 		return "", "", "", fmt.Errorf("decode tmdb details: %w", err)
 	}
-	return selectLogo(data.Images.Logos), selectTrailer(data.Videos.Results), data.ExternalIDs.ImdbID, nil
+	lang := i18n.FromContext(ctx)
+	return selectLogo(data.Images.Logos, lang), selectTrailer(data.Videos.Results, lang), data.ExternalIDs.ImdbID, nil
 }
 
-func selectLogo(logos []tmdbLogoItem) string {
-	var fallback string
+// withMediaLanguages asks for images and videos in the language ctx
+// carries and in English, which most of them are in, and for those in none.
+func withMediaLanguages(ctx context.Context, query url.Values) {
+	langs := "en,null"
+	if lang := i18n.FromContext(ctx); lang != i18n.English {
+		langs = string(lang) + "," + langs
+	}
+	query.Set("include_image_language", langs)
+	query.Set("include_video_language", langs)
+}
+
+// selectLogo prefers a logo in lang, then one in English, then any.
+func selectLogo(logos []tmdbLogoItem, lang i18n.Lang) string {
+	var english, fallback string
 	for _, logo := range logos {
 		if !validAssetPath(logo.FilePath) {
 			continue
 		}
-		if logo.Iso6391 != nil && *logo.Iso6391 == "en" {
+		switch {
+		case logo.Iso6391 != nil && *logo.Iso6391 == string(lang):
 			return logo.FilePath
-		}
-		if fallback == "" {
+		case logo.Iso6391 != nil && *logo.Iso6391 == "en" && english == "":
+			english = logo.FilePath
+		case fallback == "":
 			fallback = logo.FilePath
 		}
 	}
-	return fallback
+	return cmp.Or(english, fallback)
 }
 
-func selectTrailer(videos []tmdbVideoItem) string {
-	var best string
+// selectTrailer prefers an official trailer in lang, then one in English,
+// then any trailer, then a teaser or clip.
+func selectTrailer(videos []tmdbVideoItem, lang i18n.Lang) string {
+	var english, best string
 	for _, video := range videos {
 		if !strings.EqualFold(video.Site, "YouTube") || !validYouTubeKey(video.Key) {
 			continue
 		}
-		if video.Type == "Trailer" && video.Official && (video.Iso6391 == "en" || video.Iso6391 == "") {
+		official := video.Type == "Trailer" && video.Official
+		switch {
+		case official && (video.Iso6391 == string(lang) || lang == i18n.English && video.Iso6391 == ""):
 			return video.Key
-		}
-		if video.Type == "Trailer" && best == "" {
+		case official && (video.Iso6391 == "en" || video.Iso6391 == "") && english == "":
+			english = video.Key
+		case video.Type == "Trailer" && best == "":
 			best = video.Key
-			continue
-		}
-		if (video.Type == "Teaser" || video.Type == "Clip") && best == "" {
+		case (video.Type == "Teaser" || video.Type == "Clip") && best == "":
 			best = video.Key
 		}
 	}
-	return best
+	return cmp.Or(english, best)
 }
 
 func validYouTubeKey(key string) bool {

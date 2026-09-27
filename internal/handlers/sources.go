@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/config"
 	"github.com/lieranderl/moviestracker-app/internal/engine"
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/jacred"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
@@ -169,12 +169,15 @@ func patchSource(w http.ResponseWriter, r *http.Request, section templ.Component
 	}
 }
 
+// failed is a failure message, English: the page translates format and
+// formats args with it.
 func failed(format string, args ...any) views.SourceStatus {
-	return views.SourceStatus{Message: fmt.Sprintf(format, args...)}
+	return views.SourceStatus{Message: format, Args: args}
 }
 
+// succeeded is a success message, like failed's.
 func succeeded(format string, args ...any) views.SourceStatus {
-	return views.SourceStatus{OK: true, Message: fmt.Sprintf(format, args...)}
+	return views.SourceStatus{OK: true, Message: format, Args: args}
 }
 
 const saveFailed = "The setting could not be saved. Check that the data directory is writable."
@@ -271,7 +274,7 @@ func (s *Server) handleSaveJacRed(w http.ResponseWriter, r *http.Request) {
 	}
 	quota := ""
 	if left >= 0 {
-		quota = fmt.Sprintf(" The key has %d %s left today.", left, plural(left, "search", "searches"))
+		quota = " " + i18n.N(r.Context(), left, "The key has %d search left today.", "The key has %d searches left today.")
 	}
 	if err := s.saveSources(func(st *config.State) {
 		st.Sources.JacRedURL, st.Sources.JacRedAPIKey = baseURL, apiKey
@@ -284,7 +287,7 @@ func (s *Server) handleSaveJacRed(w http.ResponseWriter, r *http.Request) {
 		status(succeeded("Saved. JacRed answered, but the test search found no releases; it may still be indexing.%s", quota))
 		return
 	}
-	status(succeeded("Saved. The test search found %d %s.%s", found, plural(found, "release", "releases"), quota))
+	status(succeeded("%s%s", i18n.N(r.Context(), found, "Saved. The test search found %d release.", "Saved. The test search found %d releases."), quota))
 }
 
 // handleUseSharedJacRed forgets the saved JacRed key, so jacred.su searches
@@ -325,11 +328,11 @@ func (s *Server) handleSaveIMDb(w http.ResponseWriter, r *http.Request) {
 		patchSource(w, r, views.IMDbSource(s.sourcesView(), failed(saveFailed)), nil)
 		return
 	}
-	msg := "Saved. IMDb ratings are off."
+	st := succeeded("Saved. IMDb ratings are off.")
 	if sig.On {
-		msg = "Saved. Title pages show IMDb ratings when the service answers."
+		st = succeeded("Saved. Title pages show IMDb ratings when the service answers.")
 	}
-	patchSource(w, r, views.IMDbSource(s.sourcesView(), succeeded("%s", msg)), nil)
+	patchSource(w, r, views.IMDbSource(s.sourcesView(), st), nil)
 }
 
 func (s *Server) handleSaveTorrServer(w http.ResponseWriter, r *http.Request) {
@@ -443,11 +446,4 @@ func (s *Server) handleRestartEngine(w http.ResponseWriter, r *http.Request) {
 		_ = s.torrServer.SetEndpoint(url, user, password)
 	}
 	patchSource(w, r, views.TorrServerSource(s.sourcesView(), st), nil)
-}
-
-func plural(n int, one, many string) string {
-	if n == 1 {
-		return one
-	}
-	return many
 }

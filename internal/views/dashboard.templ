@@ -119,20 +119,20 @@ type DashProblem struct {
 
 // DashboardPage is the live overview; one stream keeps every card current.
 templ DashboardPage(user *auth.User) {
-	@Layout("Dashboard") {
+	@Layout(tr(ctx, "Dashboard")) {
 		@Navbar(user)
 		<main class="grow w-full max-w-7xl mx-auto px-4 sm:px-8 py-10 space-y-6" data-init="@get('/api/dashboard?stream=true', {retry: 'always'})">
 			<header class="flex flex-wrap items-end justify-between gap-3">
 				<div class="space-y-1">
 					<h1 class="text-3xl font-bold tracking-tight flex items-center gap-3">
 						@Icon("gauge", "size-7 text-primary")
-						Dashboard
+						{ tr(ctx, "Dashboard") }
 					</h1>
-					<p class="text-base-content/70">What plays now, who watches, how Moviestracker is doing, and the machine it runs on.</p>
+					<p class="text-base-content/70">{ tr(ctx, "What plays now, who watches, how Moviestracker is doing, and the machine it runs on.") }</p>
 				</div>
 				<span class="badge badge-soft badge-success gap-1.5 font-mono text-xs">
 					<span class="status status-success animate-pulse"></span>
-					Live
+					{ tr(ctx, "Live") }
 				</span>
 			</header>
 			<!-- The dashboard stream fills it when GStreamer needs attention -->
@@ -198,11 +198,11 @@ templ dashMeter(label, value string, pct int) {
 // DashPulseStrip shows the figures people look for first, each with the
 // last few minutes where that helps.
 templ DashPulseStrip(p DashPulse) {
-	<section id="dash-pulse" aria-label="At a glance" class="grid grid-cols-2 xl:grid-cols-4 gap-3">
-		@pulseTile("Playing", orDash(p.Playing), p.PlayingNote, nil, "")
-		@pulseTile("Online", orDash(p.Online), p.OnlineNote, nil, "")
-		@pulseTile("Download", orDash(p.Down), p.DownNote, p.DownSpark, "stroke-primary")
-		@pulseTile("Upload", orDash(p.Up), p.UpNote, p.UpSpark, "stroke-secondary")
+	<section id="dash-pulse" aria-label={ tr(ctx, "At a glance") } class="grid grid-cols-2 xl:grid-cols-4 gap-3">
+		@pulseTile(tr(ctx, "Playing"), orDash(p.Playing), p.PlayingNote, nil, "")
+		@pulseTile(tr(ctx, "Online"), orDash(p.Online), p.OnlineNote, nil, "")
+		@pulseTile(tr(ctx, "Download"), orDash(p.Down), p.DownNote, p.DownSpark, "stroke-primary")
+		@pulseTile(tr(ctx, "Upload"), orDash(p.Up), p.UpNote, p.UpSpark, "stroke-secondary")
 	</section>
 }
 
@@ -217,9 +217,9 @@ templ pulseTile(label, value, note string, spark []float64, stroke string) {
 
 // DashStreamsCard lists what plays through Moviestracker now.
 templ DashStreamsCard(rows []DashStream) {
-	@dashCard("dash-streams", "tv-minimal-play", "Now streaming") {
+	@dashCard("dash-streams", "tv-minimal-play", tr(ctx, "Now streaming")) {
 		if len(rows) == 0 {
-			@dashEmpty("moon", "Nothing is playing.")
+			@dashEmpty("moon", tr(ctx, "Nothing is playing."))
 		} else {
 			<ul class="divide-y divide-base-content/10 -my-2">
 				for _, s := range rows {
@@ -244,7 +244,7 @@ templ DashStreamsCard(rows []DashStream) {
 								if s.OtherApp {
 									<span class="badge badge-sm badge-soft badge-secondary gap-1">
 										@Icon("app-window", "size-3")
-										Other app
+										{ tr(ctx, "Other app") }
 									</span>
 								}
 								if s.Viewer != "" {
@@ -258,13 +258,13 @@ templ DashStreamsCard(rows []DashStream) {
 						</div>
 						<div class="col-start-2 sm:col-start-3 sm:row-start-1 sm:text-right space-y-0.5">
 							<p class="text-lg font-semibold font-mono tabular-nums">{ s.Position }</p>
-							<p class="text-xs text-base-content/60">{ "playing for " + s.Since }</p>
+							<p class="text-xs text-base-content/60">{ trf(ctx, "playing for %s", s.Since) }</p>
 						</div>
 						<dl class="col-start-2 sm:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
-							@streamFact("To the player", s.Delivery)
-							@streamFact("Torrent download", s.Download)
-							@streamFact("Buffer", fmt.Sprintf("%d%%", s.Buffer))
-							@streamFact("Peers · sent", s.Peers+" · "+s.Sent)
+							@streamFact(tr(ctx, "To the player"), s.Delivery)
+							@streamFact(tr(ctx, "Torrent download"), s.Download)
+							@streamFact(tr(ctx, "Buffer"), fmt.Sprintf("%d%%", s.Buffer))
+							@streamFact(tr(ctx, "Peers · sent"), s.Peers+" · "+s.Sent)
 						</dl>
 						if s.Warn != "" {
 							<p role="status" class="col-start-2 sm:col-span-2 flex items-center gap-1.5 text-xs text-warning">
@@ -293,13 +293,13 @@ templ DashPlayedCard(rows []DashPlayed) {
 		<div class="card-body gap-4">
 			<h2 class="card-title text-base">
 				@Icon("history", "size-5 text-primary")
-				Played today
+				{ tr(ctx, "Played today") }
 				if len(rows) > 0 {
 					<span class="badge badge-sm badge-ghost font-mono">{ fmt.Sprint(len(rows)) }</span>
 				}
 			</h2>
 			if len(rows) == 0 {
-				@dashEmpty("calendar", "Nothing finished playing today yet.")
+				@dashEmpty("calendar", tr(ctx, "Nothing finished playing today yet."))
 			} else {
 				<ul class="divide-y divide-base-content/10 -my-2 max-h-[18rem] overflow-y-auto overscroll-contain pr-1">
 					for _, p := range rows {
@@ -326,12 +326,12 @@ templ DashPlayedCard(rows []DashPlayed) {
 // DashSwarmCard shows every torrent's totals, and each active torrent:
 // how it downloads and what of it plays.
 templ DashSwarmCard(s DashSwarm) {
-	@dashCard("dash-swarm", "activity", "Torrents") {
+	@dashCard("dash-swarm", "activity", tr(ctx, "Torrents")) {
 		<div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-			@swarmFigure("Download", orDash(s.Down), "", s.DownSpark, "stroke-primary")
-			@swarmFigure("Upload", orDash(s.Up), "", s.UpSpark, "stroke-secondary")
-			@swarmFigure("Active", fmt.Sprintf("%d / %d", s.Active, s.Torrents), fmt.Sprintf("%d peers · %d seeders", s.Peers, s.Seeders), nil, "")
-			@swarmFigure("Since they started", "↓ "+orDash(s.Downloaded), "↑ "+orDash(s.Uploaded)+" uploaded", nil, "")
+			@swarmFigure(tr(ctx, "Download"), orDash(s.Down), "", s.DownSpark, "stroke-primary")
+			@swarmFigure(tr(ctx, "Upload"), orDash(s.Up), "", s.UpSpark, "stroke-secondary")
+			@swarmFigure(tr(ctx, "Active"), fmt.Sprintf("%d / %d", s.Active, s.Torrents), trf(ctx, "%d peers · %d seeders", s.Peers, s.Seeders), nil, "")
+			@swarmFigure(tr(ctx, "Since they started"), "↓ "+orDash(s.Downloaded), "↑ "+trf(ctx, "%s uploaded", orDash(s.Uploaded)), nil, "")
 		</div>
 		if len(s.Rows) > 0 {
 			<ul class="divide-y divide-base-content/10 border-t border-base-content/10">
@@ -350,13 +350,13 @@ templ dashTorrentRow(t DashTorrent) {
 			<span class={ "badge badge-sm shrink-0", t.StatusClass }>{ t.Status }</span>
 		</div>
 		<dl class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
-			@streamFact("Download", t.Down)
-			@streamFact("Upload", t.Up)
-			@streamFact("Peers", t.Peers)
-			@streamFact("Buffer", fmt.Sprintf("%d%%", t.Buffer))
-			@streamFact("Size", t.Size)
-			@streamFact("Downloaded", "↓ "+t.Downloaded)
-			@streamFact("Uploaded", "↑ "+t.Uploaded)
+			@streamFact(tr(ctx, "Download"), t.Down)
+			@streamFact(tr(ctx, "Upload"), t.Up)
+			@streamFact(tr(ctx, "Peers"), t.Peers)
+			@streamFact(tr(ctx, "Buffer"), fmt.Sprintf("%d%%", t.Buffer))
+			@streamFact(tr(ctx, "Size"), t.Size)
+			@streamFact(tr(ctx, "Downloaded"), "↓ "+t.Downloaded)
+			@streamFact(tr(ctx, "Uploaded"), "↑ "+t.Uploaded)
 		</dl>
 		if len(t.Playing) > 0 {
 			<ul class="space-y-1">
@@ -366,7 +366,7 @@ templ dashTorrentRow(t DashTorrent) {
 						<span class="font-mono truncate">{ p.File }</span>
 						<span class="text-base-content/60 shrink-0">{ p.Viewer }</span>
 						if p.OtherApp {
-							<span class="badge badge-xs badge-soft badge-secondary shrink-0">Other app</span>
+							<span class="badge badge-xs badge-soft badge-secondary shrink-0">{ tr(ctx, "Other app") }</span>
 						}
 					</li>
 				}
@@ -392,10 +392,10 @@ templ swarmFigure(label, value, note string, spark []float64, stroke string) {
 // of the machine, and TorrServer's caches.
 templ DashAppCard(a DashApp) {
 	@dashCard("dash-app", "clapperboard", "Moviestracker") {
-		<p class="text-xs text-base-content/60 -mt-2">The app and the programs it runs.</p>
+		<p class="text-xs text-base-content/60 -mt-2">{ tr(ctx, "The app and the programs it runs.") }</p>
 		<div class="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-2 text-sm">
-			<span class="text-xs text-base-content/60">Program</span>
-			<span class="text-xs text-base-content/60 text-right">Memory</span>
+			<span class="text-xs text-base-content/60">{ tr(ctx, "Program") }</span>
+			<span class="text-xs text-base-content/60 text-right">{ tr(ctx, "Memory") }</span>
 			<span class="text-xs text-base-content/60 text-right w-10">CPU</span>
 			for _, p := range a.Procs {
 				<div class={ "min-w-0", templ.KV("col-span-3 pl-4 border-l-2 border-base-content/10", p.Nested) }>
@@ -418,41 +418,41 @@ templ DashAppCard(a DashApp) {
 				}
 			}
 			if a.Memory != "" {
-				<span class="pt-2 border-t border-base-content/10 font-medium">Together</span>
+				<span class="pt-2 border-t border-base-content/10 font-medium">{ tr(ctx, "Together") }</span>
 				<span class="pt-2 border-t border-base-content/10 font-mono tabular-nums text-right font-medium">{ a.Memory }</span>
 				<span class="pt-2 border-t border-base-content/10 font-mono tabular-nums text-right w-10 font-medium">{ a.CPU }</span>
 			}
 		</div>
 		if a.Go != "" {
 			<div class="space-y-1.5 pt-3 border-t border-base-content/10">
-				<h3 class="text-xs font-medium uppercase tracking-wide text-base-content/60">Inside Moviestracker</h3>
+				<h3 class="text-xs font-medium uppercase tracking-wide text-base-content/60">{ tr(ctx, "Inside Moviestracker") }</h3>
 				@dashRow("Go") {
 					{ a.Go }
 				}
-				@dashRow("Goroutines") {
+				@dashRow(tr(ctx, "Goroutines")) {
 					{ a.Goroutines }
 				}
-				@dashRow("Heap") {
+				@dashRow(tr(ctx, "Heap")) {
 					{ a.Heap }
 				}
-				@dashRow("Garbage collections") {
+				@dashRow(tr(ctx, "Garbage collections")) {
 					{ a.GC }
 				}
-				@dashRow("Live streams") {
+				@dashRow(tr(ctx, "Live streams")) {
 					{ a.LiveStreams }
 				}
-				@dashRow("Patches") {
+				@dashRow(tr(ctx, "Patches")) {
 					{ a.Patches }
 				}
-				<p class="text-xs text-base-content/60">Live streams are the open pages Datastar keeps current over SSE. Patches: sent · skipped because nothing changed.</p>
+				<p class="text-xs text-base-content/60">{ tr(ctx, "Live streams are the open pages Datastar keeps current over SSE. Patches: sent · skipped because nothing changed.") }</p>
 			</div>
 		}
 		<div class="space-y-1.5 pt-3 border-t border-base-content/10">
-			@dashRow("RAM cache") {
+			@dashRow(tr(ctx, "RAM cache")) {
 				{ orDash(a.RAMCache) }
 			}
 			if a.DiskCache != "" {
-				@dashRow("Disk cache") {
+				@dashRow(tr(ctx, "Disk cache")) {
 					{ a.DiskCacheUsed }
 				}
 			}
@@ -468,35 +468,35 @@ templ DashSystemCard(s DashSystem) {
 			<header>
 				<h2 id="machine-title" class="card-title text-base">
 					@Icon("cpu", "size-5 text-primary")
-					This machine
+					{ tr(ctx, "This machine") }
 				</h2>
-				<p class="text-xs text-base-content/60">The whole computer, with every program on it.</p>
+				<p class="text-xs text-base-content/60">{ tr(ctx, "The whole computer, with every program on it.") }</p>
 			</header>
 			<div class="grid gap-6 sm:grid-cols-2">
 				if s.CPU != "" {
 					<div class="space-y-1">
 						@dashMeter("CPU", s.CPU, s.CPUPct)
 						if s.Load != "" {
-							<p class="text-xs text-base-content/60 text-right font-mono tabular-nums">Load { s.Load }</p>
+							<p class="text-xs text-base-content/60 text-right font-mono tabular-nums">{ trf(ctx, "Load %s", s.Load) }</p>
 						}
 						@sparkline(s.CPUSpark, "stroke-accent")
 					</div>
 				}
 				if s.MemTotal != "" {
 					<div class="space-y-1">
-						@dashMeter("Memory", s.MemUsed+" of "+s.MemTotal, s.MemPct)
+						@dashMeter(tr(ctx, "Memory"), trf(ctx, "%s of %s", s.MemUsed, s.MemTotal), s.MemPct)
 						@sparkline(s.MemSpark, "stroke-info")
 					</div>
 				}
 				if s.NetDown != "" {
 					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<p class="text-xs text-base-content/70">Network in</p>
+							<p class="text-xs text-base-content/70">{ tr(ctx, "Network in") }</p>
 							<p class="text-sm font-mono tabular-nums">{ s.NetDown }</p>
 							@sparkline(s.NetDownSpark, "stroke-primary")
 						</div>
 						<div>
-							<p class="text-xs text-base-content/70">Network out</p>
+							<p class="text-xs text-base-content/70">{ tr(ctx, "Network out") }</p>
 							<p class="text-sm font-mono tabular-nums">{ s.NetUp }</p>
 							@sparkline(s.NetUpSpark, "stroke-secondary")
 						</div>
@@ -505,7 +505,7 @@ templ DashSystemCard(s DashSystem) {
 				if len(s.Disks) > 0 {
 					<div class="space-y-3">
 						for _, d := range s.Disks {
-							@dashMeter(d.Label, d.Free+" free of "+d.Total, d.UsedPct)
+							@dashMeter(d.Label, trf(ctx, "%s free of %s", d.Free, d.Total), d.UsedPct)
 						}
 					</div>
 				}
@@ -516,9 +516,9 @@ templ DashSystemCard(s DashSystem) {
 
 // DashPeopleCard lists who is online and on which devices.
 templ DashPeopleCard(people []DashPerson) {
-	@dashCard("dash-people", "users", "People online") {
+	@dashCard("dash-people", "users", tr(ctx, "People online")) {
 		if len(people) == 0 {
-			@dashEmpty("user", "Nobody else right now.")
+			@dashEmpty("user", tr(ctx, "Nobody else right now."))
 		} else {
 			<ul class="space-y-3">
 				for _, p := range people {
@@ -544,7 +544,7 @@ templ DashPeopleCard(people []DashPerson) {
 
 // DashSourcesCard shows how the external services answered in the last hour.
 templ DashSourcesCard(rows []DashService) {
-	@dashCard("dash-sources", "plug", "Sources") {
+	@dashCard("dash-sources", "plug", tr(ctx, "Sources")) {
 		<ul class="space-y-2.5">
 			for _, r := range rows {
 				<li class="text-sm space-y-0.5">
@@ -564,7 +564,7 @@ templ DashSourcesCard(rows []DashService) {
 							if r.Known {
 								{ r.Latency + " · " + r.Ago }
 							} else {
-								not used yet
+								{ tr(ctx, "not used yet") }
 							}
 						</span>
 					</div>
@@ -582,12 +582,12 @@ templ DashSourcesCard(rows []DashService) {
 
 // DashProblemsCard shows recent warnings and errors, calm when there are none.
 templ DashProblemsCard(rows []DashProblem, engine string) {
-	@dashCard("dash-problems", "triangle-alert", "Problems") {
+	@dashCard("dash-problems", "triangle-alert", tr(ctx, "Problems")) {
 		if engine != "" {
 			<p class="text-sm text-warning">{ engine }</p>
 		}
 		if len(rows) == 0 && engine == "" {
-			@dashEmpty("circle-check", "No problems since Moviestracker started.")
+			@dashEmpty("circle-check", tr(ctx, "No problems since Moviestracker started."))
 		} else if len(rows) > 0 {
 			<ul class="space-y-2">
 				for _, p := range rows {

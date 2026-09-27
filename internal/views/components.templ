@@ -11,7 +11,7 @@ import (
 
 // tmdbRatingBadge is the TMDB score pill shown over hero imagery.
 templ tmdbRatingBadge(item tmdb.MediaItem) {
-	<span class="badge h-7 px-3 gap-1.5 text-xs font-semibold bg-black/50 backdrop-blur-md border-white/20 text-white" title={ item.TMDBRatingTitle() }>
+	<span class="badge h-7 px-3 gap-1.5 text-xs font-semibold bg-black/50 backdrop-blur-md border-white/20 text-white" title={ ratingTitle(ctx, "TMDB", item.FormattedRating(), item.FormattedVoteCount()) }>
 		<span class="bg-linear-to-r from-tmdb-start to-tmdb-end text-tmdb-ink text-[10px] font-black px-1 py-0.5 rounded-xs leading-none tracking-tight">TMDB</span>
 		<span class="font-bold text-tmdb-end">{ item.FormattedRating() }</span>
 		if item.FormattedVoteCount() != "" {
@@ -35,8 +35,8 @@ templ HeroIMDbRatingBadge(elementID string, imdbID string) {
 		class="inline-flex items-center"
 		data-init={ "@get('" + IMDbRatingURL(map[string]string{elementID: imdbID}) + "')" }
 	>
-		@imdbBadge("Fetching IMDb rating…", true) {
-			<span class="loading loading-spinner loading-xs text-warning" aria-label="Loading"></span>
+		@imdbBadge(tr(ctx, "Fetching IMDb rating…"), true) {
+			<span class="loading loading-spinner loading-xs text-warning" aria-label={ tr(ctx, "Loading") }></span>
 		}
 	</div>
 }
@@ -45,8 +45,8 @@ templ HeroIMDbRatingBadge(elementID string, imdbID string) {
 // (see heroIMDbRequest).
 templ pendingIMDbRating(elementID string) {
 	<div id={ elementID } class="inline-flex items-center">
-		@imdbBadge("Fetching IMDb rating…", true) {
-			<span class="loading loading-spinner loading-xs text-warning" aria-label="Loading"></span>
+		@imdbBadge(tr(ctx, "Fetching IMDb rating…"), true) {
+			<span class="loading loading-spinner loading-xs text-warning" aria-label={ tr(ctx, "Loading") }></span>
 		}
 	</div>
 }
@@ -72,7 +72,7 @@ templ IMDbRatingFragment(targetID string, rating string, votes string) {
 	<div id={ targetID } class="inline-flex items-center">
 		if rating != "" && rating != "N/A" {
 			{{ formattedVotes := format.FormatVotes(votes) }}
-			@imdbBadge(format.RatingTitle("IMDb", rating, formattedVotes), false) {
+			@imdbBadge(ratingTitle(ctx, "IMDb", rating, formattedVotes), false) {
 				<span class="font-bold text-imdb">{ rating }</span>
 				if formattedVotes != "" {
 					<span class="text-white/60 font-normal text-[11px] font-mono">({ formattedVotes })</span>

@@ -1,6 +1,7 @@
 package views
 
 import (
+	"context"
 	"slices"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/jacred"
@@ -15,8 +16,10 @@ const mediaPageSignals = `{ videoOpen: false, videoKey: '', videoTitle: '', torr
 
 // videoClick opens the trailer dialog for any element carrying data-video.
 // Keys and names travel in data-* attributes, never inside the expression.
-const videoClick = `const b = evt.target.closest('[data-video]')
-if (b) { $videoKey = b.dataset.video; $videoTitle = b.dataset.title || 'Trailer'; $videoOpen = true }`
+func videoClick(ctx context.Context) string {
+	return `const b = evt.target.closest('[data-video]')
+if (b) { $videoKey = b.dataset.video; $videoTitle = b.dataset.title || ` + trJS(ctx, "Trailer") + `; $videoOpen = true }`
+}
 
 // mediaHref links a movie or series card to its detail page.
 func mediaHref(item tmdb.MediaItem) templ.SafeURL {
@@ -53,7 +56,7 @@ templ MediaError(user *auth.User, heading, message string) {
 				@Icon("film", "size-12 mx-auto text-base-content/30")
 				<h1 class="text-2xl font-bold">{ heading }</h1>
 				<p class="text-base-content/70">{ message }</p>
-				<a href="/movies" class="btn btn-primary">Back to trending</a>
+				<a href="/movies" class="btn btn-primary">{ tr(ctx, "Back to trending") }</a>
 			</div>
 		</main>
 		@siteFooter()
@@ -110,7 +113,7 @@ templ detailHero(item tmdb.MediaItem, facts []string, rating string, genres stri
 				</div>
 			</div>
 		</div>
-		<a href="#about" class="absolute bottom-5 left-1/2 -translate-x-1/2 btn btn-ghost btn-circle text-white/70 hover:text-white hover:bg-white/10 animate-bounce" aria-label="Scroll to details">
+		<a href="#about" class="absolute bottom-5 left-1/2 -translate-x-1/2 btn btn-ghost btn-circle text-white/70 hover:text-white hover:bg-white/10 animate-bounce" aria-label={ tr(ctx, "Scroll to details") }>
 			@Icon("chevron-down", "size-6")
 		</a>
 	</section>
@@ -121,7 +124,7 @@ templ trailerButton(key, title string) {
 	if key != "" {
 		<button type="button" class="btn sm:btn-lg bg-white text-black border-white hover:bg-white/85 gap-2" data-video={ key } data-title={ title }>
 			@Icon("play", "size-5 fill-current")
-			Play trailer
+			{ tr(ctx, "Play trailer") }
 		</button>
 	}
 }
@@ -160,9 +163,9 @@ templ carousel() {
 // carouselButton scrolls its carousel most of a view back or forward.
 templ carouselButton(forward bool) {
 	{{
-		label, icon, side, sign := "Scroll back", "chevron-left", "-left-3", "-"
+		label, icon, side, sign := tr(ctx, "Scroll back"), "chevron-left", "-left-3", "-"
 		if forward {
-			label, icon, side, sign = "Scroll forward", "chevron-right", "-right-3", ""
+			label, icon, side, sign = tr(ctx, "Scroll forward"), "chevron-right", "-right-3", ""
 		}
 	}}
 	<button
@@ -245,7 +248,7 @@ func initials(name string) string {
 
 templ videoRail(videos []tmdb.Video) {
 	if len(videos) > 0 {
-		@rail("videos", "Trailers & videos", "") {
+		@rail("videos", tr(ctx, "Trailers & videos"), "") {
 			for _, v := range videos {
 				<li class="carousel-item">
 					<button type="button" class="group w-72 sm:w-80 text-left space-y-2" data-video={ v.Key } data-title={ v.Name }>
@@ -258,7 +261,7 @@ templ videoRail(videos []tmdb.Video) {
 							</span>
 						</span>
 						<span class="block text-sm font-semibold line-clamp-1 group-hover:text-primary">{ v.Name }</span>
-						<span class="block text-xs text-base-content/60">{ v.Type }</span>
+						<span class="block text-xs text-base-content/60">{ tr(ctx, v.Type) }</span>
 					</button>
 				</li>
 			}
@@ -270,15 +273,15 @@ templ videoRail(videos []tmdb.Video) {
 // while the dialog is open, so closing it stops playback.
 templ trailerModal() {
 	@modalDialog("trailer-modal", "videoOpen", "", "$videoKey = ''", "max-w-5xl w-full p-0 bg-black overflow-hidden", nil) {
-		<h3 id="trailer-modal-title" class="sr-only" data-text="$videoTitle">Trailer</h3>
+		<h3 id="trailer-modal-title" class="sr-only" data-text="$videoTitle">{ tr(ctx, "Trailer") }</h3>
 		<form method="dialog" class="absolute top-2 right-2 z-10">
-			<button class="btn btn-sm btn-circle bg-black/60 border-white/20 text-white hover:bg-black" aria-label="Close trailer">
+			<button class="btn btn-sm btn-circle bg-black/60 border-white/20 text-white hover:bg-black" aria-label={ tr(ctx, "Close trailer") }>
 				@Icon("x", "size-4")
 			</button>
 		</form>
 		<div class="aspect-video">
 			<iframe
-				title="Trailer"
+				title={ tr(ctx, "Trailer") }
 				class="size-full border-0"
 				data-attr:src="$videoOpen && $videoKey ? 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent($videoKey) + '?autoplay=1&rel=0&playsinline=1' : null"
 				allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
@@ -300,7 +303,7 @@ templ aboutSection(item tmdb.MediaItem, tagline string, facts []factItem, links 
 	<section id="about" class="max-w-7xl mx-auto px-4 sm:px-8 py-12 grid grid-cols-1 md:grid-cols-[12rem_1fr] lg:grid-cols-[15rem_1fr] gap-8 lg:gap-12">
 		<figure class="hidden md:block">
 			if item.PosterURL() != "" {
-				<img src={ item.PosterURL() } alt={ item.Title + " poster" } class="w-full aspect-[2/3] object-cover rounded-box shadow-2xl ring-1 ring-base-content/10" loading="lazy" decoding="async" width="240" height="360"/>
+				<img src={ item.PosterURL() } alt={ trf(ctx, "%s poster", item.Title) } class="w-full aspect-[2/3] object-cover rounded-box shadow-2xl ring-1 ring-base-content/10" loading="lazy" decoding="async" width="240" height="360"/>
 			} else {
 				<div class="w-full aspect-[2/3] rounded-box bg-base-300 grid place-items-center">
 					@Icon("film", "size-10 opacity-40")
@@ -308,7 +311,7 @@ templ aboutSection(item tmdb.MediaItem, tagline string, facts []factItem, links 
 			}
 		</figure>
 		<div class="space-y-6 min-w-0">
-			<h2 class="sr-only">About</h2>
+			<h2 class="sr-only">{ tr(ctx, "About") }</h2>
 			if tagline != "" {
 				<p class="text-lg sm:text-xl italic text-base-content/70">{ tagline }</p>
 			}
@@ -316,7 +319,7 @@ templ aboutSection(item tmdb.MediaItem, tagline string, facts []factItem, links 
 				for _, f := range facts {
 					if f.Value != "" || len(f.People) > 0 {
 						<div class="space-y-1 min-w-0">
-							<dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">{ f.Label }</dt>
+							<dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">{ tr(ctx, f.Label) }</dt>
 							<dd class="font-medium">
 								if len(f.People) > 0 {
 									for i, p := range f.People {
@@ -340,15 +343,15 @@ templ aboutSection(item tmdb.MediaItem, tagline string, facts []factItem, links 
 
 // torrentActions is the delegated click handler for every release row.
 // Magnets travel in data-magnet; the add URL is built from server ints.
-func torrentActions(addURL string) string {
+func torrentActions(ctx context.Context, addURL string) string {
 	return fmt.Sprintf(`const b = evt.target.closest('button[data-action]')
 if (!b) return
 if (b.dataset.action === 'send') {
 	$torrMagnet = b.dataset.magnet
 	@post('%s', {filterSignals: {include: /^torrMagnet$/}})
 } else if (b.dataset.action === 'copy') {
-	navigator.clipboard.writeText(b.dataset.magnet).then(() => { $toastError = false; $toast = 'Magnet link copied' }, () => { $toastError = true; $toast = 'Copy failed' })
-}`, addURL)
+	navigator.clipboard.writeText(b.dataset.magnet).then(() => { $toastError = false; $toast = %s }, () => { $toastError = true; $toast = %s })
+}`, addURL, trJS(ctx, "Magnet link copied"), trJS(ctx, "Copy failed"))
 }
 
 // SourcesSearch is the Datastar expression that (re)runs the JacRed search
@@ -385,7 +388,7 @@ func sourcesSignals(mediaType string, selected int) string {
 // season at a time. The TorrServer status badge loads on its own.
 templ sourcesSection(mediaType string, id int, seasons []tmdb.SeasonSummary, selected int) {
 	<section id="sources" class="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-5 scroll-mt-20" data-signals={ sourcesSignals(mediaType, selected) }>
-		@sectionHeading("Sources", "Torrent releases found by JacRed. Send one to your TorrServer to watch.") {
+		@sectionHeading(tr(ctx, "Sources"), tr(ctx, "Torrent releases found by JacRed. Send one to your TorrServer to watch.")) {
 			<div data-init="@get('/api/torrserver/status')">
 				@TorrServerStatus(false, "", "")
 			</div>
@@ -395,12 +398,12 @@ templ sourcesSection(mediaType string, id int, seasons []tmdb.SeasonSummary, sel
 			if mediaType == "tv" && len(seasons) > 0 {
 				<select
 					class="select select-sm w-auto"
-					aria-label="Season to search"
+					aria-label={ tr(ctx, "Season to search") }
 					data-bind:source-season
 					data-on:change={ researchSources(SourcesSearch(mediaType, id)) }
 				>
 					for _, s := range seasons {
-						<option value={ fmt.Sprint(s.Number) } selected?={ s.Number == selected }>{ seasonLabel(s) }</option>
+						<option value={ fmt.Sprint(s.Number) } selected?={ s.Number == selected }>{ seasonLabel(ctx, s) }</option>
 					}
 				</select>
 			}
@@ -410,13 +413,13 @@ templ sourcesSection(mediaType string, id int, seasons []tmdb.SeasonSummary, sel
 				<span data-class:hidden="$sourcesLoading">
 					@Icon("search", "size-4")
 				</span>
-				<span data-text="$sourcesRequested ? 'Search again' : 'Find sources'">Find sources</span>
+				<span data-text={ "$sourcesRequested ? " + trJS(ctx, "Search again") + " : " + trJS(ctx, "Find sources") }>{ tr(ctx, "Find sources") }</span>
 			</button>
 			<span class="ml-auto">
 				@JacRedCredit()
 			</span>
 		</div>
-		<div data-on:click={ torrentActions(TorrentAddURL(mediaType, id)) } data-indicator:sending>
+		<div data-on:click={ torrentActions(ctx, TorrentAddURL(mediaType, id)) } data-indicator:sending>
 			<div id="torrent-results"></div>
 		</div>
 	</section>
@@ -434,7 +437,7 @@ var searchQualities = []struct {
 // sources were asked for.
 templ searchFilters(search string) {
 	<div class="flex flex-wrap items-center gap-2" data-on:change={ researchSources(search) }>
-		<div role="group" aria-label="Search for qualities" class="join">
+		<div role="group" aria-label={ tr(ctx, "Search for qualities") } class="join">
 			for _, q := range searchQualities {
 				<label class="btn btn-sm join-item has-checked:btn-primary has-focus-visible:outline-2 has-focus-visible:outline-primary">
 					<input type="checkbox" class="sr-only" value={ fmt.Sprint(q.Value) } data-bind="qual"/>
@@ -445,7 +448,7 @@ templ searchFilters(search string) {
 		<label class="btn btn-sm gap-1.5 has-checked:btn-secondary has-focus-visible:outline-2 has-focus-visible:outline-secondary">
 			<input type="checkbox" class="sr-only" data-bind:hdr/>
 			@Icon("sun", "size-4")
-			HDR only
+			{ tr(ctx, "HDR only") }
 		</label>
 	</div>
 }
@@ -459,10 +462,10 @@ templ TorrServerStatus(online bool, version, endpoint string) {
 			TorrServer { version }
 		} else if endpoint != "" {
 			<span class="status status-error" aria-hidden="true"></span>
-			TorrServer Offline
+			{ tr(ctx, "TorrServer Offline") }
 		} else {
 			<span class="loading loading-ring loading-xs" aria-hidden="true"></span>
-			Checking TorrServer…
+			{ tr(ctx, "Checking TorrServer…") }
 		}
 	</a>
 }
@@ -472,9 +475,9 @@ templ TorrentSearching(title string) {
 		<p class="text-sm text-base-content/60 inline-flex items-center gap-2">
 			<span class="loading loading-dots loading-sm text-primary"></span>
 			if title != "" {
-				<span>Searching JacRed for <span class="font-semibold">{ title }</span>…</span>
+				<span>{ tr(ctx, "Searching JacRed for") } <span class="font-semibold">{ title }</span>…</span>
 			} else {
-				<span>Searching JacRed…</span>
+				<span>{ tr(ctx, "Searching JacRed…") }</span>
 			}
 		</p>
 		<div class="space-y-2">
@@ -586,20 +589,20 @@ templ TorrentResults(results []jacred.Result, sort, search string) {
 		if len(results) == 0 {
 			<div role="status" class="alert alert-soft">
 				@Icon("search-x", "size-5")
-				<span>No releases found on JacRed for this title.</span>
+				<span>{ tr(ctx, "No releases found on JacRed for this title.") }</span>
 			</div>
 		} else {
 			<div class="flex flex-wrap items-center justify-between gap-3">
 			@trackerFilter(results)
 			@voiceFilter(results)
-			<div class="join" role="group" aria-label="Sort releases">
+			<div class="join" role="group" aria-label={ tr(ctx, "Sort releases") }>
 				for _, o := range sortOptions {
 					<button
 						type="button"
 						class={ "btn btn-sm join-item", templ.KV("btn-active", o.Key == sort) }
 						data-class={ fmt.Sprintf("{ 'btn-active': $sort === '%s' }", o.Key) }
 						data-on:click={ fmt.Sprintf("$sort = '%s'; %s", o.Key, search) }
-					>{ o.Label }</button>
+					>{ tr(ctx, o.Label) }</button>
 				}
 			</div>
 			</div>
@@ -609,7 +612,7 @@ templ TorrentResults(results []jacred.Result, sort, search string) {
 				}
 			</ul>
 			<p class="text-xs text-base-content/50">
-				Results from JacRed. Moviestracker does not host or distribute media — only access content you are legally authorized to use.
+				{ tr(ctx, "Results from JacRed. Moviestracker does not host or distribute media — only access content you are legally authorized to use.") }
 			</p>
 		}
 	</div>
@@ -623,10 +626,10 @@ templ TorrentResults(results []jacred.Result, sort, search string) {
 templ trackerFilter(results []jacred.Result) {
 	{{ trackers := trackerCounts(results) }}
 	if len(trackers) > 1 {
-		<div role="group" aria-label="Filter by tracker" class="basis-full order-last flex flex-wrap items-center gap-2">
-			<span class="text-xs font-medium text-base-content/60 mr-1">Trackers</span>
+		<div role="group" aria-label={ tr(ctx, "Filter by tracker") } class="basis-full order-last flex flex-wrap items-center gap-2">
+			<span class="text-xs font-medium text-base-content/60 mr-1">{ tr(ctx, "Trackers") }</span>
 			<button type="button" class="btn btn-xs sm:btn-sm gap-1.5" data-class="{ 'btn-primary': !$trackers.some(Boolean) }" data-on:click="$trackers = $trackers.map(() => '')">
-				All <span class="badge badge-xs">{ fmt.Sprint(len(results)) }</span>
+				{ tr(ctx, "All") } <span class="badge badge-xs">{ fmt.Sprint(len(results)) }</span>
 			</button>
 			for _, t := range trackers {
 				<label class="btn btn-xs sm:btn-sm gap-1.5 has-checked:btn-primary has-focus-visible:outline-2 has-focus-visible:outline-primary">
@@ -645,10 +648,10 @@ templ trackerFilter(results []jacred.Result) {
 templ voiceFilter(results []jacred.Result) {
 	{{ voices := voiceCounts(results) }}
 	if len(voices) > 1 {
-		<div role="group" aria-label="Filter by voice" class="basis-full order-last flex flex-wrap items-center gap-2">
-			<span class="text-xs font-medium text-base-content/60 mr-1">Voices</span>
+		<div role="group" aria-label={ tr(ctx, "Filter by voice") } class="basis-full order-last flex flex-wrap items-center gap-2">
+			<span class="text-xs font-medium text-base-content/60 mr-1">{ tr(ctx, "Voices") }</span>
 			<button type="button" class="btn btn-xs sm:btn-sm gap-1.5" data-class="{ 'btn-primary': !$voices.some(Boolean) }" data-on:click="$voices = $voices.map(() => '')">
-				All
+				{ tr(ctx, "All") }
 			</button>
 			for _, v := range voices {
 				<label class="btn btn-xs sm:btn-sm gap-1.5 has-checked:btn-primary has-focus-visible:outline-2 has-focus-visible:outline-primary">
@@ -686,13 +689,13 @@ templ torrentRow(r jacred.Result) {
 					<span>{ r.SizeName }</span>
 				}
 				if !r.CreatedAt.IsZero() {
-					<span title="Added">{ r.CreatedAt.Format("2006-01-02") }</span>
+					<span title={ tr(ctx, "Added") }>{ r.CreatedAt.Format("2006-01-02") }</span>
 				}
-				<span class="inline-flex items-center gap-1 text-success" title="Seeders">
+				<span class="inline-flex items-center gap-1 text-success" title={ tr(ctx, "Seeders") }>
 					@Icon("arrow-up", "size-3")
 					{ fmt.Sprint(r.Seeders) }
 				</span>
-				<span class="inline-flex items-center gap-1" title="Peers">
+				<span class="inline-flex items-center gap-1" title={ tr(ctx, "Peers") }>
 					@Icon("arrow-down", "size-3")
 					{ fmt.Sprint(r.Peers) }
 				</span>
@@ -702,14 +705,14 @@ templ torrentRow(r jacred.Result) {
 			</p>
 		</div>
 		<div class="flex items-center gap-1 max-sm:list-col-wrap max-sm:justify-end">
-			<button type="button" class="btn btn-primary btn-sm gap-1.5" data-action="send" data-magnet={ r.Magnet } data-attr:disabled="$sending" title="Send to TorrServer">
+			<button type="button" class="btn btn-primary btn-sm gap-1.5" data-action="send" data-magnet={ r.Magnet } data-attr:disabled="$sending" title={ tr(ctx, "Send to TorrServer") }>
 				@Icon("send", "size-4")
 				<span>TorrServer</span>
 			</button>
-			<button type="button" class="btn btn-ghost btn-sm btn-square" data-action="copy" data-magnet={ r.Magnet } title="Copy magnet link" aria-label="Copy magnet link">
+			<button type="button" class="btn btn-ghost btn-sm btn-square" data-action="copy" data-magnet={ r.Magnet } title={ tr(ctx, "Copy magnet link") } aria-label={ tr(ctx, "Copy magnet link") }>
 				@Icon("magnet", "size-4")
 			</button>
-			<a href={ templ.SafeURL(r.SourceURL) } target="_blank" rel="noopener noreferrer nofollow" class="btn btn-ghost btn-sm btn-square" title={ "Open on " + r.Tracker } aria-label={ "Open source page on " + r.Tracker }>
+			<a href={ templ.SafeURL(r.SourceURL) } target="_blank" rel="noopener noreferrer nofollow" class="btn btn-ghost btn-sm btn-square" title={ trf(ctx, "Open on %s", r.Tracker) } aria-label={ trf(ctx, "Open source page on %s", r.Tracker) }>
 				@Icon("external-link", "size-4")
 			</a>
 		</div>
@@ -730,7 +733,7 @@ templ TorrActivity(hash, title string) {
 			</div>
 			<a href="/torrserver" class="btn btn-sm btn-primary gap-1.5">
 				@Icon("tv-minimal-play", "size-4")
-				Open player
+				{ tr(ctx, "Open player") }
 			</a>
 		</div>
 	</div>
@@ -746,13 +749,13 @@ templ TorrActivityStats(t *torrserver.Torrent) {
 		if t == nil {
 			<span class="inline-flex items-center gap-2">
 				<span class="loading loading-spinner loading-xs"></span>
-				Waiting for TorrServer…
+				{ tr(ctx, "Waiting for TorrServer…") }
 			</span>
 		} else {
-			<span class={ "badge badge-sm", t.StatusBadgeClass() }>{ t.StatusLabel() }</span>
+			<span class={ "badge badge-sm", t.StatusBadgeClass() }>{ tr(ctx, t.StatusLabel()) }</span>
 			<span class="inline-flex items-center gap-1">
 				@Icon("users", "size-3.5")
-				{ t.FormattedPeers() } peers
+				{ t.FormattedPeers() } { tr(ctx, "peers") }
 			</span>
 			<span class="inline-flex items-center gap-1 font-mono">
 				@Icon("arrow-down", "size-3.5")

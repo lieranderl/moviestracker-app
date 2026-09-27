@@ -22,8 +22,8 @@ templ ThemeSwitcher() {
 			tabindex="0"
 			class="btn btn-ghost btn-circle btn-sm"
 			aria-haspopup="menu"
-			aria-label="Theme switcher"
-			title="Change theme"
+			aria-label={ tr(ctx, "Theme switcher") }
+			title={ tr(ctx, "Change theme") }
 		>
 			for _, opt := range themeOptions {
 				<span
@@ -39,7 +39,7 @@ templ ThemeSwitcher() {
 			role="menu"
 			class="dropdown-content menu menu-sm bg-base-200 rounded-box z-50 mt-2 w-48 p-1.5 shadow-2xl border border-base-content/10"
 		>
-			<li class="menu-title text-[10px] uppercase tracking-wider">Theme</li>
+			<li class="menu-title text-[10px] uppercase tracking-wider">{ tr(ctx, "Theme") }</li>
 			for _, opt := range themeOptions {
 				<li>
 					<button
@@ -52,7 +52,7 @@ templ ThemeSwitcher() {
 					>
 						<span class="flex items-center gap-2">
 							@Icon(opt.Icon, opt.IconClass)
-							<span>{ opt.Label }</span>
+							<span>{ tr(ctx, opt.Label) }</span>
 						</span>
 						<span class="text-[10px] opacity-60 font-mono">{ opt.Hint }</span>
 					</button>

@@ -27,7 +27,7 @@ func (d DiscoverRail) id() string { return "discover-" + d.Slug }
 templ discoverSection() {
 	<div class="space-y-10" data-init="@get('/api/discover')">
 		for _, d := range DiscoverRails {
-			<section id={ d.id() } class="relative space-y-4 scroll-mt-32" aria-busy="true" aria-label={ d.Title }>
+			<section id={ d.id() } class="relative space-y-4 scroll-mt-32" aria-busy="true" aria-label={ tr(ctx, d.Title) }>
 				@rowMarker(d.id())
 				@discoverHeader(d)
 				<div class="flex gap-4 overflow-hidden pb-3" aria-hidden="true">
@@ -45,11 +45,11 @@ templ discoverHeader(d DiscoverRail) {
 		<div class="min-w-0">
 			<h2 class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
 				@Icon(d.Icon, "size-5 text-primary")
-				{ d.Title }
+				{ tr(ctx, d.Title) }
 			</h2>
-			<p class="text-sm text-base-content/60">{ d.Subtitle }</p>
+			<p class="text-sm text-base-content/60">{ tr(ctx, d.Subtitle) }</p>
 		</div>
-		@allLink(d.Slug, d.Title)
+		@allLink(d.Slug, tr(ctx, d.Title))
 	</header>
 }
 
@@ -59,7 +59,7 @@ templ DiscoverRailLoaded(d DiscoverRail, items []tmdb.MediaItem) {
 		<section id={ d.id() } class="hidden"></section>
 		<li id={ chipID(d.id()) } class="hidden"></li>
 	} else {
-		<section id={ d.id() } class="relative space-y-4 scroll-mt-32" aria-label={ d.Title }>
+		<section id={ d.id() } class="relative space-y-4 scroll-mt-32" aria-label={ tr(ctx, d.Title) }>
 			@rowMarker(d.id())
 			@discoverHeader(d)
 			@carousel() {

@@ -1,8 +1,8 @@
 package views
 
 import (
+	"context"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
-	"fmt"
 )
 
 const (
@@ -51,37 +51,46 @@ type EngineView struct {
 
 func (e EngineView) managed() bool { return e.Mode == "managed" }
 
-// SourceStatus is the outcome of the last save of one source.
+// SourceStatus is the outcome of the last save of one source. Message is
+// English, a format for Args when there are any; pages translate it.
 type SourceStatus struct {
 	OK      bool
 	Message string
+	Args    []any
+}
+
+// text is the status message in the page's language.
+func (st SourceStatus) text(ctx context.Context) string {
+	if len(st.Args) == 0 {
+		return tr(ctx, st.Message)
+	}
+	return trf(ctx, st.Message, st.Args...)
 }
 
 // SourcesPage lets the admin set the services Moviestracker depends on.
 templ SourcesPage(user *auth.User, v SourcesView) {
-	@settingsShell(user, "sources", "Sources") {
+	@settingsShell(user, "sources", tr(ctx, "Sources")) {
 		<header class="space-y-2">
 			<h1 class="text-3xl font-bold tracking-tight flex items-center gap-3">
 				@Icon("plug", "size-7 text-primary")
-				Sources
+				{ tr(ctx, "Sources") }
 			</h1>
 			<p class="text-base-content/70">
-				Moviestracker runs on this machine, but finding titles needs the internet: TMDB for movies and series,
-				JacRed for torrent releases. Streaming goes through TorrServer.
+				{ tr(ctx, "Moviestracker runs on this machine, but finding titles needs the internet: TMDB for movies and series, JacRed for torrent releases. Streaming goes through TorrServer.") }
 			</p>
 		</header>
 		if v.Welcome {
 			<div role="status" class="alert alert-info alert-soft">
 				@Icon("party-popper", "size-5")
 				<div>
-					<p class="font-semibold">Your account is ready.</p>
+					<p class="font-semibold">{ tr(ctx, "Your account is ready.") }</p>
 					if v.TMDBShared {
-						<p class="text-sm">Search already works with Moviestracker's shared TMDB key. Check JacRed and choose where TorrServer runs; you can change all of this later under Settings.</p>
+						<p class="text-sm">{ tr(ctx, "Search already works with Moviestracker's shared TMDB key. Check JacRed and choose where TorrServer runs; you can change all of this later under Settings.") }</p>
 					} else {
-						<p class="text-sm">Add a TMDB key, check JacRed and choose where TorrServer runs. You can change all of this later under Settings.</p>
+						<p class="text-sm">{ tr(ctx, "Add a TMDB key, check JacRed and choose where TorrServer runs. You can change all of this later under Settings.") }</p>
 					}
 				</div>
-				<a href="/movies" class="btn btn-sm btn-primary">Continue</a>
+				<a href="/movies" class="btn btn-sm btn-primary">{ tr(ctx, "Continue") }</a>
 			</div>
 		}
 		@TMDBSource(v, SourceStatus{})
@@ -112,7 +121,7 @@ templ sourceStatus(st SourceStatus) {
 			} else {
 				@Icon("circle-alert", "size-4")
 			}
-			<span>{ st.Message }</span>
+			<span>{ st.text(ctx) }</span>
 		</div>
 	}
 }
@@ -120,19 +129,19 @@ templ sourceStatus(st SourceStatus) {
 templ envNote(name string) {
 	<p class="text-sm text-base-content/70">
 		@Icon("lock", "size-3.5 inline")
-		Set by the <code class="font-mono">{ name }</code> environment variable; change it there.
+		{ tr(ctx, "Set by the") } <code class="font-mono">{ name }</code> { tr(ctx, "environment variable; change it there.") }
 	</p>
 }
 
 // TMDBSource sets the TMDB key and explains how to get one.
 templ TMDBSource(v SourcesView, st SourceStatus) {
-	@sourceCard("source-tmdb", "database", "TMDB — movies and series") {
+	@sourceCard("source-tmdb", "database", tr(ctx, "TMDB — movies and series")) {
 		<p class="text-sm text-base-content/70">
-			Titles, posters, cast and trailers come from The Movie Database.
+			{ tr(ctx, "Titles, posters, cast and trailers come from The Movie Database.") }
 			if v.TMDBCanShare {
-				Moviestracker comes with a shared key, so it works right away; you can use your own key instead.
+				{ tr(ctx, "Moviestracker comes with a shared key, so it works right away; you can use your own key instead.") }
 			} else {
-				It needs a free personal key.
+				{ tr(ctx, "It needs a free personal key.") }
 			}
 		</p>
 		if v.TMDBEnv != "" {
@@ -144,32 +153,32 @@ templ TMDBSource(v SourcesView, st SourceStatus) {
 				<div class="flex flex-wrap items-center justify-between gap-3 rounded-box bg-base-100 border border-base-content/10 p-3 text-sm">
 					<span class="flex items-center gap-2">
 						@Icon("key-round", "size-4 text-success")
-						Your own TMDB key is in use.
+						{ tr(ctx, "Your own TMDB key is in use.") }
 					</span>
 					<button type="button" class="btn btn-ghost btn-sm" data-on:click="@post('/api/settings/sources/tmdb/shared')">
 						@Icon("undo-2", "size-4")
-						Use the shared key instead
+						{ tr(ctx, "Use the shared key instead") }
 					</button>
 				</div>
 			}
 			<details class="collapse collapse-arrow bg-base-100 border border-base-content/10" open?={ !v.TMDBKeySet && !v.TMDBShared }>
 				<summary class="collapse-title text-sm font-semibold">
 					if v.TMDBShared {
-						Use your own key: how to get one
+						{ tr(ctx, "Use your own key: how to get one") }
 					} else {
-						How to get a TMDB key
+						{ tr(ctx, "How to get a TMDB key") }
 					}
 				</summary>
 				<ol class="collapse-content list-decimal list-inside space-y-2 text-sm text-base-content/80">
-					<li>Create a free account at <a href={ templ.SafeURL(tmdbSignupURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">themoviedb.org</a> and confirm your email.</li>
-					<li>Open <a href={ templ.SafeURL(tmdbAPIPageURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">Settings → API</a> and request an API key for personal, non-commercial use.</li>
-					<li>Copy the <strong>API Read Access Token</strong> (the long one) or the shorter <strong>API Key</strong>, and paste it below.</li>
+					<li>{ tr(ctx, "Create a free account at") } <a href={ templ.SafeURL(tmdbSignupURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">themoviedb.org</a> { tr(ctx, "and confirm your email.") }</li>
+					<li>{ tr(ctx, "Open") } <a href={ templ.SafeURL(tmdbAPIPageURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">Settings → API</a> { tr(ctx, "and request an API key for personal, non-commercial use.") }</li>
+					<li>{ tr(ctx, "Copy the") } <strong>API Read Access Token</strong> { tr(ctx, "(the long one) or the shorter") } <strong>API Key</strong>{ tr(ctx, ", and paste it below.") }</li>
 				</ol>
 			</details>
 			<form class="space-y-3" data-signals="{ tmdbKey: '' }" data-indicator:tmdb-saving data-on:submit="@post('/api/settings/sources/tmdb', {filterSignals: {include: /^tmdbKey$/}})">
 				<label class="input w-full">
 					@Icon("key-round", "size-4 opacity-60")
-					<span class="sr-only">TMDB key</span>
+					<span class="sr-only">{ tr(ctx, "TMDB key") }</span>
 					<input
 						type="password"
 						required
@@ -177,18 +186,18 @@ templ TMDBSource(v SourcesView, st SourceStatus) {
 						spellcheck="false"
 						class="grow font-mono"
 						if v.TMDBShared {
-							placeholder="Optional: paste your own TMDB token or API key"
+							placeholder={ tr(ctx, "Optional: paste your own TMDB token or API key") }
 						} else if v.TMDBKeySet {
-							placeholder="A key is saved — paste a new one to replace it"
+							placeholder={ tr(ctx, "A key is saved — paste a new one to replace it") }
 						} else {
-							placeholder="Paste your TMDB token or API key"
+							placeholder={ tr(ctx, "Paste your TMDB token or API key") }
 						}
 						data-bind:tmdb-key
 					/>
 				</label>
 				<button type="submit" class="btn btn-primary" data-attr:disabled="$tmdbSaving">
 					<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$tmdbSaving"></span>
-					Check and save
+					{ tr(ctx, "Check and save") }
 				</button>
 			</form>
 		}
@@ -201,45 +210,45 @@ templ tmdbSharedNote() {
 	<div role="status" class="alert alert-info alert-soft text-sm items-start">
 		@Icon("users", "size-4 mt-0.5")
 		<div class="space-y-2">
-			<p class="font-semibold">Moviestracker's shared TMDB key is in use: search works without any setup.</p>
-			<p>Every Moviestracker install uses this key, so:</p>
+			<p class="font-semibold">{ tr(ctx, "Moviestracker's shared TMDB key is in use: search works without any setup.") }</p>
+			<p>{ tr(ctx, "Every Moviestracker install uses this key, so:") }</p>
 			<ul class="list-disc list-inside space-y-1 text-base-content/80">
-				<li>should TMDB disable it (for example because someone else misuses it), search stops until Moviestracker is updated;</li>
-				<li>TMDB sees these requests as Moviestracker's, not yours;</li>
-				<li>a busy moment for other installs can slow it down.</li>
+				<li>{ tr(ctx, "should TMDB disable it (for example because someone else misuses it), search stops until Moviestracker is updated;") }</li>
+				<li>{ tr(ctx, "TMDB sees these requests as Moviestracker's, not yours;") }</li>
+				<li>{ tr(ctx, "a busy moment for other installs can slow it down.") }</li>
 			</ul>
-			<p>With your own key, which is free, none of this depends on anyone else. Add it below whenever you like.</p>
+			<p>{ tr(ctx, "With your own key, which is free, none of this depends on anyone else. Add it below whenever you like.") }</p>
 		</div>
 	</div>
 }
 
 // JacRedSource sets the JacRed instance used for torrent search.
 templ JacRedSource(v SourcesView, st SourceStatus) {
-	@sourceCard("source-jacred", "magnet", "JacRed — torrent search") {
+	@sourceCard("source-jacred", "magnet", tr(ctx, "JacRed — torrent search")) {
 		<p class="text-sm text-base-content/70">
-			Releases for a title are found with JacRed: the public instance at
+			{ tr(ctx, "Releases for a title are found with JacRed: the public instance at") }
 			<a href={ templ.SafeURL(jacredPublicURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">jacred.su</a>,
-			or your own, run with
+			{ tr(ctx, "or your own, run with") }
 			<a href={ templ.SafeURL(jacredRepoURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">jacred-fdb/jacred</a>
-			(Docker or Linux, port 9117) if jacred.su is slow or blocked where you are.
+			{ tr(ctx, "(Docker or Linux, port 9117) if jacred.su is slow or blocked where you are.") }
 		</p>
 		if v.JacRedEnv == "" && v.JacRedShared {
 			<div role="status" class="alert alert-soft alert-success text-sm items-start">
 				@Icon("badge-check", "size-4 mt-0.5")
 				<div class="space-y-1">
-					<p class="font-semibold">Moviestracker's JacRed key is in use: unlimited searches on jacred.su, nothing to set up.</p>
-					<p>You can use a key of your own instead: paste it below.</p>
+					<p class="font-semibold">{ tr(ctx, "Moviestracker's JacRed key is in use: unlimited searches on jacred.su, nothing to set up.") }</p>
+					<p>{ tr(ctx, "You can use a key of your own instead: paste it below.") }</p>
 				</div>
 			</div>
 		} else if v.JacRedEnv == "" && v.JacRedCanShare && v.JacRedKeySet {
 			<div class="flex flex-wrap items-center justify-between gap-3 rounded-box bg-base-100 border border-base-content/10 p-3 text-sm">
 				<span class="flex items-center gap-2">
 					@Icon("key-round", "size-4 text-success")
-					Your own JacRed key is in use.
+					{ tr(ctx, "Your own JacRed key is in use.") }
 				</span>
 				<button type="button" class="btn btn-ghost btn-sm" data-on:click="@post('/api/settings/sources/jacred/shared')">
 					@Icon("undo-2", "size-4")
-					Use Moviestracker's key instead
+					{ tr(ctx, "Use Moviestracker's key instead") }
 				</button>
 			</div>
 		}
@@ -247,12 +256,11 @@ if !v.JacRedShared && !v.JacRedCanShare {
 					<div role="note" class="alert alert-soft alert-info text-sm items-start">
 				@Icon("key-round", "size-4 mt-0.5")
 				<div class="space-y-1">
-					<p class="font-semibold">From 9 October 2026, jacred.su searches need a free personal key.</p>
+					<p class="font-semibold">{ tr(ctx, "From 9 October 2026, jacred.su searches need a free personal key.") }</p>
 					<p>
-						Sign in at
+						{ tr(ctx, "Sign in at") }
 						<a href={ templ.SafeURL(jacredKeyURL) } target="_blank" rel="noopener noreferrer" class="link">jacred.su/account</a>,
-						create one under «Мой ключ» and paste it below. A personal key allows 100 searches a day; each title
-						whose sources you open uses one, and a repeat within an hour is free.
+						{ tr(ctx, "create one under «Мой ключ» and paste it below. A personal key allows 100 searches a day; each title whose sources you open uses one, and a repeat within an hour is free.") }
 					</p>
 				</div>
 			</div>
@@ -263,27 +271,27 @@ if !v.JacRedShared && !v.JacRedCanShare {
 			<form class="space-y-3" data-signals={ templ.JSONString(map[string]string{"jacredUrl": v.JacRedURL, "jacredApiKey": ""}) } data-indicator:jacred-saving data-on:submit="@post('/api/settings/sources/jacred', {filterSignals: {include: /^jacred(Url|ApiKey)$/}})">
 				<label class="input w-full">
 					@Icon("globe", "size-4 opacity-60")
-					<span class="sr-only">JacRed address</span>
+					<span class="sr-only">{ tr(ctx, "JacRed address") }</span>
 					<input type="url" required placeholder="https://jacred.su" class="grow font-mono" data-bind:jacred-url/>
 				</label>
 				<label class="input w-full">
 					@Icon("key-round", "size-4 opacity-60")
-					<span class="sr-only">JacRed API key</span>
+					<span class="sr-only">{ tr(ctx, "JacRed API key") }</span>
 					<input
 						type="password"
 						autocomplete="off"
 						class="grow font-mono"
 						if v.JacRedKeySet {
-							placeholder="A key is saved — leave empty to keep it"
+							placeholder={ tr(ctx, "A key is saved — leave empty to keep it") }
 						} else {
-							placeholder="Your jacred.su key, or a private instance's"
+							placeholder={ tr(ctx, "Your jacred.su key, or a private instance's") }
 						}
 						data-bind:jacred-api-key
 					/>
 				</label>
 				<button type="submit" class="btn btn-primary" data-attr:disabled="$jacredSaving">
 					<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$jacredSaving"></span>
-					Test search and save
+					{ tr(ctx, "Test search and save") }
 				</button>
 			</form>
 		}
@@ -294,10 +302,9 @@ if !v.JacRedShared && !v.JacRedCanShare {
 // TorrServerSource chooses between the TorrServer Moviestracker runs and an
 // existing one.
 templ TorrServerSource(v SourcesView, st SourceStatus) {
-	@sourceCard("source-torrserver", "server", "TorrServer — streaming") {
+	@sourceCard("source-torrserver", "server", tr(ctx, "TorrServer — streaming")) {
 		<p class="text-sm text-base-content/70">
-			TorrServer downloads and streams the torrents you play. Moviestracker can run it for you, hidden behind
-			Moviestracker, or use one you already run.
+			{ tr(ctx, "TorrServer downloads and streams the torrents you play. Moviestracker can run it for you, hidden behind Moviestracker, or use one you already run.") }
 		</p>
 		if v.TorrServerEnv != "" {
 			@envNote(v.TorrServerEnv)
@@ -308,18 +315,18 @@ templ TorrServerSource(v SourcesView, st SourceStatus) {
 				data-indicator:torrserver-saving
 				data-on:submit="@post('/api/settings/sources/torrserver', {filterSignals: {include: /^torrserver(Mode|Url|User|Password)$/}})"
 			>
-				<div class="space-y-2" role="radiogroup" aria-label="Where TorrServer runs">
+				<div class="space-y-2" role="radiogroup" aria-label={ tr(ctx, "Where TorrServer runs") }>
 					<label class="flex items-start gap-3 cursor-pointer rounded-box bg-base-100 border border-base-content/10 p-3">
 						<input type="radio" name="torrserver-mode" value="managed" class="radio radio-primary mt-0.5" data-bind:torrserver-mode disabled?={ !v.Engine.Available }/>
 						<span class="space-y-1">
-							<span class="block text-sm font-semibold">Managed by Moviestracker</span>
+							<span class="block text-sm font-semibold">{ tr(ctx, "Managed by Moviestracker") }</span>
 							<span class="block text-xs text-base-content/70">
-								Recommended. Moviestracker starts TorrServer, restarts it if it stops, and keeps it off your network.
+								{ tr(ctx, "Recommended. Moviestracker starts TorrServer, restarts it if it stops, and keeps it off your network.") }
 							</span>
 							if !v.Engine.Available {
 								<span class="block text-xs text-warning">
-									The TorrServer program was not found: run <code class="font-mono">make torrserver</code> or put a
-									<code class="font-mono">torrserver</code> program next to Moviestracker.
+									{ tr(ctx, "The TorrServer program was not found: run") } <code class="font-mono">make torrserver</code> { tr(ctx, "or put a") }
+									<code class="font-mono">torrserver</code> { tr(ctx, "program next to Moviestracker.") }
 								</span>
 							}
 						</span>
@@ -327,47 +334,47 @@ templ TorrServerSource(v SourcesView, st SourceStatus) {
 					<label class="flex items-start gap-3 cursor-pointer rounded-box bg-base-100 border border-base-content/10 p-3">
 						<input type="radio" name="torrserver-mode" value="external" class="radio radio-primary mt-0.5" data-bind:torrserver-mode/>
 						<span class="space-y-1">
-							<span class="block text-sm font-semibold">A TorrServer I already run</span>
-							<span class="block text-xs text-base-content/70">On this computer, a NAS or an Android TV box.</span>
+							<span class="block text-sm font-semibold">{ tr(ctx, "A TorrServer I already run") }</span>
+							<span class="block text-xs text-base-content/70">{ tr(ctx, "On this computer, a NAS or an Android TV box.") }</span>
 						</span>
 					</label>
 				</div>
 				<div class="space-y-3" data-show="$torrserverMode === 'external'">
 					<label class="input w-full">
 						@Icon("globe", "size-4 opacity-60")
-						<span class="sr-only">TorrServer address</span>
+						<span class="sr-only">{ tr(ctx, "TorrServer address") }</span>
 						<input type="url" placeholder="http://127.0.0.1:8090" class="grow font-mono" data-bind:torrserver-url/>
 					</label>
 					<div class="grid gap-3 sm:grid-cols-2">
 						<label class="input w-full">
 							@Icon("user", "size-4 opacity-60")
-							<span class="sr-only">TorrServer username</span>
-							<input type="text" autocomplete="off" placeholder="Username (if it asks for one)" class="grow" data-bind:torrserver-user/>
+							<span class="sr-only">{ tr(ctx, "TorrServer username") }</span>
+							<input type="text" autocomplete="off" placeholder={ tr(ctx, "Username (if it asks for one)") } class="grow" data-bind:torrserver-user/>
 						</label>
 						<label class="input w-full">
 							@Icon("key-round", "size-4 opacity-60")
-							<span class="sr-only">TorrServer password</span>
+							<span class="sr-only">{ tr(ctx, "TorrServer password") }</span>
 							<input
 								type="password"
 								autocomplete="off"
 								class="grow"
 								if v.TorrServerPassSet {
-									placeholder="A password is saved — leave empty to keep it"
+									placeholder={ tr(ctx, "A password is saved — leave empty to keep it") }
 								} else {
-									placeholder="Password"
+									placeholder={ tr(ctx, "Password") }
 								}
 								data-bind:torrserver-password
 							/>
 						</label>
 					</div>
 					<p class="text-xs text-base-content/60">
-						Only for a TorrServer started with <code class="font-mono">--httpauth</code>: the login from its
-						<code class="font-mono">accs.db</code>. Moviestracker keeps it in its data folder and never shows the password again.
+						{ tr(ctx, "Only for a TorrServer started with") } <code class="font-mono">--httpauth</code>{ tr(ctx, ": the login from its") }
+						<code class="font-mono">accs.db</code>. { tr(ctx, "Moviestracker keeps it in its data folder and never shows the password again.") }
 					</p>
 				</div>
 				<button type="submit" class="btn btn-primary" data-attr:disabled="$torrserverSaving">
 					<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$torrserverSaving"></span>
-					Connect and save
+					{ tr(ctx, "Connect and save") }
 				</button>
 			</form>
 			if v.Engine.Available && v.Engine.managed() {
@@ -385,22 +392,22 @@ templ engineStatus(e EngineView) {
 			switch e.State {
 				case "running":
 					<span class="status status-success" aria-hidden="true"></span>
-					<span>Running TorrServer <span class="font-mono">{ e.Version }</span></span>
+					<span>{ tr(ctx, "Running TorrServer") } <span class="font-mono">{ e.Version }</span></span>
 				case "starting", "restarting":
 					<span class="status status-warning animate-pulse" aria-hidden="true"></span>
-					<span>Starting TorrServer…</span>
+					<span>{ tr(ctx, "Starting TorrServer…") }</span>
 				default:
 					<span class="status status-error" aria-hidden="true"></span>
-					<span>TorrServer is not running</span>
+					<span>{ tr(ctx, "TorrServer is not running") }</span>
 			}
 			if e.Restarts > 0 {
-				<span class="badge badge-sm badge-ghost">{ fmt.Sprintf("%d restarts", e.Restarts) }</span>
+				<span class="badge badge-sm badge-ghost">{ trn(ctx, e.Restarts, "%d restart", "%d restarts") }</span>
 			}
 		</div>
 		<button type="button" class="btn btn-sm btn-outline" data-indicator:engine-restarting data-attr:disabled="$engineRestarting" data-on:click="@post('/api/settings/engine/restart', {filterSignals: {include: /^$/}})">
 			<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$engineRestarting"></span>
 			@Icon("rotate-cw", "size-4")
-			Restart
+			{ tr(ctx, "Restart") }
 		</button>
 		if e.LastError != "" && e.State != "running" {
 			<p class="w-full text-xs text-error">{ e.LastError }</p>
@@ -410,9 +417,9 @@ templ engineStatus(e EngineView) {
 
 // IMDbSource sets the IMDb rating service.
 templ IMDbSource(v SourcesView, st SourceStatus) {
-	@sourceCard("source-imdb", "star", "IMDb ratings") {
+	@sourceCard("source-imdb", "star", tr(ctx, "IMDb ratings")) {
 		<p class="text-sm text-base-content/70">
-			Title pages show IMDb ratings from a small public rating service. Ratings are hidden when it is off or unreachable.
+			{ tr(ctx, "Title pages show IMDb ratings from a small public rating service. Ratings are hidden when it is off or unreachable.") }
 		</p>
 		if v.IMDbEnv != "" {
 			@envNote(v.IMDbEnv)
@@ -420,9 +427,9 @@ templ IMDbSource(v SourcesView, st SourceStatus) {
 			<form class="space-y-3" data-signals={ templ.JSONString(map[string]any{"imdbOn": v.IMDbOn}) } data-on:submit="@post('/api/settings/sources/imdb', {filterSignals: {include: /^imdbOn$/}})">
 				<label class="label cursor-pointer gap-3">
 					<input type="checkbox" class="toggle toggle-primary" data-bind:imdb-on/>
-					<span class="text-sm">Show IMDb ratings</span>
+					<span class="text-sm">{ tr(ctx, "Show IMDb ratings") }</span>
 				</label>
-				<button type="submit" class="btn btn-primary">Save</button>
+				<button type="submit" class="btn btn-primary">{ tr(ctx, "Save") }</button>
 			</form>
 		}
 		@sourceStatus(st)

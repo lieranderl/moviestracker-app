@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/jacred"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
@@ -25,7 +26,10 @@ type fakeTMDBDetails struct {
 	seasons map[string]*tmdb.Season
 	people  map[int]*tmdb.Person
 	search  map[string]*tmdb.SearchResults
-	lists   map[tmdb.List][]tmdb.MediaItem
+	// searchIn answers searches made in a language other than English,
+	// whose titles TMDB sends in that language.
+	searchIn map[i18n.Lang]map[string]*tmdb.SearchResults
+	lists    map[tmdb.List][]tmdb.MediaItem
 	// pages is each list's page count for ListPage, which makes 20 titles a
 	// page, ids page*100+n; pageItems overrides a page's titles.
 	pages     map[tmdb.List]int
@@ -102,9 +106,15 @@ func (f *fakeTMDBDetails) Person(_ context.Context, id int) (*tmdb.Person, error
 	return lookup(f.people, id, f.err)
 }
 
-func (f *fakeTMDBDetails) Search(_ context.Context, q string) (*tmdb.SearchResults, error) {
+func (f *fakeTMDBDetails) Search(ctx context.Context, q string) (*tmdb.SearchResults, error) {
 	if f.err != nil {
 		return nil, f.err
+	}
+	if lang := i18n.FromContext(ctx); lang != i18n.English {
+		if r, ok := f.searchIn[lang][q]; ok {
+			return r, nil
+		}
+		return &tmdb.SearchResults{Query: q}, nil
 	}
 	if r, ok := f.search[q]; ok {
 		return r, nil

@@ -57,25 +57,34 @@ const notifyUnplayable = (what) => videoEl()?.dispatchEvent(new CustomEvent("tor
 
 const aacProfiles = { 1: "AAC Main", 2: "AAC LC", 3: "AAC SSR", 4: "AAC LTP", 5: "HE-AAC", 29: "HE-AAC v2" };
 
+// part names a part of a file in the page's language: "the HEVC video",
+// or in Russian "видео HEVC".
+const russianParts = { audio: "звук", video: "видео", format: "формат" };
+const part = (name, kind) =>
+  document.documentElement.lang === "ru" ? `${russianParts[kind]} ${name}` : `the ${name} ${kind}`;
+
+// anyFormat is the file's format when the browser does not say which part it refuses.
+const anyFormat = () => (document.documentElement.lang === "ru" ? "формат видео или звука" : "the video or audio format");
+
 // describeCodec names an HLS CODECS entry for people: "mp4a.40.1" is
 // "the AAC Main audio".
 const describeCodec = (codec) => {
   const c = codec.toLowerCase();
-  if (c.startsWith("mp4a.40.")) return `the ${aacProfiles[c.split(".")[2]] ?? "AAC"} audio`;
-  if (c === "ac-3") return "the Dolby Digital (AC-3) audio";
-  if (c === "ec-3") return "the Dolby Digital Plus audio";
-  if (c.startsWith("hvc1") || c.startsWith("hev1")) return "the HEVC video";
-  if (c.startsWith("dvh1") || c.startsWith("dvhe")) return "the Dolby Vision video";
-  if (c.startsWith("av01")) return "the AV1 video";
-  if (c.startsWith("vp09")) return "the VP9 video";
-  if (c.startsWith("avc1") || c.startsWith("avc3")) return "the H.264 video";
-  return `the ${codec} format`;
+  if (c.startsWith("mp4a.40.")) return part(aacProfiles[c.split(".")[2]] ?? "AAC", "audio");
+  if (c === "ac-3") return part("Dolby Digital (AC-3)", "audio");
+  if (c === "ec-3") return part("Dolby Digital Plus", "audio");
+  if (c.startsWith("hvc1") || c.startsWith("hev1")) return part("HEVC", "video");
+  if (c.startsWith("dvh1") || c.startsWith("dvhe")) return part("Dolby Vision", "video");
+  if (c.startsWith("av01")) return part("AV1", "video");
+  if (c.startsWith("vp09")) return part("VP9", "video");
+  if (c.startsWith("avc1") || c.startsWith("avc3")) return part("H.264", "video");
+  return part(codec, "format");
 };
 
 // unsupportedPart is what of these codecs this browser cannot decode.
 const unsupportedPart = (codecs) => {
   const refused = codecs.find((c) => !window.MediaSource?.isTypeSupported(`video/mp4; codecs="${c}"`));
-  return refused ? describeCodec(refused) : "the video or audio format";
+  return refused ? describeCodec(refused) : anyFormat();
 };
 
 window.setSubtitleTrack = (id) => {
@@ -156,7 +165,7 @@ window.playHlsVideo = (url) => {
       "error",
       () => {
         if (currentUrl === url && video.error?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
-          notifyUnplayable("the video or audio format");
+          notifyUnplayable(anyFormat());
         }
       },
       { once: true },

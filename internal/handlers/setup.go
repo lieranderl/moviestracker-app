@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 
 	"github.com/a-h/templ"
@@ -35,7 +36,7 @@ func (s *Server) setupGate(next http.Handler) http.Handler {
 
 func reachableBeforeSetup(path string) bool {
 	switch path {
-	case "/setup", "/api/setup", "/healthz", "/readyz":
+	case "/setup", "/api/setup", "/api/language", "/healthz", "/readyz":
 		return true
 	}
 	return strings.HasPrefix(path, "/static/")
@@ -132,7 +133,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Setup is already complete", http.StatusForbidden)
 		return
 	case errors.Is(err, auth.ErrInvalidAccount):
-		patchSetupError(w, r, "The "+err.Error()+".")
+		patchSetupError(w, r, i18n.Tf(r.Context(), "The %s.", i18n.T(r.Context(), err.Error())))
 		return
 	case err != nil:
 		slog.Error("create first admin failed", "error", err)
@@ -152,9 +153,10 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// patchSetupError shows message, translated, on the setup page.
 func patchSetupError(w http.ResponseWriter, r *http.Request, message string) {
 	sse := datastar.NewSSE(w, r)
-	if err := sse.MarshalAndPatchSignals(map[string]any{"setupError": message, "password": ""}); err != nil {
+	if err := sse.MarshalAndPatchSignals(map[string]any{"setupError": i18n.T(r.Context(), message), "password": ""}); err != nil {
 		logSSEError(r, "patch setup error", err)
 	}
 }

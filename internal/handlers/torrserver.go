@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	playback "github.com/lieranderl/moviestracker-app/internal/streams"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
 	"github.com/lieranderl/moviestracker-app/internal/views"
@@ -255,7 +256,7 @@ func (s *Server) handleTorrServerAdd(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/torrserver", http.StatusSeeOther)
 		return
 	}
-	msg, kind := addResult(added, refused, failed)
+	msg, kind := addResult(r.Context(), added, refused, failed)
 	sse := datastar.NewSSE(w, r)
 	if added > 0 {
 		list, _ := client.ListTorrents(ctx)
@@ -289,21 +290,19 @@ func readTorrentFile(fh *multipart.FileHeader) ([]byte, error) {
 }
 
 // addResult tells what an Add Torrents form did, in one sentence or two.
-func addResult(added int, refused, failed []string) (string, string) {
+func addResult(ctx context.Context, added int, refused, failed []string) (string, string) {
 	var parts []string
 	switch {
-	case added == 1:
-		parts = append(parts, "Added 1 torrent to TorrServer.")
-	case added > 1:
-		parts = append(parts, fmt.Sprintf("Added %d torrents to TorrServer.", added))
+	case added > 0:
+		parts = append(parts, i18n.N(ctx, added, "Added %d torrent to TorrServer.", "Added %d torrents to TorrServer."))
 	default:
-		parts = append(parts, "Nothing was added.")
+		parts = append(parts, i18n.T(ctx, "Nothing was added."))
 	}
 	if len(refused) > 0 {
-		parts = append(parts, "Not torrent links or .torrent files: "+strings.Join(refused, ", ")+". Use magnet, http(s) or torrs links, info-hashes or .torrent files.")
+		parts = append(parts, i18n.Tf(ctx, "Not torrent links or .torrent files: %s. Use magnet, http(s) or torrs links, info-hashes or .torrent files.", strings.Join(refused, ", ")))
 	}
 	if len(failed) > 0 {
-		parts = append(parts, "TorrServer could not add: "+strings.Join(failed, ", ")+".")
+		parts = append(parts, i18n.Tf(ctx, "TorrServer could not add: %s.", strings.Join(failed, ", ")))
 	}
 	switch {
 	case added > 0 && len(refused)+len(failed) == 0:
@@ -312,7 +311,7 @@ func addResult(added int, refused, failed []string) (string, string) {
 		return strings.Join(parts, " "), "warning"
 	}
 	if len(refused)+len(failed) == 0 {
-		parts = append(parts, "Enter at least one magnet link or torrent URL, or choose a .torrent file.")
+		parts = append(parts, i18n.T(ctx, "Enter at least one magnet link or torrent URL, or choose a .torrent file."))
 	}
 	return strings.Join(parts, " "), "error"
 }
@@ -341,16 +340,16 @@ func (s *Server) handleTorrServerAction(w http.ResponseWriter, r *http.Request) 
 	switch op {
 	case "drop":
 		if gettingInfo(ctx, client, hash) {
-			patchTorrAlert(r, datastar.NewSSE(w, r), "This torrent is still getting its info from peers: stopping it now would remove it. To get rid of it, an administrator can remove it.", "warning")
+			patchTorrAlert(r, datastar.NewSSE(w, r), i18n.T(r.Context(), "This torrent is still getting its info from peers: stopping it now would remove it. To get rid of it, an administrator can remove it."), "warning")
 			return
 		}
-		err, failure = client.DropTorrent(ctx, hash), "TorrServer could not stop this torrent. Check that it is running."
+		err, failure = client.DropTorrent(ctx, hash), i18n.T(ctx, "TorrServer could not stop this torrent. Check that it is running.")
 	case "rem":
 		if !user.IsAdmin() {
 			http.Error(w, "Only an administrator can remove a torrent.", http.StatusForbidden)
 			return
 		}
-		err, failure = client.RemoveTorrent(ctx, hash), "TorrServer could not remove this torrent. Check that it is running."
+		err, failure = client.RemoveTorrent(ctx, hash), i18n.T(ctx, "TorrServer could not remove this torrent. Check that it is running.")
 		if err == nil {
 			s.forgetTitle(hash)
 		}
@@ -412,7 +411,7 @@ func (s *Server) handleTorrServerFiles(w http.ResponseWriter, r *http.Request) {
 	sse := datastar.NewSSE(w, r)
 	if err != nil {
 		slog.Warn("failed to get torrent files", "hash", logValue(hash), "error", logError(err))
-		patchTorrAlert(r, sse, "TorrServer could not load the files of this torrent. Try again once it has metadata.", "error")
+		patchTorrAlert(r, sse, i18n.T(r.Context(), "TorrServer could not load the files of this torrent. Try again once it has metadata."), "error")
 		return
 	}
 
@@ -422,10 +421,10 @@ func (s *Server) handleTorrServerFiles(w http.ResponseWriter, r *http.Request) {
 		_ = s.patchTorrLive(sse, tList, echoInfo)
 	}
 	if len(details.FileStats) == 0 {
-		_ = sse.PatchElementTempl(views.TorrServerAlertFragment(details.DisplayName()+" is still getting its info from peers; its files show up once it has it.", "info"))
+		_ = sse.PatchElementTempl(views.TorrServerAlertFragment(i18n.Tf(r.Context(), "%s is still getting its info from peers; its files show up once it has it.", details.DisplayName()), "info"))
 		return
 	}
-	msg := fmt.Sprintf("Loaded %d file(s) for %s", len(details.FileStats), details.DisplayName())
+	msg := i18n.Tf(r.Context(), "Loaded %d file(s) for %s", len(details.FileStats), details.DisplayName())
 	_ = sse.PatchElementTempl(views.TorrServerAlertFragment(msg, "success"))
 }
 
@@ -451,7 +450,7 @@ func (s *Server) handleTorrServerProbe(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Warn("probe failed", "hash", logValue(hash), "index", idx, "error", logError(err))
 		sse := datastar.NewSSE(w, r)
-		_ = sse.PatchElementTempl(views.TorrServerProbeError("Probe failed or media is still buffering. Try again in a few seconds."))
+		_ = sse.PatchElementTempl(views.TorrServerProbeError(i18n.T(r.Context(), "Probe failed or media is still buffering. Try again in a few seconds.")))
 		return
 	}
 

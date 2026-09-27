@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/config"
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 
@@ -24,6 +25,9 @@ const (
 	reconnectCost   = "Saving makes TorrServer reconnect (about 2 seconds)."
 	startupOnly     = "Only when Moviestracker runs TorrServer (Settings → Sources)."
 	engineAsleep    = "TorrServer is not answering, so its settings cannot be shown. Check Settings → Sources."
+	gstCost         = "Applied at once to new streams."
+	gstNotBuilt     = "This TorrServer was built without GStreamer, so MKV files cannot be converted for the browser. " +
+		"The TorrServer Moviestracker runs (make torrserver) is the GStreamer build."
 )
 
 func (s *Server) handleSettingsIndex(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +55,7 @@ func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 		}
 		templ.Handler(views.AppsPage(user, s.appsView(r), views.SourceStatus{})).ServeHTTP(w, r)
 	case "users":
-		templ.Handler(views.UsersPage(user, s.usersView(user))).ServeHTTP(w, r)
+		templ.Handler(views.UsersPage(user, s.usersView(r.Context(), user))).ServeHTTP(w, r)
 	default:
 		sec, ok := sectionByID(id)
 		if !ok {
@@ -93,7 +97,7 @@ func (s *Server) engineSectionView(ctx context.Context, sec settingsSection) vie
 // gstreamerView shows TorrServer's GStreamer settings.
 func (s *Server) gstreamerView(ctx context.Context) views.SettingsSection {
 	v := sectionView(gstreamerSection, "/api/settings/gstreamer")
-	v.Cost, v.ResetURL = "Applied at once to new streams.", "/api/settings/gstreamer/reset"
+	v.Cost, v.ResetURL = gstCost, "/api/settings/gstreamer/reset"
 	client := s.torrServer.Client()
 	gst, err := client.GSTSettings(ctx)
 	switch {
@@ -101,8 +105,7 @@ func (s *Server) gstreamerView(ctx context.Context) views.SettingsSection {
 		v.Unavailable = engineAsleep
 		return v
 	case !gst.BuiltIn:
-		v.Unavailable = "This TorrServer was built without GStreamer, so MKV files cannot be converted for the browser. " +
-			"The TorrServer Moviestracker runs (make torrserver) is the GStreamer build."
+		v.Unavailable = gstNotBuilt
 		return v
 	}
 	echo, _ := client.Echo(ctx)
@@ -148,6 +151,25 @@ func shownValue(sets torrserver.Fields, f settingField) any {
 	}
 }
 
+// outOfRange is a number outside a setting's range.
+type outOfRange struct {
+	min, max int64
+	unit     string
+}
+
+func (e outOfRange) Error() string {
+	return strings.TrimSpace(fmt.Sprintf("must be between %d and %d %s", e.min, e.max, e.unit))
+}
+
+// fieldProblem says, in the request's language, why f's value was refused.
+func fieldProblem(ctx context.Context, f settingField, err error) views.SourceStatus {
+	reason := i18n.T(ctx, err.Error())
+	if r, ok := errors.AsType[outOfRange](err); ok {
+		reason = strings.TrimSpace(i18n.Tf(ctx, "must be between %d and %d %s", r.min, r.max, i18n.T(ctx, r.unit)))
+	}
+	return failed("%s %s.", i18n.T(ctx, f.Label), reason)
+}
+
 // parse turns a posted form value into what TorrServer stores.
 func (f settingField) parse(posted any) (any, error) {
 	switch f.Kind {
@@ -172,7 +194,7 @@ func (f settingField) parse(posted any) (any, error) {
 			return nil, errors.New("must be a whole number")
 		}
 		if n < f.Min || n > f.Max {
-			return nil, fmt.Errorf("must be between %d and %d %s", f.Min, f.Max, f.Unit)
+			return nil, outOfRange{f.Min, f.Max, f.Unit}
 		}
 		return n * max(f.Scale, 1), nil
 	case kindSelect:
@@ -238,7 +260,7 @@ func (s *Server) handleSaveEngineSettings(w http.ResponseWriter, r *http.Request
 		}
 		stored, err := f.parse(value)
 		if err != nil {
-			status(failed("%s %v.", f.Label, err))
+			status(fieldProblem(ctx, f, err))
 			return
 		}
 		if f.Startup {
@@ -251,7 +273,7 @@ func (s *Server) handleSaveEngineSettings(w http.ResponseWriter, r *http.Request
 	client := s.torrServer.Client()
 	current, err := client.Settings(ctx)
 	if err != nil {
-		status(failed("%s", engineAsleep))
+		status(failed(engineAsleep))
 		return
 	}
 	for key, value := range engineChanges {
@@ -259,14 +281,14 @@ func (s *Server) handleSaveEngineSettings(w http.ResponseWriter, r *http.Request
 			delete(engineChanges, key) // unchanged: no need to reconnect for it
 		}
 	}
-	var done []string
+	reconnected, restarted := false, false
 	if len(engineChanges) > 0 {
 		if err := client.UpdateSettings(ctx, engineChanges); err != nil {
 			slog.Warn("saving engine settings failed", "section", sec.ID, "error", err)
 			status(failed("TorrServer did not accept the settings: %v", err))
 			return
 		}
-		done = append(done, "TorrServer reconnected")
+		reconnected = true
 	}
 	if startup != before {
 		if err := s.saveStartup(startup); err != nil {
@@ -278,13 +300,18 @@ func (s *Server) handleSaveEngineSettings(w http.ResponseWriter, r *http.Request
 			status(failed("Saved, but TorrServer did not restart: %v", err))
 			return
 		}
-		done = append(done, "TorrServer restarted")
+		restarted = true
 	}
-	if len(done) == 0 {
+	switch {
+	case reconnected && restarted:
+		status(succeeded("Saved. TorrServer reconnected and TorrServer restarted."))
+	case reconnected:
+		status(succeeded("Saved. TorrServer reconnected."))
+	case restarted:
+		status(succeeded("Saved. TorrServer restarted."))
+	default:
 		status(succeeded("Nothing changed."))
-		return
 	}
-	status(succeeded("Saved. %s.", strings.Join(done, " and ")))
 }
 
 // saveStartup stores the managed engine's startup options.
@@ -366,7 +393,7 @@ func (s *Server) handleSaveGStreamer(w http.ResponseWriter, r *http.Request) {
 		}
 		stored, err := f.parse(value)
 		if err != nil {
-			status(failed("%s %v.", f.Label, err))
+			status(fieldProblem(ctx, f, err))
 			return
 		}
 		changes[f.Key] = stored

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 
 	"github.com/starfederation/datastar-go/datastar"
 )
@@ -70,7 +71,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			sse := datastar.NewSSE(w, r)
 			if err := sse.MarshalAndPatchSignals(map[string]any{
 				"submitting":   false,
-				"errorMessage": authErr.Error(),
+				"errorMessage": i18n.T(r.Context(), authErr.Error()),
 			}); err != nil {
 				logSSEError(r, "patch login error signals", err)
 			}
