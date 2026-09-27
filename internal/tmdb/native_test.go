@@ -20,6 +20,8 @@ func TestAnOriginalTitleInAnotherScriptIsReplacedByTheTitleInItsLanguage(t *test
 				{"iso_3166_1": "RU", "title": "Слово пацана. Кровь на асфальте"},
 				{"iso_3166_1": "UA", "title": "Слово пацана. Кров на асфальті"}
 			]}}`,
+		"/3/movie/4": `{"id": 4, "title": "Drishyam", "original_title": "Drishyam", "original_language": "ml", "origin_country": ["IN"],
+			"alternative_titles": {"titles": [{"iso_3166_1": "IN", "title": "ദൃശ്യം"}]}}`,
 		"/3/movie/1": `{"id": 1, "title": "Bigfoot", "original_title": "Bigfoot", "original_language": "ja", "origin_country": ["JP"],
 			"alternative_titles": {"titles": [{"iso_3166_1": "JP", "title": "ビッグフット"}]}}`,
 	})
@@ -37,6 +39,9 @@ func TestAnOriginalTitleInAnotherScriptIsReplacedByTheTitleInItsLanguage(t *test
 	}
 	if movie.OriginalTitle != "ビッグフット" {
 		t.Errorf("movie OriginalTitle = %q, want its Japanese title", movie.OriginalTitle)
+	}
+	if m, err := client.Movie(context.Background(), 4); err != nil || m.OriginalTitle != "ദൃശ്യം" {
+		t.Errorf("Malayalam movie OriginalTitle = %q, %v, want its Malayalam title", m.OriginalTitle, err)
 	}
 }
 

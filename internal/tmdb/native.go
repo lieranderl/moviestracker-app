@@ -27,7 +27,14 @@ var scripts = map[string][]*unicode.RangeTable{
 	"ka": {unicode.Georgian},
 	"hy": {unicode.Armenian},
 	"hi": {unicode.Devanagari}, "mr": {unicode.Devanagari}, "ne": {unicode.Devanagari},
-	"bn": {unicode.Bengali}, "ta": {unicode.Tamil}, "te": {unicode.Telugu},
+	"sa": {unicode.Devanagari},
+	"bn": {unicode.Bengali}, "as": {unicode.Bengali}, "ta": {unicode.Tamil}, "te": {unicode.Telugu},
+	"ml": {unicode.Malayalam}, "kn": {unicode.Kannada}, "gu": {unicode.Gujarati}, "pa": {unicode.Gurmukhi},
+	"or": {unicode.Oriya}, "si": {unicode.Sinhala},
+	"km": {unicode.Khmer}, "my": {unicode.Myanmar}, "lo": {unicode.Lao}, "bo": {unicode.Tibetan}, "dz": {unicode.Tibetan},
+	"am": {unicode.Ethiopic}, "ti": {unicode.Ethiopic},
+	"dv": {unicode.Thaana},
+	"ps": {unicode.Arabic}, "sd": {unicode.Arabic}, "ug": {unicode.Arabic},
 }
 
 // nativeTitle is original, or, when TMDB wrote it in letters of another
