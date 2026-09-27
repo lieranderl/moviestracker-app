@@ -21,8 +21,13 @@ $programs = 'Moviestracker', 'moviestracker-server', 'torrserver'
 function Step($text) { Write-Host "`n==> $text" }
 function Fail($text) {
   Write-Host "FAIL: $text"
-  $log = Join-Path $data 'moviestracker.log'
-  if (Test-Path $log) { Get-Content $log -Tail 80 | Write-Host }
+  foreach ($name in 'moviestracker.log', 'engine\engine.out', 'engine\torrserver.log') {
+    $log = Join-Path $data $name
+    if (Test-Path $log) {
+      Write-Host "--- $name"
+      Get-Content $log -Tail 80 | Write-Host
+    }
+  }
   exit 1
 }
 

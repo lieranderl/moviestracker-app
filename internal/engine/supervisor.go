@@ -56,7 +56,8 @@ type Config struct {
 	// ReadyTimeout bounds how long a start may take (30s when zero).
 	ReadyTimeout time.Duration
 	// MinBackoff and MaxBackoff bound the wait before a crashed engine is
-	// restarted; the wait doubles after every crash (1s and 60s when zero).
+	// restarted, or one that exited while starting is tried again; the wait
+	// doubles after every crash (1s and 60s when zero).
 	MinBackoff, MaxBackoff time.Duration
 	// Options are the command-line-only settings (see SetOptions).
 	Options Options
@@ -167,6 +168,17 @@ func (s *Supervisor) Start(ctx context.Context) error {
 	s.mu.Unlock()
 
 	r, err := s.launch(ctx, nil)
+	// A TorrServer that quits while starting often starts on another try
+	// (a port or file still held for a moment): try again as after a crash.
+	for backoff, try := s.cfg.MinBackoff, 1; errors.Is(err, errExited) && try < startAttempts; backoff, try = min(backoff*2, s.cfg.MaxBackoff), try+1 {
+		slog.Warn("engine exited while starting; trying again", "in", backoff, "error", err)
+		select {
+		case <-ctx.Done():
+			return fail(ctx.Err())
+		case <-time.After(backoff):
+		}
+		r, err = s.launch(ctx, nil)
+	}
 	if err != nil {
 		return fail(err)
 	}
@@ -177,6 +189,13 @@ func (s *Supervisor) Start(ctx context.Context) error {
 	go s.watch(r) // #nosec G118 -- the watcher outlives Start's context: the engine runs until Stop
 	return nil
 }
+
+// startAttempts is how many times Start launches an engine that exits
+// while starting before it gives up.
+const startAttempts = 3
+
+// errExited is an engine that exited before it answered.
+var errExited = errors.New("TorrServer exited while starting")
 
 // firstStartMarker records in the engine directory that FirstStart has run.
 const firstStartMarker = "moviestracker-setup.done"
@@ -292,7 +311,7 @@ func (s *Supervisor) waitReady(ctx context.Context, port int, exited, stop <-cha
 		}
 		select {
 		case <-exited:
-			return "", fmt.Errorf("TorrServer exited while starting; see %s", filepath.Join(s.cfg.Dir, "engine.out"))
+			return "", fmt.Errorf("%w; see %s", errExited, filepath.Join(s.cfg.Dir, "engine.out"))
 		case <-stop:
 			return "", errors.New("stopped while starting")
 		case <-ctx.Done():
