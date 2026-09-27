@@ -86,6 +86,13 @@ func New(cfg Config) *Gateway {
 			pr.Out.SetBasicAuth(up.User, up.Password)
 			pr.Out.Header.Set(markHeader, g.mark)
 		},
+		// The gateway lets browser apps read its answers (ServeHTTP): one
+		// Access-Control-Allow-Origin from TorrServer as well would make
+		// the browser refuse them.
+		ModifyResponse: func(resp *http.Response) error {
+			resp.Header.Del("Access-Control-Allow-Origin")
+			return nil
+		},
 		// Streams go out as TorrServer sends them, not buffered.
 		FlushInterval: -1,
 	}
@@ -93,6 +100,12 @@ func New(cfg Config) *Gateway {
 }
 
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Browser apps (Lampa) are loaded from another address: let them read
+	// every answer, the gateway's refusals too. Logins go in a header, not
+	// cookies, so no page can use one it was not given.
+	if r.Header.Get("Origin") != "" {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+	}
 	if subtle.ConstantTimeCompare([]byte(r.Header.Get(markHeader)), []byte(g.mark)) == 1 {
 		http.Error(w, "Moviestracker's TorrServer address is this port itself: start that TorrServer, or choose another in Settings → Sources.", http.StatusLoopDetected)
 		return
@@ -100,6 +113,10 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	addr, ok := clientAddr(r.RemoteAddr)
 	if !ok || (!atHome(addr) && !g.cfg.Store.State().Gateway.Internet) {
 		http.Error(w, "Moviestracker lets apps in from the home network only (Settings → Other apps).", http.StatusForbidden)
+		return
+	}
+	if isPreflight(r) {
+		allowPreflight(w, r)
 		return
 	}
 	now := time.Now()
@@ -121,6 +138,32 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	g.proxy.ServeHTTP(w, r)
+}
+
+// isPreflight reports whether r is the check a browser makes before an
+// app loaded from another address (Lampa) sends a login or a JSON body.
+// Browsers never put a login on it.
+func isPreflight(r *http.Request) bool {
+	return r.Method == http.MethodOptions && r.Header.Get("Origin") != "" && r.Header.Get("Access-Control-Request-Method") != ""
+}
+
+// allowPreflight lets the browser send the request it asked about: the
+// login is checked on that request itself.
+func allowPreflight(w http.ResponseWriter, r *http.Request) {
+	h := w.Header()
+	h.Set("Access-Control-Allow-Methods", r.Header.Get("Access-Control-Request-Method"))
+	if asked := r.Header.Get("Access-Control-Request-Headers"); asked != "" {
+		h.Set("Access-Control-Allow-Headers", asked)
+	}
+	// Chrome asks before a page on the internet reaches a home address.
+	if r.Header.Get("Access-Control-Request-Private-Network") == "true" {
+		h.Set("Access-Control-Allow-Private-Network", "true")
+	}
+	h.Set("Access-Control-Max-Age", "600")
+	h.Add("Vary", "Origin")
+	h.Add("Vary", "Access-Control-Request-Method")
+	h.Add("Vary", "Access-Control-Request-Headers")
+	w.WriteHeader(http.StatusNoContent)
 }
 
 const managedByMoviestracker = "Moviestracker manages TorrServer's settings: change them in Moviestracker."
