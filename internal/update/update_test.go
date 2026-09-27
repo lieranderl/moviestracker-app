@@ -208,3 +208,27 @@ func TestOnlyGitHubLinksAreOffered(t *testing.T) {
 		t.Errorf("Available() = %+v, %v; want %+v", got, ok, want)
 	}
 }
+
+func TestPrereleaseBuildIsToldAboutItsStableRelease(t *testing.T) {
+	for current, want := range map[string]bool{
+		"v0.4.0-rc.1": true,  // v0.4.0 is the release it previews
+		"v0.3.9-rc.2": true,  // an older pre-release
+		"v0.4.1-rc.1": false, // previews something newer than v0.4.0
+	} {
+		t.Run(current, func(t *testing.T) {
+			gh, calls := fakeGitHub(t, latestRelease)
+			c := update.New(current, update.Mac, update.WithAPI(gh.URL))
+
+			if err := c.Refresh(context.Background()); err != nil {
+				t.Fatalf("Refresh: %v", err)
+			}
+
+			if calls.all != 1 {
+				t.Errorf("GitHub was asked %d times, want 1", calls.all)
+			}
+			if _, ok := c.Available(); ok != want {
+				t.Errorf("update available = %v, want %v", ok, want)
+			}
+		})
+	}
+}

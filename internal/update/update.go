@@ -155,7 +155,7 @@ func (c *Checker) RefreshIfDue(ctx context.Context) {
 // Refresh asks GitHub for the latest release. Development builds, which
 // have no version, never ask, nor does anything while checks are off.
 func (c *Checker) Refresh(ctx context.Context) error {
-	if _, ok := parse(c.current); !ok || !c.enabled() {
+	if _, _, ok := parse(c.current); !ok || !c.enabled() {
 		return nil
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.api+"/repos/"+Repo+"/releases/latest", nil)
@@ -217,36 +217,40 @@ func (p Platform) wants(name string) bool {
 	return false
 }
 
-// newer reports whether version a comes after b. Both are "vMAJOR.MINOR.PATCH";
-// anything else is never newer.
-func newer(a, b string) bool {
-	va, okA := parse(a)
-	vb, okB := parse(b)
-	if !okA || !okB {
+// newer reports whether the stable release latest comes after the running
+// version current, which may be a pre-release: v1.2.0 comes after
+// v1.2.0-rc.1. A pre-release latest, or anything unreadable, is never newer.
+func newer(latest, current string) bool {
+	vl, pre, okL := parse(latest)
+	vc, currentPre, okC := parse(current)
+	if !okL || !okC || pre {
 		return false
 	}
-	for i := range va {
-		if va[i] != vb[i] {
-			return va[i] > vb[i]
+	for i := range vl {
+		if vl[i] != vc[i] {
+			return vl[i] > vc[i]
 		}
 	}
-	return false
+	return currentPre
 }
 
-// parse reads "vMAJOR.MINOR.PATCH"; pre-releases ("v1.2.0-rc.1") and other
-// forms are refused.
-func parse(v string) ([3]int, bool) {
-	var n [3]int
-	parts := strings.Split(strings.TrimPrefix(v, "v"), ".")
-	if !strings.HasPrefix(v, "v") || len(parts) != 3 {
-		return n, false
+// parse reads "vMAJOR.MINOR.PATCH", with pre telling whether a pre-release
+// suffix follows ("v1.2.0-rc.1"); other forms are refused.
+func parse(v string) (n [3]int, pre bool, ok bool) {
+	core, suffix, pre := strings.Cut(v, "-")
+	if pre && suffix == "" {
+		return n, false, false
+	}
+	parts := strings.Split(strings.TrimPrefix(core, "v"), ".")
+	if !strings.HasPrefix(core, "v") || len(parts) != 3 {
+		return n, false, false
 	}
 	for i, p := range parts {
 		x, err := strconv.Atoi(p)
 		if err != nil || x < 0 || p != strconv.Itoa(x) {
-			return n, false
+			return n, false, false
 		}
 		n[i] = x
 	}
-	return n, true
+	return n, pre, true
 }
