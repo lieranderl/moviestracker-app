@@ -203,6 +203,31 @@ func TestACrashedEngineIsRestartedWithBackoff(t *testing.T) {
 	}
 }
 
+func TestAnEngineThatFailsToStartIsTriedAgain(t *testing.T) {
+	sup := newSupervisor(t, t.TempDir(), freePort(t), "FAKE_FAIL_STARTS=2")
+	if err := sup.Start(context.Background()); err != nil {
+		t.Fatalf("Start() after two failed starts: %v", err)
+	}
+	st := sup.Status()
+	if st.State != engine.Running {
+		t.Fatalf("Status() = %+v, want running", st)
+	}
+	if url, user, pass := sup.Endpoint(); get(t, url, user, pass) != http.StatusOK {
+		t.Errorf("the engine does not answer with its credentials at %s", url)
+	}
+}
+
+func TestAnEngineThatNeverStartsIsReported(t *testing.T) {
+	sup := newSupervisor(t, t.TempDir(), freePort(t), "FAKE_FAIL_STARTS=100")
+	err := sup.Start(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "engine.out") {
+		t.Fatalf("Start() = %v, want an error pointing at engine.out", err)
+	}
+	if st := sup.Status(); st.State != engine.Stopped || st.LastError == "" {
+		t.Errorf("Status() = %+v, want stopped with the error", st)
+	}
+}
+
 func TestAnEngineLeftByAPreviousRunIsReplaced(t *testing.T) {
 	dir := t.TempDir()
 	port := freePort(t)

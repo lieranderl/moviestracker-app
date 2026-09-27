@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
@@ -51,6 +52,18 @@ func fakeTorrServer() {
 	authorized := func(r *http.Request) bool {
 		user, pass, ok := r.BasicAuth()
 		return !*httpAuth || (ok && accounts[user] == pass)
+	}
+	// FAKE_FAIL_STARTS=n makes the first n starts in a directory exit at
+	// once, as a TorrServer that cannot start yet does.
+	if n, err := strconv.Atoi(os.Getenv("FAKE_FAIL_STARTS")); err == nil {
+		counter := filepath.Join(*dir, "fake-starts")
+		raw, _ := os.ReadFile(counter) // #nosec G304 -- test fake
+		started, _ := strconv.Atoi(string(raw))
+		_ = os.WriteFile(counter, []byte(strconv.Itoa(started+1)), 0o600)
+		if started < n {
+			fmt.Fprintln(os.Stderr, "fake: failing this start")
+			os.Exit(1)
+		}
 	}
 	if after, err := time.ParseDuration(os.Getenv("FAKE_EXIT_AFTER")); err == nil {
 		time.AfterFunc(after, func() { os.Exit(1) })
