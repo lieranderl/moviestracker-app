@@ -149,8 +149,10 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if play, ok := playOf(r); ok && g.cfg.Plays != nil {
 		play.Client, play.Viewer = addr.String(), g.viewer(addr, name, now)
 		c := &counted{ResponseWriter: w, plays: g.cfg.Plays, play: play}
+		// Deferred: the proxy panics with http.ErrAbortHandler when the
+		// player hangs up mid-stream, and the session must still end.
+		defer c.done()
 		g.proxy.ServeHTTP(c, r)
-		c.done()
 		return
 	}
 	g.proxy.ServeHTTP(w, r)
