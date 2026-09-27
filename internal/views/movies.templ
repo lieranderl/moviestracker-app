@@ -42,6 +42,7 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 			} else if len(movies) > 0 {
 				@HeroBillboard(movies[:min(len(movies), 5)])
 			}
+			@categoryBar(homeLists(discover), "")
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 space-y-10 mt-10">
 				@mediaRow("trending-movies", "Trending Movies", "Top trending films from The Movie Database", "film", "text-primary", "badge-primary", "No trending movies available. Please verify TMDB_API_KEY configuration.", movies, discover)
 				@mediaRow("trending-series", "Trending TV Series", "Top trending episodic series and releases", "tv", "text-accent", "badge-accent", "No trending TV series available. Please verify TMDB_API_KEY configuration.", series, discover)
@@ -49,6 +50,7 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 					@discoverSection()
 				}
 			</div>
+			@toTopButton()
 		</main>
 		@siteFooter()
 	}
@@ -57,7 +59,7 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 // mediaRow is a home row; with all, its header links to the whole list at
 // /browse/{id}.
 templ mediaRow(id, title, subtitle, icon, iconTone, badgeTone, emptyMsg string, items []tmdb.MediaItem, all bool) {
-	<section id={ id } class="space-y-4" aria-labelledby={ id + "-title" }>
+	<section id={ id } class="space-y-4 scroll-mt-32" aria-labelledby={ id + "-title" } { inView(id)... }>
 		<header class="flex items-end justify-between gap-4">
 			<div class="min-w-0">
 				<h2 id={ id + "-title" } class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
