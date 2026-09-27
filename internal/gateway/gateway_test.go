@@ -33,6 +33,10 @@ func newFakeTorrServer(t *testing.T) *fakeTorrServer {
 		f.mu.Lock()
 		f.requests = append(f.requests, r.Method+" "+r.URL.RequestURI()+" "+string(body))
 		f.mu.Unlock()
+		// TorrServer lets pages from any address read its answers.
+		if r.Header.Get("Origin") != "" {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		}
 		if user, pass, ok := r.BasicAuth(); !ok || user != "moviestracker" || pass != "engine-secret" {
 			w.Header().Set("WWW-Authenticate", `Basic realm="Authorization Required"`)
 			w.WriteHeader(http.StatusUnauthorized)

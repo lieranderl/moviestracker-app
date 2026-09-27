@@ -305,6 +305,10 @@ other way round.
   [Tailscale](https://tailscale.com) network) get in. **Also allow from the
   internet** opens it further. Logins then travel unencrypted, so for access
   away from home a VPN such as Tailscale or WireGuard is the safer way.
+- In Lampa, switch on authorization in its TorrServer settings, or it sends
+  no login. Lampa opened from an `https://` address cannot reach an
+  `http://` one: the browser blocks it. Use the Lampa app, or open Lampa
+  from an `http://` address.
 - Removing a login in **Settings → Other apps** signs that app out at once.
 - Port 8090 is the one TorrServer apps suggest. If a TorrServer of its own
   already uses it, stop that one, or choose another port with
