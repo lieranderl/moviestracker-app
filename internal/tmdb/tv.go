@@ -115,7 +115,12 @@ type Season struct {
 
 type rawTV struct {
 	rawTMDBResult
-	OriginalName   string          `json:"original_name"`
+	OriginalName string   `json:"original_name"`
+	Language     string   `json:"original_language"`
+	Countries    []string `json:"origin_country"`
+	AltTitles    struct {
+		Results []altTitle `json:"results"`
+	} `json:"alternative_titles"`
 	Tagline        string          `json:"tagline"`
 	Status         string          `json:"status"`
 	LastAirDate    string          `json:"last_air_date"`
@@ -160,7 +165,7 @@ func (c *Client) TV(ctx context.Context, id int) (*TVDetails, error) {
 	return cached(ctx, c, fmt.Sprintf("tv/%d", id), func(ctx context.Context) (*TVDetails, error) {
 		var raw rawTV
 		query := url.Values{
-			"append_to_response":     {"aggregate_credits,videos,images,content_ratings,external_ids,recommendations,similar"},
+			"append_to_response":     {"aggregate_credits,videos,images,content_ratings,external_ids,recommendations,similar,alternative_titles"},
 			"include_image_language": {"en,null"},
 		}
 		if err := c.getJSON(ctx, fmt.Sprintf("/3/tv/%d", id), query, &raw); err != nil {
@@ -168,7 +173,7 @@ func (c *Client) TV(ctx context.Context, id int) (*TVDetails, error) {
 		}
 		t := &TVDetails{
 			MediaItem:        raw.mediaItem("tv"),
-			OriginalTitle:    raw.OriginalName,
+			OriginalTitle:    nativeTitle(raw.OriginalName, raw.Language, raw.Countries, raw.AltTitles.Results),
 			Tagline:          raw.Tagline,
 			Status:           raw.Status,
 			LastAirDate:      raw.LastAirDate,

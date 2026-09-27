@@ -138,18 +138,23 @@ type rawCredits struct {
 
 type rawMovie struct {
 	rawTMDBResult
-	OriginalTitle string                       `json:"original_title"`
-	Tagline       string                       `json:"tagline"`
-	Runtime       int                          `json:"runtime"`
-	Status        string                       `json:"status"`
-	ImdbID        string                       `json:"imdb_id"`
-	Homepage      string                       `json:"homepage"`
-	ExternalIDs   ExternalIDs                  `json:"external_ids"`
-	Genres        []Genre                      `json:"genres"`
-	Credits       rawCredits                   `json:"credits"`
-	Videos        struct{ Results []rawVideo } `json:"videos"`
-	Images        tmdbImagesResponse           `json:"images"`
-	ReleaseDates  struct {
+	OriginalTitle string   `json:"original_title"`
+	Language      string   `json:"original_language"`
+	Countries     []string `json:"origin_country"`
+	AltTitles     struct {
+		Titles []altTitle `json:"titles"`
+	} `json:"alternative_titles"`
+	Tagline      string                       `json:"tagline"`
+	Runtime      int                          `json:"runtime"`
+	Status       string                       `json:"status"`
+	ImdbID       string                       `json:"imdb_id"`
+	Homepage     string                       `json:"homepage"`
+	ExternalIDs  ExternalIDs                  `json:"external_ids"`
+	Genres       []Genre                      `json:"genres"`
+	Credits      rawCredits                   `json:"credits"`
+	Videos       struct{ Results []rawVideo } `json:"videos"`
+	Images       tmdbImagesResponse           `json:"images"`
+	ReleaseDates struct {
 		Results []struct {
 			Country string `json:"iso_3166_1"`
 			Dates   []struct {
@@ -167,7 +172,7 @@ func (c *Client) Movie(ctx context.Context, id int) (*MovieDetails, error) {
 	return cached(ctx, c, fmt.Sprintf("movie/%d", id), func(ctx context.Context) (*MovieDetails, error) {
 		var raw rawMovie
 		query := url.Values{
-			"append_to_response":     {"credits,videos,images,release_dates,recommendations,similar,external_ids"},
+			"append_to_response":     {"credits,videos,images,release_dates,recommendations,similar,external_ids,alternative_titles"},
 			"include_image_language": {"en,null"},
 		}
 		if err := c.getJSON(ctx, fmt.Sprintf("/3/movie/%d", id), query, &raw); err != nil {
@@ -175,7 +180,7 @@ func (c *Client) Movie(ctx context.Context, id int) (*MovieDetails, error) {
 		}
 		m := &MovieDetails{
 			MediaItem:       raw.mediaItem("movie"),
-			OriginalTitle:   raw.OriginalTitle,
+			OriginalTitle:   nativeTitle(raw.OriginalTitle, raw.Language, raw.Countries, raw.AltTitles.Titles),
 			Tagline:         raw.Tagline,
 			Runtime:         raw.Runtime,
 			Status:          raw.Status,
