@@ -271,3 +271,17 @@ func TestTheNewestStableGStreamerIsPinnedAndDevelopmentVersionsSkipped(t *testin
 		t.Errorf("the summary does not name the GStreamer update:\n%s", out)
 	}
 }
+
+func TestAnOlderTorrServerMarkedLatestIsNotADowngrade(t *testing.T) {
+	up := current()
+	up.tsTag = "MatriX.144"
+	up.tsPublished = time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+	root := pinnedRepo(t)
+
+	out, err := updatePins(t, root, up.serve(t), time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("update-pins.sh: %v\n%s", err, out)
+	}
+
+	unchanged(t, root)
+}

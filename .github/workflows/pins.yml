@@ -58,6 +58,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.setup.outputs.ready == 'true'
         with:
+          # GITHUB_TOKEN has no permissions here: the app's token reads the
+          # repository, and is not left in .git/config.
+          token: ${{ steps.app.outputs.token }}
           persist-credentials: false
 
       - name: Move the pins

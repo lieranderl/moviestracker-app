@@ -42,6 +42,13 @@ sha256() {
   fi
 }
 
+# is_newer <candidate> <pinned>: whether dotted version candidate ("145",
+# "1.28.10") comes after pinned, comparing numbers, not text.
+is_newer() {
+  [ "$1" != "$2" ] &&
+    [ "$(printf '%s\n%s\n' "$2" "$1" | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -1)" = "$1" ]
+}
+
 # old enough <unix time>: whether a release published then has waited a week.
 old_enough() {
   [ $((now - $1)) -ge "$min_age" ]
@@ -50,12 +57,15 @@ old_enough() {
 update_torrserver() {
   local auth=() rel tag published pinned
   [ -n "${GH_TOKEN:-}" ] && auth=(-H "Authorization: Bearer $GH_TOKEN")
-  rel="$(fetch "${auth[@]}" -H "Accept: application/vnd.github+json" "$github_api/repos/YouROK/TorrServer/releases/latest")"
+  # ${auth[@]+…}: macOS's bash 3.2 calls an empty array unbound under set -u.
+  rel="$(fetch ${auth[@]+"${auth[@]}"} -H "Accept: application/vnd.github+json" "$github_api/repos/YouROK/TorrServer/releases/latest")"
   tag="$(jq -r '.tag_name' <<<"$rel")"
   published="$(jq -r '.published_at | fromdateiso8601' <<<"$rel")"
   pinned="$(awk '$1 == "version" {print $2}' "$lock")"
   [ "$(jq -r '.prerelease' <<<"$rel")" = false ] || return 0
-  [ "$tag" != "$pinned" ] || return 0
+  [[ "$tag" =~ ^MatriX\.[0-9]+(\.[0-9]+)*$ ]] || fail "TorrServer's latest release is $tag, not MatriX.<number>: pin it by hand"
+  # GitHub's latest can be an older release upstream marked so: no downgrades.
+  is_newer "${tag#MatriX.}" "${pinned#MatriX.}" || return 0
   old_enough "$published" || return 0
 
   # Every pinned file must be in the release, with GitHub's digest.
@@ -84,8 +94,7 @@ update_gstreamer() {
   pinned="$(sed -n 's/^gst_version="\(.*\)"$/\1/p' "$gst_script")"
   latest="$(fetch "$gstreamer/" | grep -oE 'href="1\.[0-9]*[02468]\.[0-9]+/"' | sed -E 's/href="(.*)\/"/\1/' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)"
   [ -n "$latest" ] || fail "no GStreamer versions at $gstreamer/"
-  [ "$latest" != "$pinned" ] || return 0
-  [ "$(printf '%s\n%s\n' "$pinned" "$latest" | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)" = "$latest" ] || return 0
+  is_newer "$latest" "$pinned" || return 0
 
   pkg="gstreamer-1.0-$latest-universal.pkg"
   headers="$(fetch -I "$gstreamer/$latest/$pkg" | tr -d '\r')"
