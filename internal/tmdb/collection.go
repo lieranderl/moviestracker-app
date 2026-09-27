@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"time"
 )
 
 // Collection is a series of films (a trilogy, a franchise), in release
@@ -13,6 +14,33 @@ type Collection struct {
 	ID    int
 	Name  string
 	Parts []MediaItem
+}
+
+// defaultCollectionWait keeps a movie page within its deadline: the
+// collection is asked after the movie, and is extra.
+const defaultCollectionWait = 2 * time.Second
+
+// collectionWithin is the collection id, or nil when TMDB fails or takes
+// longer than the client's collection wait, or ctx ends first. A late one
+// is still fetched and cached, for the next visit.
+func (c *Client) collectionWithin(ctx context.Context, id int) *Collection {
+	done := make(chan *Collection, 1)
+	go func() {
+		col, err := c.collection(context.WithoutCancel(ctx), id)
+		if err != nil {
+			col = nil
+		}
+		done <- col
+	}()
+	wait := time.NewTimer(c.collectionWait)
+	defer wait.Stop()
+	select {
+	case col := <-done:
+		return col
+	case <-wait.C:
+	case <-ctx.Done():
+	}
+	return nil
 }
 
 // collection returns the films of a collection, cached for the client TTL:

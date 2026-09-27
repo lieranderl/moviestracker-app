@@ -2,7 +2,11 @@ package tmdb
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestAMovieInACollectionListsTheCollectionsFilmsInReleaseOrder(t *testing.T) {
@@ -68,4 +72,45 @@ func join(s []string) string {
 		out += v
 	}
 	return out
+}
+
+// The collection is extra: a slow one must not hold the movie page past its
+// deadline. The movie comes without it, and it is cached once it arrives.
+func TestASlowCollectionDoesNotHoldUpTheMovie(t *testing.T) {
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/3/movie/155":
+			_, _ = io.WriteString(w, `{"id": 155, "title": "The Dark Knight", "belongs_to_collection": {"id": 263}}`)
+		case "/3/collection/263":
+			<-release
+			_, _ = io.WriteString(w, `{"id": 263, "name": "The Dark Knight Collection", "parts": [{"id": 272, "title": "Batman Begins"}, {"id": 155, "title": "The Dark Knight"}]}`)
+		}
+	}))
+	defer server.Close()
+	client := NewClient("test-key", WithBaseURL(server.URL), WithHTTPClient(server.Client()), WithCollectionWait(50*time.Millisecond))
+
+	start := time.Now()
+	m, err := client.Movie(context.Background(), 155)
+	if err != nil || m.Collection != nil {
+		t.Fatalf("Movie = collection %+v, %v; want the movie without its collection", m.Collection, err)
+	}
+	if took := time.Since(start); took > time.Second {
+		t.Errorf("the movie waited %v for its collection", took)
+	}
+
+	// The collection arrives after all: the next visit has it.
+	close(release)
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		m, err := client.Movie(context.Background(), 155)
+		if err == nil && m.Collection != nil && m.Collection.Name == "The Dark Knight Collection" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("a later visit has no collection: %+v, %v", m.Collection, err)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 }

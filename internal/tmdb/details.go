@@ -103,8 +103,10 @@ type MovieDetails struct {
 	Recommendations []MediaItem
 	Similar         []MediaItem
 	// Collection is the series of films the movie belongs to; nil when it
-	// belongs to none, or TMDB did not send it.
+	// belongs to none, or TMDB did not send it in time.
 	Collection *Collection
+
+	collectionID int
 }
 
 // FormattedRuntime renders minutes as "2h 28m", "45m" or "".
@@ -173,8 +175,25 @@ type rawMovie struct {
 	} `json:"belongs_to_collection"`
 }
 
-// Movie returns full details for a movie, cached for the client TTL.
+// Movie returns full details for a movie, cached for the client TTL, with
+// its collection when TMDB sends that in time.
 func (c *Client) Movie(ctx context.Context, id int) (*MovieDetails, error) {
+	m, err := c.movie(ctx, id)
+	if err != nil || m.collectionID == 0 {
+		return m, err
+	}
+	col := c.collectionWithin(ctx, m.collectionID)
+	if col == nil || len(col.Parts) < 2 {
+		return m, nil
+	}
+	// Cached details are shared: the collection goes on a copy.
+	withCollection := *m
+	withCollection.Collection = col
+	return &withCollection, nil
+}
+
+// movie is a movie's details without its collection.
+func (c *Client) movie(ctx context.Context, id int) (*MovieDetails, error) {
 	return cached(ctx, c, fmt.Sprintf("movie/%d", id), func(ctx context.Context) (*MovieDetails, error) {
 		var raw rawMovie
 		query := url.Values{
@@ -201,11 +220,8 @@ func (c *Client) Movie(ctx context.Context, id int) (*MovieDetails, error) {
 			Similar:         relatedTitles(raw.Similar.Results, "movie"),
 		}
 		m.ImdbID = raw.ImdbID
-		if raw.Collection != nil && raw.Collection.ID > 0 {
-			// The page shows without the collection rather than fail.
-			if col, err := c.collection(ctx, raw.Collection.ID); err == nil && len(col.Parts) > 1 {
-				m.Collection = col
-			}
+		if raw.Collection != nil {
+			m.collectionID = raw.Collection.ID
 		}
 		m.LogoPath = selectLogo(raw.Images.Logos)
 		m.TrailerKey = selectTrailer(raw.Videos.Results)
