@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
@@ -83,6 +84,7 @@ templ BrowsePage(user *auth.User, v BrowseView) {
 	@Layout(v.List.Title) {
 		@Navbar(user)
 		<main class="grow pb-20">
+			@categoryBar(BrowseLists, v.List.Slug)
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
 				<header class="flex flex-wrap items-end justify-between gap-4">
 					<div class="min-w-0 space-y-1">
@@ -108,6 +110,7 @@ templ BrowsePage(user *auth.User, v BrowseView) {
 				</ul>
 				@BrowseMore(v)
 			</div>
+			@toTopButton()
 		</main>
 		@siteFooter()
 	}
@@ -148,4 +151,126 @@ templ BrowseMore(v BrowseView) {
 				<p class="text-sm text-base-content/60">That is the whole list.</p>
 		}
 	</div>
+}
+
+// homeID is the id of the list's row on the home page.
+func (l BrowseList) homeID() string {
+	if l.Day != "" {
+		return l.Slug
+	}
+	return "discover-" + l.Slug
+}
+
+// rowsFrom are the ids of the home row with id and the rows below it, as a
+// JavaScript array; rowBefore is the row above it ("" for the first).
+func rowsFrom(id string) (rows, rowBefore string) {
+	var ids []string
+	for _, l := range BrowseLists {
+		if l.homeID() == id || len(ids) > 0 {
+			ids = append(ids, "'"+l.homeID()+"'")
+		} else {
+			rowBefore = l.homeID()
+		}
+	}
+	return "[" + strings.Join(ids, ", ") + "]", rowBefore
+}
+
+// markerTop is how far above its row a row's marker sits: just past the
+// navbar and the category bar, where a row's heading lands after a jump
+// (scroll-mt-32).
+const markerTop = "-top-36"
+
+// rowMarker keeps the category bar on the row under the bars. Its row is
+// current once the marker has scrolled past the top of the screen; while
+// the marker is on screen or below, its row is not, and if it or a row
+// below it is current, the row above becomes current. It reads where it is
+// on load and as the page scrolls (the last scroll too, so a jump such as
+// Home or back to top lands on the right row).
+templ rowMarker(id string) {
+	{{ rows, before := rowsFrom(id) }}
+	{{ place := fmt.Sprintf("el.getBoundingClientRect().top < 0 ? ($homeRow = '%s') : (%s.includes($homeRow) && ($homeRow = '%s'))", id, rows, before) }}
+	<span
+		aria-hidden="true"
+		class={ "absolute inset-x-0 h-px pointer-events-none", markerTop }
+		data-init={ place }
+		data-on:scroll__window__throttle.100ms.trailing={ place }
+	></span>
+}
+
+// chipID is the id of a home row's chip in the category bar: a row that
+// collapses hides its chip too.
+func chipID(rowID string) string { return "chip-" + rowID }
+
+// homeLists are the rows the home page shows: the trending ones, and the
+// discovery rails when TMDB details are set up.
+func homeLists(discover bool) []BrowseList {
+	if discover {
+		return BrowseLists
+	}
+	return BrowseLists[:2]
+}
+
+// categoryBar sticks under the navbar with a chip per home row. On the
+// home page (current "") chips jump to their row, and the row in view
+// lights up its chip; on a browse page they open the other lists.
+templ categoryBar(lists []BrowseList, current string) {
+	<nav
+		id="category-bar"
+		class="sticky top-16 z-40 bg-base-100/80 backdrop-blur-md border-b border-base-content/10"
+		aria-label="Categories"
+		if current == "" {
+			data-signals:home-row="''"
+		}
+	>
+		<ul class="max-w-7xl mx-auto px-4 sm:px-8 py-2 flex gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:none]">
+			for _, l := range lists {
+				<li
+					class="shrink-0"
+					if current == "" {
+						id={ chipID(l.homeID()) }
+					}
+				>
+					if current == "" {
+						<a
+							href={ templ.SafeURL("#" + l.homeID()) }
+							class="btn btn-sm btn-soft rounded-full gap-1.5"
+							data-class:btn-primary={ fmt.Sprintf("$homeRow == '%s'", l.homeID()) }
+						>
+							@Icon(l.Icon, "size-4")
+							{ l.Title }
+						</a>
+					} else if l.Slug == current {
+						<a href={ templ.SafeURL("/browse/" + l.Slug) } class="btn btn-sm btn-soft btn-primary rounded-full gap-1.5" aria-current="page">
+							@Icon(l.Icon, "size-4")
+							{ l.Title }
+						</a>
+					} else {
+						<a href={ templ.SafeURL("/browse/" + l.Slug) } class="btn btn-sm btn-soft rounded-full gap-1.5">
+							@Icon(l.Icon, "size-4")
+							{ l.Title }
+						</a>
+					}
+				</li>
+			}
+		</ul>
+	</nav>
+}
+
+// toTopButton appears once the page is scrolled down and takes it back to
+// the top ("#top" is the top of any page).
+templ toTopButton() {
+	<a
+		href="#top"
+		data-signals:scrolled-down="window.scrollY > 600"
+		data-on:scroll__window__throttle.150ms.trailing="$scrolledDown = window.scrollY > 600"
+		class="btn btn-circle btn-primary shadow-lg fixed bottom-6 right-6 z-40 transition-opacity duration-300 opacity-0 pointer-events-none"
+		data-class:opacity-0="!$scrolledDown"
+		data-class:pointer-events-none="!$scrolledDown"
+		data-attr:tabindex="$scrolledDown ? 0 : -1"
+		tabindex="-1"
+		aria-label="Back to top"
+		title="Back to top"
+	>
+		@Icon("arrow-up", "size-5")
+	</a>
 }

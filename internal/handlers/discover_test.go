@@ -55,6 +55,9 @@ func TestDiscoverHidesRailsThatFail(t *testing.T) {
 	if !strings.Contains(body, `id="discover-popular-movies" class="hidden"`) {
 		t.Errorf("failed rails should collapse, got %q", body)
 	}
+	if !strings.Contains(body, `id="chip-discover-popular-movies" class="hidden"`) {
+		t.Errorf("a collapsed rail should hide its chip in the category bar, got %q", body)
+	}
 }
 
 func TestDiscoverRequiresSignIn(t *testing.T) {

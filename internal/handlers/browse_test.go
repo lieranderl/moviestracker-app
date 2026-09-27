@@ -146,3 +146,36 @@ func TestABrowsePageSaysWhenTMDBFails(t *testing.T) {
 		t.Errorf("a failed next page should say so and offer to try again:\n%s", more)
 	}
 }
+
+func TestTheHomePageJumpsToEachRowFromABarThatFollowsTheScroll(t *testing.T) {
+	server := newMediaServer(t, &fakeTMDBDetails{}, &fakeJacRed{}, "")
+
+	body := html.UnescapeString(get(t, server, "/movies", true).Body.String())
+
+	for _, want := range []string{
+		`id="category-bar"`,
+		`href="#trending-movies"`, `href="#trending-series"`, `href="#discover-now-playing"`, `href="#discover-top-rated-series"`,
+		// A row lights up its chip once it reaches the bars, and the row
+		// above takes it back only when the row returns below them.
+		`data-on:scroll__window__throttle.100ms.trailing="el.getBoundingClientRect().top < 0 ? ($homeRow = 'discover-popular-movies') : (['discover-popular-movies', 'discover-top-rated-movies', 'discover-popular-series', 'discover-top-rated-series'].includes($homeRow) && ($homeRow = 'discover-now-playing'))"`,
+		`data-class:btn-primary="$homeRow == 'discover-popular-movies'"`,
+		`id="chip-discover-popular-movies"`,
+		`href="#top"`, "Back to top",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("home lacks %q", want)
+		}
+	}
+}
+
+func TestABrowsePageLinksToTheOtherListsAndBackToTop(t *testing.T) {
+	server := newMediaServer(t, &fakeTMDBDetails{pages: map[tmdb.List]int{tmdb.PopularSeries: 1}}, &fakeJacRed{}, "")
+
+	body := get(t, server, "/browse/popular-series", true).Body.String()
+
+	for _, want := range []string{`id="category-bar"`, `href="/browse/trending-movies"`, `href="/browse/top-rated-series"`, `aria-current="page"`, `href="#top"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("browse page lacks %q", want)
+		}
+	}
+}
