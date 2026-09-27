@@ -14,6 +14,8 @@
 # - rulesets: main changes only through pull requests with CI green; only
 #   admins create v* tags, and nobody moves or deletes them
 # - immutable releases: a published release's files and tag stay as they are
+# - the `pins` environment, which only main can use, with the pins app's
+#   client id and private key from .pins-app-client-id and .pins-app-key.pem
 # - the `release` environment, which only v* tags can use, with the
 #   MT_SHARED_TMDB_KEY secret from .tmdb-shared-key when present
 #   JACRED_APIKEY secret (jacred.su project key) from .jacred-shared-key when present
@@ -173,6 +175,27 @@ fi
 if gh secret list --repo "$repo" --json name --jq '.[].name' | grep -qx JACRED_APIKEY; then
   say "  removing the repository-wide JACRED_APIKEY"
   gh secret delete JACRED_APIKEY --repo "$repo"
+fi
+
+say "Environment: pins, for main only"
+gh api -X PUT "repos/$repo/environments/pins" --input - --silent <<<'{
+  "deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}
+}'
+if ! gh api "repos/$repo/environments/pins/deployment-branch-policies" \
+  --jq '.branch_policies[] | select(.type == "branch" and .name == "main") | .id' | grep -q .; then
+  gh api -X POST "repos/$repo/environments/pins/deployment-branch-policies" --silent \
+    -f name=main -f type=branch
+fi
+# The Moviestracker pins GitHub App opens the weekly pin updates
+# (.github/workflows/pins.yml); docs/MAINTAINING.md says how to create it.
+if [ -f "$root/.pins-app-client-id" ] && [ -f "$root/.pins-app-key.pem" ]; then
+  say "Pins app: PINS_APP_CLIENT_ID and PINS_APP_PRIVATE_KEY in the pins environment"
+  gh variable set PINS_APP_CLIENT_ID --env pins --repo "$repo" --body "$(tr -d '[:space:]' <"$root/.pins-app-client-id")"
+  gh secret set PINS_APP_PRIVATE_KEY --env pins --repo "$repo" <"$root/.pins-app-key.pem"
+else
+  say "No .pins-app-client-id and .pins-app-key.pem: weekly pin updates stay off until you set them:"
+  say "  gh variable set PINS_APP_CLIENT_ID --env pins --repo $repo --body <client id>"
+  say "  gh secret set PINS_APP_PRIVATE_KEY --env pins --repo $repo < <app>.private-key.pem"
 fi
 
 say "Done: https://github.com/$repo/settings"

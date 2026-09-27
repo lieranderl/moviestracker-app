@@ -16,6 +16,8 @@ coverage.out
 .env.*
 !.env.example
 .tmdb-shared-key
+.pins-app-client-id
+*.pem
 .jacred-shared-key
 *.log
 *.bundle

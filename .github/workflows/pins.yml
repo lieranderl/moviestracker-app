@@ -1,0 +1,108 @@
+name: Pin updates
+
+# Every week, moves the TorrServer and GStreamer pins (scripts/torrserver.lock,
+# macos/install-gstreamer.sh) to their latest stable releases, once those are
+# a week old, and opens a pull request for a person to check: CI builds and
+# tests with the new versions, and playback wants a look on a Mac before it
+# merges (see docs/MAINTAINING.md). Apps get them with the next release.
+#
+# The pull request comes from the Moviestracker pins GitHub App, not
+# GITHUB_TOKEN: Actions may not open pull requests here, and those it opened
+# would not start CI. The app's client id and private key live in the `pins`
+# environment, which only main can use.
+on:
+  schedule:
+    - cron: "17 6 * * 1" # Mondays, with Dependabot
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: pins
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Update the TorrServer and GStreamer pins
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pins
+    defaults:
+      run:
+        shell: bash # -eo pipefail: a failing update-pins.sh is not hidden by tee
+    steps:
+      - name: Is the pins app set up?
+        id: setup
+        env:
+          CLIENT_ID: ${{ vars.PINS_APP_CLIENT_ID }}
+        run: |
+          if [ -z "$CLIENT_ID" ]; then
+            echo "::notice::The pins app is not set up yet (docs/MAINTAINING.md, Secrets): no pin updates."
+            echo "ready=false" >>"$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Get a token for the pins app
+        id: app
+        if: steps.setup.outputs.ready == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.PINS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PINS_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.setup.outputs.ready == 'true'
+        with:
+          # GITHUB_TOKEN has no permissions here: the app's token reads the
+          # repository, and is not left in .git/config.
+          token: ${{ steps.app.outputs.token }}
+          persist-credentials: false
+
+      - name: Move the pins
+        id: pins
+        if: steps.setup.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          scripts/update-pins.sh | tee "$RUNNER_TEMP/moved.txt"
+          if git diff --quiet; then
+            echo "changed=false" >>"$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Open or refresh the pull request
+        if: steps.pins.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+          REPO: ${{ github.repository }}
+        run: |
+          branch=deps/pins
+          moved="$(cat "$RUNNER_TEMP/moved.txt")"
+          title="build(deps): $(paste -sd ';' "$RUNNER_TEMP/moved.txt" | sed 's/;/, /g')"
+          user_id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -qam "$title" -m "$moved"
+          # The branch is the app's own: each run replaces it with a fresh
+          # update from main.
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "$branch"
+
+          body="$(printf '%s\n' \
+            "Upstream released newer stable versions, at least a week old:" "" \
+            "$(sed 's/^/- /' "$RUNNER_TEMP/moved.txt")" "" \
+            "Checksums are the ones upstream publishes (GitHub's asset digests for TorrServer, the \`.sha256sum\` beside GStreamer's installer). CI builds the apps and the image and tests them with these versions." "" \
+            "Before merging: play an MKV (HLS) and an MP4 (Direct) in the Mac app, as docs/MAINTAINING.md asks." "" \
+            "Opened by \`.github/workflows/pins.yml\`.")"
+          if [ -n "$(gh pr list -R "$REPO" --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            gh pr edit "$branch" -R "$REPO" --title "$title" --body "$body"
+          else
+            gh pr create -R "$REPO" --head "$branch" --base main --title "$title" --body "$body" --label dependencies
+          fi
