@@ -27,6 +27,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/streamlink"
 	playback "github.com/lieranderl/moviestracker-app/internal/streams"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
+	"github.com/lieranderl/moviestracker-app/internal/update"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 	webstatic "github.com/lieranderl/moviestracker-app/static"
 )
@@ -56,6 +57,7 @@ type Server struct {
 	torrServer      *torrserver.Manager
 	engine          *engine.Supervisor                // nil without a TorrServer program
 	gst             *gstinstall.Installer             // downloads GStreamer in the macOS app; nil elsewhere
+	updates         *update.Checker                   // new releases; nil never tells
 	links           atomic.Pointer[streamlink.Signer] // signs the links external players open
 	playing         atomic.Int64                      // media responses streaming through the proxy
 	live            *live.Hub                         // shared pollers behind every live view
@@ -105,6 +107,7 @@ func NewServer(cfg Config) (*Server, error) {
 		torrServer:      torrMgr,
 		engine:          cfg.Engine,
 		gst:             cfg.GStreamer,
+		updates:         cfg.Updates,
 		setupCode:       normalizeSetupCode(cfg.SetupCode),
 		appsPort:        cfg.AppsPort,
 	}
@@ -124,7 +127,7 @@ func NewServer(cfg Config) (*Server, error) {
 	// Rejects cross-origin POSTs (Sec-Fetch-Site / Origin), so no other site
 	// can submit forms or Datastar actions with a visitor's cookies.
 	s.presence = newPresence()
-	s.handler = http.NewCrossOriginProtection().Handler(s.setupGate(s.presenceMiddleware(s.mux)))
+	s.handler = http.NewCrossOriginProtection().Handler(s.setupGate(s.presenceMiddleware(s.updateNotice(s.mux))))
 	return s, nil
 }
 
@@ -186,6 +189,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /login", s.handleLoginPage)
 	s.mux.HandleFunc("GET /settings", s.handleSettingsIndex)
 	s.mux.HandleFunc("GET /settings/sources", s.handleSourcesPage)
+	s.mux.HandleFunc("GET /settings/updates", s.handleUpdatesPage)
 	s.mux.HandleFunc("GET /settings/{section}", s.handleSettingsPage)
 	s.mux.HandleFunc("GET /movies", s.handleMoviesPage)
 	s.mux.HandleFunc("GET /dashboard", s.handleDashboardPage)
@@ -214,6 +218,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/gstreamer/dismiss", s.handleGStreamerDismiss)
 	s.mux.HandleFunc("GET /api/gstreamer", s.handleGStreamerStream)
 	s.mux.HandleFunc("POST /api/settings/security/cancel-links", s.handleCancelLinks)
+	s.mux.HandleFunc("POST /api/settings/updates", s.handleSaveUpdates)
+	s.mux.HandleFunc("GET /api/update", s.handleUpdateForApps)
 	s.mux.HandleFunc("POST /api/settings/apps", s.handleSwitchApps)
 	s.mux.HandleFunc("POST /api/settings/apps/logins", s.handleAddAppLogin)
 	s.mux.HandleFunc("POST /api/settings/apps/logins/{user}/revoke", s.handleRevokeAppLogin)

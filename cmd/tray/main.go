@@ -10,6 +10,7 @@
 package main
 
 import (
+	"context"
 	_ "embed"
 	"log"
 	"os"
@@ -67,6 +68,7 @@ func main() {
 	// Moviestracker runs whether or not its icon can be shown.
 	go a.whenAskedToQuit()
 	go a.followTheNetwork()
+	go a.followReleases()
 	a.server.Start()
 	// At sign-in the taskbar may not be there yet, and an icon added too
 	// early never shows.
@@ -83,6 +85,7 @@ type app struct {
 	mu       sync.Mutex
 	items    map[tray.ItemID]*systray.MenuItem
 	lan      string
+	release  *tray.Release // a newer Moviestracker, as the server last said
 	quitting sync.Once
 }
 
@@ -130,12 +133,32 @@ func (a *app) followTheNetwork() {
 	}
 }
 
+// followReleases asks the server, which asks GitHub once a day, whether a
+// newer Moviestracker is out, for the menu to offer it.
+func (a *app) followReleases() {
+	for ; ; time.Sleep(10 * time.Minute) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		rel := tray.LatestRelease(ctx, localURL)
+		cancel()
+		a.mu.Lock()
+		changed := (rel == nil) != (a.release == nil) || (rel != nil && *rel != *a.release)
+		a.release = rel
+		a.mu.Unlock()
+		if changed {
+			if rel != nil {
+				tray.Logf(a.dataDir, "Moviestracker %s is available", rel.Version)
+			}
+			a.refresh()
+		}
+	}
+}
+
 // state is what the menu shows now.
 func (a *app) state() tray.MenuState {
 	a.mu.Lock()
-	lan := a.lan
+	lan, rel := a.lan, a.release
 	a.mu.Unlock()
-	return tray.MenuState{Version: version, Status: a.server.Status(), Port: port, LAN: lan, StartAtLogin: startsAtSignIn(a.exe)}
+	return tray.MenuState{Version: version, Status: a.server.Status(), Port: port, LAN: lan, StartAtLogin: startsAtSignIn(a.exe), Release: rel}
 }
 
 // refresh shows the current state in the menu, and opens Moviestracker in
@@ -179,6 +202,13 @@ func (a *app) click(id tray.ItemID) {
 		shellOpen(localURL)
 	case tray.Dashboard:
 		shellOpen(localURL + "/dashboard")
+	case tray.NewRelease:
+		a.mu.Lock()
+		rel := a.release
+		a.mu.Unlock()
+		if rel != nil {
+			shellOpen(rel.Page())
+		}
 	case tray.CopyLAN:
 		a.mu.Lock()
 		lan := a.lan

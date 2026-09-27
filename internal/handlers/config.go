@@ -16,6 +16,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/sources"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
+	"github.com/lieranderl/moviestracker-app/internal/update"
 )
 
 // Config defines bounded resources and security behavior for Server.
@@ -58,6 +59,9 @@ type Config struct {
 	StreamIdle time.Duration
 	// Version is Moviestracker's version, shown on the dashboard.
 	Version string
+	// Updates tells whether a newer Moviestracker has been released; nil
+	// never tells.
+	Updates *update.Checker
 	// AppsPort is the gateway's port, where other apps (TorrServe, Lampa)
 	// reach TorrServer once an admin turns it on; nil hides Other apps.
 	AppsPort *gateway.Port

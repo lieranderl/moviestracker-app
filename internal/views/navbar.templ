@@ -55,6 +55,9 @@ templ Navbar(user *auth.User) {
 						</label>
 					</form>
 				}
+				if rel, ok := newRelease(ctx); ok && user.IsAdmin() {
+					@releaseBadge(rel)
+				}
 				@ThemeSwitcher()
 				if user != nil {
 					@userMenu(user)
@@ -67,6 +70,16 @@ templ Navbar(user *auth.User) {
 			</div>
 		</nav>
 	</header>
+}
+
+// releaseBadge tells an administrator that a newer Moviestracker is out and
+// leads to Settings → Updates.
+templ releaseBadge(rel Release) {
+	<a href="/settings/updates" class="btn btn-accent btn-soft btn-sm gap-1.5" title={ "Moviestracker " + rel.Version + " is available" }>
+		@Icon("circle-arrow-up", "size-4")
+		<span class="sr-only">Moviestracker { rel.Version } is available</span>
+		<span class="hidden sm:inline" aria-hidden="true">{ rel.Version }</span>
+	</a>
 }
 
 // userMenu is a DaisyUI 5 popover dropdown anchored to the avatar button.

@@ -108,6 +108,8 @@ major (minor while the version is `0.x`).
 5. Publishing the release (not a pre-release) moves the image's `latest`
    tag to it.
 
+Installed apps find new releases through GitHub's `releases/latest` (published, not drafts or pre-releases) and offer the file named `Moviestracker-<version>.dmg` or `Moviestracker-Setup-<version>-x64.exe`: keep those names, or the apps link only to the release page.
+
 A release that fails or turns out wrong is not repaired in place: fix it on
 `main` through a pull request and release the next patch version. Anyone can
 check a download or the image came from this workflow:

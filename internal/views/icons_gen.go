@@ -37,6 +37,8 @@ func iconPath(name string) string {
 		return "<path d=\"m6 17 5-5-5-5\"/><path d=\"m13 17 5-5-5-5\"/>"
 	case "circle-alert":
 		return "<circle cx=\"12\" cy=\"12\" r=\"10\"/><line x1=\"12\" x2=\"12\" y1=\"8\" y2=\"12\"/><line x1=\"12\" x2=\"12.01\" y1=\"16\" y2=\"16\"/>"
+	case "circle-arrow-up":
+		return "<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m16 12-4-4-4 4\"/><path d=\"M12 16V8\"/>"
 	case "circle-check":
 		return "<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m16 9-5.5 5.5L8 12\"/>"
 	case "clapperboard":

@@ -12,6 +12,7 @@ for running it from source, on a server, or in a container.
 | `/login` | public | Disclaimer (accepted once per browser, versioned cookie), then sign-in with a local account |
 | `/settings/sources` | admin | TMDB key (releases work out of the box with a shared key; add your own any time, with a how-to guide), JacRed instance, TorrServer (managed or existing), IMDb ratings; each is checked before it is saved |
 | `/settings/{engine,streaming,storage,network,sharing,gstreamer,security}` | admin | TorrServer's settings grouped by topic, GStreamer settings, and cancelling shared links |
+| `/settings/updates` | admin | This version, a newer release if GitHub has one (the DMG or installer to download, or the `docker pull` for the image), and the switch for the daily check |
 | `/settings/users` | admin | Accounts: add viewers or administrators, reset passwords (signs that person out), change roles, delete; the last administrator stays |
 | `/dashboard` | signed in | Live overview: what plays now (and on which device), torrent totals with sparklines, engine, storage, system and source health |
 | `/movies` | signed in | Home: trending billboard, weekly trending rails, and lazily streamed now playing / popular / top rated rails |
@@ -22,6 +23,8 @@ for running it from source, on a server, or in a container.
 | `/s/<token>/…` | anyone with the link | Signed 7-day stream links for VLC, TVs and `.m3u` playlists; one file each |
 
 `/` sends signed-in users to `/movies` and everyone else to `/login`.
+
+**New releases.** Once a day Moviestracker asks GitHub for its latest stable release (`api.github.com`, with an ETag, so an unchanged answer is not sent again). When one is newer, administrators see it in the navbar and Settings → Updates, and the menu bar and tray apps offer **Download Moviestracker vX.Y.Z…**. Nothing is downloaded or installed by itself: the Mac DMG and the Windows installer install over the running version and keep accounts and settings; the image is updated with `docker compose pull && docker compose up -d`. TorrServer and GStreamer come with the release they were tested with. GitHub sees the machine's internet address; turn the check off in Settings → Updates. Development builds never check.
 
 ## Environment variables
 

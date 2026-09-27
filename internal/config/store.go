@@ -44,6 +44,14 @@ type State struct {
 	Titles map[string]TitleRef `json:"titles,omitempty"`
 	// Gateway opens TorrServer to other apps (TorrServe, Lampa).
 	Gateway Gateway `json:"gateway,omitzero"`
+	// Updates is whether Moviestracker looks for new releases.
+	Updates Updates `json:"updates,omitzero"`
+}
+
+// Updates is the administrator's choice about new releases: Moviestracker
+// asks GitHub once a day unless Off.
+type Updates struct {
+	Off bool `json:"off,omitempty"`
 }
 
 // Gateway is TorrServer's door for other apps: off until an admin turns it

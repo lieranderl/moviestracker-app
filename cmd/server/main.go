@@ -29,6 +29,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/handlers"
 	"github.com/lieranderl/moviestracker-app/internal/sources"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
+	"github.com/lieranderl/moviestracker-app/internal/update"
 )
 
 // version is set by release builds: -ldflags "-X main.version=v1.2.3".
@@ -135,6 +136,13 @@ func main() {
 		},
 	}))
 
+	// Once a day, unless an admin turned it off, ask GitHub whether a newer
+	// Moviestracker is out, to tell admins and the menu bar and tray apps.
+	releases := update.New(version, platform(), update.WithEnabled(func() bool { return !store.State().Updates.Off }))
+	releaseCtx, stopReleases := context.WithCancel(context.Background())
+	defer stopReleases()
+	go releases.Run(releaseCtx)
+
 	server, err := handlers.NewServer(handlers.Config{
 		Sessions:          sessions,
 		Accounts:          accounts,
@@ -156,6 +164,7 @@ func main() {
 		Engine:            sup,
 		GStreamer:         newGStreamerInstaller(dataDir, torrMgr, sup),
 		Version:           version,
+		Updates:           releases,
 		Events:            problems,
 		SetupCode:         setupCode,
 		LANAddress:        lanAddressFrom(os.Getenv("MT_LAN_ADDRESS")),
@@ -224,6 +233,7 @@ func main() {
 			slog.Error("http server shutdown failed", "error", err)
 		}
 
+		stopReleases()
 		_ = appsPort.Close()
 		// Close background stores cleanly
 		server.Close()
@@ -245,6 +255,18 @@ func main() {
 
 	<-serverCtx.Done()
 	slog.Info("server stopped cleanly")
+}
+
+// platform is how Moviestracker is released for this system: the Mac app,
+// the Windows installer, or on Linux the Docker image.
+func platform() update.Platform {
+	switch runtime.GOOS {
+	case "darwin":
+		return update.Mac
+	case "windows":
+		return update.Windows
+	}
+	return update.Docker
 }
 
 // newEngine returns the supervisor of a managed TorrServer, or nil when no
