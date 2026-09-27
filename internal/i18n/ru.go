@@ -777,7 +777,7 @@ var ru = map[string]string{ // #nosec G101 -- interface texts ("Password"), not 
 	"No torrents added yet":                    "Торрентов пока нет",
 	"Nobody else right now.":                   "Больше никого сейчас нет.",
 	"Not torrent links or .torrent files: %s. Use magnet, http(s) or torrs links, info-hashes or .torrent files.": "Это не торрент-ссылки и не файлы .torrent: %s. Используйте ссылки magnet, http(s) или torrs, инфо-хеши или файлы .torrent.",
-	"Nothing finished playing today yet.": "Сегодня ещё ничего не досмотрено.",
+	"Nothing finished playing today yet.": "Сегодня ещё ничего не просмотрено.",
 	"Nothing is playing.":                 "Ничего не воспроизводится.",
 	"Nothing was added.":                  "Ничего не добавлено.",
 	"Now streaming":                       "Сейчас воспроизводится",
