@@ -7,6 +7,8 @@ func iconPath(name string) string {
 	switch name {
 	case "activity":
 		return "<path d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\"/>"
+	case "app-window":
+		return "<rect x=\"2\" y=\"4\" width=\"20\" height=\"16\" rx=\"2\"/><path d=\"M10 4v4\"/><path d=\"M2 8h20\"/><path d=\"M6 4v4\"/>"
 	case "arrow-down":
 		return "<path d=\"M12 5v14\"/><path d=\"m19 12-7 7-7-7\"/>"
 	case "arrow-right":

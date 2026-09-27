@@ -15,6 +15,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/config"
 	"github.com/lieranderl/moviestracker-app/internal/events"
 	"github.com/lieranderl/moviestracker-app/internal/handlers"
+	"github.com/lieranderl/moviestracker-app/internal/streams"
 )
 
 // playingEngine is a TorrServer with Dune downloading, whose /stream answers
@@ -28,7 +29,7 @@ func playingEngine(t *testing.T) (*httptest.Server, chan struct{}) {
 			_, _ = w.Write([]byte("MatriX.145"))
 		case r.URL.Path == "/torrents":
 			_, _ = w.Write([]byte(`[{"hash":"` + duneHash + `","title":"Dune","stat":3,"download_speed":5242880,"upload_speed":1048576,` +
-				`"connected_seeders":7,"active_peers":21,"loaded_size":1048576,"bytes_read_data":1073741824,"bytes_written_data":104857600,` +
+				`"connected_seeders":7,"active_peers":21,"total_peers":40,"torrent_size":10000000000,"loaded_size":1048576,"bytes_read_data":1073741824,"bytes_written_data":104857600,` +
 				`"file_stats":[{"id":1,"path":"Dune (2021)/Dune.2021.mkv","length":10000000000}]},` +
 				`{"hash":"` + strings.Repeat("b", 40) + `","title":"Heat","stat":5}]`))
 		case strings.HasPrefix(r.URL.Path, "/stream/"):
@@ -79,7 +80,7 @@ func TestTheDashboardShowsWhatIsPlayingAndWhereFrom(t *testing.T) {
 	for _, want := range []string{
 		`id="dash-streams"`, "Dune", "Dune.2021.mkv", "admin", "Shared link", "192.168.1.31", "25%", // the TV reads a quarter in
 		`id="dash-swarm"`, "5.00 MB/s", "1.00 MB/s", "21", // totals of the list
-		"Busiest now", "↓ 1.00 GB", "↑ 100 MB uploaded", // since TorrServer connected them
+		"↓ 1.00 GB", "↑ 100 MB uploaded", // since TorrServer connected them
 		`id="dash-pulse"`, "1 in the app · 1 shared link",
 		"To the player", "Torrent download", // each stream's delivery against its torrent
 		`id="dash-app"`, "MatriX.145",
@@ -104,6 +105,51 @@ func TestTheDashboardShowsWhatIsPlayingAndWhereFrom(t *testing.T) {
 		if !strings.Contains(played, want) {
 			t.Errorf("Played today lacks %q", want)
 		}
+	}
+}
+
+func TestTheDashboardShowsWhatOtherAppsPlayAndEachActiveTorrent(t *testing.T) {
+	engine, _ := playingEngine(t)
+	plays := streams.New(time.Minute)
+	l := newLocal(t, withAdmin(t), withEngineAt(engine.URL), fastLive, func(c *handlers.Config) { c.Plays = plays })
+	admin := l.admin(t)
+	// Lampa on the TV plays Dune through the port for other apps, halfway in.
+	plays.Observe(streams.Request{Client: "192.168.1.40", Viewer: "Lampa", OtherApp: true, Hash: duneHash, File: 1, Kind: streams.Direct, Segment: -1, Offset: 5_000_000_000, Bytes: 1 << 20})
+
+	body := openStreams(t, l, admin, 300*time.Millisecond, "/api/dashboard?stream=true")[0]
+	// card is the latest patch of a card: its SSE event.
+	card := func(id string) string {
+		start := strings.LastIndex(body, `id="`+id+`"`)
+		if start < 0 {
+			t.Fatalf("no %s card", id)
+		}
+		end := strings.Index(body[start:], "\n\n")
+		if end < 0 {
+			end = len(body) - start
+		}
+		return body[start : start+end]
+	}
+	for _, c := range []struct {
+		id   string
+		want []string
+	}{
+		{"dash-pulse", []string{"1 in another app"}},
+		{"dash-streams", []string{"Dune", "Dune.2021.mkv", "Lampa", "Other app", "192.168.1.40", "50%"}},
+		{"dash-swarm", []string{
+			"Dune", "Working", "9.31 GB", // title, status, size
+			"5.00 MB/s", "1.00 MB/s", "21 of 40 · 7 seeders", "↓ 1.00 GB", "↑ 100 MB",
+			"Dune.2021.mkv", "Lampa", // what of it plays, and who
+		}},
+	} {
+		got := card(c.id)
+		for _, want := range c.want {
+			if !strings.Contains(got, want) {
+				t.Errorf("%s lacks %q", c.id, want)
+			}
+		}
+	}
+	if swarm := card("dash-swarm"); strings.Contains(swarm, "Heat") {
+		t.Error("the torrents card lists Heat, which is not active")
 	}
 }
 

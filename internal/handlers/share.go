@@ -101,7 +101,7 @@ func (s *Server) handleShareLink(w http.ResponseWriter, r *http.Request) {
 		enginePrefix := "/gst/" + grant.Hash + "/"
 		play := s.playRequest(r, sharedViewer)
 		play.Hash, play.Kind = grant.Hash, playback.HLS
-		play.File, play.Audio, play.Segment = hlsPosition(hlsPath, query)
+		play.File, play.Audio, play.Segment = playback.HLSPosition(hlsPath, query)
 		s.proxyEngine(w, r, "gst/"+grant.Hash+"/"+hlsPath, query.Encode(), &play, func(line string) string {
 			if after, ok := strings.CutPrefix(line, enginePrefix); ok {
 				return prefix + after

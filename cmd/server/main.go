@@ -28,6 +28,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/gstinstall"
 	"github.com/lieranderl/moviestracker-app/internal/handlers"
 	"github.com/lieranderl/moviestracker-app/internal/sources"
+	"github.com/lieranderl/moviestracker-app/internal/streams"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
 	"github.com/lieranderl/moviestracker-app/internal/update"
 )
@@ -126,10 +127,14 @@ func main() {
 		}
 	}
 
+	// What plays, in Moviestracker and in other apps, for the dashboard.
+	plays := streams.New(30 * time.Second)
+
 	// Other apps (TorrServe, Lampa) reach TorrServer here once an admin
 	// turns it on in Settings → Other apps; nothing listens until then.
 	appsPort := gateway.NewPort(appsListenAddr(), gateway.New(gateway.Config{
 		Store: store,
+		Plays: plays,
 		Upstream: func() gateway.Upstream {
 			url, user, password := torrMgr.Endpoint()
 			return gateway.Upstream{URL: url, User: user, Password: password}
@@ -145,6 +150,7 @@ func main() {
 
 	server, err := handlers.NewServer(handlers.Config{
 		Sessions:          sessions,
+		Plays:             plays,
 		Accounts:          accounts,
 		Store:             store,
 		Env:               env,

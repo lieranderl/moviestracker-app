@@ -14,7 +14,7 @@ for running it from source, on a server, or in a container.
 | `/settings/{engine,streaming,storage,network,sharing,gstreamer,security}` | admin | TorrServer's settings grouped by topic, GStreamer settings, and cancelling shared links |
 | `/settings/updates` | admin | This version, a newer release if GitHub has one (the DMG or installer to download, or the `docker pull` for the image), and the switch for the daily check |
 | `/settings/users` | admin | Accounts: add viewers or administrators, reset passwords (signs that person out), change roles, delete; the last administrator stays |
-| `/dashboard` | signed in | Live overview: what plays now (and on which device), torrent totals with sparklines, engine, storage, system and source health |
+| `/dashboard` | signed in | Live overview: what plays now, in Moviestracker and in other apps (and on which device), torrent totals with sparklines and each active torrent, engine, storage, system and source health |
 | `/movies` | signed in | Home: trending billboard, weekly trending rails, and lazily streamed now playing / popular / top rated rails |
 | `/movie/{id}`, `/tv/{id}` | signed in | Title pages: hero, credits, seasons & episodes (TV), JacRed sources (quality and HDR picked before searching; tracker and voice filters), trailers, recommendations |
 | `/person/{id}` | signed in | Biography, known-for rail, movie/TV filmography |

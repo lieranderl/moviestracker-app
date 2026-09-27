@@ -117,7 +117,10 @@ func NewServer(cfg Config) (*Server, error) {
 		return nil, err
 	}
 	s.links.Store(signer)
-	s.plays = playback.New(cmp.Or(cfg.StreamIdle, 30*time.Second))
+	s.plays = cfg.Plays
+	if s.plays == nil {
+		s.plays = playback.New(cmp.Or(cfg.StreamIdle, 30*time.Second))
+	}
 	s.sampler = stats.NewSampler()
 	s.startedAt, s.version = time.Now(), cmp.Or(cfg.Version, "dev")
 	views.SetVersion(s.version)
