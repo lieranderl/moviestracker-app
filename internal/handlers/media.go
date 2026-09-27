@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/jacred"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
@@ -59,9 +59,10 @@ func (s *Server) detailsContext(r *http.Request) (context.Context, context.Cance
 
 // renderMediaError answers a failed TMDB lookup with a 404 or 502 page.
 func renderMediaError(w http.ResponseWriter, r *http.Request, user *auth.User, err error) {
-	status, heading, message := http.StatusBadGateway, "TMDB is unavailable", "Movie and TV metadata could not be loaded from TMDB right now. Please try again in a moment."
+	ctx := r.Context()
+	status, heading, message := http.StatusBadGateway, i18n.T(ctx, "TMDB is unavailable"), i18n.T(ctx, "Movie and TV metadata could not be loaded from TMDB right now. Please try again in a moment.")
 	if errors.Is(err, tmdb.ErrNotFound) {
-		status, heading, message = http.StatusNotFound, "Title not found", "TMDB has no entry for this address."
+		status, heading, message = http.StatusNotFound, i18n.T(ctx, "Title not found"), i18n.T(ctx, "TMDB has no entry for this address.")
 	} else {
 		slog.Warn("tmdb details lookup failed", "path", logPath(r.URL.Path), "error", logError(err))
 	}
@@ -242,7 +243,7 @@ func (s *Server) handleTorrentSearch(w http.ResponseWriter, r *http.Request) {
 	results, err := s.clients().Torrents.Search(ctx, title.query)
 	if err != nil {
 		slog.Warn("jacred search failed", "title", title.label, "error", err)
-		patchTorrentError(r, sse, jacredProblem(err))
+		patchTorrentError(r, sse, jacredProblem(r.Context(), err))
 		return
 	}
 	sort := sortParam(r)
@@ -253,32 +254,33 @@ func (s *Server) handleTorrentSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 // jacredProblem says why a JacRed search failed, and what to do about it.
-func jacredProblem(err error) string {
+func jacredProblem(ctx context.Context, err error) string {
 	var limit *jacred.LimitError
 	switch {
 	case errors.Is(err, jacred.ErrKeyNeeded):
-		return "JacRed needs a key to search. An administrator adds a free one in Settings → Sources."
+		return i18n.T(ctx, "JacRed needs a key to search. An administrator adds a free one in Settings → Sources.")
 	case errors.Is(err, jacred.ErrBlocked):
-		return "JacRed has blocked the account of this server's key. An administrator can check it at jacred.su."
+		return i18n.T(ctx, "JacRed has blocked the account of this server's key. An administrator can check it at jacred.su.")
 	case errors.As(err, &limit):
 		if limit.Retry <= 0 {
-			return "Today's JacRed searches are used up. Please try again later."
+			return i18n.T(ctx, "Today's JacRed searches are used up. Please try again later.")
 		}
-		return "Today's JacRed searches are used up. Please try again in " + waitText(limit.Retry) + "."
+		return i18n.Tf(ctx, "Today's JacRed searches are used up. Please try again in %s.", waitText(ctx, limit.Retry))
 	default:
-		return "JacRed is not responding right now. Please try again later."
+		return i18n.T(ctx, "JacRed is not responding right now. Please try again later.")
 	}
 }
 
 // waitText says a wait the way people do: "20 minutes", "about 3 hours".
-func waitText(d time.Duration) string {
+func waitText(ctx context.Context, d time.Duration) string {
+	hours, minutes := int(d.Round(time.Hour)/time.Hour), max(1, int(d.Round(time.Minute)/time.Minute))
 	switch {
 	case d >= 90*time.Minute:
-		return fmt.Sprintf("about %d hours", int(d.Round(time.Hour)/time.Hour))
+		return i18n.N(ctx, hours, "about %d hour", "about %d hours")
 	case d >= 50*time.Minute:
-		return "about an hour"
+		return i18n.T(ctx, "about an hour")
 	default:
-		return fmt.Sprintf("%d minutes", max(1, int(d.Round(time.Minute)/time.Minute)))
+		return i18n.N(ctx, minutes, "%d minute", "%d minutes")
 	}
 }
 

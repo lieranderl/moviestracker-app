@@ -24,6 +24,8 @@ anywhere.
 - **Works with TorrServer apps:** TorrServe on an Android TV, Lampa and other
   TorrServer apps can use the same TorrServer and torrent list, each with a
   login of its own ([more](#torrserver-apps-torrserve-lampa)).
+- **English and Russian:** the whole interface, and TMDB's titles, overviews
+  and trailers, in either language; pick it from the navbar.
 - **Private by design:** everything stays on your machine. Pages never show
   your TorrServer or keys, and links for TVs expire after a week.
 

@@ -21,7 +21,7 @@ templ Layout(title string) {
 // are passed explicitly so heavy bundles (hls.js) load only where needed.
 templ layoutWithScripts(title string, scripts ...string) {
 	<!DOCTYPE html>
-	<html lang="en" class="scroll-smooth">
+	<html lang={ pageLang(ctx) } class="scroll-smooth">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>

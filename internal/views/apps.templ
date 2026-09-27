@@ -1,6 +1,9 @@
 package views
 
 import (
+	"context"
+
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"time"
 )
@@ -28,23 +31,25 @@ type NewAppLogin struct {
 }
 
 // copyValue copies the text of any [data-copy] button inside the card.
-const copyValue = `const b = evt.target.closest('[data-copy]')
-if (b) (navigator.clipboard ? navigator.clipboard.writeText(b.dataset.copy) : Promise.reject()).then(() => { $appsCopied = b.dataset.copyName + ' copied' }, () => { $appsCopied = 'Copy failed: select the text instead' })`
+func copyValue(ctx context.Context) string {
+	return `const b = evt.target.closest('[data-copy]')
+if (b) (navigator.clipboard ? navigator.clipboard.writeText(b.dataset.copy) : Promise.reject()).then(() => { $appsCopied = ` +
+		trJS(ctx, "%s copied") + `.replace('%s', b.dataset.copyName) }, () => { $appsCopied = ` + trJS(ctx, "Copy failed: select the text instead") + ` })`
+}
 
 // AppsPage lets an admin open TorrServer to other apps.
 templ AppsPage(user *auth.User, v AppsView, st SourceStatus) {
-	@settingsShell(user, "apps", "Other apps") {
+	@settingsShell(user, "apps", tr(ctx, "Other apps")) {
 		<header class="space-y-2">
 			<h1 class="text-3xl font-bold tracking-tight flex items-center gap-3">
 				@Icon("tv", "size-7 text-primary")
-				Other apps
+				{ tr(ctx, "Other apps") }
 			</h1>
 			<p class="text-base-content/70 max-w-2xl">
-				Let TorrServer apps such as TorrServe on an Android TV or Lampa use Moviestracker's TorrServer. They see the
-				same torrents: what you save here shows up there, and the other way round.
+				{ tr(ctx, "Let TorrServer apps such as TorrServe on an Android TV or Lampa use Moviestracker's TorrServer. They see the same torrents: what you save here shows up there, and the other way round.") }
 			</p>
 		</header>
-		<div data-signals={ templ.JSONString(map[string]any{"appsCopied": ""}) } data-on:click={ copyValue } class="space-y-6">
+		<div data-signals={ templ.JSONString(map[string]any{"appsCopied": ""}) } data-on:click={ copyValue(ctx) } class="space-y-6">
 			@AppsSwitch(v, st)
 			@AppsLogins(v, nil, SourceStatus{})
 			<p role="status" aria-live="polite" class="text-sm text-success min-h-5" data-text="$appsCopied"></p>
@@ -54,7 +59,7 @@ templ AppsPage(user *auth.User, v AppsView, st SourceStatus) {
 
 // AppsSwitch turns TorrServer for other apps on or off.
 templ AppsSwitch(v AppsView, st SourceStatus) {
-	@sourceCard("apps-switch", "plug", "TorrServer for other apps") {
+	@sourceCard("apps-switch", "plug", tr(ctx, "TorrServer for other apps")) {
 		<form
 			class="space-y-4"
 			data-signals={ templ.JSONString(map[string]bool{"appsOn": v.On, "appsInternet": v.Internet}) }
@@ -64,35 +69,32 @@ templ AppsSwitch(v AppsView, st SourceStatus) {
 			<label class="flex items-start gap-3 cursor-pointer">
 				<input type="checkbox" class="toggle toggle-primary mt-0.5" data-bind:apps-on data-attr:disabled="$appsSaving"/>
 				<span>
-					<span class="block text-sm font-semibold">Open TorrServer to other apps</span>
+					<span class="block text-sm font-semibold">{ tr(ctx, "Open TorrServer to other apps") }</span>
 					<span class="block text-sm text-base-content/70">
-						Apps sign in with a login of their own (below). They can play, add and remove torrents; TorrServer's
-						settings stay Moviestracker's. Video players the apps hand streams to need no login for torrents you saved.
+						{ tr(ctx, "Apps sign in with a login of their own (below). They can play, add and remove torrents; TorrServer's settings stay Moviestracker's. Video players the apps hand streams to need no login for torrents you saved.") }
 					</span>
 				</span>
 			</label>
 			<label class="flex items-start gap-3 cursor-pointer">
 				<input type="checkbox" class="toggle toggle-warning mt-0.5" data-bind:apps-internet data-attr:disabled="!$appsOn || $appsSaving"/>
 				<span>
-					<span class="block text-sm font-semibold">Also allow from the internet</span>
+					<span class="block text-sm font-semibold">{ tr(ctx, "Also allow from the internet") }</span>
 					<span class="block text-sm text-base-content/70">
-						Off, only devices on your home network (and your Tailscale network) get in. On, anyone who reaches this
-						machine can try — logins travel unencrypted, and your internet connection streams to them. For access away
-						from home, a VPN such as Tailscale or WireGuard is the safer way.
+						{ tr(ctx, "Off, only devices on your home network (and your Tailscale network) get in. On, anyone who reaches this machine can try — logins travel unencrypted, and your internet connection streams to them. For access away from home, a VPN such as Tailscale or WireGuard is the safer way.") }
 					</span>
 				</span>
 			</label>
 		</form>
 		if v.On {
 			<div class="rounded-box bg-base-100 border border-base-content/10 p-4 space-y-2">
-				<p class="text-sm">In the app, add this TorrServer address, then sign in with the app's login:</p>
-				@copyable("Address", v.Address)
+				<p class="text-sm">{ tr(ctx, "In the app, add this TorrServer address, then sign in with the app's login:") }</p>
+				@copyable(tr(ctx, "Address"), v.Address)
 			</div>
 		}
 		if v.Problem != "" {
 			<div role="alert" class="alert alert-soft alert-error text-sm py-2.5">
 				@Icon("circle-alert", "size-4")
-				<span>{ v.Problem }</span>
+				<span>{ tr(ctx, v.Problem) }</span>
 			</div>
 		}
 		@sourceStatus(st)
@@ -101,16 +103,15 @@ templ AppsSwitch(v AppsView, st SourceStatus) {
 
 // AppsLogins lists the apps' logins, with the one just made and its password.
 templ AppsLogins(v AppsView, created *NewAppLogin, st SourceStatus) {
-	@sourceCard("apps-logins", "key-round", "Logins for apps") {
+	@sourceCard("apps-logins", "key-round", tr(ctx, "Logins for apps")) {
 		<p class="text-sm text-base-content/70">
-			Give each app or TV its own login, so you can take one away without the others. The password is shown only when
-			the login is made.
+			{ tr(ctx, "Give each app or TV its own login, so you can take one away without the others. The password is shown only when the login is made.") }
 		</p>
 		if created != nil {
 			<div role="status" class="rounded-box bg-success/10 border border-success/30 p-4 space-y-2">
-				<p class="text-sm font-semibold">Login for { created.Name }: enter it in the app now, it is not shown again.</p>
-				@copyable("Username", created.User)
-				@copyable("Password", created.Password)
+				<p class="text-sm font-semibold">{ trf(ctx, "Login for %s: enter it in the app now, it is not shown again.", created.Name) }</p>
+				@copyable(tr(ctx, "Username"), created.User)
+				@copyable(tr(ctx, "Password"), created.Password)
 			</div>
 		}
 		if len(v.Logins) > 0 {
@@ -120,17 +121,17 @@ templ AppsLogins(v AppsView, created *NewAppLogin, st SourceStatus) {
 						<div class="grow min-w-0">
 							<p class="text-sm font-medium truncate">{ l.Name }</p>
 							<p class="text-xs text-base-content/60">
-								<span class="font-mono">{ l.User }</span> · made { l.CreatedAt.Local().Format("2 Jan 2006") }
+								<span class="font-mono">{ l.User }</span> · { trf(ctx, "made %s", i18n.Date(ctx, l.CreatedAt.Local())) }
 							</p>
 						</div>
 						<button
 							type="button"
 							class="btn btn-ghost btn-sm text-error"
-							aria-label={ "Remove the login of " + l.Name }
-							data-on:click={ "confirm('Remove this login? The app is signed out at once.') && @post('/api/settings/apps/logins/" + l.User + "/revoke', {filterSignals: {include: /^$/}})" }
+							aria-label={ trf(ctx, "Remove the login of %s", l.Name) }
+							data-on:click={ "confirm(" + trJS(ctx, "Remove this login? The app is signed out at once.") + ") && @post('/api/settings/apps/logins/" + l.User + "/revoke', {filterSignals: {include: /^$/}})" }
 						>
 							@Icon("trash-2", "size-4")
-							Remove
+							{ tr(ctx, "Remove") }
 						</button>
 					</li>
 				}
@@ -143,12 +144,12 @@ templ AppsLogins(v AppsView, created *NewAppLogin, st SourceStatus) {
 			data-on:submit="@post('/api/settings/apps/logins', {filterSignals: {include: /^appName$/}})"
 		>
 			<label class="input grow min-w-48">
-				<span class="sr-only">App or device name</span>
-				<input type="text" maxlength="60" autocomplete="off" placeholder="Living room TV" data-bind:app-name/>
+				<span class="sr-only">{ tr(ctx, "App or device name") }</span>
+				<input type="text" maxlength="60" autocomplete="off" placeholder={ tr(ctx, "Living room TV") } data-bind:app-name/>
 			</label>
 			<button type="submit" class="btn btn-primary" data-attr:disabled="$appsAdding || !$appName.trim()">
 				@Icon("plus", "size-4")
-				New login
+				{ tr(ctx, "New login") }
 			</button>
 		</form>
 		@sourceStatus(st)
@@ -160,7 +161,7 @@ templ copyable(name, value string) {
 	<div class="flex items-center gap-2">
 		<span class="text-sm text-base-content/70 w-24 shrink-0">{ name }</span>
 		<code class="font-mono text-sm select-all bg-base-200 rounded px-2 py-1 break-all">{ value }</code>
-		<button type="button" class="btn btn-ghost btn-sm btn-square" data-copy={ value } data-copy-name={ name } aria-label={ "Copy " + name } title={ "Copy " + name }>
+		<button type="button" class="btn btn-ghost btn-sm btn-square" data-copy={ value } data-copy-name={ name } aria-label={ trf(ctx, "Copy %s", name) } title={ trf(ctx, "Copy %s", name) }>
 			@Icon("copy", "size-4")
 		</button>
 	</div>

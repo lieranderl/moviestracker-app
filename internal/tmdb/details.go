@@ -1,6 +1,7 @@
 package tmdb
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,8 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 )
 
 // ErrNotFound reports that TMDB has no resource with the requested id.
@@ -77,6 +80,8 @@ type Video struct {
 	Name     string
 	Type     string
 	Official bool
+
+	lang string
 }
 
 // ThumbnailURL returns the YouTube poster frame for the video.
@@ -170,6 +175,7 @@ type rawMovie struct {
 	} `json:"release_dates"`
 	Recommendations tmdbResponse `json:"recommendations"`
 	Similar         tmdbResponse `json:"similar"`
+	Translations    translations `json:"translations"`
 	Collection      *struct {
 		ID int `json:"id"`
 	} `json:"belongs_to_collection"`
@@ -196,13 +202,14 @@ func (c *Client) Movie(ctx context.Context, id int) (*MovieDetails, error) {
 func (c *Client) movie(ctx context.Context, id int) (*MovieDetails, error) {
 	return cached(ctx, c, fmt.Sprintf("movie/%d", id), func(ctx context.Context) (*MovieDetails, error) {
 		var raw rawMovie
-		query := url.Values{
-			"append_to_response":     {"credits,videos,images,release_dates,recommendations,similar,external_ids,alternative_titles"},
-			"include_image_language": {"en,null"},
-		}
+		query := detailQuery(ctx, "credits,videos,images,release_dates,recommendations,similar,external_ids,alternative_titles")
 		if err := c.getJSON(ctx, fmt.Sprintf("/3/movie/%d", id), query, &raw); err != nil {
 			return nil, err
 		}
+		english := raw.Translations.english()
+		raw.Overview = cmp.Or(raw.Overview, english.Overview)
+		raw.Tagline = cmp.Or(raw.Tagline, english.Tagline)
+		lang := i18n.FromContext(ctx)
 		m := &MovieDetails{
 			MediaItem:       raw.mediaItem("movie"),
 			OriginalTitle:   nativeTitle(raw.OriginalTitle, raw.Language, raw.Countries, raw.AltTitles.Titles),
@@ -215,7 +222,7 @@ func (c *Client) movie(ctx context.Context, id int) (*MovieDetails, error) {
 			Cast:            limit(raw.Credits.Cast, maxCast),
 			Directors:       crewWithJobs(raw.Credits.Crew, "Director"),
 			Writers:         crewWithJobs(raw.Credits.Crew, "Screenplay", "Writer", "Story", "Novel"),
-			Videos:          youTubeVideos(raw.Videos.Results),
+			Videos:          youTubeVideos(raw.Videos.Results, lang),
 			Recommendations: relatedTitles(raw.Recommendations.Results, "movie"),
 			Similar:         relatedTitles(raw.Similar.Results, "movie"),
 		}
@@ -223,8 +230,8 @@ func (c *Client) movie(ctx context.Context, id int) (*MovieDetails, error) {
 		if raw.Collection != nil {
 			m.collectionID = raw.Collection.ID
 		}
-		m.LogoPath = selectLogo(raw.Images.Logos)
-		m.TrailerKey = selectTrailer(raw.Videos.Results)
+		m.LogoPath = selectLogo(raw.Images.Logos, lang)
+		m.TrailerKey = selectTrailer(raw.Videos.Results, lang)
 		for _, country := range raw.ReleaseDates.Results {
 			if country.Country != "US" {
 				continue
@@ -318,21 +325,61 @@ func crewWithJobs(crew []CrewMember, jobs ...string) []CrewMember {
 	return out
 }
 
-// youTubeVideos keeps embeddable YouTube videos, trailers first.
-func youTubeVideos(raw []rawVideo) []Video {
+// youTubeVideos keeps embeddable YouTube videos, trailers first and, among
+// each, those in lang first.
+func youTubeVideos(raw []rawVideo, lang i18n.Lang) []Video {
 	var trailers, others []Video
 	for _, v := range raw {
 		if !strings.EqualFold(v.Site, "YouTube") || !validYouTubeKey(v.Key) {
 			continue
 		}
-		video := Video{Key: v.Key, Name: v.Name, Type: v.Type, Official: v.Official}
+		video := Video{Key: v.Key, Name: v.Name, Type: v.Type, Official: v.Official, lang: v.Iso6391}
 		if v.Type == "Trailer" {
 			trailers = append(trailers, video)
 		} else {
 			others = append(others, video)
 		}
 	}
+	inLangFirst := func(a, b Video) int {
+		return cmp.Compare(boolRank(a.lang != string(lang)), boolRank(b.lang != string(lang)))
+	}
+	slices.SortStableFunc(trailers, inLangFirst)
+	slices.SortStableFunc(others, inLangFirst)
 	return append(trailers, others...)
+}
+
+// detailQuery asks for a title's details with appends, their images and
+// videos in the language ctx carries or in English, and, when that language
+// is not English, the English translation its blanks fall back to.
+func detailQuery(ctx context.Context, appends string) url.Values {
+	if i18n.FromContext(ctx) != i18n.English {
+		appends += ",translations"
+	}
+	query := url.Values{"append_to_response": {appends}}
+	withMediaLanguages(ctx, query)
+	return query
+}
+
+// translations are a title's or person's texts in every language TMDB has.
+type translations struct {
+	Translations []struct {
+		Language string `json:"iso_639_1"`
+		Data     struct {
+			Overview  string `json:"overview"`
+			Tagline   string `json:"tagline"`
+			Biography string `json:"biography"`
+		} `json:"data"`
+	} `json:"translations"`
+}
+
+// english is the English translation, empty when TMDB has none.
+func (t translations) english() (out struct{ Overview, Tagline, Biography string }) {
+	for _, tr := range t.Translations {
+		if tr.Language == "en" {
+			return struct{ Overview, Tagline, Biography string }{tr.Data.Overview, tr.Data.Tagline, tr.Data.Biography}
+		}
+	}
+	return out
 }
 
 // getJSON performs an authenticated GET and decodes a bounded JSON body.

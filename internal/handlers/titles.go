@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/config"
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
 )
 
@@ -116,24 +117,27 @@ func (s *Server) matchTitles(torrents []torrserver.Torrent) {
 }
 
 // findTitle returns the TMDB id of the movie or series t is named after (0
-// when none matches exactly).
+// when none matches exactly). Moviestracker names releases in the language
+// of the page they were sent from, so each language is tried.
 func (s *Server) findTitle(ctx context.Context, t torrserver.Torrent) (int, error) {
 	m := titleYear.FindStringSubmatch(strings.TrimSpace(t.Title))
 	details := s.clients().Details
 	if m == nil || details == nil {
 		return 0, nil
 	}
-	results, err := details.Search(ctx, m[1])
-	if err != nil {
-		return 0, err
-	}
-	items := results.Movies
-	if t.Category == "tv" {
-		items = results.Series
-	}
-	for _, item := range items {
-		if strings.EqualFold(item.Title, m[1]) && item.ReleaseYear() == m[2] {
-			return item.ID, nil
+	for _, lang := range i18n.Supported {
+		results, err := details.Search(i18n.WithLang(ctx, lang), m[1])
+		if err != nil {
+			return 0, err
+		}
+		items := results.Movies
+		if t.Category == "tv" {
+			items = results.Series
+		}
+		for _, item := range items {
+			if strings.EqualFold(item.Title, m[1]) && item.ReleaseYear() == m[2] {
+				return item.ID, nil
+			}
 		}
 	}
 	return 0, nil

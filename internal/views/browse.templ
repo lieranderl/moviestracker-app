@@ -72,8 +72,8 @@ func (v BrowseView) moreURL(page int) string {
 }
 
 templ allLink(slug, title string) {
-	<a href={ templ.SafeURL("/browse/" + slug) } class="btn btn-ghost btn-sm shrink-0 gap-1" aria-label={ "All " + title }>
-		All
+	<a href={ templ.SafeURL("/browse/" + slug) } class="btn btn-ghost btn-sm shrink-0 gap-1" aria-label={ trf(ctx, "All %s", title) }>
+		{ tr(ctx, "All") }
 		@Icon("arrow-right", "size-4")
 	</a>
 }
@@ -81,7 +81,7 @@ templ allLink(slug, title string) {
 // BrowsePage is a whole list as a grid of posters, 20 at first and 20 more
 // each time the end of the grid scrolls into view.
 templ BrowsePage(user *auth.User, v BrowseView) {
-	@Layout(v.List.Title) {
+	@Layout(tr(ctx, v.List.Title)) {
 		@Navbar(user)
 		<main class="grow pb-20">
 			@categoryBar(BrowseLists, v.List.Slug)
@@ -90,18 +90,18 @@ templ BrowsePage(user *auth.User, v BrowseView) {
 					<div class="min-w-0 space-y-1">
 						<a href="/movies" class="link link-hover text-sm text-base-content/60 inline-flex items-center gap-1">
 							@Icon("arrow-left", "size-4")
-							Home
+							{ tr(ctx, "Home") }
 						</a>
 						<h1 class="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
 							@Icon(v.List.Icon, "size-6 text-primary")
-							{ v.List.Title }
+							{ tr(ctx, v.List.Title) }
 						</h1>
-						<p class="text-sm text-base-content/60">{ v.List.Subtitle }</p>
+						<p class="text-sm text-base-content/60">{ tr(ctx, v.List.Subtitle) }</p>
 					</div>
 					if v.List.Day != "" {
-						<nav role="tablist" class="tabs tabs-box tabs-sm" aria-label="Trending over">
-							<a role="tab" href={ templ.SafeURL(v.pageURL(false)) } class={ "tab", templ.KV("tab-active", !v.Today) } aria-selected={ fmt.Sprint(!v.Today) }>This week</a>
-							<a role="tab" href={ templ.SafeURL(v.pageURL(true)) } class={ "tab", templ.KV("tab-active", v.Today) } aria-selected={ fmt.Sprint(v.Today) }>Today</a>
+						<nav role="tablist" class="tabs tabs-box tabs-sm" aria-label={ tr(ctx, "Trending over") }>
+							<a role="tab" href={ templ.SafeURL(v.pageURL(false)) } class={ "tab", templ.KV("tab-active", !v.Today) } aria-selected={ fmt.Sprint(!v.Today) }>{ tr(ctx, "This week") }</a>
+							<a role="tab" href={ templ.SafeURL(v.pageURL(true)) } class={ "tab", templ.KV("tab-active", v.Today) } aria-selected={ fmt.Sprint(v.Today) }>{ tr(ctx, "Today") }</a>
 						</nav>
 					}
 				</header>
@@ -133,11 +133,11 @@ templ BrowseMore(v BrowseView) {
 			case v.Failed:
 				<div role="alert" class="alert alert-warning alert-soft">
 					@Icon("triangle-alert", "size-5")
-					<span>TMDB did not answer.</span>
+					<span>{ tr(ctx, "TMDB did not answer.") }</span>
 					if v.Next > 1 {
-						<button type="button" class="btn btn-sm" data-on:click={ v.moreURL(v.Next) }>Try again</button>
+						<button type="button" class="btn btn-sm" data-on:click={ v.moreURL(v.Next) }>{ tr(ctx, "Try again") }</button>
 					} else {
-						<a href={ templ.SafeURL(v.pageURL(v.Today)) } class="btn btn-sm">Try again</a>
+						<a href={ templ.SafeURL(v.pageURL(v.Today)) } class="btn btn-sm">{ tr(ctx, "Try again") }</a>
 					}
 				</div>
 			case v.Next > 0:
@@ -145,10 +145,10 @@ templ BrowseMore(v BrowseView) {
 				// loader must not ask for it again. Each page's loader is a
 				// new element.
 				<div id={ fmt.Sprintf("browse-page-%d", v.Next) } data-on-intersect__once={ v.moreURL(v.Next) }>
-					<span class="loading loading-spinner loading-md text-primary" aria-label="Loading more"></span>
+					<span class="loading loading-spinner loading-md text-primary" aria-label={ tr(ctx, "Loading more") }></span>
 				</div>
 			default:
-				<p class="text-sm text-base-content/60">That is the whole list.</p>
+				<p class="text-sm text-base-content/60">{ tr(ctx, "That is the whole list.") }</p>
 		}
 	</div>
 }
@@ -217,7 +217,7 @@ templ categoryBar(lists []BrowseList, current string) {
 	<nav
 		id="category-bar"
 		class="sticky top-16 z-40 bg-base-100/80 backdrop-blur-md border-b border-base-content/10"
-		aria-label="Categories"
+		aria-label={ tr(ctx, "Categories") }
 		if current == "" {
 			data-signals:home-row="''"
 		}
@@ -237,17 +237,17 @@ templ categoryBar(lists []BrowseList, current string) {
 							data-class:btn-primary={ fmt.Sprintf("$homeRow == '%s'", l.homeID()) }
 						>
 							@Icon(l.Icon, "size-4")
-							{ l.Title }
+							{ tr(ctx, l.Title) }
 						</a>
 					} else if l.Slug == current {
 						<a href={ templ.SafeURL("/browse/" + l.Slug) } class="btn btn-sm btn-soft btn-primary rounded-full gap-1.5" aria-current="page">
 							@Icon(l.Icon, "size-4")
-							{ l.Title }
+							{ tr(ctx, l.Title) }
 						</a>
 					} else {
 						<a href={ templ.SafeURL("/browse/" + l.Slug) } class="btn btn-sm btn-soft rounded-full gap-1.5">
 							@Icon(l.Icon, "size-4")
-							{ l.Title }
+							{ tr(ctx, l.Title) }
 						</a>
 					}
 				</li>
@@ -268,8 +268,8 @@ templ toTopButton() {
 		data-class:pointer-events-none="!$scrolledDown"
 		data-attr:tabindex="$scrolledDown ? 0 : -1"
 		tabindex="-1"
-		aria-label="Back to top"
-		title="Back to top"
+		aria-label={ tr(ctx, "Back to top") }
+		title={ tr(ctx, "Back to top") }
 	>
 		@Icon("arrow-up", "size-5")
 	</a>

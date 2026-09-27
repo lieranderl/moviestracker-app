@@ -30,28 +30,28 @@ templ footer(showVersion bool) {
 		<aside class="max-w-sm space-y-3">
 			@brand("/")
 			<p class="text-xs leading-relaxed">
-				A free, non-commercial personal catalog. Moviestracker does not host, upload, seed or distribute media.
+				{ tr(ctx, "A free, non-commercial personal catalog. Moviestracker does not host, upload, seed or distribute media.") }
 			</p>
 		</aside>
-		<nav aria-label="Data sources">
-			<h2 class="footer-title">Data sources</h2>
+		<nav aria-label={ tr(ctx, "Data sources") }>
+			<h2 class="footer-title">{ tr(ctx, "Data sources") }</h2>
 			@externalLink(tmdbHomeURL, "The Movie Database (TMDB)")
-			@externalLink(torrentIndexURL, "JacRed torrent index")
-			<p class="text-xs max-w-xs">{ TMDBDisclaimer }</p>
+			@externalLink(torrentIndexURL, tr(ctx, "JacRed torrent index"))
+			<p class="text-xs max-w-xs">{ tr(ctx, TMDBDisclaimer) }</p>
 		</nav>
-		<nav aria-label="Streaming">
-			<h2 class="footer-title">Streaming</h2>
+		<nav aria-label={ tr(ctx, "Streaming") }>
+			<h2 class="footer-title">{ tr(ctx, "Streaming") }</h2>
 			@externalLink(torrServerURL, "TorrServer")
 			@externalLink(gstreamerURL, "GStreamer")
-			<p class="text-xs max-w-xs">TorrServer streams torrents; GStreamer converts MKV files for the browser.</p>
+			<p class="text-xs max-w-xs">{ tr(ctx, "TorrServer streams torrents; GStreamer converts MKV files for the browser.") }</p>
 		</nav>
-		<nav aria-label="Built with">
-			<h2 class="footer-title">Built with</h2>
+		<nav aria-label={ tr(ctx, "Built with") }>
+			<h2 class="footer-title">{ tr(ctx, "Built with") }</h2>
 			@externalLink("https://go.dev", "Go")
 			@externalLink("https://data-star.dev", "Datastar")
 			@externalLink("https://daisyui.com", "DaisyUI")
-			@externalLink(SourceURL, "Source code (AGPL-3.0)")
-			if label := versionLabel(); showVersion && label != "" {
+			@externalLink(SourceURL, tr(ctx, "Source code (AGPL-3.0)"))
+			if label := tr(ctx, versionLabel()); showVersion && label != "" {
 				<p class="text-xs font-mono text-base-content/50 pt-2">{ label }</p>
 			}
 		</nav>
@@ -62,7 +62,7 @@ templ externalLink(href templ.SafeURL, label string) {
 	<a href={ href } target="_blank" rel="noopener noreferrer" class="link link-hover text-xs inline-flex items-center gap-1">
 		{ label }
 		@Icon("external-link", "size-3")
-		<span class="sr-only">(opens in new tab)</span>
+		<span class="sr-only">{ tr(ctx, "(opens in new tab)") }</span>
 	</a>
 }
 
@@ -70,8 +70,8 @@ templ externalLink(href templ.SafeURL, label string) {
 templ JacRedCredit() {
 	<a href={ jacredReferralURL } target="_blank" rel="noopener noreferrer" class="badge badge-primary badge-soft gap-1.5 hover:badge-outline shrink-0 whitespace-nowrap">
 		@Icon("magnet", "size-3.5")
-		Search is powered by JacRed
+		{ tr(ctx, "Search is powered by JacRed") }
 		@Icon("external-link", "size-3")
-		<span class="sr-only">(opens in new tab)</span>
+		<span class="sr-only">{ tr(ctx, "(opens in new tab)") }</span>
 	</a>
 }

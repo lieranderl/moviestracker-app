@@ -1,24 +1,26 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/config"
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 
 	"github.com/starfederation/datastar-go/datastar"
 )
 
 // usersView lists the accounts for the Users settings page.
-func (s *Server) usersView(me *auth.User) views.UsersView {
+func (s *Server) usersView(ctx context.Context, me *auth.User) views.UsersView {
 	v := views.UsersView{Me: me.Username}
 	for _, a := range s.accounts.List() {
 		v.Accounts = append(v.Accounts, views.UserRow{
 			Username: a.Username, Name: a.Name, Admin: a.Role == config.RoleAdmin,
-			Created: a.CreatedAt.Format("2 Jan 2006"), Known: !a.CreatedAt.IsZero(),
+			Created: i18n.Date(ctx, a.CreatedAt), Known: !a.CreatedAt.IsZero(),
 		})
 	}
 	return v
@@ -26,16 +28,16 @@ func (s *Server) usersView(me *auth.User) views.UsersView {
 
 // patchUsers answers a Users action with the refreshed page section.
 func (s *Server) patchUsers(w http.ResponseWriter, r *http.Request, me *auth.User, st views.SourceStatus, signals map[string]any) {
-	patchSource(w, r, views.UsersSection(s.usersView(me), st), signals)
+	patchSource(w, r, views.UsersSection(s.usersView(r.Context(), me), st), signals)
 }
 
 // accountProblem says what went wrong with an account change, in words.
-func accountProblem(err error) views.SourceStatus {
+func accountProblem(ctx context.Context, err error) views.SourceStatus {
 	switch {
 	case errors.Is(err, auth.ErrAccountExists), errors.Is(err, auth.ErrInvalidAccount),
 		errors.Is(err, auth.ErrInvalidRole), errors.Is(err, auth.ErrLastAdmin), errors.Is(err, auth.ErrNoAccount):
-		msg := err.Error()
-		return failed("%s.", strings.ToUpper(msg[:1])+msg[1:])
+		msg := []rune(i18n.T(ctx, err.Error()))
+		return failed("%s.", strings.ToUpper(string(msg[:1]))+string(msg[1:]))
 	}
 	return failed(saveFailed)
 }
@@ -58,7 +60,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.accounts.Create(sig.Username, sig.Name, sig.Password, sig.Role); err != nil {
-		s.patchUsers(w, r, me, accountProblem(err), map[string]any{"newPassword": ""})
+		s.patchUsers(w, r, me, accountProblem(r.Context(), err), map[string]any{"newPassword": ""})
 		return
 	}
 	name := strings.ToLower(strings.TrimSpace(sig.Username))
@@ -89,14 +91,14 @@ func (s *Server) handleUserAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := s.accounts.SetRole(username, role); err != nil {
-			s.patchUsers(w, r, me, accountProblem(err), nil)
+			s.patchUsers(w, r, me, accountProblem(r.Context(), err), nil)
 			return
 		}
-		what := "a viewer"
+		st := succeeded("%s is a viewer now.", accountName(s.accounts, username))
 		if role == config.RoleAdmin {
-			what = "an administrator"
+			st = succeeded("%s is an administrator now.", accountName(s.accounts, username))
 		}
-		s.patchUsers(w, r, me, succeeded("%s is %s now.", accountName(s.accounts, username), what), nil)
+		s.patchUsers(w, r, me, st, nil)
 		return
 	}
 
@@ -111,19 +113,19 @@ func (s *Server) handleUserAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := s.accounts.SetPassword(username, sig.Password); err != nil {
-			s.patchUsers(w, r, me, accountProblem(err), map[string]any{"resetPassword": ""})
+			s.patchUsers(w, r, me, accountProblem(r.Context(), err), map[string]any{"resetPassword": ""})
 			return
 		}
-		msg := "New password saved; %s is signed out everywhere."
+		st := succeeded("New password saved; %s is signed out everywhere.", accountName(s.accounts, username))
 		if username == me.Username {
-			msg = "New password saved for %s; your other browsers are signed out."
+			st = succeeded("New password saved for %s; your other browsers are signed out.", accountName(s.accounts, username))
 			if cookie, err := r.Cookie(auth.SessionCookieName); err == nil {
 				s.sessions.EndOtherSessionsOf(username, cookie.Value)
 			}
 		} else {
 			s.sessions.EndSessionsOf(username)
 		}
-		s.patchUsers(w, r, me, succeeded(msg, accountName(s.accounts, username)),
+		s.patchUsers(w, r, me, st,
 			map[string]any{"resetPassword": "", "resetOpen": false})
 	case "delete":
 		if username == me.Username {
@@ -132,7 +134,7 @@ func (s *Server) handleUserAction(w http.ResponseWriter, r *http.Request) {
 		}
 		name := accountName(s.accounts, username)
 		if err := s.accounts.Delete(username); err != nil {
-			s.patchUsers(w, r, me, accountProblem(err), nil)
+			s.patchUsers(w, r, me, accountProblem(r.Context(), err), nil)
 			return
 		}
 		s.sessions.EndSessionsOf(username)

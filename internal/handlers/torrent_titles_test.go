@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 )
 
@@ -105,5 +106,24 @@ func TestEarlierTorrentsAreMatchedToTheirTitleByNameAndYear(t *testing.T) {
 		if strings.Contains(page, wrong) {
 			t.Errorf("TorrServer page links %s: a different year, a different title, or a torrent without a category", wrong)
 		}
+	}
+}
+
+// Releases sent from a Russian page are named in Russian: they are matched
+// in the language their name is in.
+func TestTorrentsNamedInRussianAreMatchedToTheirTitle(t *testing.T) {
+	details := &fakeTMDBDetails{
+		search: map[string]*tmdb.SearchResults{
+			"Дюна": {Movies: []tmdb.MediaItem{{ID: 438631, Title: "Dune", ReleaseDate: "2021-09-15"}}},
+		},
+		searchIn: map[i18n.Lang]map[string]*tmdb.SearchResults{i18n.Russian: {
+			"Дюна": {Movies: []tmdb.MediaItem{{ID: 438631, Title: "Дюна", ReleaseDate: "2021-09-15"}}},
+		}},
+	}
+	engine := listingTorrServer(t, map[string]any{"hash": strings.Repeat("d", 40), "title": "Дюна (2021)", "category": "movie", "stat": 5})
+	server := newMediaServer(t, details, &fakeJacRed{}, engine)
+
+	if page := titleLinks(t, server, `href="/movie/438631"`); !strings.Contains(page, `href="/movie/438631"`) {
+		t.Error("a torrent named in Russian is not linked to its movie")
 	}
 }

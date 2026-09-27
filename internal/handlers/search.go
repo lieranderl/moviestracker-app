@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 
 	"github.com/a-h/templ"
@@ -70,13 +71,13 @@ func (s *Server) searchView(ctx context.Context, q string) views.SearchView {
 		return view
 	}
 	if s.clients().Details == nil {
-		view.Err = "Search is unavailable because TMDB is not configured."
+		view.Err = i18n.T(ctx, "Search is unavailable because TMDB is not configured.")
 		return view
 	}
 	results, err := s.clients().Details.Search(ctx, q)
 	if err != nil {
 		slog.Warn("tmdb search failed", "error", err)
-		view.Err = "TMDB search is not responding right now. Please try again."
+		view.Err = i18n.T(ctx, "TMDB search is not responding right now. Please try again.")
 		return view
 	}
 	view.Results = results

@@ -23,7 +23,7 @@ var disclaimerPoints = []disclaimerPoint{
 // Login renders the two-step sign-in card: the disclaimer until this browser
 // has accepted it, then the sign-in form.
 templ Login(consented bool, errorMsg string) {
-	@authPage("Sign in") {
+	@authPage(tr(ctx, "Sign in")) {
 		if consented {
 			@SignInStep(errorMsg)
 		} else {
@@ -38,7 +38,10 @@ templ authPage(title string) {
 		<main class="relative grow bg-base-200/50 flex flex-col">
 			<div class="flex items-center justify-between px-4 sm:px-8 py-4">
 				@brand("/login")
-				@ThemeSwitcher()
+				<div class="flex items-center gap-2">
+					@LanguageSwitcher()
+					@ThemeSwitcher()
+				</div>
 			</div>
 			<div class="grow flex items-center justify-center px-4 pb-12">
 				<div id="login-card" class="card w-full max-w-xl bg-base-100 shadow-xl border border-base-content/10">
@@ -52,9 +55,9 @@ templ authPage(title string) {
 
 templ stepHeader(step, title, body string) {
 	<header class="space-y-2">
-		<p class="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{ step }</p>
-		<h1 class="text-2xl sm:text-3xl font-bold tracking-tight">{ title }</h1>
-		<p class="text-sm text-base-content/70">{ body }</p>
+		<p class="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{ tr(ctx, step) }</p>
+		<h1 class="text-2xl sm:text-3xl font-bold tracking-tight">{ tr(ctx, title) }</h1>
+		<p class="text-sm text-base-content/70">{ tr(ctx, body) }</p>
 	</header>
 }
 
@@ -72,10 +75,10 @@ templ ConsentStep() {
 		>
 			<label class="flex items-start gap-3 cursor-pointer rounded-box bg-base-200/60 border border-base-content/5 p-4">
 				<input type="checkbox" name="accept" value="yes" required class="checkbox checkbox-primary mt-0.5" data-bind:accepted/>
-				<span class="text-sm">I have read and accept these terms, and I will only access content I am legally authorized to use.</span>
+				<span class="text-sm">{ tr(ctx, "I have read and accept these terms, and I will only access content I am legally authorized to use.") }</span>
 			</label>
 			<button type="submit" class="btn btn-primary btn-block" data-attr:disabled="!$accepted">
-				Continue
+				{ tr(ctx, "Continue") }
 				@Icon("arrow-right", "size-4")
 			</button>
 		</form>
@@ -103,24 +106,24 @@ templ SignInStep(errorMsg string) {
 		</div>
 		<form action="/api/login" method="POST" data-indicator:submitting data-on:submit="$errorMessage = ''; @post('/api/login')">
 			<fieldset class="fieldset gap-3" data-attr:disabled="$submitting">
-				<legend class="sr-only">Account</legend>
+				<legend class="sr-only">{ tr(ctx, "Account") }</legend>
 				<label class="input w-full">
 					@Icon("user", "size-4 opacity-60")
-					<span class="sr-only">Username</span>
-					<input name="username" type="text" required autocomplete="username" autocapitalize="none" placeholder="Username" class="grow" data-bind:username/>
+					<span class="sr-only">{ tr(ctx, "Username") }</span>
+					<input name="username" type="text" required autocomplete="username" autocapitalize="none" placeholder={ tr(ctx, "Username") } class="grow" data-bind:username/>
 				</label>
 				<label class="input w-full">
 					@Icon("lock", "size-4 opacity-60")
-					<span class="sr-only">Password</span>
-					<input name="password" type="password" required autocomplete="current-password" placeholder="Password" class="grow" data-bind:password/>
+					<span class="sr-only">{ tr(ctx, "Password") }</span>
+					<input name="password" type="password" required autocomplete="current-password" placeholder={ tr(ctx, "Password") } class="grow" data-bind:password/>
 				</label>
 				<button type="submit" id="submit-login-btn" class="btn btn-primary btn-block">
 					<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$submitting"></span>
-					<span data-text="$submitting ? 'Signing in…' : 'Sign in'">Sign in</span>
+					<span data-text={ "$submitting ? " + trJS(ctx, "Signing in…") + " : " + trJS(ctx, "Sign in") }>{ tr(ctx, "Sign in") }</span>
 				</button>
 			</fieldset>
 		</form>
-		<a href="/login?review=1" class="link link-hover text-xs text-base-content/60 text-center">Review the disclaimer</a>
+		<a href="/login?review=1" class="link link-hover text-xs text-base-content/60 text-center">{ tr(ctx, "Review the disclaimer") }</a>
 	</div>
 }
 
@@ -133,15 +136,15 @@ templ disclaimerList() {
 					@Icon(p.Icon, "size-4.5")
 				</span>
 				<div class="space-y-1">
-					<p class="font-semibold text-sm">{ p.Title }</p>
+					<p class="font-semibold text-sm">{ tr(ctx, p.Title) }</p>
 					<p class="text-sm text-base-content/70 leading-relaxed">
-						{ p.Body }
+						{ tr(ctx, p.Body) }
 						if p.LinkURL != "" {
 							<a href={ templ.SafeURL(p.LinkURL) } target="_blank" rel="noopener noreferrer" class="link link-primary whitespace-nowrap">{ p.LinkText }</a>
 						}
 					</p>
 					if p.Note != "" {
-						<p class="text-xs text-base-content/60 italic">{ p.Note }</p>
+						<p class="text-xs text-base-content/60 italic">{ tr(ctx, p.Note) }</p>
 					}
 				</div>
 			</li>

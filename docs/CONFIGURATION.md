@@ -25,6 +25,8 @@ for running it from source, on a server, or in a container.
 
 `/` sends signed-in users to `/movies` and everyone else to `/login`.
 
+**Languages.** The interface is in English or Russian. A browser gets the language it prefers (`Accept-Language`) until someone picks one from the language menu in the navbar, which is remembered for that browser (`mt_lang` cookie, a year). TMDB titles, overviews, genres, logos and trailers come in the same language (`language=ru-RU`), each language cached on its own; a Russian page falls back to the English overview, tagline or biography when TMDB has no Russian one, and to English logos and trailers. JacRed searches with the original title first, as before.
+
 **New releases.** Once a day Moviestracker asks GitHub for its latest stable release (`api.github.com`, with an ETag, so an unchanged answer is not sent again). When one is newer, administrators see it in the navbar and Settings → Updates, and the menu bar and tray apps offer **Download Moviestracker vX.Y.Z…**. Nothing is downloaded or installed by itself: the Mac DMG and the Windows installer install over the running version and keep accounts and settings; the image is updated with `docker compose pull && docker compose up -d`. TorrServer and GStreamer come with the release they were tested with. The request carries nothing about the install, its accounts or what plays; like any web request, GitHub sees the internet address it comes from. Turn the check off in Settings → Updates. Development builds never check.
 
 ## Environment variables

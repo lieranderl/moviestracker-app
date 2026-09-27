@@ -1,6 +1,7 @@
 package views
 
 import (
+	"context"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"fmt"
@@ -33,10 +34,10 @@ document.querySelectorAll('iframe[data-trailer-iframe]').forEach(f => f.contentW
 
 // Movies is the authenticated home; discover adds the lazily loaded rails.
 templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, series []tmdb.MediaItem, discover bool) {
-	@Layout("Trending Movies & Series") {
+	@Layout(tr(ctx, "Trending Movies & Series")) {
 		@Navbar(user)
 		<main class="grow pb-20">
-			<h1 class="sr-only">Trending movies and TV series</h1>
+			<h1 class="sr-only">{ tr(ctx, "Trending movies and TV series") }</h1>
 			if len(hero) > 0 {
 				@HeroBillboard(hero)
 			} else if len(movies) > 0 {
@@ -44,8 +45,8 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 			}
 			@categoryBar(homeLists(discover), "")
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 space-y-10 mt-10">
-				@mediaRow("trending-movies", "Trending Movies", "Top trending films from The Movie Database", "film", "text-primary", "badge-primary", "No trending movies available. Please verify TMDB_API_KEY configuration.", movies, discover)
-				@mediaRow("trending-series", "Trending TV Series", "Top trending episodic series and releases", "tv", "text-accent", "badge-accent", "No trending TV series available. Please verify TMDB_API_KEY configuration.", series, discover)
+				@mediaRow("trending-movies", tr(ctx, "Trending Movies"), tr(ctx, "Top trending films from The Movie Database"), "film", "text-primary", "badge-primary", tr(ctx, "No trending movies available. Please verify TMDB_API_KEY configuration."), movies, discover)
+				@mediaRow("trending-series", tr(ctx, "Trending TV Series"), tr(ctx, "Top trending episodic series and releases"), "tv", "text-accent", "badge-accent", tr(ctx, "No trending TV series available. Please verify TMDB_API_KEY configuration."), series, discover)
 				if discover {
 					@discoverSection()
 				}
@@ -66,7 +67,7 @@ templ mediaRow(id, title, subtitle, icon, iconTone, badgeTone, emptyMsg string, 
 				<h2 id={ id + "-title" } class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
 					@Icon(icon, "size-5 "+iconTone)
 					{ title }
-					<span class={ "badge badge-sm badge-soft font-semibold", badgeTone }>Weekly</span>
+					<span class={ "badge badge-sm badge-soft font-semibold", badgeTone }>{ tr(ctx, "Weekly") }</span>
 				</h2>
 				<p class="text-sm text-base-content/60">{ subtitle }</p>
 			</div>
@@ -95,7 +96,7 @@ templ HeroBillboard(items []tmdb.MediaItem) {
 	if len(items) > 0 {
 		<section
 			aria-roledescription="carousel"
-			aria-label="Trending highlights"
+			aria-label={ tr(ctx, "Trending highlights") }
 			data-signals={ fmt.Sprintf("{ heroSlide: 0, heroTotal: %d, heroPaused: false, heroHovered: false, heroElapsed: 0, heroPlayTrailer: false, heroMuted: true }", len(items)) }
 			data-on-interval__duration.1s={ heroTick }
 			data-on:mouseenter="$heroHovered = true; if (!$heroPlayTrailer) { $heroElapsed = 0 }"
@@ -112,8 +113,8 @@ templ HeroBillboard(items []tmdb.MediaItem) {
 			</div>
 			if len(items) > 1 {
 				<div class="absolute inset-x-4 top-1/2 hidden sm:flex -translate-y-1/2 justify-between pointer-events-none z-20">
-					@heroArrow("Previous slide", "chevron-left", "$heroSlide = ($heroSlide - 1 + $heroTotal) % $heroTotal"+heroGoto)
-					@heroArrow("Next slide", "chevron-right", "$heroSlide = ($heroSlide + 1) % $heroTotal"+heroGoto)
+					@heroArrow(tr(ctx, "Previous slide"), "chevron-left", "$heroSlide = ($heroSlide - 1 + $heroTotal) % $heroTotal"+heroGoto)
+					@heroArrow(tr(ctx, "Next slide"), "chevron-right", "$heroSlide = ($heroSlide + 1) % $heroTotal"+heroGoto)
 				</div>
 			}
 			<!-- Trailer sound toggle (only visible while a trailer plays) -->
@@ -124,8 +125,8 @@ templ HeroBillboard(items []tmdb.MediaItem) {
 					data-on:click={ heroMute }
 					data-attr:aria-pressed="!$heroMuted"
 					class="btn btn-circle btn-sm bg-base-100/70 backdrop-blur-md border-base-content/20 hover:bg-base-100 shadow-xl hidden"
-					aria-label="Toggle trailer sound"
-					title="Mute / unmute trailer"
+					aria-label={ tr(ctx, "Toggle trailer sound") }
+					title={ tr(ctx, "Mute / unmute trailer") }
 				>
 					<span data-class:hidden="!$heroMuted">
 						@Icon("volume-x", "size-4")
@@ -136,7 +137,7 @@ templ HeroBillboard(items []tmdb.MediaItem) {
 				</button>
 			</div>
 			if len(items) > 1 {
-				<div class="flex w-full justify-center items-center gap-1.5 sm:gap-2.5 py-3 px-4 bg-base-200 border-b border-base-content/10 overflow-x-auto" role="group" aria-label="Choose slide">
+				<div class="flex w-full justify-center items-center gap-1.5 sm:gap-2.5 py-3 px-4 bg-base-200 border-b border-base-content/10 overflow-x-auto" role="group" aria-label={ tr(ctx, "Choose slide") }>
 					for idx, item := range items {
 						<button
 							type="button"
@@ -172,7 +173,7 @@ templ heroSlide(idx, total int, item tmdb.MediaItem) {
 	<article
 		id={ fmt.Sprintf("hero-slide-%d", idx) }
 		aria-roledescription="slide"
-		aria-label={ fmt.Sprintf("%d of %d: %s", idx+1, total, item.Title) }
+		aria-label={ trf(ctx, "%d of %d: %s", idx+1, total, item.Title) }
 		class={ "absolute inset-0 flex items-end", templ.KV("hidden", idx != 0) }
 		data-class={ fmt.Sprintf("{ hidden: $heroSlide !== %d }", idx) }
 	>
@@ -208,7 +209,7 @@ templ heroSlide(idx, total int, item tmdb.MediaItem) {
 			>
 				<iframe
 					data-trailer-iframe
-					title={ item.Title + " trailer" }
+					title={ trf(ctx, "%s trailer", item.Title) }
 					data-attr:src={ fmt.Sprintf("($heroPlayTrailer && $heroSlide === %d) ? 'https://www.youtube-nocookie.com/embed/%s?autoplay=1&controls=0&playsinline=1&rel=0&iv_load_policy=3&disablekb=1&enablejsapi=1&mute=' + (@peek(() => $heroMuted) ? 1 : 0) : null", idx, url.PathEscape(item.TrailerKey)) }
 					class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[180%] h-[180%] min-w-full min-h-full border-0"
 					allow="autoplay; encrypted-media"
@@ -224,7 +225,7 @@ templ heroSlide(idx, total int, item tmdb.MediaItem) {
 				<div class="flex flex-wrap items-center gap-2">
 					<span class="badge h-7 px-3 gap-1.5 text-xs font-semibold bg-black/50 backdrop-blur-md border-white/20 text-white">
 						@Icon("sparkles", "size-3.5 text-primary")
-						Trending <span class="text-primary font-bold">#{ fmt.Sprint(idx + 1) }</span>
+						{ tr(ctx, "Trending") } <span class="text-primary font-bold">#{ fmt.Sprint(idx + 1) }</span>
 					</span>
 					@tmdbRatingBadge(item)
 					if item.ImdbID != "" {
@@ -234,7 +235,7 @@ templ heroSlide(idx, total int, item tmdb.MediaItem) {
 						<span class="badge h-7 px-3 text-xs font-medium font-mono bg-black/50 backdrop-blur-md border-white/20 text-white">{ item.ReleaseYear() }</span>
 					}
 					<span class="badge h-7 px-3 text-xs font-medium font-mono uppercase bg-black/50 backdrop-blur-md border-white/20 text-white">
-						{ mediaTypeLabel(item.MediaType, "TV Series") }
+						{ mediaTypeLabel(ctx, item.MediaType, tr(ctx, "TV Series")) }
 					</span>
 				</div>
 				<h2 class="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight drop-shadow-lg">
@@ -259,7 +260,7 @@ templ heroSlide(idx, total int, item tmdb.MediaItem) {
 				<div class="pt-3 flex flex-wrap gap-3">
 					<a href={ mediaHref(item) } class="btn bg-white text-black border-white hover:bg-white/85 gap-2 shadow-lg">
 						@Icon("info", "size-4")
-						More info
+						{ tr(ctx, "More info") }
 					</a>
 					<button
 						type="button"
@@ -273,7 +274,7 @@ templ heroSlide(idx, total int, item tmdb.MediaItem) {
 						<span class="hidden" data-class:hidden="!$heroPaused">
 							@Icon("square", "size-4 fill-current")
 						</span>
-						<span data-text="$heroPaused ? 'Stop Preview' : 'Play Preview'">Play Preview</span>
+						<span data-text={ "$heroPaused ? " + trJS(ctx, "Stop Preview") + " : " + trJS(ctx, "Play Preview") }>{ tr(ctx, "Play Preview") }</span>
 					</button>
 				</div>
 			</div>
@@ -297,11 +298,11 @@ func heroIMDbRequest(items []tmdb.MediaItem) string {
 	return "@get('" + IMDbRatingURL(badges) + "')"
 }
 
-func mediaTypeLabel(mediaType, tvLabel string) string {
+func mediaTypeLabel(ctx context.Context, mediaType, tvLabel string) string {
 	if mediaType == "tv" {
 		return tvLabel
 	}
-	return "Movie"
+	return tr(ctx, "Movie")
 }
 
 templ MediaCard(item tmdb.MediaItem) {
@@ -315,7 +316,7 @@ templ mediaCard(item tmdb.MediaItem, size string) {
 			if item.PosterURL() != "" {
 				<img
 					src={ item.PosterURL() }
-					alt={ item.Title + " poster" }
+					alt={ trf(ctx, "%s poster", item.Title) }
 					class="size-full object-cover transition-transform duration-500 group-hover:scale-105"
 					loading="lazy"
 					decoding="async"
@@ -341,7 +342,7 @@ templ mediaCard(item tmdb.MediaItem, size string) {
 			</h3>
 			<div class="flex items-center justify-between text-xs text-base-content/60">
 				<span class="font-mono">{ item.ReleaseYear() }</span>
-				<span class="badge badge-neutral badge-xs font-mono uppercase">{ mediaTypeLabel(item.MediaType, "TV") }</span>
+				<span class="badge badge-neutral badge-xs font-mono uppercase">{ mediaTypeLabel(ctx, item.MediaType, tr(ctx, "TV")) }</span>
 			</div>
 		</div>
 	</a>

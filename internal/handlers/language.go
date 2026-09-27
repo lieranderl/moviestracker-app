@@ -1,0 +1,64 @@
+package handlers
+
+import (
+	"net/http"
+	"net/url"
+	"strings"
+
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
+)
+
+// langCookieName keeps the interface language a browser chose.
+const langCookieName = "mt_lang"
+
+// requestLang is the language a request's pages are in: the one its browser
+// chose, else the one it prefers.
+func requestLang(r *http.Request) i18n.Lang {
+	if c, err := r.Cookie(langCookieName); err == nil {
+		if lang, ok := i18n.Parse(c.Value); ok {
+			return lang
+		}
+	}
+	return i18n.Negotiate(r.Header.Get("Accept-Language"))
+}
+
+// language puts the request's language in its context, for pages and TMDB.
+func language(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(i18n.WithLang(r.Context(), requestLang(r))))
+	})
+}
+
+// handleLanguage remembers the language a visitor picked and takes them
+// back to the page they picked it on.
+func (s *Server) handleLanguage(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
+	lang, ok := i18n.Parse(r.PostFormValue("lang"))
+	if !ok {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	cookie := &http.Cookie{
+		Name:     langCookieName,
+		Value:    string(lang),
+		Path:     "/",
+		MaxAge:   consentMaxAge,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	}
+	cookie.Secure = s.secureCookies
+	http.SetCookie(w, cookie)
+	http.Redirect(w, r, backTo(r.Referer()), http.StatusSeeOther) // #nosec G710 -- backTo keeps only a path on this server
+}
+
+// backTo is the path of a page the Referer names, or "/" when it names none
+// of ours (the host is not checked: cross-origin posts never get here).
+func backTo(referer string) string {
+	u, err := url.Parse(referer)
+	if err != nil || !strings.HasPrefix(u.Path, "/") || strings.HasPrefix(u.Path, "//") || strings.HasPrefix(u.Path, "/\\") || strings.HasPrefix(u.Path, "/api/") {
+		return "/"
+	}
+	back := &url.URL{Path: u.Path, RawQuery: u.RawQuery}
+	return back.String()
+}

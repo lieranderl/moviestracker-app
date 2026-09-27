@@ -1,6 +1,7 @@
 package views
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path"
@@ -34,7 +35,8 @@ func torrPageSignals(gst, canRemove bool, linkOrigin string) string {
 // torrListActions is the single delegated click handler for every torrent and
 // file action button. Buttons declare intent via data-action and carry their
 // payload in data-* attributes, so no JS strings are built from torrent data.
-const torrListActions = `
+func torrListActions(ctx context.Context) string {
+	return `
 const btn = evt.target.closest('button[data-action]')
 if (!btn) return
 const d = btn.dataset
@@ -49,7 +51,7 @@ switch (d.action) {
 		$probeHash = d.hash; $probeIndex = +d.index; $probeOpen = true
 		break
 	case 'copy':
-		window.copyLink(d.url, $linkOrigin).then(ok => { $toastError = !ok; $toast = ok ? d.msg : 'Copy failed' })
+		window.copyLink(d.url, $linkOrigin).then(ok => { $toastError = !ok; $toast = ok ? d.msg : ` + trJS(ctx, "Copy failed") + ` })
 		break
 	case 'files':
 		@post('/api/torrserver/files?hash=' + hash, {filterSignals: {include: /^$/}})
@@ -62,6 +64,7 @@ switch (d.action) {
 		break
 }
 `
+}
 
 // torrStartPlay (re)starts the player on $activeHash's file as $playKind:
 // Direct streams the original file, HLS goes through GStreamer and first
@@ -131,8 +134,9 @@ const onMac = `/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints
 
 // openPlayer opens the file in an external player and says so when the
 // browser could not: it has no handler for the player's links.
-func openPlayer(player, name string) string {
-	return fmt.Sprintf(`window.openInPlayer('%s', $streamCleanUrl, $linkOrigin).then(opened => opened || ($toastError = true, $toast = '%s did not open: is it installed? Copy the Direct link and open it there instead'))`, player, name)
+func openPlayer(ctx context.Context, player, name string) string {
+	return fmt.Sprintf(`window.openInPlayer('%s', $streamCleanUrl, $linkOrigin).then(opened => opened || ($toastError = true, $toast = %s))`,
+		player, jsString(trf(ctx, "%s did not open: is it installed? Copy the Direct link and open it there instead", name)))
 }
 
 // torrPlayback (re)starts the stream once the audio track is known: right
@@ -275,7 +279,7 @@ func titlePage(links StreamLinks, hash string) (href, label, icon string) {
 
 // TorrServer is the TorrServer page. Its address is set in Settings → Sources.
 templ TorrServer(user *auth.User, engine, linkOrigin string, links StreamLinks, echo torrserver.EchoInfo, torrents []torrserver.Torrent, gst GStreamerSetup) {
-	@layoutWithScripts("TorrServer Web Player & Stream Manager", "/static/player.js") {
+	@layoutWithScripts(tr(ctx, "TorrServer Web Player & Stream Manager"), "/static/player.js") {
 		@Navbar(user)
 		<main
 			id="torrserver-app"
@@ -291,15 +295,15 @@ templ TorrServer(user *auth.User, engine, linkOrigin string, links StreamLinks, 
 								@Icon("server", "size-6")
 							</span>
 							<div>
-								<h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">TorrServer Web Hub</h1>
+								<h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">{ tr(ctx, "TorrServer Web Hub") }</h1>
 								<p class="text-xs sm:text-sm text-base-content/70">
-									In-browser HLS streaming, external player playlist export, and batch torrent management
+									{ tr(ctx, "In-browser HLS streaming, external player playlist export, and batch torrent management") }
 								</p>
 							</div>
 						</div>
 						<div class="flex flex-wrap items-center gap-2">
 							if user.IsAdmin() {
-								<a href="/settings/sources" class="btn btn-outline btn-sm gap-2 font-mono text-xs" title="Change the TorrServer address in Settings → Sources">
+								<a href="/settings/sources" class="btn btn-outline btn-sm gap-2 font-mono text-xs" title={ tr(ctx, "Change the TorrServer address in Settings → Sources") }>
 									@Icon("hard-drive", "size-4 text-secondary")
 									@torrActiveServer(engine)
 								</a>
@@ -313,8 +317,8 @@ templ TorrServer(user *auth.User, engine, linkOrigin string, links StreamLinks, 
 								type="button"
 								data-on:click="@get('/api/torrserver/torrents')"
 								class="btn btn-ghost btn-sm btn-circle"
-								title="Refresh torrents list"
-								aria-label="Refresh torrents list"
+								title={ tr(ctx, "Refresh torrents list") }
+								aria-label={ tr(ctx, "Refresh torrents list") }
 							>
 								@Icon("refresh-cw", "size-4")
 							</button>
@@ -324,7 +328,7 @@ templ TorrServer(user *auth.User, engine, linkOrigin string, links StreamLinks, 
 								class="btn btn-primary btn-sm gap-2 shadow-md shadow-primary/20"
 							>
 								@Icon("plus", "size-4")
-								Add Torrents
+								{ tr(ctx, "Add Torrents") }
 							</button>
 						</div>
 					</div>
@@ -340,17 +344,17 @@ templ TorrServer(user *auth.User, engine, linkOrigin string, links StreamLinks, 
 					<div class="flex items-center gap-3">
 						<h2 id="torr-list-title" class="text-xl font-bold flex items-center gap-2">
 							@Icon("film", "size-5 text-primary")
-							Torrents
+							{ tr(ctx, "Torrents") }
 							@torrCount(len(torrents))
 						</h2>
 						<span class="badge badge-sm badge-soft badge-success gap-1.5 font-mono text-[11px]">
 							<span class="status status-success animate-pulse"></span>
-							Live Sync
+							{ tr(ctx, "Live Sync") }
 						</span>
 					</div>
 					<label class="input input-sm w-full sm:w-64">
 						@Icon("search", "size-3.5 opacity-50")
-						<input type="search" data-bind:filter-query placeholder="Search torrents…" aria-label="Search torrents"/>
+						<input type="search" data-bind:filter-query placeholder={ tr(ctx, "Search torrents…") } aria-label={ tr(ctx, "Search torrents") }/>
 					</label>
 				</div>
 				@streamKindsLegend()
@@ -358,7 +362,7 @@ templ TorrServer(user *auth.User, engine, linkOrigin string, links StreamLinks, 
 				<div
 					id="torr-list-stream-wrapper"
 					data-init="@get('/api/torrserver/torrents?stream=true', {retry: 'always'})"
-					data-on:click={ torrListActions }
+					data-on:click={ torrListActions(ctx) }
 				>
 					@TorrServerListFragment(links, torrents)
 				</div>
@@ -383,7 +387,7 @@ templ TorrServerLiveFragment(torrents []torrserver.Torrent, echo torrserver.Echo
 }
 
 templ torrActiveServer(engine string) {
-	<span id="torr-active-server" class="truncate max-w-[140px] sm:max-w-[220px]">{ engine }</span>
+	<span id="torr-active-server" class="truncate max-w-[140px] sm:max-w-[220px]">{ tr(ctx, engine) }</span>
 }
 
 templ torrCount(n int) {
@@ -395,26 +399,26 @@ templ torrStatus(echo torrserver.EchoInfo) {
 		if echo.Version != "" {
 			<span class="badge badge-sm badge-soft badge-primary font-mono">{ echo.Version }</span>
 		} else {
-			<span class="badge badge-sm badge-soft badge-error font-mono">Offline</span>
+			<span class="badge badge-sm badge-soft badge-error font-mono">{ tr(ctx, "Offline") }</span>
 		}
 		if echo.GSTAvailable {
 			<span class="flex items-center gap-1.5 text-success font-semibold">
 				<span class="status status-success animate-pulse"></span>
-				GStreamer v{ echo.GSTVersion } Active (HLS / Remux Ready)
+				{ trf(ctx, "GStreamer v%s Active (HLS / Remux Ready)", echo.GSTVersion) }
 			</span>
 		} else {
 			<span class="flex items-center gap-1.5 text-warning font-semibold">
 				<span class="status status-warning"></span>
-				GStreamer Inactive (Direct HTTP Streaming Only)
+				{ tr(ctx, "GStreamer Inactive (Direct HTTP Streaming Only)") }
 			</span>
 		}
 		if echo.Discoverer {
 			<span class="badge badge-sm badge-soft badge-info">GST Discoverer</span>
 		}
 		if echo.HDRTonemap {
-			<span class="badge badge-sm badge-soft badge-accent">HDR Tone Mapping</span>
+			<span class="badge badge-sm badge-soft badge-accent">{ tr(ctx, "HDR Tone Mapping") }</span>
 		}
-		<span class="text-base-content/50 ml-auto font-mono">Auto-updates via Datastar SSE</span>
+		<span class="text-base-content/50 ml-auto font-mono">{ tr(ctx, "Auto-updates via Datastar SSE") }</span>
 	</div>
 }
 
@@ -427,9 +431,9 @@ templ TorrServerListFragment(links StreamLinks, torrents []torrserver.Torrent) {
 						@Icon("film", "size-8")
 					</span>
 					<div class="max-w-md space-y-1">
-						<h3 class="text-lg font-bold">No torrents added yet</h3>
+						<h3 class="text-lg font-bold">{ tr(ctx, "No torrents added yet") }</h3>
 						<p class="text-sm text-base-content/60">
-							Add one or multiple torrents via HTTP/HTTPS download links or magnet URLs to stream directly in your browser.
+							{ tr(ctx, "Add one or multiple torrents via HTTP/HTTPS download links or magnet URLs to stream directly in your browser.") }
 						</p>
 					</div>
 					<button
@@ -438,7 +442,7 @@ templ TorrServerListFragment(links StreamLinks, torrents []torrserver.Torrent) {
 						class="btn btn-primary btn-sm gap-2"
 					>
 						@Icon("plus", "size-4")
-						Add First Torrent
+						{ tr(ctx, "Add First Torrent") }
 					</button>
 				</div>
 			</div>
@@ -491,22 +495,22 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 						</h3>
 						<div class="flex flex-wrap items-center gap-2 text-xs">
 							<span class="badge badge-sm badge-soft badge-primary font-mono">{ t.FormattedSize() }</span>
-							<span class={ "badge badge-sm font-medium", t.StatusBadgeClass() }>{ t.StatusLabel() }</span>
+							<span class={ "badge badge-sm font-medium", t.StatusBadgeClass() }>{ tr(ctx, t.StatusLabel()) }</span>
 							if t.Category != "" {
 								<span class="badge badge-sm badge-ghost font-mono">{ t.Category }</span>
 							}
 							<span class="text-base-content/40 font-mono text-[11px] truncate max-w-[120px] sm:max-w-[200px]" title={ t.Hash }>{ t.Hash }</span>
 						</div>
 						<div class="stats stats-horizontal bg-base-100/90 border border-base-content/10 shadow-xs mt-2 w-full max-w-sm">
-							@torrStat("Peers", t.FormattedPeers(), "")
-							@torrStat("Down", t.FormattedDownloadSpeed(), "text-success")
-							@torrStat("Up", t.FormattedUploadSpeed(), "text-info")
+							@torrStat(tr(ctx, "Peers"), t.FormattedPeers(), "")
+							@torrStat(tr(ctx, "Down"), t.FormattedDownloadSpeed(), "text-success")
+							@torrStat(tr(ctx, "Up"), t.FormattedUploadSpeed(), "text-info")
 						</div>
 					</div>
 				</div>
 				<div class="flex flex-wrap items-center gap-2 shrink-0 self-end @2xl:self-center">
 					if page != "" {
-						<a href={ templ.SafeURL(page) } class="btn btn-ghost btn-sm btn-circle text-primary" title={ pageLabel } aria-label={ pageLabel }>
+						<a href={ templ.SafeURL(page) } class="btn btn-ghost btn-sm btn-circle text-primary" title={ tr(ctx, pageLabel) } aria-label={ tr(ctx, pageLabel) }>
 							@Icon(pageIcon, "size-4")
 						</a>
 					}
@@ -514,10 +518,10 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 						type="button"
 						data-action="copy"
 						data-url={ t.MagnetLink() }
-						data-msg="Magnet link copied to clipboard"
+						data-msg={ tr(ctx, "Magnet link copied to clipboard") }
 						class="btn btn-ghost btn-sm btn-circle text-accent"
-						title="Copy magnet link"
-						aria-label="Copy magnet link"
+						title={ tr(ctx, "Copy magnet link") }
+						aria-label={ tr(ctx, "Copy magnet link") }
 					>
 						@Icon("magnet", "size-4")
 					</button>
@@ -527,8 +531,8 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 							data-action="drop"
 							data-hash={ t.Hash }
 							class="btn btn-ghost btn-sm btn-circle text-warning"
-							title="Drop active torrent cache"
-							aria-label="Drop cache"
+							title={ tr(ctx, "Drop active torrent cache") }
+							aria-label={ tr(ctx, "Drop cache") }
 						>
 							@Icon("rotate-ccw", "size-4")
 						</button>
@@ -540,8 +544,8 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 						data-title={ name }
 						data-show="$canRemove"
 						class="btn btn-ghost btn-sm btn-circle text-error"
-						title="Remove from TorrServer"
-						aria-label="Remove torrent"
+						title={ tr(ctx, "Remove from TorrServer") }
+						aria-label={ tr(ctx, "Remove torrent") }
 					>
 						@Icon("trash-2", "size-4")
 					</button>
@@ -556,9 +560,9 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 				>
 					<summary class="collapse-title text-xs sm:text-sm font-semibold flex items-center gap-2 py-2.5 min-h-0">
 						@Icon("folder", "size-4 text-primary")
-						Torrent Files ({ fmt.Sprint(len(t.FileStats)) })
+						{ trf(ctx, "Torrent Files (%d)", len(t.FileStats)) }
 						if videoCount > 0 {
-							<span class="badge badge-xs badge-soft badge-primary font-mono">{ fmt.Sprintf("%d video", videoCount) }</span>
+							<span class="badge badge-xs badge-soft badge-primary font-mono">{ trn(ctx, videoCount, "%d video", "%d videos") }</span>
 						}
 					</summary>
 					<div class="collapse-content text-sm">
@@ -569,7 +573,7 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 						</ul>
 						<div class="mt-3 pt-3 border-t border-base-content/10 flex flex-wrap items-center justify-between gap-2 text-xs">
 							if videoCount > 1 {
-								<span class="text-base-content/60">{ fmt.Sprintf("All %d videos", videoCount) }</span>
+								<span class="text-base-content/60">{ trf(ctx, "All %d videos", videoCount) }</span>
 							}
 							<div class="flex flex-wrap items-center gap-2 ml-auto">
 								if videoCount > 1 {
@@ -579,10 +583,10 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 										data-kind="hls"
 										{ playAttrs(t.Hash, videos[0].ID, videos[0].Path, links.Direct(t.Hash, videos[0]), links.HLS(t.Hash, videos[0]))... }
 										class="btn btn-xs btn-primary gap-1.5"
-										title="Play every video here, one after the other"
+										title={ tr(ctx, "Play every video here, one after the other") }
 									>
 										@Icon("list-video", "size-3")
-										Play all
+										{ tr(ctx, "Play all") }
 									</button>
 									@playlistButton("direct", playlistPath(t.Hash, "direct"))
 									@playlistButton("hls", playlistPath(t.Hash, "hls"))
@@ -592,10 +596,10 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 									data-action="files"
 									data-hash={ t.Hash }
 									class="btn btn-xs btn-ghost gap-1 text-primary font-mono"
-									title="Refetch files from TorrServer"
+									title={ tr(ctx, "Refetch files from TorrServer") }
 								>
 									@Icon("refresh-cw", "size-3")
-									Refetch
+									{ tr(ctx, "Refetch") }
 								</button>
 							</div>
 						</div>
@@ -605,7 +609,7 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 				<div class="flex items-center justify-between text-xs text-base-content/60 bg-base-100/50 p-2.5 rounded-field border border-base-content/10 mt-auto">
 					<span class="flex items-center gap-2 font-mono">
 						@Icon("folder", "size-3.5 opacity-50")
-						Files: not loaded
+						{ tr(ctx, "Files: not loaded") }
 					</span>
 					<button
 						type="button"
@@ -614,7 +618,7 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 						class="btn btn-xs btn-primary btn-outline font-mono gap-1"
 					>
 						@Icon("folder-search", "size-3.5")
-						Fetch Files
+						{ tr(ctx, "Fetch Files") }
 					</button>
 				</div>
 			}
@@ -643,7 +647,7 @@ templ torrentFileRow(links StreamLinks, hash string, f torrserver.FileStat) {
 				<div class="flex items-center gap-2 text-[11px] font-mono text-base-content/60">
 					{ f.FormattedLength() }
 					if isVideo {
-						<span class="badge badge-xs badge-soft badge-primary">Video</span>
+						<span class="badge badge-xs badge-soft badge-primary">{ tr(ctx, "Video") }</span>
 					}
 				</div>
 			</div>
@@ -657,8 +661,8 @@ templ torrentFileRow(links StreamLinks, hash string, f torrserver.FileStat) {
 					data-index={ fmt.Sprint(f.ID) }
 					data-show="$gst"
 					class="btn btn-xs btn-ghost btn-square text-info"
-					title="Inspect codecs & audio/subtitle tracks"
-					aria-label="Inspect tracks"
+					title={ tr(ctx, "Inspect codecs & audio/subtitle tracks") }
+					aria-label={ tr(ctx, "Inspect tracks") }
 				>
 					@Icon("info", "size-3.5")
 				</button>
@@ -689,7 +693,7 @@ templ modalDialog(id, openSignal, onOpen, onClose, boxClass string, attrs templ.
 			{ children... }
 		</div>
 		<form method="dialog" class="modal-backdrop">
-			<button>close</button>
+			<button>{ tr(ctx, "close") }</button>
 		</form>
 	</dialog>
 }
@@ -701,7 +705,7 @@ templ modalHeader(id, title, icon, iconTone string) {
 			<span class="truncate">{ title }</span>
 		</h3>
 		<form method="dialog">
-			<button class="btn btn-sm btn-circle btn-ghost" aria-label="Close">
+			<button class="btn btn-sm btn-circle btn-ghost" aria-label={ tr(ctx, "Close") }>
 				@Icon("x", "size-4")
 			</button>
 		</form>
@@ -739,10 +743,10 @@ templ torrPlayerModal() {
 		<header class="flex items-center justify-between gap-4 pb-3 border-b border-base-content/10">
 			<div class="flex items-center gap-2 min-w-0">
 				@playKindSwitch()
-				<h3 id="torr-player-modal-title" class="font-bold text-base sm:text-lg truncate" data-text="$streamTitle">Streaming</h3>
+				<h3 id="torr-player-modal-title" class="font-bold text-base sm:text-lg truncate" data-text="$streamTitle">{ tr(ctx, "Streaming") }</h3>
 			</div>
 			<form method="dialog">
-				<button class="btn btn-sm btn-circle btn-ghost" aria-label="Close player">
+				<button class="btn btn-sm btn-circle btn-ghost" aria-label={ tr(ctx, "Close player") }>
 					@Icon("x", "size-5")
 				</button>
 			</form>
@@ -788,8 +792,8 @@ templ torrPlayerModal() {
 			<div class="absolute inset-0 z-20 grid place-items-center p-6 bg-black/90" data-show="$_unplayable" role="alert">
 				<div class="max-w-md text-center space-y-2 text-base-100">
 					@Icon("circle-alert", "size-8 mx-auto text-warning")
-					<p class="font-semibold">This browser cannot play <span data-text="$_unplayable"></span> of this file.</p>
-					<p class="text-sm opacity-80">Copy its Direct link below for VLC, another player or your TV, which play it as it is.</p>
+					<p class="font-semibold">{ tr(ctx, "This browser cannot play") } <span data-text="$_unplayable"></span> { tr(ctx, "of this file.") }</p>
+					<p class="text-sm opacity-80">{ tr(ctx, "Copy its Direct link below for VLC, another player or your TV, which play it as it is.") }</p>
 				</div>
 			</div>
 			<!--
@@ -831,7 +835,7 @@ templ torrPlayerModal() {
 				<input
 					type="range"
 					class="range range-xs w-full"
-					aria-label="Seek"
+					aria-label={ tr(ctx, "Seek") }
 					min="0"
 					step="0.1"
 					data-attr:max="$_dur || 0"
@@ -840,7 +844,7 @@ templ torrPlayerModal() {
 					data-on:change="$_video.currentTime = +el.value; $_seeking = false"
 				/>
 				<div class="mt-1 flex items-center gap-1">
-					<button type="button" class="btn btn-ghost btn-sm btn-square text-primary-content" aria-label="Play or pause" data-on:click="$_video.paused ? $_video.play() : $_video.pause()">
+					<button type="button" class="btn btn-ghost btn-sm btn-square text-primary-content" aria-label={ tr(ctx, "Play or pause") } data-on:click="$_video.paused ? $_video.play() : $_video.pause()">
 						<span data-show="$_paused">
 							@Icon("play", "size-5")
 						</span>
@@ -851,14 +855,14 @@ templ torrPlayerModal() {
 					<button
 						type="button"
 						class="btn btn-ghost btn-sm btn-square text-primary-content"
-						aria-label="Next file"
-						title="Next file"
+						aria-label={ tr(ctx, "Next file") }
+						title={ tr(ctx, "Next file") }
 						data-show={ torrHasNext }
 						data-on:click={ torrPlayNext }
 					>
 						@Icon("skip-forward", "size-5")
 					</button>
-					<button type="button" class="btn btn-ghost btn-sm btn-square text-primary-content" aria-label="Mute" data-on:click="$_video.muted = !$_video.muted">
+					<button type="button" class="btn btn-ghost btn-sm btn-square text-primary-content" aria-label={ tr(ctx, "Mute") } data-on:click="$_video.muted = !$_video.muted">
 						<span data-show="!$_muted">
 							@Icon("volume-2", "size-5")
 						</span>
@@ -869,7 +873,7 @@ templ torrPlayerModal() {
 					<input
 						type="range"
 						class="range range-xs w-20 hidden sm:block"
-						aria-label="Volume"
+						aria-label={ tr(ctx, "Volume") }
 						min="0"
 						max="1"
 						step="0.05"
@@ -886,13 +890,13 @@ templ torrPlayerModal() {
 					<button
 						type="button"
 						class="btn btn-ghost btn-sm btn-square text-primary-content"
-						aria-label="Picture in picture"
+						aria-label={ tr(ctx, "Picture in picture") }
 						data-show="document.pictureInPictureEnabled"
 						data-on:click="document.pictureInPictureElement ? document.exitPictureInPicture() : $_video.requestPictureInPicture()"
 					>
 						@Icon("picture-in-picture-2", "size-5")
 					</button>
-					<button type="button" class="btn btn-ghost btn-sm btn-square text-primary-content" aria-label="Fullscreen" data-on:click={ torrFullscreenToggle }>
+					<button type="button" class="btn btn-ghost btn-sm btn-square text-primary-content" aria-label={ tr(ctx, "Fullscreen") } data-on:click={ torrFullscreenToggle }>
 						<span data-show="!$_fs">
 							@Icon("maximize", "size-5")
 						</span>
@@ -908,37 +912,37 @@ templ torrPlayerModal() {
 			<div id="torr-media-info"></div>
 		</div>
 		<div class="mt-4 flex flex-wrap items-center gap-2 pt-3 border-t border-base-content/10">
-			<div role="group" aria-label="Direct: the original file" class="w-full flex flex-wrap items-center gap-2" data-show="$streamCleanUrl">
-				<span class="badge badge-sm badge-primary badge-soft font-bold w-14 justify-center">Direct</span>
-				<button type="button" data-on:click="window.copyLink($streamCleanUrl, $linkOrigin).then(ok => { $toastError = !ok; $toast = ok ? 'Direct link copied' : 'Copy failed' })" class="btn btn-xs btn-outline btn-primary gap-1.5">
+			<div role="group" aria-label={ tr(ctx, "Direct: the original file") } class="w-full flex flex-wrap items-center gap-2" data-show="$streamCleanUrl">
+				<span class="badge badge-sm badge-primary badge-soft font-bold w-14 justify-center">{ tr(ctx, "Direct") }</span>
+				<button type="button" data-on:click={ "window.copyLink($streamCleanUrl, $linkOrigin).then(ok => { $toastError = !ok; $toast = ok ? " + trJS(ctx, "Direct link copied") + " : " + trJS(ctx, "Copy failed") + " })" } class="btn btn-xs btn-outline btn-primary gap-1.5">
 					@Icon("link", "size-3.5")
-					Copy link
+					{ tr(ctx, "Copy link") }
 				</button>
 				<a data-attr:href="'/api/torrserver/playlist?hash=' + encodeURIComponent($activeHash) + '&kind=direct'" download class="btn btn-xs btn-outline btn-primary gap-1.5">
 					@Icon("download", "size-3.5")
 					.m3u8
 				</a>
-				<button type="button" data-on:click={ openPlayer("vlc", "VLC") } class="btn btn-xs btn-outline btn-primary gap-1.5" title="Open the original file in VLC">
+				<button type="button" data-on:click={ openPlayer(ctx, "vlc", "VLC") } class="btn btn-xs btn-outline btn-primary gap-1.5" title={ trf(ctx, "Open the original file in %s", "VLC") }>
 					@Icon("external-link", "size-3.5")
 					VLC
 				</button>
-				<button type="button" data-on:click={ openPlayer("iina", "IINA") } data-show={ onMac } class="btn btn-xs btn-outline btn-primary gap-1.5" title="Open the original file in IINA">
+				<button type="button" data-on:click={ openPlayer(ctx, "iina", "IINA") } data-show={ onMac } class="btn btn-xs btn-outline btn-primary gap-1.5" title={ trf(ctx, "Open the original file in %s", "IINA") }>
 					@Icon("external-link", "size-3.5")
 					IINA
 				</button>
-				<span class="text-xs text-base-content/60">The original file, full quality. For VLC and other players, and TVs.</span>
+				<span class="text-xs text-base-content/60">{ tr(ctx, "The original file, full quality. For VLC and other players, and TVs.") }</span>
 			</div>
-			<div role="group" aria-label="HLS: converted by GStreamer" class="w-full flex flex-wrap items-center gap-2" data-show="$gst">
+			<div role="group" aria-label={ tr(ctx, "HLS: converted by GStreamer") } class="w-full flex flex-wrap items-center gap-2" data-show="$gst">
 				<span class="badge badge-sm badge-secondary badge-soft font-bold w-14 justify-center">HLS</span>
-				<button type="button" data-on:click="window.copyLink($streamHlsUrl, $linkOrigin).then(ok => { $toastError = !ok; $toast = ok ? 'HLS link copied' : 'Copy failed' })" class="btn btn-xs btn-outline btn-secondary gap-1.5">
+				<button type="button" data-on:click={ "window.copyLink($streamHlsUrl, $linkOrigin).then(ok => { $toastError = !ok; $toast = ok ? " + trJS(ctx, "HLS link copied") + " : " + trJS(ctx, "Copy failed") + " })" } class="btn btn-xs btn-outline btn-secondary gap-1.5">
 					@Icon("link", "size-3.5")
-					Copy link
+					{ tr(ctx, "Copy link") }
 				</button>
 				<a data-attr:href="'/api/torrserver/playlist?hash=' + encodeURIComponent($activeHash) + '&kind=hls'" download class="btn btn-xs btn-outline btn-secondary gap-1.5">
 					@Icon("download", "size-3.5")
 					.m3u8
 				</a>
-				<span class="text-xs text-base-content/60">Converted by GStreamer as it plays. Plays in any browser, on phones and TVs.</span>
+				<span class="text-xs text-base-content/60">{ tr(ctx, "Converted by GStreamer as it plays. Plays in any browser, on phones and TVs.") }</span>
 			</div>
 			<div class="w-full flex flex-wrap items-center gap-2 pt-2 border-t border-base-content/10" data-show="$gst">
 			<button
@@ -946,10 +950,10 @@ templ torrPlayerModal() {
 				data-show="$gst"
 				data-on:click="$probeHash = $activeHash; $probeIndex = $activeFileIndex; $probeOpen = true"
 				class="btn btn-xs btn-ghost gap-1.5 text-info"
-				title="Inspect media codecs, audio streams, and subtitle tracks"
+				title={ tr(ctx, "Inspect media codecs, audio streams, and subtitle tracks") }
 			>
 				@Icon("info", "size-3.5")
-				Inspect Tracks
+				{ tr(ctx, "Inspect Tracks") }
 			</button>
 			<button
 				type="button"
@@ -957,10 +961,10 @@ templ torrPlayerModal() {
 				data-on:click="$mediaInfoOpen = !$mediaInfoOpen"
 				data-class:btn-active="$mediaInfoOpen"
 				class="btn btn-xs btn-ghost gap-1.5"
-				title="Compare the source file with the HLS stream"
+				title={ tr(ctx, "Compare the source file with the HLS stream") }
 			>
 				@Icon("film", "size-3.5")
-				Media Info
+				{ tr(ctx, "Media Info") }
 			</button>
 			</div>
 		</div>
@@ -969,7 +973,7 @@ templ torrPlayerModal() {
 
 templ torrAddModal() {
 	@modalDialog("torr-add-modal", "addModalOpen", "", "", "max-w-xl", nil) {
-		@modalHeader("torr-add-modal", "Add Torrents", "plus", "text-primary")
+		@modalHeader("torr-add-modal", tr(ctx, "Add Torrents"), "plus", "text-primary")
 		@TorrAddForm()
 	}
 }
@@ -987,11 +991,11 @@ templ TorrAddForm() {
 		data-on:submit="@post('/api/torrserver/add', {contentType: 'form'})"
 	>
 		<fieldset class="fieldset gap-4" data-attr:disabled="$adding">
-			<legend class="sr-only">New torrents</legend>
+			<legend class="sr-only">{ tr(ctx, "New torrents") }</legend>
 			<label class="flex flex-col gap-1.5">
 				<span class="label justify-between font-semibold text-sm text-base-content">
-					Links
-					<span class="text-xs font-normal text-base-content/60">One per line</span>
+					{ tr(ctx, "Links") }
+					<span class="text-xs font-normal text-base-content/60">{ tr(ctx, "One per line") }</span>
 				</span>
 				<textarea
 					name="addLinks"
@@ -999,32 +1003,32 @@ templ TorrAddForm() {
 					class="textarea w-full font-mono text-xs"
 					placeholder="magnet:?xt=urn:btih:…&#10;https://tracker.example/file.torrent"
 				></textarea>
-				<span class="text-xs text-base-content/60">Magnet links, http(s) links to .torrent files, torrs:// links or info-hashes</span>
+				<span class="text-xs text-base-content/60">{ tr(ctx, "Magnet links, http(s) links to .torrent files, torrs:// links or info-hashes") }</span>
 			</label>
 			<label class="flex flex-col gap-1.5">
 				<span class="label justify-between font-semibold text-sm text-base-content">
-					.torrent files
-					<span class="text-xs font-normal text-base-content/60">Up to 20</span>
+					{ tr(ctx, ".torrent files") }
+					<span class="text-xs font-normal text-base-content/60">{ tr(ctx, "Up to 20") }</span>
 				</span>
 				<input id="torr-add-files" type="file" name="addFiles" multiple accept=".torrent,application/x-bittorrent" class="file-input w-full"/>
 			</label>
 			<label class="flex flex-col gap-1.5">
 				<span class="label justify-between font-semibold text-sm text-base-content">
-					Custom title
-					<span class="text-xs font-normal text-base-content/60">Optional, single torrent only</span>
+					{ tr(ctx, "Custom title") }
+					<span class="text-xs font-normal text-base-content/60">{ tr(ctx, "Optional, single torrent only") }</span>
 				</span>
 				<input
 					type="text"
 					name="addTitle"
 					class="input w-full text-sm"
-					placeholder="e.g. Inception (2010)"
+					placeholder={ tr(ctx, "e.g. Inception (2010)") }
 				/>
 			</label>
 			<div class="modal-action mt-2 pt-3 border-t border-base-content/10">
-				<button type="button" data-on:click="$addModalOpen = false" class="btn btn-sm btn-ghost">Cancel</button>
+				<button type="button" data-on:click="$addModalOpen = false" class="btn btn-sm btn-ghost">{ tr(ctx, "Cancel") }</button>
 				<button type="submit" class="btn btn-sm btn-primary">
 					<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$adding"></span>
-					Add to TorrServer
+					{ tr(ctx, "Add to TorrServer") }
 				</button>
 			</div>
 		</fieldset>
@@ -1033,9 +1037,9 @@ templ TorrAddForm() {
 
 templ torrProbeModal() {
 	@modalDialog("torr-probe-modal", "probeOpen", "@get('/api/torrserver/probe?hash=' + encodeURIComponent($probeHash) + '&index=' + $probeIndex)", "", "max-w-2xl", templ.Attributes{"data-indicator:probe-loading": true}) {
-		@modalHeader("torr-probe-modal", "GStreamer Media Analysis", "info", "text-info")
+		@modalHeader("torr-probe-modal", tr(ctx, "GStreamer Media Analysis"), "info", "text-info")
 		<div class="mt-4 flex justify-center p-8 hidden" data-class:hidden="!$probeLoading">
-			<span class="loading loading-spinner text-info" aria-label="Loading"></span>
+			<span class="loading loading-spinner text-info" aria-label={ tr(ctx, "Loading") }></span>
 		</div>
 		<div data-class:hidden="$probeLoading">
 			<div id="torr-probe-content"></div>
@@ -1045,14 +1049,14 @@ templ torrProbeModal() {
 
 templ torrConfirmModal() {
 	@modalDialog("torr-confirm-modal", "confirmOpen", "", "", "max-w-md", nil) {
-		@modalHeader("torr-confirm-modal", "Remove torrent?", "trash-2", "text-error")
+		@modalHeader("torr-confirm-modal", tr(ctx, "Remove torrent?"), "trash-2", "text-error")
 		<p class="mt-4 text-sm">
 			<span class="font-semibold break-all" data-text="$confirmName"></span>
-			will be removed from the TorrServer database. This cannot be undone.
+			{ tr(ctx, "will be removed from the TorrServer database. This cannot be undone.") }
 		</p>
 		<div class="modal-action">
 			<form method="dialog">
-				<button class="btn btn-sm btn-ghost">Cancel</button>
+				<button class="btn btn-sm btn-ghost">{ tr(ctx, "Cancel") }</button>
 			</form>
 			<button
 				type="button"
@@ -1060,7 +1064,7 @@ templ torrConfirmModal() {
 				class="btn btn-sm btn-error"
 			>
 				@Icon("trash-2", "size-4")
-				Remove
+				{ tr(ctx, "Remove") }
 			</button>
 		</div>
 	}
@@ -1069,23 +1073,23 @@ templ torrConfirmModal() {
 templ TorrServerProbeFragment(res *torrserver.ProbeResult) {
 	<div id="torr-probe-content" class="mt-4 space-y-4">
 		<dl class="bg-base-100 p-4 rounded-box border border-base-content/10 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
-			<div><dt class="inline text-base-content/60">Container: </dt><dd class="inline font-bold text-primary">{ res.Container }</dd></div>
-			<div><dt class="inline text-base-content/60">Duration: </dt><dd class="inline font-bold text-accent">{ res.DurationFormatted() }</dd></div>
-			<div><dt class="inline text-base-content/60">Size: </dt><dd class="inline font-bold">{ torrserver.FormatBytes(res.FileSize) }</dd></div>
+			<div><dt class="inline text-base-content/60">{ tr(ctx, "Container:") } </dt><dd class="inline font-bold text-primary">{ res.Container }</dd></div>
+			<div><dt class="inline text-base-content/60">{ tr(ctx, "Duration:") } </dt><dd class="inline font-bold text-accent">{ res.DurationFormatted() }</dd></div>
+			<div><dt class="inline text-base-content/60">{ tr(ctx, "Size:") } </dt><dd class="inline font-bold">{ torrserver.FormatBytes(res.FileSize) }</dd></div>
 		</dl>
 		<div class="space-y-2">
-			<h4 class="text-xs font-bold uppercase tracking-wider text-base-content/60">Discovered Media Tracks</h4>
+			<h4 class="text-xs font-bold uppercase tracking-wider text-base-content/60">{ tr(ctx, "Discovered Media Tracks") }</h4>
 			<ul class="space-y-2">
 				for _, trk := range res.Tracks {
 					<li class="p-3 rounded-box bg-base-100 border border-base-content/10 flex items-start justify-between gap-3 text-xs">
 						<div class="flex items-start gap-2.5 min-w-0">
 							switch trk.Type {
 								case "video":
-									<span class="badge badge-sm badge-primary font-mono uppercase">Video</span>
+									<span class="badge badge-sm badge-primary font-mono uppercase">{ tr(ctx, "Video") }</span>
 								case "audio":
-									<span class="badge badge-sm badge-secondary font-mono uppercase">Audio</span>
+									<span class="badge badge-sm badge-secondary font-mono uppercase">{ tr(ctx, "Audio") }</span>
 								default:
-									<span class="badge badge-sm badge-neutral font-mono uppercase">Subtitle</span>
+									<span class="badge badge-sm badge-neutral font-mono uppercase">{ tr(ctx, "Subtitle") }</span>
 							}
 							<div class="min-w-0 space-y-1">
 								<div class="font-semibold break-words">
@@ -1095,7 +1099,7 @@ templ TorrServerProbeFragment(res *torrserver.ProbeResult) {
 										{ trk.CapsName }
 									}
 								</div>
-								<div class="text-[11px] text-base-content/60 font-mono">{ trackDetails(trk) }</div>
+								<div class="text-[11px] text-base-content/60 font-mono">{ trackDetails(ctx, trk) }</div>
 								if caps := trackCaps(trk.Codec); caps != "" {
 									<p class="text-[11px] text-base-content/50 font-mono break-all whitespace-normal">{ caps }</p>
 								}
@@ -1122,22 +1126,22 @@ templ TorrServerProbeError(msg string) {
 templ TorrMediaInfo(probe *torrserver.ProbeResult, audioIndex int, output *torrserver.HLSOutput) {
 	<div id="torr-media-info" class="mt-3 overflow-x-auto rounded-box border border-base-content/10 bg-base-200">
 		if probe == nil {
-			<p class="p-3 text-xs text-base-content/60">Media info unavailable — the file may still be buffering.</p>
+			<p class="p-3 text-xs text-base-content/60">{ tr(ctx, "Media info unavailable — the file may still be buffering.") }</p>
 		} else {
 			<table class="table table-xs font-mono">
 				<thead>
 					<tr>
 						<th></th>
-						<th>Source</th>
-						<th>HLS output</th>
+						<th>{ tr(ctx, "Source") }</th>
+						<th>{ tr(ctx, "HLS output") }</th>
 					</tr>
 				</thead>
 				<tbody>
 					for _, row := range newMediaInfo(probe, audioIndex, output).Rows {
 						<tr>
-							<th class="font-sans text-base-content/60">{ row.Label }</th>
+							<th class="font-sans text-base-content/60">{ tr(ctx, row.Label) }</th>
 							<td>{ row.Source }</td>
-							<td class={ row.OutputTone }>{ row.Output }</td>
+							<td class={ row.OutputTone }>{ tr(ctx, row.Output) }</td>
 						</tr>
 					}
 				</tbody>
@@ -1150,23 +1154,23 @@ templ TorrMediaInfo(probe *torrserver.ProbeResult, audioIndex int, output *torrs
 templ TorrPlayerStats(t *torrserver.Torrent, cacheSize int64) {
 	<div id="torr-player-stats" class="mt-3 flex flex-wrap items-center gap-2">
 		if t == nil {
-			<span class="badge badge-sm badge-ghost font-mono">Stats unavailable</span>
+			<span class="badge badge-sm badge-ghost font-mono">{ tr(ctx, "Stats unavailable") }</span>
 		} else {
-			<span class="badge badge-sm badge-ghost font-mono gap-1" title="Active / total peers">
+			<span class="badge badge-sm badge-ghost font-mono gap-1" title={ tr(ctx, "Active / total peers") }>
 				@Icon("users", "size-3.5")
-				{ fmt.Sprintf("Peers %d/%d", t.ActivePeers, max(t.ActivePeers, t.TotalPeers)) }
+				{ trf(ctx, "Peers %d/%d", t.ActivePeers, max(t.ActivePeers, t.TotalPeers)) }
 			</span>
-			<span class="badge badge-sm badge-ghost font-mono gap-1" title="Connected seeders">
+			<span class="badge badge-sm badge-ghost font-mono gap-1" title={ tr(ctx, "Connected seeders") }>
 				@Icon("sprout", "size-3.5")
-				{ fmt.Sprintf("Seeds %d", t.Connected) }
+				{ trf(ctx, "Seeds %d", t.Connected) }
 			</span>
-			<span class="badge badge-sm badge-ghost font-mono gap-1" title="Download speed">
+			<span class="badge badge-sm badge-ghost font-mono gap-1" title={ tr(ctx, "Download speed") }>
 				@Icon("arrow-down", "size-3.5")
 				{ t.FormattedDownloadSpeed() }
 			</span>
-			<span class={ "badge badge-sm font-mono gap-1", bufferBadgeTone(t.BufferPercent(cacheSize)) } title="TorrServer read-ahead cache fill">
+			<span class={ "badge badge-sm font-mono gap-1", bufferBadgeTone(t.BufferPercent(cacheSize)) } title={ tr(ctx, "TorrServer read-ahead cache fill") }>
 				@Icon("database", "size-3.5")
-				{ fmt.Sprintf("Buffer %d%%", t.BufferPercent(cacheSize)) }
+				{ trf(ctx, "Buffer %d%%", t.BufferPercent(cacheSize)) }
 			</span>
 		}
 	</div>
@@ -1194,13 +1198,13 @@ if (b) { $_subMenu = false; window.setSubtitleTrack(+b.dataset.track) }`
 templ TorrSubtitleMenu(tracks []torrserver.ProbeTrack) {
 	<div id="torr-subtitle-menu" class="contents">
 		if len(tracks) > 0 {
-			@trackMenu("Subtitles", "captions", "$_subMenu", "$_subMenu = !$_subMenu; $_audioMenu = false", "$subTrack >= 0", torrSubtitlePick) {
+			@trackMenu(tr(ctx, "Subtitles"), "captions", "$_subMenu", "$_subMenu = !$_subMenu; $_audioMenu = false", "$subTrack >= 0", torrSubtitlePick) {
 				<li>
-					<button type="button" data-track="-1" data-class:menu-active="$subTrack < 0">Off</button>
+					<button type="button" data-track="-1" data-class:menu-active="$subTrack < 0">{ tr(ctx, "Off") }</button>
 				</li>
 				for _, trk := range tracks {
 					<li>
-						<button type="button" data-track={ fmt.Sprint(trk.Index) } data-class:menu-active={ fmt.Sprintf("$subTrack === %d", trk.Index) }>{ trackLabel(trk) }</button>
+						<button type="button" data-track={ fmt.Sprint(trk.Index) } data-class:menu-active={ fmt.Sprintf("$subTrack === %d", trk.Index) }>{ trackLabel(ctx, trk) }</button>
 					</li>
 				}
 			}
@@ -1242,10 +1246,10 @@ if (b) {
 templ TorrAudioPicker(tracks []torrserver.ProbeTrack, selected int) {
 	<div id="torr-audio-picker" class="contents">
 		if len(tracks) > 1 {
-			@trackMenu("Audio", "audio-lines", "$_audioMenu", "$_audioMenu = !$_audioMenu; $_subMenu = false", "false", torrAudioPick) {
+			@trackMenu(tr(ctx, "Audio"), "audio-lines", "$_audioMenu", "$_audioMenu = !$_audioMenu; $_subMenu = false", "false", torrAudioPick) {
 				for _, trk := range tracks {
 					<li>
-						<button type="button" data-track={ fmt.Sprint(trk.Index) } data-lang={ trk.Language } data-class:menu-active={ fmt.Sprintf("$audioTrack === %d", trk.Index) }>{ trackLabel(trk) }</button>
+						<button type="button" data-track={ fmt.Sprint(trk.Index) } data-lang={ trk.Language } data-class:menu-active={ fmt.Sprintf("$audioTrack === %d", trk.Index) }>{ trackLabel(ctx, trk) }</button>
 					</li>
 				}
 			}
@@ -1258,7 +1262,7 @@ templ TorrAudioPicker(tracks []torrserver.ProbeTrack, selected int) {
 templ TorrPlaylist(videos []torrserver.FileStat) {
 	<div id="torr-playlist" class="contents">
 		if len(videos) > 1 {
-			@trackMenu("Playlist", "list-video", "$_listMenu", "$_listMenu = !$_listMenu; $_audioMenu = false; $_subMenu = false", "false", torrPlaylistPick) {
+			@trackMenu(tr(ctx, "Playlist"), "list-video", "$_listMenu", "$_listMenu = !$_listMenu; $_audioMenu = false; $_subMenu = false", "false", torrPlaylistPick) {
 				for i, f := range videos {
 					<li>
 						<button type="button" data-at={ fmt.Sprint(i) } data-class:menu-active={ fmt.Sprintf("$activeFileIndex === %d", f.ID) } title={ f.Path }>
@@ -1272,7 +1276,7 @@ templ TorrPlaylist(videos []torrserver.FileStat) {
 }
 
 // trackLabel renders "EN · Original · 5.1" for the audio and subtitle pickers.
-func trackLabel(trk torrserver.ProbeTrack) string {
+func trackLabel(ctx context.Context, trk torrserver.ProbeTrack) string {
 	var parts []string
 	if trk.Language != "" {
 		parts = append(parts, strings.ToUpper(trk.Language))
@@ -1283,23 +1287,23 @@ func trackLabel(trk torrserver.ProbeTrack) string {
 	switch trk.Channels {
 	case 0:
 	case 1:
-		parts = append(parts, "Mono")
+		parts = append(parts, tr(ctx, "Mono"))
 	case 2:
-		parts = append(parts, "Stereo")
+		parts = append(parts, tr(ctx, "Stereo"))
 	case 6:
 		parts = append(parts, "5.1")
 	case 8:
 		parts = append(parts, "7.1")
 	default:
-		parts = append(parts, fmt.Sprintf("%d ch", trk.Channels))
+		parts = append(parts, trf(ctx, "%d ch", trk.Channels))
 	}
 	if len(parts) == 0 {
-		return fmt.Sprintf("Track %d", trk.Index+1)
+		return trf(ctx, "Track %d", trk.Index+1)
 	}
 	return strings.Join(parts, " · ")
 }
 
-func trackDetails(trk torrserver.ProbeTrack) string {
+func trackDetails(ctx context.Context, trk torrserver.ProbeTrack) string {
 	parts := []string{trk.CapsName}
 	if trk.Language != "" {
 		parts = append(parts, trk.Language)
@@ -1308,7 +1312,7 @@ func trackDetails(trk torrserver.ProbeTrack) string {
 		parts = append(parts, fmt.Sprintf("%dx%d", trk.Width, trk.Height))
 	}
 	if trk.Channels > 0 {
-		parts = append(parts, fmt.Sprintf("%d ch", trk.Channels))
+		parts = append(parts, trf(ctx, "%d ch", trk.Channels))
 	}
 	return strings.Join(parts, " • ")
 }
@@ -1334,7 +1338,7 @@ templ TorrServerAlertFragment(msg, alertType string) {
 				type="button"
 				data-on:click="$torrAlert = false"
 				class="btn btn-xs btn-ghost btn-circle"
-				aria-label="Dismiss"
+				aria-label={ tr(ctx, "Dismiss") }
 			>
 				@Icon("x", "size-4")
 			</button>
@@ -1361,9 +1365,9 @@ func alertClass(alertType string) string {
 // that every file and the player offer.
 templ streamKindsLegend() {
 	<div id="stream-kinds" class="grid gap-3 sm:grid-cols-2">
-		@streamKind("Direct", "The original file", "The original file, full quality. For VLC and other players, and TVs.", "file-play", false)
+		@streamKind(tr(ctx, "Direct"), tr(ctx, "The original file"), tr(ctx, "The original file, full quality. For VLC and other players, and TVs."), "file-play", false)
 		<div class="contents" data-show="$gst">
-			@streamKind("HLS", "Converted as it plays", "Converted by GStreamer as it plays. Plays in any browser, on phones and TVs.", "monitor-play", true)
+			@streamKind("HLS", tr(ctx, "Converted as it plays"), tr(ctx, "Converted by GStreamer as it plays. Plays in any browser, on phones and TVs."), "monitor-play", true)
 		</div>
 	</div>
 }
@@ -1389,11 +1393,11 @@ templ streamKind(label, title, text, icon string, hls bool) {
 templ streamGroup(kind, link string, play templ.Attributes) {
 	{{
 		hls := kind == "hls"
-		label, aria, msg := "Direct", "Direct: the original file", "Direct link copied"
-		playHelp := "Play the original file here. Browsers can't play every format: if it stays black or silent, use HLS or VLC"
+		label, aria, msg := tr(ctx, "Direct"), tr(ctx, "Direct: the original file"), tr(ctx, "Direct link copied")
+		playHelp := tr(ctx, "Play the original file here. Browsers can't play every format: if it stays black or silent, use HLS or VLC")
 		if hls {
-			label, aria, msg = "HLS", "HLS: converted by GStreamer", "HLS link copied"
-			playHelp = "Play here, converted by GStreamer: works in every browser, picks audio tracks"
+			label, aria, msg = "HLS", tr(ctx, "HLS: converted by GStreamer"), tr(ctx, "HLS link copied")
+			playHelp = tr(ctx, "Play here, converted by GStreamer: works in every browser, picks audio tracks")
 		}
 	}}
 	<div
@@ -1413,7 +1417,7 @@ templ streamGroup(kind, link string, play templ.Attributes) {
 				data-kind={ kind }
 				{ play... }
 				class={ "btn btn-xs btn-square shadow-none", templ.KV("btn-primary", !hls), templ.KV("btn-secondary", hls) }
-				aria-label={ "Play " + label }
+				aria-label={ trf(ctx, "Play %s", label) }
 				title={ playHelp }
 			>
 				@Icon("play", "size-3.5")
@@ -1425,7 +1429,7 @@ templ streamGroup(kind, link string, play templ.Attributes) {
 			data-url={ link }
 			data-msg={ msg }
 			class={ "btn btn-ghost btn-xs btn-square", templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }
-			aria-label={ "Copy " + label + " link" }
+			aria-label={ trf(ctx, "Copy %s link", label) }
 		>
 			@Icon("link", "size-3.5")
 		</button>
@@ -1435,14 +1439,14 @@ templ streamGroup(kind, link string, play templ.Attributes) {
 // playlistButton downloads the playlist of all files, Direct or HLS.
 templ playlistButton(kind, href string) {
 	if kind == "hls" {
-		<a href={ templ.SafeURL(href) } download data-show="$gst" aria-label="HLS: converted by GStreamer" class="btn btn-xs btn-outline btn-secondary gap-1.5">
+		<a href={ templ.SafeURL(href) } download data-show="$gst" aria-label={ tr(ctx, "HLS: converted by GStreamer") } class="btn btn-xs btn-outline btn-secondary gap-1.5">
 			@Icon("download", "size-3")
 			HLS .m3u8
 		</a>
 	} else {
-		<a href={ templ.SafeURL(href) } download aria-label="Direct: the original file" class="btn btn-xs btn-outline btn-primary gap-1.5">
+		<a href={ templ.SafeURL(href) } download aria-label={ tr(ctx, "Direct: the original file") } class="btn btn-xs btn-outline btn-primary gap-1.5">
 			@Icon("download", "size-3")
-			Direct .m3u8
+			{ tr(ctx, "Direct") } .m3u8
 		</a>
 	}
 }
@@ -1453,7 +1457,7 @@ templ seekZoneHint(dir string) {
 	{{
 		back := dir == "back"
 		shown := fmt.Sprintf("$_seekHint === '%s' || ($_zone === '%s' && !$_idle && !$_seekHint)", dir, dir)
-		text := fmt.Sprintf("($_seekHint === '%s' ? $_seekSum : 10) + ' s'", dir)
+		text := fmt.Sprintf("($_seekHint === '%s' ? $_seekSum : 10) + ' ' + %s", dir, trJS(ctx, "s"))
 	}}
 	<div class={ "absolute inset-y-0 w-1/3 grid place-items-center pointer-events-none", templ.KV("left-0", back), templ.KV("right-0", !back) } aria-hidden="true" data-show={ shown }>
 		<span
@@ -1463,7 +1467,7 @@ templ seekZoneHint(dir string) {
 			if back {
 				@Icon("chevrons-left", "size-4")
 			}
-			<span data-text={ text }>10 s</span>
+			<span data-text={ text }>10 { tr(ctx, "s") }</span>
 			if !back {
 				@Icon("chevrons-right", "size-4")
 			}
@@ -1474,20 +1478,20 @@ templ seekZoneHint(dir string) {
 // playKindSwitch shows what the player plays and switches it, keeping the
 // position: Direct always, HLS with GStreamer.
 templ playKindSwitch() {
-	<div role="group" aria-label="Stream" class="join shrink-0">
+	<div role="group" aria-label={ tr(ctx, "Stream") } class="join shrink-0">
 		<button
 			type="button"
 			class="btn btn-xs join-item font-bold"
 			data-class="{ 'btn-primary': $playKind === 'direct' }"
-			aria-label="Play Direct"
+			aria-label={ trf(ctx, "Play %s", tr(ctx, "Direct")) }
 			data-on:click={ "if ($playKind !== 'direct') { $playKind = 'direct'\n" + torrStartPlay + "\n}" }
-		>Direct</button>
+		>{ tr(ctx, "Direct") }</button>
 		<button
 			type="button"
 			class="btn btn-xs join-item font-bold"
 			data-class="{ 'btn-secondary': $playKind === 'hls' }"
 			data-show="$gst"
-			aria-label="Play HLS"
+			aria-label={ trf(ctx, "Play %s", "HLS") }
 			data-on:click={ "if ($playKind !== 'hls') { $playKind = 'hls'\n" + torrStartPlay + "\n}" }
 		>HLS</button>
 	</div>

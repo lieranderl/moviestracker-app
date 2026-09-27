@@ -58,15 +58,15 @@ templ BrandIcon(slug, class string) {
 
 templ officialLinksRow(links []officialLink) {
 	if len(links) > 0 {
-		<nav aria-label="Official links" class="flex flex-wrap items-center gap-1 -ml-2">
+		<nav aria-label={ tr(ctx, "Official links") } class="flex flex-wrap items-center gap-1 -ml-2">
 			for _, l := range links {
 				<a
 					href={ templ.SafeURL(l.URL) }
 					target="_blank"
 					rel="noopener noreferrer"
 					class="btn btn-ghost btn-circle btn-sm tooltip tooltip-bottom"
-					data-tip={ l.Label }
-					aria-label={ l.Label }
+					data-tip={ tr(ctx, l.Label) }
+					aria-label={ tr(ctx, l.Label) }
 				>
 					if l.Brand != "" {
 						@BrandIcon(l.Brand, "size-4")

@@ -1,6 +1,7 @@
 package views
 
 import (
+	"context"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
 	"fmt"
@@ -27,17 +28,17 @@ var settingsNav = []settingsNavItem{
 
 // settingsShell is the settings layout: the menu and the active page.
 templ settingsShell(user *auth.User, active, title string) {
-	@Layout(title + " · Settings") {
+	@Layout(title + " · " + tr(ctx, "Settings")) {
 		@Navbar(user)
 		<main class="grow w-full max-w-6xl mx-auto px-4 sm:px-8 py-10 grid gap-8 lg:grid-cols-[14rem_1fr]">
-			<nav aria-label="Settings">
-				<p class="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-3">Settings</p>
+			<nav aria-label={ tr(ctx, "Settings") }>
+				<p class="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-3">{ tr(ctx, "Settings") }</p>
 				<ul class="menu menu-sm lg:menu-md bg-base-200/60 rounded-box w-full border border-base-content/10">
 					for _, item := range settingsNav {
 						<li>
 							<a href={ templ.SafeURL("/settings/" + item.ID) } class={ templ.KV("menu-active", item.ID == active) } aria-current?={ item.ID == active }>
 								@Icon(item.Icon, "size-4")
-								{ item.Title }
+								{ tr(ctx, item.Title) }
 							</a>
 						</li>
 					}
@@ -85,13 +86,13 @@ type SettingsSection struct {
 
 // SettingsPage shows one settings section.
 templ SettingsPage(user *auth.User, s SettingsSection) {
-	@settingsShell(user, s.ID, s.Title) {
+	@settingsShell(user, s.ID, tr(ctx, s.Title)) {
 		<header class="space-y-2">
 			<h1 class="text-3xl font-bold tracking-tight flex items-center gap-3">
 				@Icon(s.Icon, "size-7 text-primary")
-				{ s.Title }
+				{ tr(ctx, s.Title) }
 			</h1>
-			<p class="text-base-content/70">{ s.Intro }</p>
+			<p class="text-base-content/70">{ tr(ctx, s.Intro) }</p>
 		</header>
 		if s.Header != nil {
 			@s.Header
@@ -105,11 +106,8 @@ func settingsSignals(s SettingsSection) string {
 	return signals
 }
 
-func playingWarning(n int) string {
-	if n == 1 {
-		return "1 stream is playing and will pause while TorrServer reconnects."
-	}
-	return fmt.Sprintf("%d streams are playing and will pause while TorrServer reconnects.", n)
+func playingWarning(ctx context.Context, n int) string {
+	return trn(ctx, n, "%d stream is playing and will pause while TorrServer reconnects.", "%d streams are playing and will pause while TorrServer reconnects.")
 }
 
 // SettingsForm is the patchable form of a section.
@@ -119,7 +117,7 @@ templ SettingsForm(s SettingsSection, st SourceStatus) {
 			if s.Unavailable != "" {
 				<div role="status" class="alert alert-warning alert-soft">
 					@Icon("plug-zap", "size-5")
-					<span>{ s.Unavailable }</span>
+					<span>{ tr(ctx, s.Unavailable) }</span>
 				</div>
 			} else {
 				<form
@@ -134,21 +132,21 @@ templ SettingsForm(s SettingsSection, st SourceStatus) {
 					<div class="flex flex-wrap items-center gap-3 pt-2">
 						<button type="submit" class="btn btn-primary" data-attr:disabled={ "$" + s.ID + "Saving" }>
 							<span class="loading loading-spinner loading-xs hidden" data-class:hidden={ "!$" + s.ID + "Saving" }></span>
-							Save
+							{ tr(ctx, "Save") }
 						</button>
 						if s.ResetURL != "" {
-							<button type="button" class="btn btn-ghost" data-on:click={ fmt.Sprintf("confirm('Restore the default settings?') && @post('%s', {filterSignals: {include: /^$/}})", s.ResetURL) }>
-								Restore defaults
+							<button type="button" class="btn btn-ghost" data-on:click={ fmt.Sprintf("confirm(%s) && @post('%s', {filterSignals: {include: /^$/}})", trJS(ctx, "Restore the default settings?"), s.ResetURL) }>
+								{ tr(ctx, "Restore defaults") }
 							</button>
 						}
 						if s.Cost != "" {
-							<span class="text-xs text-base-content/60">{ s.Cost }</span>
+							<span class="text-xs text-base-content/60">{ tr(ctx, s.Cost) }</span>
 						}
 					</div>
 					if s.Playing > 0 {
 						<div role="status" class="alert alert-warning alert-soft text-sm py-2.5">
 							@Icon("circle-alert", "size-4")
-							<span>{ playingWarning(s.Playing) }</span>
+							<span>{ playingWarning(ctx, s.Playing) }</span>
 						</div>
 					}
 				</form>
@@ -161,7 +159,7 @@ templ SettingsForm(s SettingsSection, st SourceStatus) {
 templ settingInput(section string, f SettingField) {
 	{{ bind := section + "." + f.Key }}
 	<div class="grid gap-1.5 sm:grid-cols-[16rem_1fr] sm:items-start">
-		<label for={ "setting-" + section + "-" + f.Key } class="text-sm font-medium pt-2">{ f.Label }</label>
+		<label for={ "setting-" + section + "-" + f.Key } class="text-sm font-medium pt-2">{ tr(ctx, f.Label) }</label>
 		<div class="space-y-1">
 			switch f.Kind {
 				case "bool":
@@ -170,13 +168,13 @@ templ settingInput(section string, f SettingField) {
 					<label class="input w-full max-w-xs">
 						<input id={ "setting-" + section + "-" + f.Key } type="number" class="grow font-mono" min={ fmt.Sprint(f.Min) } max={ fmt.Sprint(f.Max) } data-bind={ bind } disabled?={ f.ReadOnly != "" }/>
 						if f.Unit != "" {
-							<span class="text-xs text-base-content/60">{ f.Unit }</span>
+							<span class="text-xs text-base-content/60">{ tr(ctx, f.Unit) }</span>
 						}
 					</label>
 				case "select":
 					<select id={ "setting-" + section + "-" + f.Key } class="select w-full max-w-md" data-bind={ bind } disabled?={ f.ReadOnly != "" }>
 						for _, c := range f.Choices {
-							<option value={ c.Value }>{ c.Label }</option>
+							<option value={ c.Value }>{ tr(ctx, c.Label) }</option>
 						}
 					</select>
 				case "textarea":
@@ -185,9 +183,9 @@ templ settingInput(section string, f SettingField) {
 					<input id={ "setting-" + section + "-" + f.Key } type="text" class="input w-full font-mono" autocomplete="off" spellcheck="false" data-bind={ bind } disabled?={ f.ReadOnly != "" }/>
 			}
 			if f.ReadOnly != "" {
-				<p class="text-xs text-warning">{ f.ReadOnly }</p>
+				<p class="text-xs text-warning">{ tr(ctx, f.ReadOnly) }</p>
 			} else if f.Help != "" {
-				<p class="text-xs text-base-content/60">{ f.Help }</p>
+				<p class="text-xs text-base-content/60">{ tr(ctx, f.Help) }</p>
 			}
 		</div>
 	</div>
@@ -195,11 +193,11 @@ templ settingInput(section string, f SettingField) {
 
 // SecurityPage offers cancelling every shared stream link.
 templ SecurityPage(user *auth.User, st SourceStatus) {
-	@settingsShell(user, "security", "Security") {
+	@settingsShell(user, "security", tr(ctx, "Security")) {
 		<header class="space-y-2">
 			<h1 class="text-3xl font-bold tracking-tight flex items-center gap-3">
 				@Icon("shield", "size-7 text-primary")
-				Security
+				{ tr(ctx, "Security") }
 			</h1>
 		</header>
 		@SecurityLinks(st)
@@ -212,16 +210,15 @@ templ SecurityLinks(st SourceStatus) {
 		<div class="card-body gap-4">
 			<h2 class="card-title">
 				@Icon("link", "size-5 text-primary")
-				Shared stream links
+				{ tr(ctx, "Shared stream links") }
 			</h2>
 			<p class="text-sm text-base-content/70">
-				Links copied for VLC, TVs and playlists work without signing in for 7 days, each for one file.
-				If one got into the wrong hands, cancel all of them: new links work at once, old ones stop.
+				{ tr(ctx, "Links copied for VLC, TVs and playlists work without signing in for 7 days, each for one file. If one got into the wrong hands, cancel all of them: new links work at once, old ones stop.") }
 			</p>
 			<div>
-				<button type="button" class="btn btn-error btn-outline" data-on:click="confirm('Cancel every shared link? Saved playlists will stop working.') && @post('/api/settings/security/cancel-links', {filterSignals: {include: /^$/}})">
+				<button type="button" class="btn btn-error btn-outline" data-on:click={ "confirm(" + trJS(ctx, "Cancel every shared link? Saved playlists will stop working.") + ") && @post('/api/settings/security/cancel-links', {filterSignals: {include: /^$/}})" }>
 					@Icon("link-2-off", "size-4")
-					Cancel all shared links
+					{ tr(ctx, "Cancel all shared links") }
 				</button>
 			</div>
 			@sourceStatus(st)
@@ -245,23 +242,23 @@ templ GStreamerRuntime(echo torrserver.EchoInfo) {
 		} else {
 			<span class="badge badge-warning badge-soft gap-1.5">
 				@Icon("circle-alert", "size-3.5")
-				GStreamer is not installed on this machine
+				{ tr(ctx, "GStreamer is not installed on this machine") }
 			</span>
 		}
 		if echo.Discoverer {
 			<span class="badge badge-ghost">gst-discoverer</span>
 		}
 		if echo.HDRTonemap {
-			<span class="tooltip tooltip-bottom" data-tip={ hdrToneMapHelp }>
+			<span class="tooltip tooltip-bottom" data-tip={ tr(ctx, hdrToneMapHelp) }>
 				<span class="badge badge-ghost gap-1.5">
-					HDR tone mapping
+					{ tr(ctx, "HDR tone mapping") }
 					@Icon("info", "size-3.5 opacity-60")
 				</span>
 			</span>
 		} else {
-			<span class="tooltip tooltip-bottom" data-tip={ hdrKeptHelp }>
+			<span class="tooltip tooltip-bottom" data-tip={ tr(ctx, hdrKeptHelp) }>
 				<span class="badge badge-ghost gap-1.5">
-					HDR stays HDR (no tone mapping)
+					{ tr(ctx, "HDR stays HDR (no tone mapping)") }
 					@Icon("info", "size-3.5 opacity-60")
 				</span>
 			</span>

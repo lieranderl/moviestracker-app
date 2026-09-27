@@ -130,7 +130,7 @@ func NewServer(cfg Config) (*Server, error) {
 	// Rejects cross-origin POSTs (Sec-Fetch-Site / Origin), so no other site
 	// can submit forms or Datastar actions with a visitor's cookies.
 	s.presence = newPresence()
-	s.handler = http.NewCrossOriginProtection().Handler(s.setupGate(s.presenceMiddleware(s.updateNotice(s.mux))))
+	s.handler = http.NewCrossOriginProtection().Handler(language(s.setupGate(s.presenceMiddleware(s.updateNotice(s.mux)))))
 	return s, nil
 }
 
@@ -204,6 +204,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /search", s.handleSearchPage)
 
 	// API Endpoints
+	s.mux.HandleFunc("POST /api/language", s.handleLanguage)
 	s.mux.HandleFunc("POST /api/consent", s.handleConsent)
 	s.mux.HandleFunc("POST /api/setup", s.handleSetup)
 	s.mux.HandleFunc("POST /api/login", s.handleLogin)

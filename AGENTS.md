@@ -17,6 +17,7 @@ A fullstack reactive web application built with Go (1.27), Templ, Datastar (v1.0
 - **Authored Utilities Exemption**: Small authored utilities are allowed strictly for behavior not cleanly expressible via DaisyUI/Tailwind (e.g. video crossfade transitions).
 - **Icons**: Render Lucide icons server-side with `@Icon("name", "size-4 …")` (`internal/views/icon.templ`). `bun run icons` regenerates `icons_gen.go` from icon names used in templates. Never use client-side `data-lucide` placeholders.
 - **Modals**: Use native `<dialog>` via the `modalDialog` helper (signal-driven `showModal()`/`close()`), never `div.modal` + `modal-open`.
+- **Languages**: Every user-facing text is English in the code and translated at render: `tr(ctx, "…")`, `trf` for formats, `trn` for counts, `trJS` inside Datastar expressions (views); `i18n.T/Tf/N` in handlers. Add its Russian to `internal/i18n/ru.go` (plural forms in `ruPlural`); `TestEveryInterfaceTextHasARussianTranslation` fails otherwise. Texts kept in tables (labels, settings specs) are translated where rendered and listed in that test.
 - **No Inline Styles**: Never use inline `style="..."` attributes; they violate the strict CSP `style-src 'self'`.
 
 ---

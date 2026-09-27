@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 )
 
 const (
@@ -81,17 +83,18 @@ type rawCredit struct {
 }
 
 type rawPerson struct {
-	ID                 int         `json:"id"`
-	Name               string      `json:"name"`
-	Biography          string      `json:"biography"`
-	Birthday           string      `json:"birthday"`
-	Deathday           string      `json:"deathday"`
-	PlaceOfBirth       string      `json:"place_of_birth"`
-	ProfilePath        string      `json:"profile_path"`
-	KnownForDepartment string      `json:"known_for_department"`
-	ImdbID             string      `json:"imdb_id"`
-	Homepage           string      `json:"homepage"`
-	ExternalIDs        ExternalIDs `json:"external_ids"`
+	ID                 int          `json:"id"`
+	Name               string       `json:"name"`
+	Biography          string       `json:"biography"`
+	Birthday           string       `json:"birthday"`
+	Deathday           string       `json:"deathday"`
+	PlaceOfBirth       string       `json:"place_of_birth"`
+	ProfilePath        string       `json:"profile_path"`
+	KnownForDepartment string       `json:"known_for_department"`
+	ImdbID             string       `json:"imdb_id"`
+	Homepage           string       `json:"homepage"`
+	ExternalIDs        ExternalIDs  `json:"external_ids"`
+	Translations       translations `json:"translations"`
 	CombinedCredits    struct {
 		Cast []rawCredit `json:"cast"`
 		Crew []rawCredit `json:"crew"`
@@ -102,10 +105,15 @@ type rawPerson struct {
 func (c *Client) Person(ctx context.Context, id int) (*Person, error) {
 	return cached(ctx, c, fmt.Sprintf("person/%d", id), func(ctx context.Context) (*Person, error) {
 		var raw rawPerson
-		query := url.Values{"append_to_response": {"combined_credits,external_ids"}}
+		appends := "combined_credits,external_ids"
+		if i18n.FromContext(ctx) != i18n.English {
+			appends += ",translations"
+		}
+		query := url.Values{"append_to_response": {appends}}
 		if err := c.getJSON(ctx, fmt.Sprintf("/3/person/%d", id), query, &raw); err != nil {
 			return nil, err
 		}
+		raw.Biography = cmp.Or(raw.Biography, raw.Translations.english().Biography)
 		p := &Person{
 			ID:                 raw.ID,
 			Name:               raw.Name,

@@ -27,7 +27,7 @@ templ brand(href string) {
 
 templ Navbar(user *auth.User) {
 	<header id="main-navbar" class="sticky top-0 z-50 w-full backdrop-blur-md bg-base-100/80 border-b border-base-content/10">
-		<nav class="navbar max-w-7xl mx-auto px-4 sm:px-8 min-h-16 gap-2" aria-label="Main">
+		<nav class="navbar max-w-7xl mx-auto px-4 sm:px-8 min-h-16 gap-2" aria-label={ tr(ctx, "Main") }>
 			<div class="navbar-start gap-4">
 				if user != nil {
 					@brand("/movies")
@@ -36,7 +36,7 @@ templ Navbar(user *auth.User) {
 							<li>
 								<a href={ templ.SafeURL(l.Href) }>
 									@Icon(l.Icon, "size-4")
-									{ l.Label }
+									{ tr(ctx, l.Label) }
 								</a>
 							</li>
 						}
@@ -47,24 +47,25 @@ templ Navbar(user *auth.User) {
 			</div>
 			<div class="navbar-end gap-2">
 				if user != nil {
-					<form action="/search" method="GET" role="search" class="hidden lg:block">
+					<form action="/search" method="GET" role="search" class="hidden xl:block">
 						<label class="input input-sm w-64">
 							@Icon("search", "size-4 opacity-60")
-							<span class="sr-only">Search</span>
-							<input type="search" name="q" maxlength="100" placeholder="Search movies, TV, people" class="grow"/>
+							<span class="sr-only">{ tr(ctx, "Search") }</span>
+							<input type="search" name="q" maxlength="100" placeholder={ tr(ctx, "Search movies, TV, people") } class="grow"/>
 						</label>
 					</form>
 				}
 				if rel, ok := newRelease(ctx); ok && user.IsAdmin() {
 					@releaseBadge(rel)
 				}
+				@LanguageSwitcher()
 				@ThemeSwitcher()
 				if user != nil {
 					@userMenu(user)
 				} else {
 					<a href="/login" class="btn btn-primary btn-sm gap-1.5">
 						@Icon("log-in", "size-4")
-						Sign in
+						{ tr(ctx, "Sign in") }
 					</a>
 				}
 			</div>
@@ -75,9 +76,9 @@ templ Navbar(user *auth.User) {
 // releaseBadge tells an administrator that a newer Moviestracker is out and
 // leads to Settings → Updates.
 templ releaseBadge(rel Release) {
-	<a href="/settings/updates" class="btn btn-accent btn-soft btn-sm gap-1.5" title={ "Moviestracker " + rel.Version + " is available" }>
+	<a href="/settings/updates" class="btn btn-accent btn-soft btn-sm gap-1.5" title={ trf(ctx, "Moviestracker %s is available", rel.Version) }>
 		@Icon("circle-arrow-up", "size-4")
-		<span class="sr-only">Moviestracker { rel.Version } is available</span>
+		<span class="sr-only">{ trf(ctx, "Moviestracker %s is available", rel.Version) }</span>
 		<span class="hidden sm:inline" aria-hidden="true">{ rel.Version }</span>
 	</a>
 }
@@ -88,7 +89,7 @@ templ userMenu(user *auth.User) {
 		type="button"
 		popovertarget="user-popover-menu"
 		class="btn btn-ghost btn-circle user-popover-anchor"
-		aria-label="User menu"
+		aria-label={ tr(ctx, "User menu") }
 	>
 		<span class="avatar avatar-placeholder avatar-online">
 			<span class="size-9 rounded-full grid place-items-center bg-primary text-primary-content ring-2 ring-primary ring-offset-base-100 ring-offset-1">
@@ -101,7 +102,7 @@ templ userMenu(user *auth.User) {
 		popover
 		class="dropdown dropdown-end user-popover-menu menu bg-base-200 rounded-box z-50 mt-2 w-64 p-2 shadow-2xl border border-base-content/10"
 	>
-		<li class="menu-title text-xs uppercase tracking-wider">Signed in as</li>
+		<li class="menu-title text-xs uppercase tracking-wider">{ tr(ctx, "Signed in as") }</li>
 		<li class="pointer-events-none">
 			<div class="flex items-center gap-3">
 				<span class="avatar avatar-placeholder shrink-0">
@@ -112,7 +113,7 @@ templ userMenu(user *auth.User) {
 				<span class="flex flex-col min-w-0">
 					<span class="font-bold text-sm truncate">{ user.Name }</span>
 					<span class="text-xs text-base-content/60 font-mono truncate">{ user.Username }</span>
-					<span class="badge badge-accent badge-xs mt-1 font-mono uppercase">{ user.Role }</span>
+					<span class="badge badge-accent badge-xs mt-1 font-mono uppercase">{ tr(ctx, user.Role) }</span>
 				</span>
 			</div>
 		</li>
@@ -121,7 +122,7 @@ templ userMenu(user *auth.User) {
 			<li>
 				<a href={ templ.SafeURL(l.Href) }>
 					@Icon(l.Icon, "size-4")
-					{ l.Label }
+					{ tr(ctx, l.Label) }
 				</a>
 			</li>
 		}
@@ -129,7 +130,7 @@ templ userMenu(user *auth.User) {
 			<li>
 				<a href="/settings/sources">
 					@Icon("settings", "size-4")
-					Settings
+					{ tr(ctx, "Settings") }
 				</a>
 			</li>
 		}
@@ -139,7 +140,7 @@ templ userMenu(user *auth.User) {
 			<form action="/api/logout" method="POST" class="p-0" data-on:submit="@post('/api/logout')">
 				<button type="submit" class="w-full flex items-center gap-2 px-3 py-1.5 text-error font-medium">
 					@Icon("log-out", "size-4")
-					Sign Out
+					{ tr(ctx, "Sign Out") }
 				</button>
 			</form>
 		</li>

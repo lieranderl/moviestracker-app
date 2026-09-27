@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 )
 
 // defaultDetailCacheSize bounds the detail/search cache so a crawl over many
@@ -38,10 +40,12 @@ func newDetailCache(max int) *detailCache {
 	}
 }
 
-// cached returns the fresh cached value for key or fetches it once. Cached
-// values are shared between callers and must be treated as read-only.
+// cached returns the fresh cached value for key, in the language ctx
+// carries, or fetches it once. Cached values are shared between callers and
+// must be treated as read-only.
 func cached[T any](ctx context.Context, c *Client, key string, fetch func(context.Context) (T, error)) (T, error) {
 	var zero T
+	key = string(i18n.FromContext(ctx)) + "/" + key
 	dc := c.details
 	dc.mu.Lock()
 	if e, ok := dc.entries[key]; ok && c.now().Before(e.expires) {

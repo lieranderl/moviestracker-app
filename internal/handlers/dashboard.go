@@ -16,6 +16,7 @@ import (
 
 	"github.com/lieranderl/moviestracker-app/internal/engine"
 	"github.com/lieranderl/moviestracker-app/internal/gstinstall"
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/live"
 	"github.com/lieranderl/moviestracker-app/internal/sources"
 	"github.com/lieranderl/moviestracker-app/internal/stats"
@@ -189,21 +190,21 @@ func (s *Server) handleDashboardStream(w http.ResponseWriter, r *http.Request) {
 		torrents := liveValue[torrentsState](sub, topicTorrents)
 		system := liveValue[systemState](sub, topicSystem)
 		plays := liveValue[[]playback.Session](sub, topicPlays)
-		people := s.dashPeople(now)
-		played := s.dashPlayed(now, torrents.List)
-		problems, engineNote := s.dashProblems()
+		people := s.dashPeople(ctx, now)
+		played := s.dashPlayed(ctx, now, torrents.List)
+		problems, engineNote := s.dashProblems(ctx)
 		for _, card := range []struct {
 			id string
 			c  templ.Component
 		}{
-			{"pulse", views.DashPulseStrip(dashPulse(plays, people, torrents, system))},
-			{"streams", views.DashStreamsCard(s.dashStreams(plays, torrents.List, system))},
+			{"pulse", views.DashPulseStrip(dashPulse(ctx, plays, people, torrents, system))},
+			{"streams", views.DashStreamsCard(s.dashStreams(ctx, plays, torrents.List, system))},
 			{"played", views.DashPlayedCard(played)},
-			{"swarm", views.DashSwarmCard(dashSwarm(torrents, plays, system.CacheSize))},
-			{"app", views.DashAppCard(s.dashApp(system, echo, plays))},
-			{"system", views.DashSystemCard(dashMachine(system))},
+			{"swarm", views.DashSwarmCard(dashSwarm(ctx, torrents, plays, system.CacheSize))},
+			{"app", views.DashAppCard(s.dashApp(ctx, system, echo, plays))},
+			{"system", views.DashSystemCard(dashMachine(ctx, system))},
 			{"people", views.DashPeopleCard(people)},
-			{"sources", views.DashSourcesCard(dashSources(liveValue[map[string]sources.ServiceHealth](sub, topicSources)))},
+			{"sources", views.DashSourcesCard(dashSources(ctx, liveValue[map[string]sources.ServiceHealth](sub, topicSources)))},
 			{"problems", views.DashProblemsCard(problems, engineNote)},
 			{"gstreamer", views.GStreamerCard(s.gstSetup(user, liveValue[gstinstall.Status](sub, topicGStreamer), liveValue[torrserver.EchoInfo](sub, topicEngine)), true)},
 		} {
@@ -216,7 +217,7 @@ func (s *Server) handleDashboardStream(w http.ResponseWriter, r *http.Request) {
 }
 
 // dashPulse is the headline strip.
-func dashPulse(plays []playback.Session, people []views.DashPerson, t torrentsState, sys systemState) views.DashPulse {
+func dashPulse(ctx context.Context, plays []playback.Session, people []views.DashPerson, t torrentsState, sys systemState) views.DashPulse {
 	shared, other := 0, 0
 	for _, p := range plays {
 		switch {
@@ -233,40 +234,40 @@ func dashPulse(plays []playback.Session, people []views.DashPerson, t torrentsSt
 	totals := stats.TotalsOf(t.List)
 	v := views.DashPulse{
 		Playing: fmt.Sprint(len(plays)), Online: fmt.Sprint(len(people)),
-		OnlineNote: countOf(devices, "device", "devices"),
+		OnlineNote: i18n.N(ctx, devices, "%d device", "%d devices"),
 		Down:       speed(totals.Download), Up: speed(totals.Upload),
-		DownNote:  countOf(totals.Active, "active torrent", "active torrents"),
-		UpNote:    countOf(totals.Peers, "peer", "peers"),
+		DownNote:  i18n.N(ctx, totals.Active, "%d active torrent", "%d active torrents"),
+		UpNote:    i18n.N(ctx, totals.Peers, "%d peer", "%d peers"),
 		DownSpark: t.Down, UpSpark: t.Up,
 	}
 	var where []string
 	if inApp := len(plays) - shared - other; inApp > 0 {
-		where = append(where, fmt.Sprintf("%d in the app", inApp))
+		where = append(where, i18n.Tf(ctx, "%d in the app", inApp))
 	}
 	if shared > 0 {
-		where = append(where, countOf(shared, "shared link", "shared links"))
+		where = append(where, i18n.N(ctx, shared, "%d shared link", "%d shared links"))
 	}
-	if other == 1 {
-		where = append(where, "1 in another app")
-	} else if other > 1 {
-		where = append(where, fmt.Sprintf("%d in other apps", other))
+	if other > 0 {
+		where = append(where, i18n.N(ctx, other, "%d in another app", "%d in other apps"))
 	}
 	v.PlayingNote = strings.Join(where, " · ")
 	if len(plays) == 0 {
-		v.PlayingNote = "nothing right now"
+		v.PlayingNote = i18n.T(ctx, "nothing right now")
 	}
 	return v
 }
 
 // countOf says "1 device", "3 devices".
-func countOf(n int, one, many string) string {
-	if n == 1 {
-		return "1 " + one
+// viewerName is who plays, as the page shows them: shared links are named
+// in its language, people by their account.
+func viewerName(ctx context.Context, viewer string) string {
+	if viewer == sharedViewer {
+		return i18n.T(ctx, sharedViewer)
 	}
-	return fmt.Sprintf("%d %s", n, many)
+	return viewer
 }
 
-func (s *Server) dashStreams(plays []playback.Session, list []torrserver.Torrent, sys systemState) []views.DashStream {
+func (s *Server) dashStreams(ctx context.Context, plays []playback.Session, list []torrserver.Torrent, sys systemState) []views.DashStream {
 	byHash := map[string]torrserver.Torrent{}
 	for _, t := range list {
 		byHash[strings.ToLower(t.Hash)] = t
@@ -277,10 +278,10 @@ func (s *Server) dashStreams(plays []playback.Session, list []torrserver.Torrent
 		row := views.DashStream{
 			Title:    t.DisplayName(),
 			Poster:   t.Poster,
-			Viewer:   p.Viewer,
+			Viewer:   viewerName(ctx, p.Viewer),
 			OtherApp: p.OtherApp,
 			Client:   p.Client,
-			Since:    humanDuration(time.Since(p.Started)),
+			Since:    humanDuration(ctx, time.Since(p.Started)),
 			Sent:     size(p.Bytes),
 			Delivery: speed(p.Rate),
 			Download: speed(t.Download),
@@ -298,7 +299,7 @@ func (s *Server) dashStreams(plays []playback.Session, list []torrserver.Torrent
 		}
 		if p.Kind == playback.HLS {
 			row.Kind = "HLS"
-			row.Position = "starting"
+			row.Position = i18n.T(ctx, "starting")
 			if p.Segment >= 0 {
 				row.Position = formatDuration(p.Position(time.Duration(sys.SegmentSeconds) * time.Second))
 			}
@@ -306,13 +307,13 @@ func (s *Server) dashStreams(plays []playback.Session, list []torrserver.Torrent
 				row.Output = strings.TrimSpace(fmt.Sprintf("%s %s", codecName(out.VideoCodec), resolution(out.Width, out.Height)))
 			}
 		} else {
-			row.Kind = "Direct"
+			row.Kind = i18n.T(ctx, "Direct")
 			row.Position = fmt.Sprintf("%.0f%%", p.Progress(size))
 		}
 		// The player takes data faster than the torrent brings it, and little
 		// is buffered ahead: playback is about to wait for the network.
 		if p.Rate > 0 && t.Download < p.Rate && row.Buffer < 30 && (size == 0 || t.LoadedSize < size) {
-			row.Warn = "Downloading slower than it plays: it may pause to buffer."
+			row.Warn = i18n.T(ctx, "Downloading slower than it plays: it may pause to buffer.")
 		}
 		out = append(out, row)
 	}
@@ -320,7 +321,7 @@ func (s *Server) dashStreams(plays []playback.Session, list []torrserver.Torrent
 }
 
 // dashPlayed lists today's finished streams, newest first.
-func (s *Server) dashPlayed(now time.Time, list []torrserver.Torrent) []views.DashPlayed {
+func (s *Server) dashPlayed(ctx context.Context, now time.Time, list []torrserver.Torrent) []views.DashPlayed {
 	byHash := map[string]torrserver.Torrent{}
 	for _, t := range list {
 		byHash[strings.ToLower(t.Hash)] = t
@@ -337,31 +338,31 @@ func (s *Server) dashPlayed(now time.Time, list []torrserver.Torrent) []views.Da
 		if title == "" {
 			title = p.Hash[:min(len(p.Hash), 12)] + "…"
 		}
-		kind := "Direct"
+		kind := i18n.T(ctx, "Direct")
 		if p.Kind == playback.HLS {
 			kind = "HLS"
 		}
 		rows = append(rows, views.DashPlayed{
-			When: p.Started.Format("15:04"), Duration: humanDuration(p.Ended.Sub(p.Started)),
-			Title: title, Viewer: viewerOf(p), Device: p.Client, Kind: kind, Sent: size(p.Bytes),
+			When: p.Started.Format("15:04"), Duration: humanDuration(ctx, p.Ended.Sub(p.Started)),
+			Title: title, Viewer: viewerOf(ctx, p), Device: p.Client, Kind: kind, Sent: size(p.Bytes),
 		})
 	}
 	return rows
 }
 
 // viewerOf names who played p in a line of text: an other app says so.
-func viewerOf(p playback.Session) string {
+func viewerOf(ctx context.Context, p playback.Session) string {
 	switch {
 	case !p.OtherApp:
-		return p.Viewer
+		return viewerName(ctx, p.Viewer)
 	case p.Viewer == "":
-		return "Other app"
+		return i18n.T(ctx, "Other app")
 	default:
-		return p.Viewer + " (other app)"
+		return i18n.Tf(ctx, "%s (other app)", p.Viewer)
 	}
 }
 
-func dashSwarm(t torrentsState, plays []playback.Session, cacheSize int64) views.DashSwarm {
+func dashSwarm(ctx context.Context, t torrentsState, plays []playback.Session, cacheSize int64) views.DashSwarm {
 	totals := stats.TotalsOf(t.List)
 	v := views.DashSwarm{
 		Torrents: totals.Torrents, Active: totals.Active, Peers: totals.Peers, Seeders: totals.Seeders,
@@ -373,9 +374,9 @@ func dashSwarm(t torrentsState, plays []playback.Session, cacheSize int64) views
 	slices.SortStableFunc(active, func(a, b torrserver.Torrent) int { return cmp.Compare(b.Download, a.Download) })
 	for _, tr := range active {
 		row := views.DashTorrent{
-			Title: tr.DisplayName(), Status: tr.StatusLabel(), StatusClass: tr.StatusBadgeClass(),
+			Title: tr.DisplayName(), Status: i18n.T(ctx, tr.StatusLabel()), StatusClass: tr.StatusBadgeClass(),
 			Size: size(tr.TorrentSize), Down: speed(tr.Download), Up: speed(tr.Upload),
-			Peers:      fmt.Sprintf("%d of %d · %d seeders", tr.ActivePeers, tr.TotalPeers, tr.Connected),
+			Peers:      i18n.Tf(ctx, "%d of %d · %d seeders", tr.ActivePeers, tr.TotalPeers, tr.Connected),
 			Downloaded: size(tr.Downloaded), Uploaded: size(tr.Uploaded),
 			Buffer: tr.BufferPercent(cacheSize),
 		}
@@ -383,13 +384,13 @@ func dashSwarm(t torrentsState, plays []playback.Session, cacheSize int64) views
 			if p.Hash != strings.ToLower(tr.Hash) {
 				continue
 			}
-			file := fmt.Sprintf("File %d", p.File)
+			file := i18n.Tf(ctx, "File %d", p.File)
 			for _, f := range tr.FileStats {
 				if f.ID == p.File {
 					file = torrserver.StreamFileName(p.Hash, f)
 				}
 			}
-			row.Playing = append(row.Playing, views.DashTorrentPlay{File: file, Viewer: p.Viewer, OtherApp: p.OtherApp})
+			row.Playing = append(row.Playing, views.DashTorrentPlay{File: file, Viewer: viewerName(ctx, p.Viewer), OtherApp: p.OtherApp})
 		}
 		v.Rows = append(v.Rows, row)
 	}
@@ -397,7 +398,7 @@ func dashSwarm(t torrentsState, plays []playback.Session, cacheSize int64) views
 }
 
 // dashPeople groups the devices in use now by person.
-func (s *Server) dashPeople(now time.Time) []views.DashPerson {
+func (s *Server) dashPeople(ctx context.Context, now time.Time) []views.DashPerson {
 	var out []views.DashPerson
 	for _, d := range s.presence.online(now) {
 		name := d.User
@@ -407,12 +408,12 @@ func (s *Server) dashPeople(now time.Time) []views.DashPerson {
 		if len(out) == 0 || out[len(out)-1].Name != name {
 			out = append(out, views.DashPerson{Name: name})
 		}
-		seen := "live page open"
+		seen := i18n.T(ctx, "live page open")
 		if !d.Live {
-			seen = ago(now.Sub(d.LastSeen))
+			seen = ago(ctx, now.Sub(d.LastSeen))
 		}
 		p := &out[len(out)-1]
-		p.Devices = append(p.Devices, views.DashDevice{Name: d.Name, IP: d.IP, Seen: seen, Live: d.Live})
+		p.Devices = append(p.Devices, views.DashDevice{Name: localDevice(ctx, d.Name), IP: d.IP, Seen: seen, Live: d.Live})
 	}
 	return out
 }
@@ -422,7 +423,7 @@ const problemRows = 6
 
 // dashProblems lists recent warnings and errors, and the managed engine's
 // restarts, if any.
-func (s *Server) dashProblems() ([]views.DashProblem, string) {
+func (s *Server) dashProblems(ctx context.Context) ([]views.DashProblem, string) {
 	var rows []views.DashProblem
 	if s.events != nil {
 		for _, e := range s.events.Recent() {
@@ -437,9 +438,9 @@ func (s *Server) dashProblems() ([]views.DashProblem, string) {
 		st := s.engine.Status()
 		switch {
 		case st.State != engine.Running && st.LastError != "":
-			engineNote = "TorrServer is not running: " + st.LastError
+			engineNote = i18n.Tf(ctx, "TorrServer is not running: %s", st.LastError)
 		case st.Restarts > 0:
-			engineNote = "TorrServer restarted " + countOf(st.Restarts, "time", "times") + " since Moviestracker started."
+			engineNote = i18n.N(ctx, st.Restarts, "TorrServer restarted %d time since Moviestracker started.", "TorrServer restarted %d times since Moviestracker started.")
 		}
 	}
 	return rows, engineNote
@@ -468,11 +469,11 @@ func engineLocalPort(address string) (int, bool) {
 
 // dashMachine is the machine card: CPU, memory, network and disks of the
 // whole computer.
-func dashMachine(sys systemState) views.DashSystem {
+func dashMachine(ctx context.Context, sys systemState) views.DashSystem {
 	v := views.DashSystem{NetDownSpark: sys.NetDownHist, NetUpSpark: sys.NetUpHist, CPUSpark: sys.CPUHist, MemSpark: sys.MemHist}
 	if c := sys.System.CPU; c.Cores > 0 {
 		v.CPUPct = int(c.Percent + 0.5)
-		v.CPU = fmt.Sprintf("%d%% · %d cores", v.CPUPct, c.Cores)
+		v.CPU = fmt.Sprintf("%d%% · %s", v.CPUPct, i18n.N(ctx, c.Cores, "%d core", "%d cores"))
 		if c.Load1 > 0 {
 			v.Load = fmt.Sprintf("%.2f · %.2f · %.2f", c.Load1, c.Load5, c.Load15)
 		}
@@ -483,9 +484,9 @@ func dashMachine(sys systemState) views.DashSystem {
 	if n := sys.System.Net; n.Measured {
 		v.NetDown, v.NetUp = speed(n.Down), speed(n.Up)
 	}
-	dirs := []struct{ label, dir string }{{"Disk with the data folder", sys.DataDir}}
+	dirs := []struct{ label, dir string }{{i18n.T(ctx, "Disk with the data folder"), sys.DataDir}}
 	if sys.DiskCache != "" {
-		dirs = append(dirs, struct{ label, dir string }{"Disk with the disk cache", sys.DiskCache})
+		dirs = append(dirs, struct{ label, dir string }{i18n.T(ctx, "Disk with the disk cache"), sys.DiskCache})
 	}
 	for _, d := range dirs {
 		if disk, ok := sys.System.Disks[d.dir]; ok && disk.Total > 0 {
@@ -500,7 +501,7 @@ func dashMachine(sys systemState) views.DashSystem {
 
 // dashApp is the app card: Moviestracker, TorrServer and its GStreamer,
 // what they use together, and TorrServer's caches.
-func (s *Server) dashApp(sys systemState, echoSnap live.Snapshot, plays []playback.Session) views.DashApp {
+func (s *Server) dashApp(ctx context.Context, sys systemState, echoSnap live.Snapshot, plays []playback.Session) views.DashApp {
 	proc := func(p stats.Process) (string, string) {
 		return size(p.RSS), fmt.Sprintf("%.0f%%", p.CPU)
 	}
@@ -510,7 +511,7 @@ func (s *Server) dashApp(sys systemState, echoSnap live.Snapshot, plays []playba
 	}
 	if g := sys.System.Go; g.Version != "" {
 		v.Go, v.Goroutines, v.Heap = g.Version, fmt.Sprint(g.Goroutines), size(g.HeapInUse)
-		v.GC = fmt.Sprintf("%d · last %s", g.GCs, g.LastPause.Round(time.Microsecond))
+		v.GC = i18n.Tf(ctx, "%d · last %s", g.GCs, g.LastPause.Round(time.Microsecond))
 		sent, skipped := patchesSent.Load(), patchesSkipped.Load()
 		v.LiveStreams = fmt.Sprint(s.live.Subscribers())
 		v.Patches = fmt.Sprintf("%d · %d", sent, skipped)
@@ -522,7 +523,7 @@ func (s *Server) dashApp(sys systemState, echoSnap live.Snapshot, plays []playba
 		v.Memory, v.CPU = proc(together)
 	}
 
-	self := views.DashProc{Name: "Moviestracker", Detail: s.version + " · up " + humanDuration(time.Since(s.startedAt)), Known: true, Online: true}
+	self := views.DashProc{Name: "Moviestracker", Detail: s.version + " · " + i18n.Tf(ctx, "up %s", humanDuration(ctx, time.Since(s.startedAt))), Known: true, Online: true}
 	self.Memory, self.CPU = proc(sys.System.Self)
 
 	echo, _ := echoSnap.Value.(torrserver.EchoInfo)
@@ -530,17 +531,17 @@ func (s *Server) dashApp(sys systemState, echoSnap live.Snapshot, plays []playba
 	engineRow := views.DashProc{Name: "TorrServer", Known: known, Online: echoSnap.Err == nil && echo.Version != ""}
 	switch {
 	case !known:
-		engineRow.Detail = "checking…"
+		engineRow.Detail = i18n.T(ctx, "checking…")
 	case engineRow.Online:
-		label := s.engineLabel() // "Run by Moviestracker": lowercase only its first letter
-		engineRow.Detail = echo.Version + " · " + strings.ToLower(label[:1]) + label[1:]
+		label := []rune(i18n.T(ctx, s.engineLabel())) // "Run by Moviestracker": lowercase only its first letter
+		engineRow.Detail = echo.Version + " · " + strings.ToLower(string(label[:1])) + string(label[1:])
 	default:
-		engineRow.Detail = "not answering"
+		engineRow.Detail = i18n.T(ctx, "not answering")
 	}
 	if sys.System.Engine != nil {
 		engineRow.Memory, engineRow.CPU = proc(*sys.System.Engine)
 	} else if sys.EngineElsewhere {
-		engineRow.Note = "runs on another machine: not measured here"
+		engineRow.Note = i18n.T(ctx, "runs on another machine: not measured here")
 	}
 
 	gst := views.DashProc{Name: "GStreamer", Nested: true, Known: known && engineRow.Online, Online: echo.GSTAvailable}
@@ -559,38 +560,38 @@ func (s *Server) dashApp(sys systemState, echoSnap live.Snapshot, plays []playba
 				}
 			}
 		}
-		detail := []string{echo.GSTVersion, "idle"}
+		detail := []string{echo.GSTVersion, i18n.T(ctx, "idle")}
 		if streams > 0 {
-			detail[1] = countOf(streams, "HLS stream", "HLS streams")
+			detail[1] = i18n.N(ctx, streams, "%d HLS stream", "%d HLS streams")
 		}
 		detail = append(detail, outputs...)
 		if echo.HDRTonemap {
-			detail = append(detail, "HDR tone mapping")
+			detail = append(detail, i18n.T(ctx, "HDR tone mapping"))
 		}
 		gst.Detail = strings.Join(detail, " · ")
-		gst.Note = "part of TorrServer: its CPU and memory are counted there"
+		gst.Note = i18n.T(ctx, "part of TorrServer: its CPU and memory are counted there")
 	default:
-		gst.Detail = "not installed"
-		gst.Note = "MKV files play in VLC, on TVs and in other players, not in the browser"
+		gst.Detail = i18n.T(ctx, "not installed")
+		gst.Note = i18n.T(ctx, "MKV files play in VLC, on TVs and in other players, not in the browser")
 	}
 	v.Procs = []views.DashProc{self, engineRow, gst}
 	return v
 }
 
-func dashSources(health map[string]sources.ServiceHealth) []views.DashService {
+func dashSources(ctx context.Context, health map[string]sources.ServiceHealth) []views.DashService {
 	out := make([]views.DashService, 0, 3)
 	for _, name := range []string{"TMDB", "JacRed", "IMDb"} {
 		h, called := health[name]
 		row := views.DashService{Name: name, Known: called, OK: h.OK, Error: h.Error}
 		if called {
 			row.Latency = h.Latency.Round(time.Millisecond).String()
-			row.Ago = ago(time.Since(h.LastCall))
-			row.Calls = countOf(h.Calls, "call", "calls") + " in the last hour"
+			row.Ago = ago(ctx, time.Since(h.LastCall))
+			row.Calls = i18n.N(ctx, h.Calls, "%d call in the last hour", "%d calls in the last hour")
 			switch h.Failures {
 			case 0:
-				row.Calls += " · no failures"
+				row.Calls += " · " + i18n.T(ctx, "no failures")
 			default:
-				row.Calls += " · " + countOf(h.Failures, "failure", "failures")
+				row.Calls += " · " + i18n.N(ctx, h.Failures, "%d failure", "%d failures")
 			}
 		}
 		out = append(out, row)
@@ -628,29 +629,37 @@ func size(n int64) string {
 
 // humanDuration says how long, the way people do: "under a minute",
 // "42 min", "1 h 5 min".
-func humanDuration(d time.Duration) string {
+func humanDuration(ctx context.Context, d time.Duration) string {
 	switch {
 	case d < time.Minute:
-		return "under a minute"
+		return i18n.T(ctx, "under a minute")
 	case d < time.Hour:
-		return fmt.Sprintf("%d min", int(d.Minutes()))
+		return i18n.Tf(ctx, "%d min", int(d.Minutes()))
 	}
 	h, m := int(d.Hours()), int(d.Minutes())%60
 	if m == 0 {
-		return fmt.Sprintf("%d h", h)
+		return i18n.Tf(ctx, "%d h", h)
 	}
-	return fmt.Sprintf("%d h %d min", h, m)
+	return i18n.Tf(ctx, "%d h %d min", h, m)
 }
 
 // ago says how long ago: "just now", "3 min ago", "2 h ago".
-func ago(d time.Duration) string {
+func ago(ctx context.Context, d time.Duration) string {
 	switch {
 	case d < time.Minute:
-		return "just now"
+		return i18n.T(ctx, "just now")
 	case d < time.Hour:
-		return fmt.Sprintf("%d min ago", int(d.Minutes()))
+		return i18n.Tf(ctx, "%d min ago", int(d.Minutes()))
 	}
-	return fmt.Sprintf("%d h ago", int(d.Hours()))
+	return i18n.Tf(ctx, "%d h ago", int(d.Hours()))
+}
+
+// localDevice is a device's name (see deviceName) in ctx's language.
+func localDevice(ctx context.Context, name string) string {
+	if browser, system, ok := strings.Cut(name, " on "); ok {
+		return i18n.Tf(ctx, "%s on %s", browser, system)
+	}
+	return i18n.T(ctx, name)
 }
 
 // formatDuration shows a duration as h:mm:ss or m:ss.

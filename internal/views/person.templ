@@ -32,38 +32,38 @@ templ PersonPage(user *auth.User, p *tmdb.Person) {
 					<div class="space-y-5 min-w-0">
 						<div class="space-y-2">
 							if p.KnownForDepartment != "" {
-								<span class="badge badge-soft badge-primary">{ p.KnownForDepartment }</span>
+								<span class="badge badge-soft badge-primary">{ tr(ctx, p.KnownForDepartment) }</span>
 							}
 							<h1 class="text-4xl sm:text-5xl font-black tracking-tight text-balance">{ p.Name }</h1>
 						</div>
 						<dl class="flex flex-wrap gap-x-10 gap-y-3 text-sm">
 							if p.Birthday != "" {
 								<div>
-									<dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">Born</dt>
+									<dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">{ tr(ctx, "Born") }</dt>
 									<dd class="font-medium">{ p.Birthday }</dd>
 								</div>
 							}
 							if p.PlaceOfBirth != "" {
 								<div>
-									<dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">Birthplace</dt>
+									<dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">{ tr(ctx, "Birthplace") }</dt>
 									<dd class="font-medium">{ p.PlaceOfBirth }</dd>
 								</div>
 							}
 							if p.Deathday != "" {
 								<div>
-									<dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">Died</dt>
+									<dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">{ tr(ctx, "Died") }</dt>
 									<dd class="font-medium">{ p.Deathday }</dd>
 								</div>
 							}
 							<div>
-								<dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">Credits</dt>
+								<dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">{ tr(ctx, "Credits") }</dt>
 								<dd class="font-medium">{ fmt.Sprint(len(p.Credits)) }</dd>
 							</div>
 						</dl>
 						@officialLinksRow(officialLinks("name", p.Links, p.Homepage))
 						if paras := p.BiographyParagraphs(); len(paras) > 0 {
 							<div class="space-y-3 max-w-3xl">
-								<h2 class="sr-only">Biography</h2>
+								<h2 class="sr-only">{ tr(ctx, "Biography") }</h2>
 								<div
 									class={ "space-y-3 text-base leading-relaxed text-base-content/85", templ.KV("line-clamp-6", len(p.Biography) > longBiography) }
 									if len(p.Biography) > longBiography {
@@ -76,7 +76,7 @@ templ PersonPage(user *auth.User, p *tmdb.Person) {
 								</div>
 								if len(p.Biography) > longBiography {
 									<button type="button" class="btn btn-ghost btn-sm px-0" data-on:click="$bioOpen = !$bioOpen" data-attr:aria-expanded="$bioOpen">
-										<span data-text="$bioOpen ? 'Show less' : 'Read more'">Read more</span>
+										<span data-text={ "$bioOpen ? " + trJS(ctx, "Show less") + " : " + trJS(ctx, "Read more") }>{ tr(ctx, "Read more") }</span>
 									</button>
 								}
 							</div>
@@ -84,7 +84,7 @@ templ PersonPage(user *auth.User, p *tmdb.Person) {
 					</div>
 				</div>
 			</section>
-			@mediaRail("known-for", "Known for", p.KnownFor)
+			@mediaRail("known-for", tr(ctx, "Known for"), p.KnownFor)
 			@filmography(p)
 		</main>
 		@siteFooter()
@@ -94,10 +94,10 @@ templ PersonPage(user *auth.User, p *tmdb.Person) {
 templ filmography(p *tmdb.Person) {
 	if len(p.Credits) > 0 {
 		<section id="credits" class="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-4">
-			@sectionHeading("Filmography", "") {
-				<div role="tablist" aria-label="Credit type" class="tabs tabs-box tabs-sm">
-					@creditTab("movie", "Movies", len(p.MovieCredits()))
-					@creditTab("tv", "TV", len(p.TVCredits()))
+			@sectionHeading(tr(ctx, "Filmography"), "") {
+				<div role="tablist" aria-label={ tr(ctx, "Credit type") } class="tabs tabs-box tabs-sm">
+					@creditTab("movie", tr(ctx, "Movies"), len(p.MovieCredits()))
+					@creditTab("tv", tr(ctx, "TV"), len(p.TVCredits()))
 				</div>
 			}
 			@creditTable("movie", p.MovieCredits())
@@ -124,14 +124,14 @@ templ creditTable(kind string, credits []tmdb.Credit) {
 		data-class:hidden={ fmt.Sprintf("$credits !== '%s'", kind) }
 	>
 		if len(credits) == 0 {
-			<p class="p-4 text-sm text-base-content/60">No credits.</p>
+			<p class="p-4 text-sm text-base-content/60">{ tr(ctx, "No credits.") }</p>
 		} else {
 			<table class="table table-sm">
 				<thead>
 					<tr>
-						<th class="w-20">Year</th>
-						<th>Title</th>
-						<th>Role</th>
+						<th class="w-20">{ tr(ctx, "Year") }</th>
+						<th>{ tr(ctx, "Title") }</th>
+						<th>{ tr(ctx, "Role") }</th>
 					</tr>
 				</thead>
 				<tbody>

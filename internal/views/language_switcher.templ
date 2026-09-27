@@ -1,0 +1,50 @@
+package views
+
+import "github.com/lieranderl/moviestracker-app/internal/i18n"
+
+// LanguageSwitcher is a DaisyUI dropdown of the interface languages. Each is
+// a plain form POST: the server keeps the choice in a cookie and sends the
+// visitor back to the page, rendered in it.
+templ LanguageSwitcher() {
+	<div class="dropdown dropdown-end">
+		<div
+			role="button"
+			tabindex="0"
+			class="btn btn-ghost btn-sm gap-1 px-2"
+			aria-haspopup="menu"
+			aria-label={ tr(ctx, "Language") }
+			title={ tr(ctx, "Change language") }
+		>
+			@Icon("languages", "size-4")
+			<span class="text-xs font-mono uppercase">{ pageLang(ctx) }</span>
+		</div>
+		<form action="/api/language" method="POST" tabindex="-1" class="dropdown-content z-50 mt-2">
+			<ul role="menu" class="menu menu-sm bg-base-200 rounded-box w-44 p-1.5 shadow-2xl border border-base-content/10">
+				<li class="menu-title text-[10px] uppercase tracking-wider">{ tr(ctx, "Language") }</li>
+				for _, lang := range i18n.Supported {
+					<li>
+						<button
+							type="submit"
+							name="lang"
+							value={ string(lang) }
+							role="menuitemradio"
+							aria-checked={ boolAttr(i18n.FromContext(ctx) == lang) }
+							class={ "justify-between", templ.KV("menu-active", i18n.FromContext(ctx) == lang) }
+						>
+							<span>{ lang.Name() }</span>
+							<span class="text-[10px] opacity-60 font-mono uppercase">{ string(lang) }</span>
+						</button>
+					</li>
+				}
+			</ul>
+		</form>
+	</div>
+}
+
+// boolAttr is b as an ARIA state attribute's value.
+func boolAttr(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
