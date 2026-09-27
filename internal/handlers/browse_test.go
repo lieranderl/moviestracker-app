@@ -41,7 +41,7 @@ func TestABrowsePageShowsTwentyTitlesAndLoadsMoreOnScroll(t *testing.T) {
 	if strings.Contains(body, `href="/movie/200"`) {
 		t.Error("page shows the second page before scrolling")
 	}
-	if !strings.Contains(body, `data-on-intersect="@get('/api/browse/popular-movies?page=2')"`) {
+	if !strings.Contains(body, `data-on-intersect__once="@get('/api/browse/popular-movies?page=2')"`) {
 		t.Error("page does not load page 2 on scroll")
 	}
 }
@@ -52,7 +52,7 @@ func TestScrollingAppendsTheNextTwentyTitlesUntilTheLastPage(t *testing.T) {
 	body := html.UnescapeString(get(t, server, "/api/browse/top-rated-series?page=2", true).Body.String())
 	for _, want := range []string{
 		"selector #browse-grid", "mode append", `href="/tv/200"`, `href="/tv/219"`,
-		`data-on-intersect="@get('/api/browse/top-rated-series?page=3')"`,
+		`data-on-intersect__once="@get('/api/browse/top-rated-series?page=3')"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page 2 lacks %q", want)

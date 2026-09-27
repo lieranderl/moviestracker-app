@@ -138,7 +138,10 @@ templ BrowseMore(v BrowseView) {
 					}
 				</div>
 			case v.Next > 0:
-				<div data-on-intersect={ v.moreURL(v.Next) }>
+				// Once: scrolled away and back before the page arrives, the
+				// loader must not ask for it again. Each page's loader is a
+				// new element.
+				<div id={ fmt.Sprintf("browse-page-%d", v.Next) } data-on-intersect__once={ v.moreURL(v.Next) }>
 					<span class="loading loading-spinner loading-md text-primary" aria-label="Loading more"></span>
 				</div>
 			default:
