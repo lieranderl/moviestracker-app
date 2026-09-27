@@ -1,5 +1,7 @@
 # Moviestracker
 
+**English** · [Русский](README.ru.md)
+
 [![CI](https://github.com/lieranderl/moviestracker-app/actions/workflows/ci.yml/badge.svg)](https://github.com/lieranderl/moviestracker-app/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/lieranderl/moviestracker-app?sort=semver)](https://github.com/lieranderl/moviestracker-app/releases/latest)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
@@ -24,8 +26,10 @@ anywhere.
 - **Works with TorrServer apps:** TorrServe on an Android TV, Lampa and other
   TorrServer apps can use the same TorrServer and torrent list, each with a
   login of its own ([more](#torrserver-apps-torrserve-lampa)).
-- **English and Russian:** the whole interface, and TMDB's titles, overviews
-  and trailers, in either language; pick it from the navbar.
+- **English and Russian:** the whole interface, and TMDB's titles, overviews,
+  logos and trailers, in either language. A browser starts in the language it
+  prefers; the language menu in the navbar switches it, and it is remembered
+  for that browser.
 - **Private by design:** everything stays on your machine. Pages never show
   your TorrServer or keys, and links for TVs expire after a week.
 
