@@ -906,6 +906,9 @@ var ru = map[string]string{ // #nosec G101 -- interface texts ("Password"), not 
 	"Official website": "Официальный сайт",
 	"Search is unavailable because TMDB is not configured.":      "Поиск недоступен: TMDB не настроен.",
 	"TMDB search is not responding right now. Please try again.": "Поиск TMDB сейчас не отвечает. Попробуйте ещё раз.",
+
+	// Language menu
+	"There is no such language.": "Такого языка нет.",
 }
 
 // ruPlural holds the one, few and many forms of counts, by English one form.

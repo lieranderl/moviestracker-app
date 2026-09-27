@@ -35,7 +35,7 @@ func (s *Server) handleLanguage(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
 	lang, ok := i18n.Parse(r.PostFormValue("lang"))
 	if !ok {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		http.Error(w, i18n.T(r.Context(), "There is no such language."), http.StatusBadRequest)
 		return
 	}
 	cookie := &http.Cookie{

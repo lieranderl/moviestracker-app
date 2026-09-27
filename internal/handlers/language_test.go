@@ -68,6 +68,12 @@ func TestLanguageSwitchRefusesUnknownLanguagesAndForeignReturnAddresses(t *testi
 	if rr := post("klingon", ""); rr.Code != http.StatusBadRequest {
 		t.Errorf("unknown language = %d, want 400", rr.Code)
 	}
+	req := httptest.NewRequest(http.MethodPost, "/api/language", strings.NewReader("lang=klingon"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept-Language", "ru")
+	if body := l.do(t, req, nil).Body.String(); !strings.Contains(body, "Такого языка нет") {
+		t.Errorf("a Russian browser is refused in English: %q", body)
+	}
 	for _, referer := range []string{"", "not a url", "http://example.com//evil.example/x", "http://example.com/api/language"} {
 		rr := post("en", referer)
 		if loc := rr.Header().Get("Location"); rr.Code != http.StatusSeeOther || loc != "/" {
