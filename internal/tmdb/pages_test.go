@@ -27,7 +27,7 @@ func pagedTMDB(t *testing.T, totalPages int) (*Client, func() []string) {
 			results = append(results, fmt.Sprintf(`{"id": %d, "title": "Title %d", "name": "Title %d"}`, page*100+n, page*100+n, page*100+n))
 		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"page": %d, "total_pages": %d, "results": [%s]}`, page, totalPages, strings.Join(results, ","))
+		_, _ = fmt.Fprintf(w, `{"page": %d, "total_pages": %d, "results": [%s]}`, page, totalPages, strings.Join(results, ","))
 	}))
 	t.Cleanup(server.Close)
 	client := NewClient("test-key", WithBaseURL(server.URL), WithHTTPClient(server.Client()))
