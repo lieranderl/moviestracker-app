@@ -24,7 +24,7 @@ for running it from source, on a server, or in a container.
 
 `/` sends signed-in users to `/movies` and everyone else to `/login`.
 
-**New releases.** Once a day Moviestracker asks GitHub for its latest stable release (`api.github.com`, with an ETag, so an unchanged answer is not sent again). When one is newer, administrators see it in the navbar and Settings → Updates, and the menu bar and tray apps offer **Download Moviestracker vX.Y.Z…**. Nothing is downloaded or installed by itself: the Mac DMG and the Windows installer install over the running version and keep accounts and settings; the image is updated with `docker compose pull && docker compose up -d`. TorrServer and GStreamer come with the release they were tested with. GitHub sees the machine's internet address; turn the check off in Settings → Updates. Development builds never check.
+**New releases.** Once a day Moviestracker asks GitHub for its latest stable release (`api.github.com`, with an ETag, so an unchanged answer is not sent again). When one is newer, administrators see it in the navbar and Settings → Updates, and the menu bar and tray apps offer **Download Moviestracker vX.Y.Z…**. Nothing is downloaded or installed by itself: the Mac DMG and the Windows installer install over the running version and keep accounts and settings; the image is updated with `docker compose pull && docker compose up -d`. TorrServer and GStreamer come with the release they were tested with. The request carries nothing about the install, its accounts or what plays; like any web request, GitHub sees the internet address it comes from. Turn the check off in Settings → Updates. Development builds never check.
 
 ## Environment variables
 
