@@ -11,8 +11,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/config"
 	"github.com/lieranderl/moviestracker-app/internal/handlers"
 	"github.com/lieranderl/moviestracker-app/internal/i18n"
+	"github.com/lieranderl/moviestracker-app/internal/sources"
 	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 	webstatic "github.com/lieranderl/moviestracker-app/static"
@@ -30,14 +33,18 @@ type Config struct {
 	// Store keeps each user's preferences and favourites; nil keeps them in
 	// memory until the app stops.
 	Store store.Store
+	// Sources are the TMDB, JacRed and IMDb clients of the catalog; a nil
+	// one is a service not configured.
+	Sources sources.Clients
 	// Now is the clock; nil is the wall clock.
 	Now func() time.Time
 }
 
 // app is the web app's state behind its routes.
 type app struct {
-	cfg    Config
-	signer signer
+	cfg     Config
+	signer  signer
+	catalog *handlers.Catalog
 }
 
 func (a *app) now() time.Time {
@@ -64,6 +71,7 @@ func New(cfg Config) http.Handler {
 		cfg.Store = store.NewMemory()
 	}
 	a := &app{cfg: cfg, signer: signer{key: cfg.SessionKey}}
+	a.catalog = handlers.NewCatalog(func() *sources.Clients { return &a.cfg.Sources }, a.catalogUser, "/", catalogTimeout)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -76,24 +84,25 @@ func New(cfg Config) http.Handler {
 	})
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(webstatic.Files))))
 	mux.HandleFunc("GET /{$}", a.handleHome)
+	a.catalog.Register(mux, "")
 	mux.HandleFunc("GET "+signInPath, a.handleSignIn)
 	mux.HandleFunc("GET "+signInPath+"/callback", a.handleSignInCallback)
 	mux.HandleFunc("POST /api/logout", a.handleSignOut)
 	mux.HandleFunc("POST /api/language", handlers.SetLanguage(a.secure(), a.saveLanguage))
-	app := http.NewCrossOriginProtection().Handler(handlers.Language(mux))
+	app := http.NewCrossOriginProtection().Handler(handlers.Language(webSite(mux)))
 	return handlers.RecoveryMiddleware(handlers.SecurityHeadersMiddleware(true, handlers.LoggingMiddleware(app)))
 }
 
-// handleHome is the home page of a signed-in visitor, and the sign-in page
-// for the others.
+// handleHome is the catalog's home page for a signed-in visitor, and the
+// sign-in page for the others.
 func (a *app) handleHome(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	page := views.WebSignIn()
-	if user, ok := a.currentUser(r); ok {
-		page = views.WebHome(user.Name, user.Email)
+	if _, ok := a.currentUser(r); ok {
+		a.catalog.Home(w, r)
+		return
 	}
-	if err := page.Render(r.Context(), w); err != nil {
+	if err := views.WebSignIn().Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "home", "error", err)
 	}
 }
@@ -116,4 +125,26 @@ func (a *app) saveLanguage(r *http.Request, lang i18n.Lang) {
 func (a *app) handleSignOut(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, a.cookie(sessionCookie, "", "/", -1))
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// catalogTimeout bounds the TMDB lookups of one catalog page, as in the
+// local app.
+const catalogTimeout = 8 * time.Second
+
+// catalogUser is the signed-in visitor as the catalog's pages show them:
+// their Google name and email, never an administrator.
+func (a *app) catalogUser(r *http.Request) *auth.User {
+	user, ok := a.currentUser(r)
+	if !ok {
+		return nil
+	}
+	return &auth.User{Username: user.Email, Name: user.Name, Role: config.RoleViewer}
+}
+
+// webSite marks every page as the web app's, so shared views show its
+// navigation.
+func webSite(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(views.WithSite(r.Context(), views.Site{Cloud: true})))
+	})
 }

@@ -14,14 +14,14 @@ import (
 
 // handleTVPage renders a series with the requested (or first) season's
 // episodes inline, so the page is complete without JavaScript.
-func (s *Server) handleTVPage(w http.ResponseWriter, r *http.Request) {
-	user, id, ok := s.detailTarget(w, r)
+func (c *Catalog) handleTVPage(w http.ResponseWriter, r *http.Request) {
+	user, id, ok := c.detailTarget(w, r)
 	if !ok {
 		return
 	}
-	ctx, cancel := s.detailsContext(r)
+	ctx, cancel := c.detailsContext(r)
 	defer cancel()
-	tv, err := s.clients().Details.TV(ctx, id)
+	tv, err := c.clients().Details.TV(ctx, id)
 	if err != nil {
 		renderMediaError(w, r, user, err)
 		return
@@ -33,7 +33,7 @@ func (s *Server) handleTVPage(w http.ResponseWriter, r *http.Request) {
 	}
 	var season *tmdb.Season
 	if len(tv.Seasons) > 0 {
-		if season, err = s.clients().Details.Season(ctx, id, selected); err != nil {
+		if season, err = c.clients().Details.Season(ctx, id, selected); err != nil {
 			slog.Warn("tmdb season lookup failed", "tv", id, "season", selected, "error", err)
 		}
 	}
@@ -50,20 +50,20 @@ func hasSeason(tv *tmdb.TVDetails, n int) bool {
 }
 
 // handleSeason patches one season's episode list and the $season signal.
-func (s *Server) handleSeason(w http.ResponseWriter, r *http.Request) {
-	if s.apiUser(w, r) == nil {
+func (c *Catalog) handleSeason(w http.ResponseWriter, r *http.Request) {
+	if c.apiUser(w, r) == nil {
 		return
 	}
 	id, idOK := positiveInt(r.PathValue("id"))
 	number, err := strconv.Atoi(r.PathValue("season"))
 	sse := datastar.NewSSE(w, r)
-	if !idOK || err != nil || number < 0 || s.clients().Details == nil {
+	if !idOK || err != nil || number < 0 || c.clients().Details == nil {
 		patchSeasonError(r, sse)
 		return
 	}
-	ctx, cancel := s.detailsContext(r)
+	ctx, cancel := c.detailsContext(r)
 	defer cancel()
-	season, err := s.clients().Details.Season(ctx, id, number)
+	season, err := c.clients().Details.Season(ctx, id, number)
 	if err != nil {
 		slog.Warn("tmdb season lookup failed", "tv", id, "season", number, "error", err)
 		patchSeasonError(r, sse)

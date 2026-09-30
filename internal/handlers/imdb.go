@@ -22,11 +22,11 @@ type imdbRatingResult struct {
 // id/target pairs (?id=tt1&target=a&id=tt2&target=b), so the home hero fills
 // every slide's badge with one request, each patched as its rating arrives.
 // A failed lookup patches an empty badge.
-func (s *Server) handleMovieIMDbRating(w http.ResponseWriter, r *http.Request) {
-	if s.apiUser(w, r) == nil {
+func (c *Catalog) handleMovieIMDbRating(w http.ResponseWriter, r *http.Request) {
+	if c.apiUser(w, r) == nil {
 		return
 	}
-	if s.clients().IMDb == nil {
+	if c.clients().IMDb == nil {
 		http.NotFound(w, r)
 		return
 	}
@@ -50,7 +50,7 @@ func (s *Server) handleMovieIMDbRating(w http.ResponseWriter, r *http.Request) {
 			target = targets[i]
 		}
 		go func() {
-			rating, err := s.clients().IMDb.GetRating(ctx, imdbID)
+			rating, err := c.clients().IMDb.GetRating(ctx, imdbID)
 			if err != nil {
 				slog.Warn("failed to fetch imdb rating", "imdb_id", logValue(imdbID), "error", logError(err))
 				results <- imdbRatingResult{target: target}

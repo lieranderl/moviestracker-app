@@ -30,17 +30,17 @@ const (
 var errDetailsUnavailable = errors.New("tmdb details provider not configured")
 
 // pageUser returns the signed-in user or redirects to the sign-in flow.
-func (s *Server) pageUser(w http.ResponseWriter, r *http.Request) *auth.User {
-	user := s.userFromRequest(r)
+func (c *Catalog) pageUser(w http.ResponseWriter, r *http.Request) *auth.User {
+	user := c.userFromRequest(r)
 	if user == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		http.Redirect(w, r, c.signIn, http.StatusSeeOther)
 	}
 	return user
 }
 
 // apiUser returns the signed-in user or answers 401.
-func (s *Server) apiUser(w http.ResponseWriter, r *http.Request) *auth.User {
-	user := s.userFromRequest(r)
+func (c *Catalog) apiUser(w http.ResponseWriter, r *http.Request) *auth.User {
+	user := c.userFromRequest(r)
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 	}
@@ -53,8 +53,8 @@ func positiveInt(raw string) (int, bool) {
 	return n, err == nil && n > 0
 }
 
-func (s *Server) detailsContext(r *http.Request) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(r.Context(), s.catalogTimeout)
+func (c *Catalog) detailsContext(r *http.Request) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(r.Context(), c.catalogTimeout)
 }
 
 // renderMediaError answers a failed TMDB lookup with a 404 or 502 page.
@@ -72,8 +72,8 @@ func renderMediaError(w http.ResponseWriter, r *http.Request, user *auth.User, e
 // detailTarget resolves the signed-in user and the {id} of a title page. It
 // answers the request itself (redirect, 404 or 502) and returns ok=false when
 // the page cannot be served.
-func (s *Server) detailTarget(w http.ResponseWriter, r *http.Request) (*auth.User, int, bool) {
-	user := s.pageUser(w, r)
+func (c *Catalog) detailTarget(w http.ResponseWriter, r *http.Request) (*auth.User, int, bool) {
+	user := c.pageUser(w, r)
 	if user == nil {
 		return nil, 0, false
 	}
@@ -82,21 +82,21 @@ func (s *Server) detailTarget(w http.ResponseWriter, r *http.Request) (*auth.Use
 		renderMediaError(w, r, user, tmdb.ErrNotFound)
 		return nil, 0, false
 	}
-	if s.clients().Details == nil {
+	if c.clients().Details == nil {
 		renderMediaError(w, r, user, errDetailsUnavailable)
 		return nil, 0, false
 	}
 	return user, id, true
 }
 
-func (s *Server) handleMoviePage(w http.ResponseWriter, r *http.Request) {
-	user, id, ok := s.detailTarget(w, r)
+func (c *Catalog) handleMoviePage(w http.ResponseWriter, r *http.Request) {
+	user, id, ok := c.detailTarget(w, r)
 	if !ok {
 		return
 	}
-	ctx, cancel := s.detailsContext(r)
+	ctx, cancel := c.detailsContext(r)
 	defer cancel()
-	movie, err := s.clients().Details.Movie(ctx, id)
+	movie, err := c.clients().Details.Movie(ctx, id)
 	if err != nil {
 		renderMediaError(w, r, user, err)
 		return
@@ -104,14 +104,14 @@ func (s *Server) handleMoviePage(w http.ResponseWriter, r *http.Request) {
 	templ.Handler(views.MoviePage(user, movie)).ServeHTTP(w, r)
 }
 
-func (s *Server) handlePersonPage(w http.ResponseWriter, r *http.Request) {
-	user, id, ok := s.detailTarget(w, r)
+func (c *Catalog) handlePersonPage(w http.ResponseWriter, r *http.Request) {
+	user, id, ok := c.detailTarget(w, r)
 	if !ok {
 		return
 	}
-	ctx, cancel := s.detailsContext(r)
+	ctx, cancel := c.detailsContext(r)
 	defer cancel()
-	person, err := s.clients().Details.Person(ctx, id)
+	person, err := c.clients().Details.Person(ctx, id)
 	if err != nil {
 		renderMediaError(w, r, user, err)
 		return

@@ -14,9 +14,9 @@ import (
 
 // browseView is the list /browse/{slug} names, with ?window=day for today's
 // trending; ok is false for a list there is not.
-func (s *Server) browseView(r *http.Request) (views.BrowseView, bool) {
+func (c *Catalog) browseView(r *http.Request) (views.BrowseView, bool) {
 	list, ok := views.FindBrowseList(r.PathValue("slug"))
-	if !ok || s.clients().Details == nil {
+	if !ok || c.clients().Details == nil {
 		return views.BrowseView{}, false
 	}
 	return views.BrowseView{List: list, Today: list.Day != "" && r.URL.Query().Get("window") == "day"}, true
@@ -24,20 +24,20 @@ func (s *Server) browseView(r *http.Request) (views.BrowseView, bool) {
 
 // handleBrowsePage shows a home row whole: its first 20 titles, and more
 // as the page scrolls (handleBrowseMore).
-func (s *Server) handleBrowsePage(w http.ResponseWriter, r *http.Request) {
-	user := s.userFromRequest(r)
+func (c *Catalog) handleBrowsePage(w http.ResponseWriter, r *http.Request) {
+	user := c.userFromRequest(r)
 	if user == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		http.Redirect(w, r, c.signIn, http.StatusSeeOther)
 		return
 	}
-	v, ok := s.browseView(r)
+	v, ok := c.browseView(r)
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	ctx, cancel := s.detailsContext(r)
+	ctx, cancel := c.detailsContext(r)
 	defer cancel()
-	p, err := s.clients().Details.ListPage(ctx, v.Source(), 1)
+	p, err := c.clients().Details.ListPage(ctx, v.Source(), 1)
 	if err != nil {
 		slog.Warn("tmdb browse page failed", "list", v.Source(), "error", err)
 		v.Failed = true
@@ -52,11 +52,11 @@ func (s *Server) handleBrowsePage(w http.ResponseWriter, r *http.Request) {
 
 // handleBrowseMore appends ?page= of a list to the grid and moves the
 // loader under it to the page after, until TMDB's last page.
-func (s *Server) handleBrowseMore(w http.ResponseWriter, r *http.Request) {
-	if s.apiUser(w, r) == nil {
+func (c *Catalog) handleBrowseMore(w http.ResponseWriter, r *http.Request) {
+	if c.apiUser(w, r) == nil {
 		return
 	}
-	v, ok := s.browseView(r)
+	v, ok := c.browseView(r)
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -66,9 +66,9 @@ func (s *Server) handleBrowseMore(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Ask for a page from 2 to 500.", http.StatusBadRequest)
 		return
 	}
-	ctx, cancel := s.detailsContext(r)
+	ctx, cancel := c.detailsContext(r)
 	defer cancel()
-	details := s.clients().Details
+	details := c.clients().Details
 	p, err := details.ListPage(ctx, v.Source(), page)
 	sse := datastar.NewSSE(w, r)
 	if err != nil {

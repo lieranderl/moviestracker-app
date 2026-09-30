@@ -30,9 +30,9 @@ templ Navbar(user *auth.User) {
 		<nav class="navbar max-w-7xl mx-auto px-4 sm:px-8 min-h-16 gap-2" aria-label={ tr(ctx, "Main") }>
 			<div class="navbar-start gap-4">
 				if user != nil {
-					@brand("/movies")
+					@brand(homeHref(ctx))
 					<ul class="menu menu-horizontal flex-nowrap whitespace-nowrap gap-1 text-sm font-medium hidden md:flex">
-						for _, l := range appLinks {
+						for _, l := range navLinks(ctx) {
 							<li>
 								<a href={ templ.SafeURL(l.Href) }>
 									@Icon(l.Icon, "size-4")
@@ -42,7 +42,7 @@ templ Navbar(user *auth.User) {
 						}
 					</ul>
 				} else {
-					@brand("/login")
+					@brand(signInHref(ctx))
 				}
 			</div>
 			<div class="navbar-end gap-2">
@@ -63,7 +63,7 @@ templ Navbar(user *auth.User) {
 				if user != nil {
 					@userMenu(user)
 				} else {
-					<a href="/login" class="btn btn-primary btn-sm gap-1.5">
+					<a href={ templ.SafeURL(signInHref(ctx)) } class="btn btn-primary btn-sm gap-1.5">
 						@Icon("log-in", "size-4")
 						{ tr(ctx, "Sign in") }
 					</a>
@@ -113,12 +113,14 @@ templ userMenu(user *auth.User) {
 				<span class="flex flex-col min-w-0">
 					<span class="font-bold text-sm truncate">{ user.Name }</span>
 					<span class="text-xs text-base-content/60 font-mono truncate">{ user.Username }</span>
-					<span class="badge badge-accent badge-xs mt-1 font-mono uppercase">{ tr(ctx, user.Role) }</span>
+					if !siteOf(ctx).Cloud {
+						<span class="badge badge-accent badge-xs mt-1 font-mono uppercase">{ tr(ctx, user.Role) }</span>
+					}
 				</span>
 			</div>
 		</li>
 		<li></li>
-		for _, l := range appLinks {
+		for _, l := range navLinks(ctx) {
 			<li>
 				<a href={ templ.SafeURL(l.Href) }>
 					@Icon(l.Icon, "size-4")

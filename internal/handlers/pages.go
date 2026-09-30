@@ -23,25 +23,25 @@ func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	templ.Handler(views.Login(consented, "")).ServeHTTP(w, r)
 }
 
-func (s *Server) handleMoviesPage(w http.ResponseWriter, r *http.Request) {
-	user := s.userFromRequest(r)
+func (c *Catalog) handleMoviesPage(w http.ResponseWriter, r *http.Request) {
+	user := c.userFromRequest(r)
 	if user == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		http.Redirect(w, r, c.signIn, http.StatusSeeOther)
 		return
 	}
 
 	var catalog tmdb.Catalog
-	if s.clients().Catalog != nil {
-		ctx, cancel := context.WithTimeout(r.Context(), s.catalogTimeout)
+	if c.clients().Catalog != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), c.catalogTimeout)
 		defer cancel()
 
 		var err error
-		catalog, err = s.clients().Catalog.GetCatalog(ctx)
+		catalog, err = c.clients().Catalog.GetCatalog(ctx)
 		if err != nil {
 			slog.Warn("failed to fetch media catalog", "error", err)
 		}
 	}
 
-	component := views.Movies(user, catalog.Hero, catalog.Movies, catalog.Series, s.clients().Details != nil)
+	component := views.Movies(user, catalog.Hero, catalog.Movies, catalog.Series, c.clients().Details != nil)
 	templ.Handler(component).ServeHTTP(w, r)
 }

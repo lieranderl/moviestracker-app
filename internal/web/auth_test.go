@@ -307,7 +307,7 @@ func TestASignedInUsersLanguageFollowsThemToOtherBrowsers(t *testing.T) {
 
 	// In another, she signs in and her pages are in Russian.
 	home := getWith(t, h, "/", signIn(t, h))
-	if body := home.Body.String(); !strings.Contains(body, "Здравствуйте, Ann Lee") {
+	if body := home.Body.String(); !strings.Contains(body, `<html lang="ru"`) || !strings.Contains(body, "Главная") {
 		t.Error("after signing in elsewhere, the home page is not in the language Ann picked")
 	}
 }

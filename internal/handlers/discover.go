@@ -17,12 +17,12 @@ type discoverResult struct {
 
 // handleDiscover fetches every home discovery list concurrently and patches
 // each rail as soon as its list arrives; failed lists collapse their rail.
-func (s *Server) handleDiscover(w http.ResponseWriter, r *http.Request) {
-	if s.apiUser(w, r) == nil {
+func (c *Catalog) handleDiscover(w http.ResponseWriter, r *http.Request) {
+	if c.apiUser(w, r) == nil {
 		return
 	}
 	sse := datastar.NewSSE(w, r)
-	ctx, cancel := s.detailsContext(r)
+	ctx, cancel := c.detailsContext(r)
 	defer cancel()
 
 	// Buffered so fetchers never block, even if the client goes away early.
@@ -30,9 +30,9 @@ func (s *Server) handleDiscover(w http.ResponseWriter, r *http.Request) {
 	for _, rail := range views.DiscoverRails {
 		go func() {
 			var items []tmdb.MediaItem
-			if s.clients().Details != nil {
+			if c.clients().Details != nil {
 				var err error
-				if items, err = s.clients().Details.List(ctx, rail.List); err != nil {
+				if items, err = c.clients().Details.List(ctx, rail.List); err != nil {
 					slog.Warn("tmdb discover list failed", "list", rail.List, "error", err)
 				}
 			}
