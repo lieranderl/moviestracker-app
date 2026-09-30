@@ -1,0 +1,19 @@
+package views
+
+// WebSignIn is the cloud web app's sign-in page (internal/web): any verified
+// Google account can sign in.
+templ WebSignIn() {
+	@authPageAt(tr(ctx, "Sign in"), "/") {
+		<div class="card-body p-6 sm:p-10 gap-6">
+			<header class="space-y-2">
+				<h1 class="text-2xl sm:text-3xl font-bold tracking-tight">{ tr(ctx, "Welcome to Moviestracker") }</h1>
+				<p class="text-sm text-base-content/70">{ tr(ctx, "Browse movies and TV, keep your favourites, and play them from your own TorrServer.") }</p>
+			</header>
+			<a href="/auth/google" class="btn btn-primary btn-block">
+				@Icon("log-in", "size-4")
+				{ tr(ctx, "Sign in with Google") }
+			</a>
+			<p class="text-xs text-base-content/60 text-center">{ tr(ctx, "Moviestracker does not host, upload, seed, or distribute media.") }</p>
+		</div>
+	}
+}

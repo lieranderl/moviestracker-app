@@ -3,7 +3,10 @@ package i18n
 // ru translates the interface into Russian, by English text.
 var ru = map[string]string{ // #nosec G101 -- interface texts ("Password"), not credentials
 	// Shell: navigation, sign-in and setup
-	"Sign in":                       "Войти",
+	"Sign in":                  "Войти",
+	"Sign in with Google":      "Войти через Google",
+	"Welcome to Moviestracker": "Добро пожаловать в Moviestracker",
+	"Browse movies and TV, keep your favourites, and play them from your own TorrServer.": "Смотрите фильмы и сериалы, сохраняйте избранное и запускайте их со своего TorrServer.",
 	"Sign in as %s":                 "Войти как %s",
 	"Home":                          "Главная",
 	"Search":                        "Поиск",

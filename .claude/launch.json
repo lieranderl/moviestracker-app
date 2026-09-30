@@ -4,9 +4,22 @@
     {
       "name": "moviestracker",
       "runtimeExecutable": "make",
-      "runtimeArgs": ["dev"],
+      "runtimeArgs": [
+        "dev"
+      ],
       "port": 8095,
       "autoPort": true
+    },
+    {
+      "name": "moviestracker-web",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PORT=8096",
+        "go",
+        "run",
+        "./cmd/web"
+      ],
+      "port": 8096
     }
   ]
 }

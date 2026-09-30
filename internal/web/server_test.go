@@ -45,3 +45,26 @@ func TestTheAppsStylesAndScriptsAreServed(t *testing.T) {
 		}
 	}
 }
+
+func TestASignedOutVisitorIsOfferedGoogleSignIn(t *testing.T) {
+	res := get(t, web.New(), "/")
+	body := res.Body.String()
+	if res.Code != http.StatusOK {
+		t.Fatalf("GET / = %d, want 200", res.Code)
+	}
+	for _, want := range []string{"Sign in with Google", `href="/auth/google"`, `action="/api/language"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("sign-in page lacks %q", want)
+		}
+	}
+}
+
+func TestTheSignInPageSpeaksTheVisitorsLanguage(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Language", "ru-RU,ru;q=0.9")
+	web.New().ServeHTTP(rec, req)
+	if body := rec.Body.String(); !strings.Contains(body, "Войти через Google") {
+		t.Errorf("sign-in page for a Russian browser lacks %q", "Войти через Google")
+	}
+}
