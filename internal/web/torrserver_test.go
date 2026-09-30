@@ -2,8 +2,10 @@ package web_test
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -22,10 +24,15 @@ func torrServers(t *testing.T) (h http.Handler, session *httptest.ResponseRecord
 	return h, signIn(t, h), users
 }
 
-// sendSignals is a Datastar request carrying signals as its JSON body.
+// sendSignals is a Datastar request carrying signals as Datastar sends
+// them: in the ?datastar= query for GET and DELETE, else as the JSON body.
 func sendSignals(t *testing.T, h http.Handler, method, path, signals string, session *httptest.ResponseRecorder) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(method, path, strings.NewReader(signals))
+	var body io.Reader = strings.NewReader(signals)
+	if method == http.MethodGet || method == http.MethodDelete {
+		path, body = path+"?datastar="+url.QueryEscape(signals), nil
+	}
+	req := httptest.NewRequest(method, path, body)
 	req.Header.Set("Datastar-Request", "true")
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(sessionCookie(session))
@@ -79,7 +86,7 @@ func TestAUserRemovesATorrServer(t *testing.T) {
 	h, session, users := torrServers(t)
 	home, _ := users.SaveTorrServer(context.Background(), "1098765", store.TorrServer{Name: "Home", URL: "http://localhost:8090"})
 	res := sendSignals(t, h, http.MethodDelete, "/api/torrservers/"+home.ID, `{}`, session)
-	if res.Code != http.StatusOK || strings.Contains(res.Body.String(), "http://localhost:8090") {
+	if res.Code != http.StatusOK || strings.Contains(res.Body.String(), `value="http://localhost:8090"`) {
 		t.Errorf("removing Home = %d, want the list patched without it", res.Code)
 	}
 	if list, _ := users.TorrServers(context.Background(), "1098765"); len(list) != 0 {
@@ -97,5 +104,31 @@ func TestTorrServersNeedASignedInUser(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("POST /api/torrservers signed out = %d, want 401", rec.Code)
+	}
+}
+
+func TestRemovingThePickedTorrServerPicksAnotherAndForgetsItsLogin(t *testing.T) {
+	h, session, users := torrServers(t)
+	ctx := context.Background()
+	home, _ := users.SaveTorrServer(ctx, "1098765", store.TorrServer{Name: "Home", URL: "http://localhost:8090"})
+	if _, err := users.SaveTorrServer(ctx, "1098765", store.TorrServer{Name: "NAS", URL: "https://nas.example:8091"}); err != nil {
+		t.Fatal(err)
+	}
+	res := sendSignals(t, h, http.MethodDelete, "/api/torrservers/"+home.ID, `{"tsSelected":"http://localhost:8090"}`, session).Body.String()
+	if !strings.Contains(res, `"tsForget":"http://localhost:8090"`) {
+		t.Errorf("removing Home does not tell the browser to forget its login:\n%s", res)
+	}
+	if !strings.Contains(res, `"tsSelected":"https://nas.example:8091"`) {
+		t.Errorf("removing the picked Home does not pick NAS:\n%s", res)
+	}
+}
+
+func TestRemovingATorrServerThatIsNotPickedKeepsThePick(t *testing.T) {
+	h, session, users := torrServers(t)
+	ctx := context.Background()
+	home, _ := users.SaveTorrServer(ctx, "1098765", store.TorrServer{Name: "Home", URL: "http://localhost:8090"})
+	res := sendSignals(t, h, http.MethodDelete, "/api/torrservers/"+home.ID, `{"tsSelected":"https://other.example"}`, session).Body.String()
+	if strings.Contains(res, `"tsSelected"`) {
+		t.Errorf("removing Home changed the pick, which was another server:\n%s", res)
 	}
 }

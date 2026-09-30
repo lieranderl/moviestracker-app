@@ -72,21 +72,58 @@ func (a *app) handleAddTorrServer(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleRemoveTorrServer forgets one of the user's TorrServers.
+// handleRemoveTorrServer forgets one of the user's TorrServers. Once it is
+// gone, the browser forgets its login ($tsForget) and, if it was the one
+// picked ($tsSelected), picks the first left, if any.
 func (a *app) handleRemoveTorrServer(w http.ResponseWriter, r *http.Request) {
 	user, ok := a.currentUser(r)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	var picked struct {
+		Selected string `json:"tsSelected"`
+	}
+	if err := datastar.ReadSignals(r, &picked); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
 	defer cancel()
-	if err := a.cfg.Store.RemoveTorrServer(ctx, user.ID, r.PathValue("id")); err != nil {
+	id := r.PathValue("id")
+	servers, err := a.cfg.Store.TorrServers(ctx, user.ID)
+	if err == nil {
+		err = a.cfg.Store.RemoveTorrServer(ctx, user.ID, id)
+	}
+	if err != nil {
 		slog.Warn("removing a TorrServer failed", "error", handlers.LogError(err))
 		http.Error(w, i18n.T(r.Context(), "The TorrServer could not be removed. Please try again."), http.StatusServiceUnavailable)
 		return
 	}
-	a.patchTorrServers(ctx, datastar.NewSSE(w, r), user.ID)
+	signals := map[string]string{}
+	var left []store.TorrServer
+	for _, s := range servers {
+		if s.ID == id {
+			signals["tsForget"] = s.URL
+			if s.URL == picked.Selected {
+				signals["tsSelected"] = ""
+			}
+		} else {
+			left = append(left, s)
+		}
+	}
+	if _, repick := signals["tsSelected"]; repick && len(left) > 0 {
+		signals["tsSelected"] = left[0].URL
+	}
+	sse := datastar.NewSSE(w, r)
+	if err := sse.PatchElementTempl(views.WebTorrServers(left)); err != nil {
+		slog.Warn("patching TorrServers failed", "error", err)
+	}
+	if len(signals) > 0 {
+		if err := sse.MarshalAndPatchSignals(signals); err != nil {
+			slog.Warn("patching the TorrServer pick failed", "error", err)
+		}
+	}
 }
 
 // patchTorrServers sends the user's TorrServers as they are kept.

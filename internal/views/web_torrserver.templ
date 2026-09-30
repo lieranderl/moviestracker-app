@@ -15,19 +15,23 @@ func webTorrServerSignals(servers []store.TorrServer) string {
 	if len(servers) > 0 {
 		first = servers[0].URL
 	}
-	return fmt.Sprintf(`{ tsSelected: localStorage.getItem('mt-ts-selected') || %q, tsStatus: {checking: false, ok: false, version: '', hls: false, problem: '', status: 0}, tsAddOpen: %t, tsName: '', tsUrl: '', tsUser: '', tsPass: '', tsFormError: '' }`, first, len(servers) == 0)
+	return fmt.Sprintf(`{ tsSelected: localStorage.getItem('mt-ts-selected') || %q, tsStatus: {checking: false, ok: false, version: '', hls: false, problem: '', status: 0}, tsAddOpen: %t, tsName: '', tsUrl: '', tsUser: '', tsPass: '', tsFormError: '', tsForget: '' }`, first, len(servers) == 0)
 }
 
 // webTorrServerAdd saves the form's login in this browser, then sends only
 // the name and address.
 const webTorrServerAdd = `tsSaveLogin($tsUrl.trim().replace(/\/+$/, ''), $tsUser.trim(), $tsPass); @post('/api/torrservers', {filterSignals: {include: /^ts(Name|Url)$/}})`
 
+// webTorrServerEffects keep the pick in this browser, and forget the login
+// of a TorrServer the server has removed ($tsForget).
+const webTorrServerEffects = `localStorage.setItem('mt-ts-selected', $tsSelected); if ($tsForget) { tsForgetLogin($tsForget); $tsForget = '' }`
+
 // WebTorrServerPage is the web app's TorrServer page: the user's
 // TorrServers, reached from their browser.
 templ WebTorrServerPage(user *auth.User, servers []store.TorrServer) {
 	@layoutWithScripts(tr(ctx, "TorrServer"), "/static/torrserver.js") {
 		@Navbar(user)
-		<main class="grow pb-20" data-signals={ webTorrServerSignals(servers) } data-effect="$tsSelected && localStorage.setItem('mt-ts-selected', $tsSelected)">
+		<main class="grow pb-20" data-signals={ webTorrServerSignals(servers) } data-effect={ webTorrServerEffects }>
 			<div class="max-w-5xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
 				<header class="flex flex-wrap items-end justify-between gap-4">
 					<div class="space-y-1">
@@ -106,7 +110,7 @@ templ WebTorrServers(servers []store.TorrServer) {
 					type="button"
 					class="btn btn-ghost btn-sm btn-square text-error"
 					aria-label={ trf(ctx, "Remove %s", s.Name) }
-					data-on:click={ fmt.Sprintf("tsForgetLogin(%q); @delete('/api/torrservers/%s')", s.URL, s.ID) }
+					data-on:click={ fmt.Sprintf("@delete('/api/torrservers/%s', {filterSignals: {include: /^tsSelected$/}})", s.ID) }
 				>
 					@Icon("trash-2", "size-4")
 				</button>
