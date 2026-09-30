@@ -12,7 +12,7 @@ CONTAINER_TOOL ?= $(shell command -v docker 2>/dev/null || command -v container 
 CONTAINER_NAME ?= moviestracker-app
 CONTAINER_PORT ?= 8095
 
-.PHONY: all help torrserver dmg winapp assets templ templ-check assets-check lint test security coverage ci build run dev clean \
+.PHONY: all help torrserver dmg winapp assets templ templ-check assets-check lint test security coverage ci build run dev web web-dev clean \
 	docker-build docker-smoke container-run container-stop
 
 all: ci
@@ -32,6 +32,8 @@ help:
 	@echo "  make winapp VERSION=v0.1.0   Build the Windows installer (Windows, Inno Setup 7)"
 	@echo "  make run             Run locally over HTTP with secure cookies disabled"
 	@echo "  make dev             Run Air locally with secure cookies disabled"
+	@echo "  make web             Run the cloud web app (cmd/web) on http://localhost:8080"
+	@echo "  make web-dev         Run the cloud web app with Air (rebuilds on changes)"
 	@echo "  make docker-build    Build the Linux image (docker, or Apple's container CLI)"
 	@echo "  make docker-smoke    Build and test the image end to end with compose.yaml (Docker)"
 	@echo "  make container-run   Run the image on port 8095 with Apple's container CLI"
@@ -135,6 +137,13 @@ run: templ assets
 
 dev: assets
 	$(DEV_ENV) $(AIR)
+
+# The cloud web app (cmd/web) on http://localhost:8080 (PORT changes it).
+web: templ assets
+	$(GO) run ./cmd/web
+
+web-dev: assets
+	$(AIR) --build.cmd "bun run assets && go tool templ generate && go build -o ./tmp/web ./cmd/web" --build.bin "./tmp/web"
 
 clean:
 	rm -rf bin tmp dist build-errors.log coverage.out
