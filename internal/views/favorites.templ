@@ -45,8 +45,9 @@ templ FavoriteButton(kind string, id int, on bool) {
 	</button>
 }
 
-// FavoritesPage lists the signed-in user's favourites, newest first.
-templ FavoritesPage(user *auth.User, items []tmdb.MediaItem) {
+// FavoritesPage lists the signed-in user's favourites, newest first;
+// failed says they could not be read.
+templ FavoritesPage(user *auth.User, items []tmdb.MediaItem, failed bool) {
 	@Layout(tr(ctx, "Favourites")) {
 		@Navbar(user)
 		<main class="grow pb-20">
@@ -58,7 +59,12 @@ templ FavoritesPage(user *auth.User, items []tmdb.MediaItem) {
 					</h1>
 					<p class="text-sm text-base-content/60">{ tr(ctx, "Movies and series you keep, newest first.") }</p>
 				</header>
-				if len(items) == 0 {
+				if failed {
+					<div role="alert" class="alert alert-error alert-soft">
+						@Icon("circle-alert", "size-5")
+						<span>{ tr(ctx, "Your favourites could not be loaded right now. Please try again in a moment.") }</span>
+					</div>
+				} else if len(items) == 0 {
 					<div role="status" class="alert alert-info alert-soft">
 						@Icon("info", "size-5")
 						<span>{ tr(ctx, "No favourites yet. Open a movie or series and press Add to favourites.") }</span>

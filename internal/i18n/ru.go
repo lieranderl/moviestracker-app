@@ -5,9 +5,10 @@ var ru = map[string]string{ // #nosec G101 -- interface texts ("Password"), not 
 	// Shell: navigation, sign-in and setup
 	"Sign in":             "Войти",
 	"Sign in with Google": "Войти через Google",
-	"Favourites":          "Избранное",
-	"In favourites":       "В избранном",
-	"Add to favourites":   "В избранное",
+	"Your favourites could not be loaded right now. Please try again in a moment.": "Не удалось загрузить избранное. Попробуйте чуть позже.",
+	"Favourites":        "Избранное",
+	"In favourites":     "В избранном",
+	"Add to favourites": "В избранное",
 	"Movies and series you keep, newest first.":                              "Фильмы и сериалы, которые вы сохранили, — сначала новые.",
 	"No favourites yet. Open a movie or series and press Add to favourites.": "В избранном пока пусто. Откройте фильм или сериал и нажмите «В избранное».",
 	"TMDB is not responding right now. Please try again.":                    "TMDB сейчас не отвечает. Попробуйте ещё раз.",

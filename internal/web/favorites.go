@@ -110,14 +110,18 @@ func (a *app) handleFavoritesPage(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	favs, err := a.cfg.Store.Favorites(ctx, user.ID)
 	if err != nil {
-		slog.Warn("reading favourites failed", "error", err)
+		slog.Warn("reading favourites failed", "error", handlers.LogError(err))
 	}
 	items := make([]tmdb.MediaItem, 0, len(favs))
 	for _, f := range favs {
 		items = append(items, tmdb.MediaItem{ID: f.TMDBID, Title: f.Title, PosterPath: f.Poster, MediaType: f.Kind})
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	if err := views.FavoritesPage(a.catalogUser(r), items).Render(r.Context(), w); err != nil {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	if err := views.FavoritesPage(a.catalogUser(r), items, err != nil).Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "favourites", "error", err)
 	}
 }

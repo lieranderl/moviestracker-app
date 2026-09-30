@@ -2,6 +2,7 @@ package web_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -107,5 +108,25 @@ func TestFavouritesNeedASignedInUser(t *testing.T) {
 	}
 	if res := get(t, h, "/favorites"); res.Code != http.StatusSeeOther || res.Header().Get("Location") != "/" {
 		t.Errorf("GET /favorites signed out = %d to %q, want 303 to /", res.Code, res.Header().Get("Location"))
+	}
+}
+
+// unreachableStore is a user store whose favourites cannot be read, as
+// Firestore when it is down.
+type unreachableStore struct{ *store.Memory }
+
+func (unreachableStore) Favorites(context.Context, string) ([]store.Favorite, error) {
+	return nil, errors.New("firestore: unavailable")
+}
+
+func TestFavouritesThatCannotBeReadAreNotShownAsNone(t *testing.T) {
+	g := newGoogle(t)
+	cfg := withTMDB(t, g.config())
+	cfg.Store = unreachableStore{store.NewMemory()}
+	h := web.New(cfg)
+	page := getWith(t, h, "/favorites", signIn(t, h))
+	body := page.Body.String()
+	if page.Code != http.StatusServiceUnavailable || strings.Contains(body, "No favourites yet") || !strings.Contains(body, "could not be loaded") {
+		t.Errorf("GET /favorites with the store down = %d, want 503 saying they could not be loaded, not that there are none", page.Code)
 	}
 }
