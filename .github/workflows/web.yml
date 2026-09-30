@@ -22,6 +22,7 @@ on:
       - package.json
       - bun.lock
       - Dockerfile.web
+      - .dockerignore
       - .github/workflows/web.yml
   workflow_dispatch:
 
