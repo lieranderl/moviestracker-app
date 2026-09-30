@@ -49,7 +49,7 @@ func webTorrentsBox() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section id=\"ts-torrents-box\" class=\"space-y-3\" data-show=\"$tsStatus.ok\" data-signals=\"{ tsConfirm: '' }\" data-effect=\"$tsStatus.ok && tsList(el, $tsSelected)\" data-on-interval__duration.5s=\"$tsStatus.ok && tsList(el, $tsSelected)\" data-on:ts-torrents=\"@post('/api/ts/torrents', {payload: {torrents: evt.detail}})\" aria-label=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section id=\"ts-torrents-box\" class=\"space-y-3\" data-show=\"$tsSelected && $tsStatus.ok\" data-signals=\"{ tsConfirm: '' }\" data-effect=\"$tsSelected && $tsStatus.ok && tsList(el, $tsSelected)\" data-on-interval__duration.5s=\"$tsSelected && $tsStatus.ok && tsList(el, $tsSelected)\" data-on:ts-torrents=\"@post('/api/ts/torrents', {payload: {torrents: evt.detail}})\" aria-label=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -323,9 +323,9 @@ func webTorrentCard(t torrserver.Torrent) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var16 string
-		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(t.FormattedPeers())
+		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d / %d", t.ActivePeers, max(t.ActivePeers, t.TotalPeers)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrents.templ`, Line: 78, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrents.templ`, Line: 78, Col: 106}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {

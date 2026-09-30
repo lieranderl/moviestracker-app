@@ -24,10 +24,10 @@ templ webTorrentsBox() {
 	<section
 		id="ts-torrents-box"
 		class="space-y-3"
-		data-show="$tsStatus.ok"
+		data-show="$tsSelected && $tsStatus.ok"
 		data-signals="{ tsConfirm: '' }"
-		data-effect="$tsStatus.ok && tsList(el, $tsSelected)"
-		data-on-interval__duration.5s="$tsStatus.ok && tsList(el, $tsSelected)"
+		data-effect="$tsSelected && $tsStatus.ok && tsList(el, $tsSelected)"
+		data-on-interval__duration.5s="$tsSelected && $tsStatus.ok && tsList(el, $tsSelected)"
 		data-on:ts-torrents="@post('/api/ts/torrents', {payload: {torrents: evt.detail}})"
 		aria-label={ tr(ctx, "Torrents") }
 	>
@@ -75,7 +75,7 @@ templ webTorrentCard(t torrserver.Torrent) {
 						}
 					</div>
 					<p class="text-xs text-base-content/60 font-mono flex flex-wrap gap-x-3">
-						<span>{ tr(ctx, "Peers") } { t.FormattedPeers() }</span>
+						<span>{ tr(ctx, "Peers") } { fmt.Sprintf("%d / %d", t.ActivePeers, max(t.ActivePeers, t.TotalPeers)) }</span>
 						<span class="text-success">↓ { t.FormattedDownloadSpeed() }</span>
 					</p>
 				</div>

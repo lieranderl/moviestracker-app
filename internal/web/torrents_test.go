@@ -34,7 +34,7 @@ func TestTheBrowsersTorrentListIsShownAsCards(t *testing.T) {
 	if res.Code != http.StatusOK || !strings.Contains(body, `id="ts-torrents"`) {
 		t.Fatalf("POST /api/ts/torrents = %d, want #ts-torrents patched:\n%s", res.Code, body)
 	}
-	for _, want := range []string{"Dune (2021)", "Severance.S01", "8.00 GB", "20.00 GB", "1.00 MB/s", "tsTorrentAction", "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"} {
+	for _, want := range []string{"Dune (2021)", "Severance.S01", "8.00 GB", "20.00 GB", "1.00 MB/s", "12 / 40", "tsTorrentAction", "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the torrent cards lack %q", want)
 		}
@@ -56,5 +56,17 @@ func TestTorrentListsNeedASignedInUserAndAreBounded(t *testing.T) {
 	huge := `{"torrents":[{"title":"` + strings.Repeat("x", 3<<20) + `"}]}`
 	if res := postTorrents(t, h, huge, session); res.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("a 3 MB list = %d, want 413", res.Code)
+	}
+}
+
+func TestTooManyTorrentsOrFilesAreRefused(t *testing.T) {
+	h, session, _ := torrServers(t)
+	many := `{"torrents":[` + strings.TrimSuffix(strings.Repeat(`{},`, 501), ",") + `]}`
+	if res := postTorrents(t, h, many, session); res.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("501 torrents = %d, want 413", res.Code)
+	}
+	files := `{"torrents":[{"file_stats":[` + strings.TrimSuffix(strings.Repeat(`{},`, 5001), ",") + `]}]}`
+	if res := postTorrents(t, h, files, session); res.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("a torrent of 5001 files = %d, want 413", res.Code)
 	}
 }
