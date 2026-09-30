@@ -72,6 +72,7 @@ lint: templ-check assets-check
 	@test -z "$$(gofmt -l cmd internal static)" || (echo "Unformatted Go files:" && gofmt -l cmd internal static && exit 1)
 
 test: lint
+	$(BUN) run test
 	$(GO) test -race -count=1 ./...
 
 security:

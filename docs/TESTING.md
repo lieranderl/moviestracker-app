@@ -30,6 +30,11 @@ This document defines testing conventions, the test-driven development loop, sea
   - Assert on explicit expected literals derived directly from specifications, never re-computing values using the same logic as the production code.
 
 ## 5. Verification Commands & Protocols
+
+- **Browser TorrServer actions**: `bun run test` exercises the browser helper's
+  public actions, outgoing requests and result events. Only browser storage and
+  external network boundaries are replaced; no DOM library is needed. These
+  tests run in `make test` and `make ci` before the Go race tests.
 - **Run Unit & Integration Tests**:
   ```bash
   go test -v ./...

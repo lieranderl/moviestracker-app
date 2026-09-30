@@ -46,7 +46,7 @@ const headers = (url) => {
 // its certificate not trusted), "login" (it wants a login), "timeout",
 // "status", or "aborted" (signal: a newer request replaced this one). The
 // timeout covers reading the body too.
-const call = async (url, path, { init = {}, read = (res) => res.text(), signal } = {}) => {
+const call = async (url, path, { init = {}, read = (res) => res.text(), signal, timeout = timeoutMs } = {}) => {
   const target = new URL(path, `${url}/`);
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(target.hostname);
   if (window.location.protocol === "https:" && target.protocol === "http:" && !local) {
@@ -55,10 +55,10 @@ const call = async (url, path, { init = {}, read = (res) => res.text(), signal }
   const ctl = new AbortController();
   const abort = () => ctl.abort();
   signal?.addEventListener("abort", abort);
-  const timer = setTimeout(abort, timeoutMs);
+  const timer = setTimeout(abort, timeout);
   try {
     const res = await fetch(target, { ...init, headers: { ...headers(url), ...init.headers }, signal: ctl.signal });
-    if (res.status === 401) return { problem: "login" };
+    if (res.status === 401) return { problem: "login", status: 401 };
     if (!res.ok) return { problem: "status", status: res.status };
     return { value: await read(res) };
   } catch (err) {
@@ -160,4 +160,92 @@ window.tsTorrentAction = async (el, url, action, hash) => {
     // Storage blocked: assume the pick did not change.
   }
   if (picked === url) await window.tsList(el, url, true);
+};
+
+// tsAddTorrent sends the form's torrent straight to TorrServer. Datastar
+// owns the progress, errors and list refresh through ts-added events.
+const webAddress = (value) => {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+};
+
+const torrentLink = (value) => {
+  if (webAddress(value)) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === "magnet:" && url.searchParams.getAll("xt").some((xt) => /^urn:btih:(?:[a-f0-9]{40}|[a-z2-7]{32})$/i.test(xt));
+  } catch {
+    return false;
+  }
+};
+
+// A server selection change cancels the old form operation. Like tsCheck,
+// this reports after an await so a data-effect never tracks its own result.
+const adding = new WeakMap();
+
+window.tsResetAdd = async (el) => {
+  adding.delete(el);
+  const signal = begin(el);
+  await Promise.resolve();
+  if (!signal.aborted) tell(el, "ts-added", { adding: false, ok: false, problem: "", status: 0 });
+};
+
+window.tsAddTorrent = async (el, url, { link = "", title = "", poster = "", file } = {}) => {
+  if (adding.has(el)) return;
+  const signal = begin(el);
+  adding.set(el, signal);
+  try {
+    await Promise.resolve();
+    if (signal.aborted) return;
+    tell(el, "ts-added", { adding: true, ok: false, problem: "", status: 0 });
+    link = link.trim();
+    title = title.trim();
+    poster = poster.trim();
+    let valid = webAddress(url) && (!poster || webAddress(poster));
+    if (file) {
+      valid = valid && !link && /\.torrent$/i.test(file.name) && file.size > 0 && file.size <= (4 << 20);
+      if (valid) valid = (await file.slice(0, 1).text().catch(() => "")) === "d";
+    } else {
+      valid = valid && torrentLink(link);
+    }
+    if (signal.aborted) return;
+    if (!valid) {
+      tell(el, "ts-added", { adding: false, ok: false, problem: "input", status: 0 });
+      return;
+    }
+    let path = "torrents";
+    let init = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "add", link, title, poster, save_to_db: true }),
+    };
+    if (file) {
+      const body = new FormData();
+      body.append("file", file, file.name);
+      body.append("save", "true");
+      body.append("title", title);
+      body.append("poster", poster);
+      path = "torrent/upload";
+      init = { method: "POST", body };
+    }
+    // Adding may wait for torrent metadata, unlike connection checks.
+    const result = await call(url, path, {
+      init, signal, timeout: 30000,
+      read: (res) => res.json().catch(() => null),
+    });
+    if (signal.aborted) return;
+    // The upload endpoint can answer HTTP 200 with null when it rejected
+    // the file. Only a returned torrent confirms it was actually added.
+    if (!result.problem && !/^[a-f0-9]{40}$/i.test(result.value?.hash || "")) {
+      result.problem = "status";
+      result.status = 200;
+    }
+    tell(el, "ts-added", { adding: false, ok: !result.problem, problem: result.problem || "", status: result.status || 0 });
+  } finally {
+    if (adding.get(el) === signal) adding.delete(el);
+  }
 };

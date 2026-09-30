@@ -59,6 +59,25 @@ func TestTheTorrServerPageListsTheUsersServers(t *testing.T) {
 	}
 }
 
+func TestAUserCanAddALinkOrTorrentFileFromTheBrowser(t *testing.T) {
+	h, session, _ := torrServers(t)
+	page := getWith(t, h, "/torrserver", session)
+	if page.Code != http.StatusOK {
+		t.Fatalf("GET /torrserver = %d, want 200", page.Code)
+	}
+	for _, want := range []string{
+		`id="ts-add-torrent"`, `name="torrentFile"`, `accept=".torrent"`,
+		`data-bind:_ts-torrent-link`, `data-bind:_ts-torrent-title`, `data-bind:_ts-torrent-poster`,
+		`data-on:submit="tsAddTorrent(`, `data-on:ts-added=`, `tsResetAdd(el, $tsSelected)`,
+		`tsList(el.closest('#ts-torrents-box'), $tsSelected, true)`,
+		"Magnet or HTTP(S) link", "Poster URL (optional)", "Torrent added.",
+	} {
+		if !strings.Contains(page.Body.String(), want) {
+			t.Errorf("the browser add form lacks %q", want)
+		}
+	}
+}
+
 func TestAUserAddsATorrServer(t *testing.T) {
 	h, session, users := torrServers(t)
 	res := sendSignals(t, h, http.MethodPost, "/api/torrservers", `{"tsName":"NAS","tsUrl":" https://nas.example:8091/ "}`, session)
