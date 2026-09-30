@@ -32,10 +32,64 @@ templ webTorrentsBox() {
 		aria-label={ tr(ctx, "Torrents") }
 	>
 		<h2 class="text-lg font-bold">{ tr(ctx, "Torrents") }</h2>
+		@webTorrentAddForm()
 		<div id="ts-torrents" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 			<div class="skeleton h-32 lg:col-span-2"></div>
 		</div>
 	</section>
+}
+
+// Inputs stay outside #ts-torrents, so list patches never replace them.
+// Private signals and the native file input keep upload data in the browser.
+templ webTorrentAddForm() {
+	<form
+		id="ts-add-torrent"
+		class="card bg-base-200/60 border border-base-content/10"
+		data-signals="{ _tsTorrentLink: '', _tsTorrentTitle: '', _tsTorrentPoster: '', _tsAddResult: {adding: false, ok: false, problem: '', status: 0} }"
+		data-effect="tsResetAdd(el, $tsSelected)"
+		data-on:submit="tsAddTorrent(el, $tsSelected, {link: $_tsTorrentLink, title: $_tsTorrentTitle, poster: $_tsTorrentPoster, file: el.elements.torrentFile.files[0]})"
+		data-on:ts-added="$_tsAddResult = evt.detail; if (evt.detail.ok) { el.reset(); $_tsTorrentLink = ''; $_tsTorrentTitle = ''; $_tsTorrentPoster = ''; tsList(el.closest('#ts-torrents-box'), $tsSelected, true) }"
+	>
+		<div class="card-body gap-3">
+			<h3 class="card-title text-base">{ tr(ctx, "Add torrent") }</h3>
+			<fieldset class="fieldset gap-3" data-attr:disabled="$_tsAddResult.adding">
+				<label class="label" for="ts-torrent-link">{ tr(ctx, "Magnet or HTTP(S) link") }</label>
+				<input id="ts-torrent-link" type="text" class="input w-full" data-bind:_ts-torrent-link placeholder="magnet:?xt=urn:btih:…"/>
+				<label class="label" for="ts-torrent-file">{ tr(ctx, "Or a .torrent file (up to 4 MB)") }</label>
+				<input id="ts-torrent-file" name="torrentFile" type="file" accept=".torrent" class="file-input w-full"/>
+				<div class="grid sm:grid-cols-2 gap-3">
+					<div class="grid gap-2">
+						<label class="label" for="ts-torrent-title">{ tr(ctx, "Title (optional)") }</label>
+						<input id="ts-torrent-title" type="text" class="input w-full" data-bind:_ts-torrent-title/>
+					</div>
+					<div class="grid gap-2">
+						<label class="label" for="ts-torrent-poster">{ tr(ctx, "Poster URL (optional)") }</label>
+						<input id="ts-torrent-poster" type="url" class="input w-full" data-bind:_ts-torrent-poster placeholder="https://…"/>
+					</div>
+				</div>
+				<div class="card-actions justify-end">
+					<button type="submit" class="btn btn-primary btn-sm gap-2">
+						<span class="loading loading-spinner loading-xs" data-show="$_tsAddResult.adding"></span>
+						{ tr(ctx, "Add torrent") }
+					</button>
+				</div>
+			</fieldset>
+			<div role="status" class="alert alert-success alert-soft text-sm" data-show="$_tsAddResult.ok">
+				@Icon("circle-check", "size-4")
+				<span>{ tr(ctx, "Torrent added.") }</span>
+			</div>
+			<div role="alert" class="alert alert-warning alert-soft text-sm" data-show="$_tsAddResult.problem === 'input'">
+				@Icon("triangle-alert", "size-4")
+				<span>{ tr(ctx, "Enter a magnet or HTTP(S) link, or choose one .torrent file up to 4 MB. The poster must be an HTTP(S) URL.") }</span>
+			</div>
+			for _, p := range tsProblems {
+				<div role="alert" class="alert alert-warning alert-soft text-sm" data-show={ fmt.Sprintf("$_tsAddResult.problem === %q", p.Problem) }>
+					@Icon("triangle-alert", "size-4")
+					<span>{ tr(ctx, p.Message) }</span>
+				</div>
+			}
+		</div>
+	</form>
 }
 
 // WebTorrents are a TorrServer's torrents, as the browser read them.

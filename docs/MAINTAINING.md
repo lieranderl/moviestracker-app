@@ -107,6 +107,10 @@ and serves, and that the user store works with Firestore's emulator.
   (`users/{uid}/torrservers`); their logins stay in the browser
   (localStorage). `static/torrserver.js` (from `frontend/torrserver.js`)
   reaches the TorrServer from the browser; the server never does.
+  The TorrServer tab adds one magnet/HTTP(S) link or `.torrent` file (up to
+  4 MB), with an optional title and poster URL. Uploads go straight to
+  TorrServer's `/torrent/upload`; neither the file nor its login is sent to
+  Cloud Run. After an add, the browser relays the updated list for rendering.
 - **Users' data:** preferences and favourites in the Firestore database
   `moviestracker` (`users/{uid}`, `users/{uid}/favorites/{kind}-{id}`;
   `internal/store`), beside the catalog collections the backend writes. The

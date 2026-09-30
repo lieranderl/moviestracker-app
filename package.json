@@ -3,6 +3,7 @@
   "private": true,
   "packageManager": "bun@1.4.2",
   "scripts": {
+    "test": "bun test frontend",
     "assets": "bun run icons && bun run assets:css && bun run assets:js",
     "icons": "bun frontend/icons.mjs",
     "assets:css": "bunx @tailwindcss/cli -i frontend/app.css -o static/app.css --minify",
