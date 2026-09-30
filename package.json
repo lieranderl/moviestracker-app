@@ -6,7 +6,7 @@
     "assets": "bun run icons && bun run assets:css && bun run assets:js",
     "icons": "bun frontend/icons.mjs",
     "assets:css": "bunx @tailwindcss/cli -i frontend/app.css -o static/app.css --minify",
-    "assets:js": "bun build frontend/player.js --outfile=static/player.js --minify --target=browser --format=esm && bun build frontend/theme.js --outfile=static/theme.js --minify --target=browser"
+    "assets:js": "bun build frontend/player.js --outfile=static/player.js --minify --target=browser --format=esm && bun build frontend/theme.js --outfile=static/theme.js --minify --target=browser && bun build frontend/torrserver.js --outfile=static/torrserver.js --minify --target=browser --format=esm"
   },
   "devDependencies": {
     "@tailwindcss/cli": "4.3.3",

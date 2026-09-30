@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -136,6 +137,79 @@ func (f *Firestore) RemoveFavorite(ctx context.Context, uid, kind string, tmdbID
 	}
 	if _, err := f.favorites(uid).Doc(id).Delete(ctx); err != nil {
 		return fmt.Errorf("remove favourite: %w", err)
+	}
+	return nil
+}
+
+// torrServerRecord is a users/{uid}/torrservers/{id} document.
+type torrServerRecord struct {
+	Name    string    `firestore:"name"`
+	URL     string    `firestore:"url"`
+	AddedAt time.Time `firestore:"addedAt"`
+}
+
+func (f *Firestore) torrServers(uid string) *firestore.CollectionRef {
+	return f.userDoc(uid).Collection("torrservers")
+}
+
+// TorrServers implements Store.
+func (f *Firestore) TorrServers(ctx context.Context, uid string) ([]TorrServer, error) {
+	docs, err := f.torrServers(uid).OrderBy("addedAt", firestore.Asc).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("read TorrServers: %w", err)
+	}
+	out := make([]TorrServer, 0, len(docs))
+	for _, doc := range docs {
+		var rec torrServerRecord
+		if err := doc.DataTo(&rec); err != nil {
+			return nil, fmt.Errorf("read TorrServer %s: %w", doc.Ref.ID, err)
+		}
+		out = append(out, TorrServer{ID: doc.Ref.ID, Name: rec.Name, URL: rec.URL, AddedAt: rec.AddedAt})
+	}
+	return out, nil
+}
+
+// SaveTorrServer implements Store.
+func (f *Firestore) SaveTorrServer(ctx context.Context, uid string, t TorrServer) (TorrServer, error) {
+	t, err := checkTorrServer(t)
+	if err != nil {
+		return TorrServer{}, err
+	}
+	if t.ID != "" {
+		doc := f.torrServers(uid).Doc(t.ID)
+		_, err := doc.Update(ctx, []firestore.Update{{Path: "name", Value: t.Name}, {Path: "url", Value: t.URL}})
+		if err == nil {
+			snap, err := doc.Get(ctx)
+			if err != nil {
+				return TorrServer{}, fmt.Errorf("read TorrServer: %w", err)
+			}
+			var rec torrServerRecord
+			if err := snap.DataTo(&rec); err != nil {
+				return TorrServer{}, fmt.Errorf("read TorrServer: %w", err)
+			}
+			return TorrServer{ID: t.ID, Name: rec.Name, URL: rec.URL, AddedAt: rec.AddedAt}, nil
+		}
+		if !notFound(err) {
+			return TorrServer{}, fmt.Errorf("save TorrServer: %w", err)
+		}
+	}
+	if t.ID == "" {
+		t.ID = newID()
+	}
+	t.AddedAt = f.opts.now().UTC()
+	if _, err := f.torrServers(uid).Doc(t.ID).Set(ctx, torrServerRecord{Name: t.Name, URL: t.URL, AddedAt: t.AddedAt}); err != nil {
+		return TorrServer{}, fmt.Errorf("save TorrServer: %w", err)
+	}
+	return t, nil
+}
+
+// RemoveTorrServer implements Store.
+func (f *Firestore) RemoveTorrServer(ctx context.Context, uid, id string) error {
+	if id == "" || strings.Contains(id, "/") {
+		return nil
+	}
+	if _, err := f.torrServers(uid).Doc(id).Delete(ctx); err != nil {
+		return fmt.Errorf("remove TorrServer: %w", err)
 	}
 	return nil
 }

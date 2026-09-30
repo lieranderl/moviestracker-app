@@ -26,7 +26,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
-COPY --from=assets /src/static/app.css /src/static/player.js /src/static/theme.js /src/static/
+COPY --from=assets /src/static/app.css /src/static/player.js /src/static/theme.js /src/static/torrserver.js /src/static/
 COPY --from=assets /src/internal/views/icons_gen.go /src/internal/views/icons_gen.go
 ARG TARGETOS TARGETARCH
 ARG VERSION=dev

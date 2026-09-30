@@ -72,6 +72,9 @@ func tableTexts() []string {
 	for _, l := range append(appLinks, cloudLinks...) {
 		out = append(out, l.Label)
 	}
+	for _, p := range tsProblems {
+		out = append(out, p.Message)
+	}
 	for _, l := range cloudBrowseLists {
 		out = append(out, l.Title, l.Subtitle)
 	}

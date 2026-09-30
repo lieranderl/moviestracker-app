@@ -7,11 +7,16 @@
 //
 //	users/{uid}                        preferences and profile
 //	users/{uid}/favorites/{kind}-{id}  one favourite title
+//	users/{uid}/torrservers/{id}       one of the user's TorrServers
 package store
 
 import (
 	"context"
+	"crypto/rand"
+	"errors"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -41,7 +46,45 @@ type Store interface {
 	AddFavorite(ctx context.Context, uid string, f Favorite) error
 	// RemoveFavorite forgets a favourite; one not kept is no error.
 	RemoveFavorite(ctx context.Context, uid, kind string, tmdbID int) error
+
+	// TorrServers are the user's TorrServers, in the order added.
+	TorrServers(ctx context.Context, uid string) ([]TorrServer, error)
+	// SaveTorrServer keeps t: a new one (no ID) gets an ID, one with an ID
+	// has its name and address changed. It returns t as kept.
+	SaveTorrServer(ctx context.Context, uid string, t TorrServer) (TorrServer, error)
+	// RemoveTorrServer forgets one; one not kept is no error.
+	RemoveTorrServer(ctx context.Context, uid, id string) error
 }
+
+// TorrServer is a TorrServer a user streams from. Only its address is kept:
+// its login stays in the user's browser.
+type TorrServer struct {
+	ID      string
+	Name    string
+	URL     string // http(s)://host[:port]
+	AddedAt time.Time
+}
+
+// checkTorrServer is t with its name and address tidied, or why it cannot
+// be kept: the address must be an http(s) URL with a host.
+func checkTorrServer(t TorrServer) (TorrServer, error) {
+	t.Name = strings.TrimSpace(t.Name)
+	t.URL = strings.TrimRight(strings.TrimSpace(t.URL), "/")
+	u, err := url.Parse(t.URL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil {
+		return t, fmt.Errorf("TorrServer address %q is not an http(s) URL", t.URL)
+	}
+	if t.Name == "" {
+		t.Name = u.Host
+	}
+	if len(t.Name) > 80 || len(t.URL) > 300 {
+		return t, errors.New("TorrServer name or address is too long")
+	}
+	return t, nil
+}
+
+// newID is a new random document ID.
+func newID() string { return strings.ToLower(rand.Text()[:16]) }
 
 // favoriteID is a favourite's key: its kind and TMDB ID ("movie-438631").
 func favoriteID(kind string, tmdbID int) (string, error) {

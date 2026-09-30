@@ -179,3 +179,48 @@ func TestOnlyMoviesAndShowsCanBeFavourites(t *testing.T) {
 		}
 	})
 }
+
+func TestAUserKeepsTheirTorrServers(t *testing.T) {
+	eachStore(t, func(t *testing.T, s store.Store, uid string, clock *time.Time) {
+		ctx := context.Background()
+		home, err := s.SaveTorrServer(ctx, uid, store.TorrServer{Name: "Home", URL: "http://localhost:8090"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if home.ID == "" {
+			t.Fatal("a new TorrServer got no ID")
+		}
+		*clock = clock.Add(time.Minute)
+		nas, err := s.SaveTorrServer(ctx, uid, store.TorrServer{Name: "NAS", URL: "https://nas.tailnet.ts.net:8091"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		home.Name = "Laptop"
+		if _, err := s.SaveTorrServer(ctx, uid, home); err != nil {
+			t.Fatal(err)
+		}
+		list, err := s.TorrServers(ctx, uid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(list) != 2 || list[0].ID != home.ID || list[0].Name != "Laptop" || list[1].URL != "https://nas.tailnet.ts.net:8091" {
+			t.Fatalf("TorrServers() = %+v, want Laptop then NAS, in the order added", list)
+		}
+		if err := s.RemoveTorrServer(ctx, uid, nas.ID); err != nil {
+			t.Fatal(err)
+		}
+		if list, _ := s.TorrServers(ctx, uid); len(list) != 1 || list[0].ID != home.ID {
+			t.Errorf("after removing NAS, TorrServers() = %+v, want Laptop only", list)
+		}
+	})
+}
+
+func TestATorrServerNeedsAnHTTPAddress(t *testing.T) {
+	eachStore(t, func(t *testing.T, s store.Store, uid string, _ *time.Time) {
+		for _, url := range []string{"", "localhost:8090", "ftp://nas", "javascript:alert(1)", "http://"} {
+			if _, err := s.SaveTorrServer(context.Background(), uid, store.TorrServer{Name: "x", URL: url}); err == nil {
+				t.Errorf("SaveTorrServer(%q) succeeded, want an error", url)
+			}
+		}
+	})
+}

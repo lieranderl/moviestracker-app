@@ -54,7 +54,7 @@ func TestASignedInUserSearchesTheCatalog(t *testing.T) {
 	if page.Code != http.StatusOK || !strings.Contains(body, `href="/movie/438631"`) {
 		t.Fatalf("GET /search?q=dune = %d, want a page linking to Dune", page.Code)
 	}
-	for _, local := range []string{`href="/dashboard"`, `href="/torrserver"`, `href="/movies"`, `href="/settings`} {
+	for _, local := range []string{`href="/dashboard"`, `href="/movies"`, `href="/settings`} {
 		if strings.Contains(body, local) {
 			t.Errorf("the web app's page links to the local app's %s", local)
 		}
