@@ -5,6 +5,7 @@ package web
 
 import (
 	"cmp"
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
@@ -104,7 +105,9 @@ func (a *app) saveLanguage(r *http.Request, lang i18n.Lang) {
 	if !ok {
 		return
 	}
-	if err := a.cfg.Store.SavePreferences(r.Context(), user.ID, store.Preferences{Language: string(lang)}); err != nil {
+	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
+	defer cancel()
+	if err := a.cfg.Store.SavePreferences(ctx, user.ID, store.Preferences{Language: string(lang)}); err != nil {
 		slog.Warn("saving a user's language failed", "error", err)
 	}
 }
