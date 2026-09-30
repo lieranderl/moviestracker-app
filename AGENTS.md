@@ -44,6 +44,7 @@ Every task follows the four-step loop:
 
 ## Essential Commands
 - `make dev`: Run dev server with Air hot-reloading (auto-generates Templ and recompiles Go)
+- `make web-dev`: Run the cloud web app (`cmd/web`) with Air on http://localhost:8080 (`make web` without Air)
 - `make test`: Run unit, integration, and memory leak tests (`go test -race ./...`)
 - `make lint`: Run static analysis (`go vet`, `staticcheck`, `golangci-lint`, `gofmt`)
 - `make templ`: Compile `.templ` templates into Go

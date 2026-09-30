@@ -138,6 +138,23 @@ jobs:
       - name: Build and test the image end to end with compose.yaml
         run: scripts/ci/docker-e2e.sh
 
+  web:
+    name: Web app image (Dockerfile.web)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # web.yml deploys this image from main: it must build, start and answer
+      # Cloud Run's probe.
+      - name: Build the image and check that it serves
+        run: |
+          docker build -f Dockerfile.web -t moviestracker-web:ci .
+          docker run -d --name web -p 8080:8080 moviestracker-web:ci
+          curl --fail --silent --show-error --retry 10 --retry-delay 1 --retry-all-errors http://localhost:8080/healthz
+          docker rm -f web
+
   workflows:
     name: Workflow security (zizmor)
     runs-on: ubuntu-latest
@@ -158,7 +175,7 @@ jobs:
   passed:
     name: CI passed
     if: ${{ always() }}
-    needs: [quality, secrets, macos, windows, docker, workflows]
+    needs: [quality, secrets, macos, windows, docker, web, workflows]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

@@ -56,6 +56,7 @@ changing it (it updates what exists).
 | `release.yml` | `v*` tags | Checks the tag is on `main`, runs CI, then in parallel the Docker image for linux/amd64 and linux/arm64 (pushed to `ghcr.io/lieranderl/moviestracker:<version>` with SBOM and signed provenance), the DMG and the Windows installer; checksums, signed build provenance, and a **draft** release |
 | `pins.yml` | Mondays, or by hand | `scripts/update-pins.sh` moves the TorrServer and GStreamer pins to upstream's latest stable releases once they are a week old, and opens (or refreshes) a pull request from the branch `deps/pins` as the pins app; it waits for a person (see [Dependencies](#dependencies)) |
 | `docker-latest.yml` | a release is published | Points the image's `latest` and `MAJOR.MINOR` tags at the published version (not for pre-releases) |
+| `web.yml` | pushes to `main` that touch the web app, or by hand | Builds `Dockerfile.web`, deploys it to Cloud Run as a revision without traffic, checks its `/healthz`, then moves all traffic to it (see [Web app on Cloud Run](#web-app-on-cloud-run)) |
 
 Every action is pinned to a commit SHA with its version in a comment;
 Dependabot updates the pins, Go modules, Bun tools and the Docker base images
@@ -63,6 +64,30 @@ weekly. Workflows get a read-only token unless a job needs more, and zizmor
 (`make lint` runs it too, with [uv](https://docs.astral.sh/uv/)) checks them
 for template injection, over-broad permissions and cache poisoning. Release
 builds use no caches.
+
+## Web app on Cloud Run
+
+The cloud web app (`cmd/web`, `Dockerfile.web`) runs as the Cloud Run service
+`moviestracker-web` in the Google Cloud project `moviestracker-f07e2`
+(`europe-west1`). It has no TorrServer or GStreamer: each visitor's browser
+talks to their own TorrServer. It deploys on its own, from `main`
+(`web.yml`), independently of the local app's `v*` releases; CI's **Web app
+image** job checks on every pull request that the image builds and serves.
+
+- **Signing in to Google Cloud:** keyless. The Workload Identity pool
+  `moviestracker-web` (provider `github`) accepts only GitHub's token for
+  `web.yml` on `refs/heads/main` of this repository (by repository ID), and
+  maps it to `movies-web-deployer@`, which may deploy Cloud Run revisions
+  (`roles/run.developer`), push to the Artifact Registry repository
+  `moviestracker` and act as the runtime account. No keys are stored in
+  GitHub.
+- **Runtime account:** `movies-web@` (Firestore `moviestracker` database,
+  read and write).
+- **Service settings** (made once, `web.yml` changes only the image): 1 CPU,
+  512 MiB, 0–3 instances, 250 requests an instance, a 3600-second request
+  timeout (Datastar reconnects its streams), public.
+- **Rolling back:** `gcloud run services update-traffic moviestracker-web
+  --region europe-west1 --to-revisions <revision>=100`.
 
 ## Secrets
 
