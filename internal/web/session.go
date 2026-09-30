@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
@@ -13,12 +14,16 @@ import (
 
 	"golang.org/x/oauth2"
 
+	"github.com/lieranderl/moviestracker-app/internal/handlers"
 	"github.com/lieranderl/moviestracker-app/internal/i18n"
 )
 
 const (
 	sessionCookie = "mt_session"
 	sessionTTL    = 30 * 24 * time.Hour
+	// storeTimeout bounds each call to the user store, so a slow Firestore
+	// cannot hold a page (the server itself has no write timeout).
+	storeTimeout = 5 * time.Second
 )
 
 // User is a visitor signed in with Google.
@@ -87,6 +92,14 @@ func (a *app) handleSignInCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, a.cookie(sessionCookie, sealed, "/", sessionTTL))
+	// The language they picked before, on any browser.
+	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
+	defer cancel()
+	if prefs, err := a.cfg.Store.Preferences(ctx, user.ID); err != nil {
+		slog.Warn("reading a user's preferences failed", "error", err)
+	} else if lang, ok := i18n.Parse(prefs.Language); ok {
+		handlers.RememberLanguage(w, lang, a.secure())
+	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 

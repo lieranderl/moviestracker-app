@@ -13,15 +13,25 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/web"
 )
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
+	cfg := configFromEnv()
+	users, err := openStore(context.Background())
+	if err != nil {
+		slog.Error("cannot open the user store", "error", err)
+		os.Exit(1)
+	}
+	defer func() { _ = users.Close() }()
+	cfg.Store = users
+
 	httpServer := &http.Server{
 		Addr:              listenAddr(),
-		Handler:           web.New(configFromEnv()),
+		Handler:           web.New(cfg),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    1 << 20, // 1 MB header protection
@@ -75,4 +85,32 @@ func configFromEnv() web.Config {
 		slog.Warn("sign-in is off: set MT_WEB_BASE_URL, MT_WEB_SESSION_KEY (32+ characters), MT_WEB_GOOGLE_CLIENT_ID and MT_WEB_GOOGLE_CLIENT_SECRET")
 	}
 	return cfg
+}
+
+// userStore is the store the app keeps users' data in.
+type userStore interface {
+	store.Store
+	Close() error
+}
+
+// memoryStore is the in-memory store, with nothing to close.
+type memoryStore struct{ *store.Memory }
+
+func (memoryStore) Close() error { return nil }
+
+// openStore opens Firestore when MT_WEB_FIRESTORE_PROJECT names its project
+// (the database is MT_WEB_FIRESTORE_DATABASE, else "moviestracker"; with
+// FIRESTORE_EMULATOR_HOST set, the emulator there). Without it, users' data
+// is kept in memory until the app stops.
+func openStore(ctx context.Context) (userStore, error) {
+	project := os.Getenv("MT_WEB_FIRESTORE_PROJECT")
+	if project == "" {
+		slog.Warn("users' preferences and favourites are kept in memory: set MT_WEB_FIRESTORE_PROJECT to keep them in Firestore")
+		return memoryStore{store.NewMemory()}, nil
+	}
+	database := os.Getenv("MT_WEB_FIRESTORE_DATABASE")
+	if database == "" {
+		database = "moviestracker"
+	}
+	return store.NewFirestore(ctx, project, database)
 }

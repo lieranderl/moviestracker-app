@@ -5,12 +5,15 @@ package web
 
 import (
 	"cmp"
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/handlers"
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
+	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 	webstatic "github.com/lieranderl/moviestracker-app/static"
 )
@@ -24,6 +27,9 @@ type Config struct {
 	SessionKey []byte
 	// Google is the OAuth client visitors sign in with.
 	Google Google
+	// Store keeps each user's preferences and favourites; nil keeps them in
+	// memory until the app stops.
+	Store store.Store
 	// Now is the clock; nil is the wall clock.
 	Now func() time.Time
 }
@@ -54,6 +60,9 @@ func (a *app) signInReady() bool {
 func New(cfg Config) http.Handler {
 	cfg.Google.AuthURL = cmp.Or(cfg.Google.AuthURL, "https://accounts.google.com/o/oauth2/v2/auth")
 	cfg.Google.TokenURL = cmp.Or(cfg.Google.TokenURL, "https://oauth2.googleapis.com/token")
+	if cfg.Store == nil {
+		cfg.Store = store.NewMemory()
+	}
 	a := &app{cfg: cfg, signer: signer{key: cfg.SessionKey}}
 
 	mux := http.NewServeMux()
@@ -70,7 +79,7 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("GET "+signInPath, a.handleSignIn)
 	mux.HandleFunc("GET "+signInPath+"/callback", a.handleSignInCallback)
 	mux.HandleFunc("POST /api/logout", a.handleSignOut)
-	mux.HandleFunc("POST /api/language", handlers.SetLanguage(true))
+	mux.HandleFunc("POST /api/language", handlers.SetLanguage(a.secure(), a.saveLanguage))
 	app := http.NewCrossOriginProtection().Handler(handlers.Language(mux))
 	return handlers.RecoveryMiddleware(handlers.SecurityHeadersMiddleware(true, handlers.LoggingMiddleware(app)))
 }
@@ -86,6 +95,20 @@ func (a *app) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := page.Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "home", "error", err)
+	}
+}
+
+// saveLanguage keeps the language a signed-in user picked, so their other
+// browsers follow it when they sign in there.
+func (a *app) saveLanguage(r *http.Request, lang i18n.Lang) {
+	user, ok := a.currentUser(r)
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
+	defer cancel()
+	if err := a.cfg.Store.SavePreferences(ctx, user.ID, store.Preferences{Language: string(lang)}); err != nil {
+		slog.Warn("saving a user's language failed", "error", err)
 	}
 }
 
