@@ -26,8 +26,9 @@ func (c *Catalog) handleDiscover(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Buffered so fetchers never block, even if the client goes away early.
-	results := make(chan discoverResult, len(views.DiscoverRails))
-	for _, rail := range views.DiscoverRails {
+	rails := views.DiscoverRailsFor(r.Context())
+	results := make(chan discoverResult, len(rails))
+	for _, rail := range rails {
 		go func() {
 			var items []tmdb.MediaItem
 			if c.clients().Details != nil {
@@ -39,7 +40,7 @@ func (c *Catalog) handleDiscover(w http.ResponseWriter, r *http.Request) {
 			results <- discoverResult{rail: rail, items: items}
 		}()
 	}
-	for range views.DiscoverRails {
+	for range rails {
 		res := <-results
 		if err := sse.PatchElementTempl(views.DiscoverRailLoaded(res.rail, res.items)); err != nil {
 			logSSEError(r, "patch discover rail", err)

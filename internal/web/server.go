@@ -15,6 +15,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/config"
 	"github.com/lieranderl/moviestracker-app/internal/handlers"
 	"github.com/lieranderl/moviestracker-app/internal/i18n"
+	"github.com/lieranderl/moviestracker-app/internal/releases"
 	"github.com/lieranderl/moviestracker-app/internal/sources"
 	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/views"
@@ -36,6 +37,9 @@ type Config struct {
 	// Sources are the TMDB, JacRed and IMDb clients of the catalog; a nil
 	// one is a service not configured.
 	Sources sources.Clients
+	// Releases are the backend's release feeds, shown as catalog rows; nil
+	// has none.
+	Releases releases.Source
 	// Now is the clock; nil is the wall clock.
 	Now func() time.Time
 }
@@ -69,6 +73,16 @@ func New(cfg Config) http.Handler {
 	cfg.Google.TokenURL = cmp.Or(cfg.Google.TokenURL, "https://oauth2.googleapis.com/token")
 	if cfg.Store == nil {
 		cfg.Store = store.NewMemory()
+	}
+	if cfg.Releases == nil {
+		cfg.Releases = releases.NewMemory(nil)
+	}
+	if cfg.Sources.Details != nil {
+		clock := cfg.Now
+		if clock == nil {
+			clock = time.Now
+		}
+		cfg.Sources.Details = releaseLists{DetailsProvider: cfg.Sources.Details, feeds: newCachedFeeds(cfg.Releases, clock)}
 	}
 	a := &app{cfg: cfg, signer: signer{key: cfg.SessionKey}}
 	a.catalog = handlers.NewCatalog(func() *sources.Clients { return &a.cfg.Sources }, a.catalogUser, "/", catalogTimeout)

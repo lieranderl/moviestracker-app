@@ -8,7 +8,13 @@ package views
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "github.com/lieranderl/moviestracker-app/internal/tmdb"
+import (
+	"context"
+	"slices"
+
+	"github.com/lieranderl/moviestracker-app/internal/releases"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+)
 
 // DiscoverRail is one lazily loaded rail on the home page.
 type DiscoverRail struct {
@@ -26,6 +32,22 @@ var DiscoverRails = []DiscoverRail{
 	{Slug: "top-rated-movies", Title: "Top rated movies", Subtitle: "All-time favourites on TMDB", Icon: "award", List: tmdb.TopRatedMovies},
 	{Slug: "popular-series", Title: "Popular series", Subtitle: "Shows people are streaming", Icon: "tv", List: tmdb.PopularSeries},
 	{Slug: "top-rated-series", Title: "Top rated series", Subtitle: "The highest rated shows", Icon: "trophy", List: tmdb.TopRatedSeries},
+}
+
+// releaseRails are the web app's rows of the backend's releases, first
+// among its discovery rows.
+var releaseRails = []DiscoverRail{
+	{Slug: "latest-releases", Title: "Latest releases", Subtitle: "Movies just found on torrent trackers", Icon: "sparkles", List: releases.ListOf(releases.Latest)},
+	{Slug: "hdr10-releases", Title: "In HDR10", Subtitle: "New releases with HDR10 video", Icon: "sun", List: releases.ListOf(releases.HDR10)},
+	{Slug: "dolby-vision-releases", Title: "In Dolby Vision", Subtitle: "New releases with Dolby Vision video", Icon: "monitor-play", List: releases.ListOf(releases.DolbyVision)},
+}
+
+// DiscoverRailsFor are the discovery rows of ctx's site, in page order.
+func DiscoverRailsFor(ctx context.Context) []DiscoverRail {
+	if siteOf(ctx).Cloud {
+		return append(slices.Clip(releaseRails), DiscoverRails...)
+	}
+	return DiscoverRails
 }
 
 func (d DiscoverRail) id() string { return "discover-" + d.Slug }
@@ -57,7 +79,7 @@ func discoverSection() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		for _, d := range DiscoverRails {
+		for _, d := range DiscoverRailsFor(ctx) {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<section id=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -65,7 +87,7 @@ func discoverSection() templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(d.id())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 30, Col: 23}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 52, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 			if templ_7745c5c3_Err != nil {
@@ -78,7 +100,7 @@ func discoverSection() templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, d.Title))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 30, Col: 112}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 52, Col: 112}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 			if templ_7745c5c3_Err != nil {
@@ -151,7 +173,7 @@ func discoverHeader(d DiscoverRail) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, d.Title))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 48, Col: 22}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 70, Col: 22}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -164,7 +186,7 @@ func discoverHeader(d DiscoverRail) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, d.Subtitle))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 50, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 72, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -216,7 +238,7 @@ func DiscoverRailLoaded(d DiscoverRail, items []tmdb.MediaItem) templ.Component 
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(d.id())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 59, Col: 22}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 81, Col: 22}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 			if templ_7745c5c3_Err != nil {
@@ -229,7 +251,7 @@ func DiscoverRailLoaded(d DiscoverRail, items []tmdb.MediaItem) templ.Component 
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(chipID(d.id()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 60, Col: 25}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 82, Col: 25}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 			if templ_7745c5c3_Err != nil {
@@ -247,7 +269,7 @@ func DiscoverRailLoaded(d DiscoverRail, items []tmdb.MediaItem) templ.Component 
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(d.id())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 62, Col: 22}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 84, Col: 22}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 			if templ_7745c5c3_Err != nil {
@@ -260,7 +282,7 @@ func DiscoverRailLoaded(d DiscoverRail, items []tmdb.MediaItem) templ.Component 
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, d.Title))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 62, Col: 94}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover.templ`, Line: 84, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 			if templ_7745c5c3_Err != nil {

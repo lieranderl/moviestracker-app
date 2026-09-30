@@ -1,13 +1,18 @@
 package web_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/config"
+	"github.com/lieranderl/moviestracker-app/internal/releases"
 	"github.com/lieranderl/moviestracker-app/internal/sources"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/web"
 )
 
@@ -51,5 +56,94 @@ func TestSignedOutVisitorsAreSentToSignIn(t *testing.T) {
 		if res.Code != http.StatusSeeOther || res.Header().Get("Location") != "/" {
 			t.Errorf("GET %s signed out = %d to %q, want 303 to /", path, res.Code, res.Header().Get("Location"))
 		}
+	}
+}
+
+// withReleases is cfg with the backend's latest-releases feed holding Dune.
+func withReleases(cfg web.Config) web.Config {
+	cfg.Releases = releases.NewMemory(map[releases.Feed][]releases.Release{
+		releases.Latest: {{ID: 438631, Title: "Дюна", OriginalTitle: "Dune", PosterPath: "/d.jpg", FoundAt: now}},
+	})
+	return cfg
+}
+
+func TestTheHomeRowsShowTheLatestReleases(t *testing.T) {
+	g := newGoogle(t)
+	h := web.New(withReleases(withTMDB(t, g.config())))
+	session := signIn(t, h)
+	rows := getWith(t, h, "/api/discover", session).Body.String()
+	if !strings.Contains(rows, `id="discover-latest-releases"`) || !strings.Contains(rows, `href="/movie/438631"`) {
+		t.Error("the home rows do not show the latest releases with Dune")
+	}
+	page := getWith(t, h, "/browse/latest-releases", session)
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), `href="/movie/438631"`) {
+		t.Errorf("GET /browse/latest-releases = %d, want the whole list with Dune", page.Code)
+	}
+}
+
+// countingFeeds is a stand-in for Firestore's feeds that counts its reads.
+type countingFeeds struct {
+	mu    sync.Mutex
+	reads int
+}
+
+// Page counts the read and, like Firestore, takes a moment to answer.
+func (c *countingFeeds) Page(context.Context, releases.Feed, int) (tmdb.Page, error) {
+	c.mu.Lock()
+	c.reads++
+	c.mu.Unlock()
+	time.Sleep(50 * time.Millisecond)
+	return tmdb.Page{Page: 1, TotalPages: 1}, nil
+}
+
+func (c *countingFeeds) count() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.reads
+}
+
+func TestReleaseFeedsAreReadAtMostEveryFiveMinutes(t *testing.T) {
+	g := newGoogle(t)
+	feeds := &countingFeeds{}
+	cfg := withTMDB(t, g.config())
+	cfg.Releases = feeds
+	clock := now
+	cfg.Now = func() time.Time { return clock }
+	h := web.New(cfg)
+	session := signIn(t, h)
+
+	getWith(t, h, "/api/discover", session)
+	first := feeds.count()
+	clock = clock.Add(4 * time.Minute)
+	getWith(t, h, "/api/discover", session)
+	if got := feeds.count(); got != first {
+		t.Errorf("feeds read %d times within five minutes, want %d", got, first)
+	}
+	clock = clock.Add(2 * time.Minute)
+	getWith(t, h, "/api/discover", session)
+	if got := feeds.count(); got != 2*first {
+		t.Errorf("feeds read %d times after five minutes, want %d", got, 2*first)
+	}
+}
+
+func TestManyHomePagesAtOnceReadEachFeedOnce(t *testing.T) {
+	g := newGoogle(t)
+	feeds := &countingFeeds{}
+	cfg := withTMDB(t, g.config())
+	cfg.Releases = feeds
+	h := web.New(cfg)
+	cookie := sessionCookie(signIn(t, h))
+
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			req := httptest.NewRequest(http.MethodGet, "/api/discover", nil)
+			req.AddCookie(cookie)
+			h.ServeHTTP(httptest.NewRecorder(), req)
+		})
+	}
+	wg.Wait()
+	if got := feeds.count(); got != 3 {
+		t.Errorf("8 home pages at once read the feeds %d times, want 3 (once each)", got)
 	}
 }

@@ -56,3 +56,15 @@ func TestTheCatalogUsesTheTMDBKeyAndIMDbServiceFromTheEnvironment(t *testing.T) 
 		t.Error("the web app searches torrents before it is set up to")
 	}
 }
+
+func TestWithoutAFirestoreProjectThereAreNoReleaseFeeds(t *testing.T) {
+	t.Setenv("MT_WEB_FIRESTORE_PROJECT", "")
+	feeds, closeFeeds, err := openReleases(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeFeeds()
+	if feeds != nil {
+		t.Errorf("openReleases() = %T, want none", feeds)
+	}
+}

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/config"
+	"github.com/lieranderl/moviestracker-app/internal/releases"
 	"github.com/lieranderl/moviestracker-app/internal/sources"
 	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/web"
@@ -31,6 +32,13 @@ func main() {
 	}
 	defer func() { _ = users.Close() }()
 	cfg.Store = users
+	feeds, closeFeeds, err := openReleases(context.Background())
+	if err != nil {
+		slog.Error("cannot open the release feeds", "error", err)
+		os.Exit(1)
+	}
+	defer closeFeeds()
+	cfg.Releases = feeds
 
 	httpServer := &http.Server{
 		Addr:              listenAddr(),
@@ -109,18 +117,35 @@ type memoryStore struct{ *store.Memory }
 func (memoryStore) Close() error { return nil }
 
 // openStore opens Firestore when MT_WEB_FIRESTORE_PROJECT names its project
-// (the database is MT_WEB_FIRESTORE_DATABASE, else "moviestracker"; with
-// FIRESTORE_EMULATOR_HOST set, the emulator there). Without it, users' data
-// is kept in memory until the app stops.
+// (see firestoreDatabase). Without it, users' data is kept in memory until
+// the app stops.
 func openStore(ctx context.Context) (userStore, error) {
-	project := os.Getenv("MT_WEB_FIRESTORE_PROJECT")
+	project, database := firestoreDatabase()
 	if project == "" {
 		slog.Warn("users' preferences and favourites are kept in memory: set MT_WEB_FIRESTORE_PROJECT to keep them in Firestore")
 		return memoryStore{store.NewMemory()}, nil
 	}
-	database := os.Getenv("MT_WEB_FIRESTORE_DATABASE")
-	if database == "" {
-		database = "moviestracker"
-	}
 	return store.NewFirestore(ctx, project, database)
+}
+
+// openReleases opens the backend's release feeds in the same Firestore
+// database; without one there are none (nil).
+func openReleases(ctx context.Context) (releases.Source, func(), error) {
+	project, database := firestoreDatabase()
+	if project == "" {
+		return nil, func() {}, nil
+	}
+	feeds, err := releases.NewFirestore(ctx, project, database)
+	if err != nil {
+		return nil, nil, err
+	}
+	return feeds, func() { _ = feeds.Close() }, nil
+}
+
+// firestoreDatabase is the Firestore database the app uses:
+// MT_WEB_FIRESTORE_PROJECT's MT_WEB_FIRESTORE_DATABASE, else "moviestracker"
+// (with FIRESTORE_EMULATOR_HOST set, that emulator's). project is empty when
+// none is set.
+func firestoreDatabase() (project, database string) {
+	return os.Getenv("MT_WEB_FIRESTORE_PROJECT"), cmp.Or(os.Getenv("MT_WEB_FIRESTORE_DATABASE"), "moviestracker")
 }

@@ -15,7 +15,7 @@ import (
 // browseView is the list /browse/{slug} names, with ?window=day for today's
 // trending; ok is false for a list there is not.
 func (c *Catalog) browseView(r *http.Request) (views.BrowseView, bool) {
-	list, ok := views.FindBrowseList(r.PathValue("slug"))
+	list, ok := views.FindBrowseList(r.Context(), r.PathValue("slug"))
 	if !ok || c.clients().Details == nil {
 		return views.BrowseView{}, false
 	}

@@ -158,17 +158,18 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      # The user store's behaviors, against Firestore's emulator as well as
-      # in memory (make firestore, make test-store).
-      - name: The user store works with Firestore
+      # The user store's and release feeds' behaviors, against Firestore's
+      # emulator as well as in memory (make firestore, make test-store).
+      - name: The user store and release feeds work with Firestore
         env:
           FIRESTORE_EMULATOR_IMAGE: gcr.io/google.com/cloudsdktool/google-cloud-cli:587.0.0-emulators@sha256:8d8573471c489a409f03891d2c24d177fa531276184f7002b9a2d853d1b3ed54
         run: |
           docker run -d --name firestore -p 8086:8086 "$FIRESTORE_EMULATOR_IMAGE" \
             gcloud emulators firestore start --host-port=0.0.0.0:8086
           curl --fail --silent --retry 60 --retry-delay 1 --retry-all-errors http://localhost:8086/
-          FIRESTORE_EMULATOR_HOST=localhost:8086 go test -count=1 -race -v ./internal/store/ | tee store.log
+          FIRESTORE_EMULATOR_HOST=localhost:8086 go test -count=1 -race -v ./internal/store/ ./internal/releases/ | tee store.log
           grep -q -- '--- PASS: TestAUsersLanguageIsKept/firestore' store.log
+          grep -q -- '--- PASS: TestTheNewestReleasesComeFirstTwentyAPage/firestore' store.log
           docker rm -f firestore
 
   workflows:
