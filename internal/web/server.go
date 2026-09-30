@@ -85,7 +85,7 @@ func (a *app) handleHome(w http.ResponseWriter, r *http.Request) {
 		page = views.WebHome(user.Name, user.Email)
 	}
 	if err := page.Render(r.Context(), w); err != nil {
-		slog.Warn("render failed", "path", r.URL.Path, "error", err)
+		slog.Warn("render failed", "page", "home", "error", err)
 	}
 }
 
