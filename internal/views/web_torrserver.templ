@@ -49,6 +49,7 @@ templ WebTorrServerPage(user *auth.User, servers []store.TorrServer) {
 				@webTorrServerForm()
 				@WebTorrServers(servers)
 				@webTorrServerStatus()
+				@webTorrentsBox()
 			</div>
 		</main>
 		@siteFooter()

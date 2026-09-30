@@ -1,0 +1,103 @@
+package views
+
+import (
+	"fmt"
+	"regexp"
+
+	"github.com/lieranderl/moviestracker-app/internal/torrserver"
+)
+
+// infoHash is a torrent's BitTorrent v1 info hash, as TorrServer names
+// torrents; only such hashes go into the page's actions.
+var infoHash = regexp.MustCompile(`^[0-9a-fA-F]{40}$`)
+
+// tsAction runs a TorrServer action on a torrent from the browser, then
+// lists its torrents again (tsTorrentAction in static/torrserver.js).
+func tsAction(action, hash string) string {
+	return fmt.Sprintf("tsTorrentAction(el.closest('#ts-torrents-box'), $tsSelected, '%s', '%s')", action, hash)
+}
+
+// webTorrentsBox lists the picked TorrServer's torrents: the browser reads
+// them when it is connected and every 5 seconds (tsList), and posts them
+// here when they changed; the server renders them into #ts-torrents.
+templ webTorrentsBox() {
+	<section
+		id="ts-torrents-box"
+		class="space-y-3"
+		data-show="$tsStatus.ok"
+		data-signals="{ tsConfirm: '' }"
+		data-effect="$tsStatus.ok && tsList(el, $tsSelected)"
+		data-on-interval__duration.5s="$tsStatus.ok && tsList(el, $tsSelected)"
+		data-on:ts-torrents="@post('/api/ts/torrents', {payload: {torrents: evt.detail}})"
+		aria-label={ tr(ctx, "Torrents") }
+	>
+		<h2 class="text-lg font-bold">{ tr(ctx, "Torrents") }</h2>
+		<div id="ts-torrents" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+			<div class="skeleton h-32 lg:col-span-2"></div>
+		</div>
+	</section>
+}
+
+// WebTorrents are a TorrServer's torrents, as the browser read them.
+templ WebTorrents(torrents []torrserver.Torrent) {
+	<div id="ts-torrents" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+		if len(torrents) == 0 {
+			<div role="status" class="alert alert-info alert-soft lg:col-span-2">
+				@Icon("info", "size-5")
+				<span>{ tr(ctx, "No torrents in this TorrServer yet.") }</span>
+			</div>
+		}
+		for _, t := range torrents {
+			@webTorrentCard(t)
+		}
+	</div>
+}
+
+templ webTorrentCard(t torrserver.Torrent) {
+	{{ name := t.DisplayName() }}
+	<article class="card bg-base-200/80 border border-base-content/10 shadow-sm">
+		<div class="card-body p-4 gap-3">
+			<div class="flex items-start gap-4 min-w-0">
+				if t.Poster != "" {
+					<img src={ t.Poster } alt="" class="w-16 h-24 rounded-field object-cover bg-base-300 shadow shrink-0" loading="lazy" decoding="async" width="64" height="96"/>
+				} else {
+					<span class="w-16 h-24 rounded-field bg-base-300 grid place-items-center text-base-content/40 shrink-0">
+						@Icon("film", "size-8")
+					</span>
+				}
+				<div class="space-y-1.5 min-w-0 grow">
+					<h3 class="font-bold leading-snug line-clamp-2" title={ name }>{ name }</h3>
+					<div class="flex flex-wrap items-center gap-2 text-xs">
+						<span class="badge badge-sm badge-soft badge-primary font-mono">{ t.FormattedSize() }</span>
+						<span class={ "badge badge-sm font-medium", t.StatusBadgeClass() }>{ tr(ctx, t.StatusLabel()) }</span>
+						if n := len(t.VideoFiles()); n > 0 {
+							<span class="badge badge-sm badge-ghost">{ trn(ctx, n, "%d video", "%d videos") }</span>
+						}
+					</div>
+					<p class="text-xs text-base-content/60 font-mono flex flex-wrap gap-x-3">
+						<span>{ tr(ctx, "Peers") } { t.FormattedPeers() }</span>
+						<span class="text-success">↓ { t.FormattedDownloadSpeed() }</span>
+					</p>
+				</div>
+			</div>
+			if infoHash.MatchString(t.Hash) {
+				<div class="card-actions justify-end">
+					if !t.GettingInfo() {
+						<button type="button" class="btn btn-ghost btn-sm gap-1.5 text-warning" title={ tr(ctx, "Drop active torrent cache") } data-on:click={ tsAction("drop", t.Hash) }>
+							@Icon("rotate-ccw", "size-4")
+							{ tr(ctx, "Drop cache") }
+						</button>
+					}
+					<button type="button" class="btn btn-ghost btn-sm gap-1.5 text-error" data-show={ fmt.Sprintf("$tsConfirm !== '%s'", t.Hash) } data-on:click={ fmt.Sprintf("$tsConfirm = '%s'", t.Hash) }>
+						@Icon("trash-2", "size-4")
+						{ tr(ctx, "Remove") }
+					</button>
+					<button type="button" class="btn btn-error btn-sm gap-1.5" data-show={ fmt.Sprintf("$tsConfirm === '%s'", t.Hash) } data-on:click={ "$tsConfirm = ''; " + tsAction("rem", t.Hash) }>
+						@Icon("trash-2", "size-4")
+						{ tr(ctx, "Remove from TorrServer") }
+					</button>
+				</div>
+			}
+		</div>
+	</article>
+}

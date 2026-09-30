@@ -109,6 +109,7 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("GET /torrserver", a.handleTorrServerPage)
 	mux.HandleFunc("POST /api/torrservers", a.handleAddTorrServer)
 	mux.HandleFunc("DELETE /api/torrservers/{id}", a.handleRemoveTorrServer)
+	mux.HandleFunc("POST /api/ts/torrents", a.handleTorrents)
 	mux.HandleFunc("POST /api/language", handlers.SetLanguage(a.secure(), a.saveLanguage))
 	app := http.NewCrossOriginProtection().Handler(handlers.Language(webSite(mux)))
 	return handlers.RecoveryMiddleware(handlers.SecurityHeadersMiddleware(true, handlers.LoggingMiddleware(app)))

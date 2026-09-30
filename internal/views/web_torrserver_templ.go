@@ -153,6 +153,10 @@ func WebTorrServerPage(user *auth.User, servers []store.TorrServer) templ.Compon
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+			templ_7745c5c3_Err = webTorrentsBox().Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div></main>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -199,7 +203,7 @@ func webTorrServerForm() templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(webTorrServerAdd)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 59, Col: 121}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 60, Col: 121}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {
@@ -212,7 +216,7 @@ func webTorrServerForm() templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Add TorrServer"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 61, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 62, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -225,7 +229,7 @@ func webTorrServerForm() templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Address"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 64, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 65, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -238,7 +242,7 @@ func webTorrServerForm() templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Name"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 68, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 69, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -251,7 +255,7 @@ func webTorrServerForm() templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "My TorrServer"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 69, Col: 98}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 70, Col: 98}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 		if templ_7745c5c3_Err != nil {
@@ -264,7 +268,7 @@ func webTorrServerForm() templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Username (if it asks for one)"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 72, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 73, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -277,7 +281,7 @@ func webTorrServerForm() templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Password"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 76, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 77, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -290,7 +294,7 @@ func webTorrServerForm() templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "On this computer TorrServer is usually at http://localhost:8090. On another machine, use its HTTPS address."))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 80, Col: 163}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 81, Col: 163}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
@@ -311,7 +315,7 @@ func webTorrServerForm() templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Cancel"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 86, Col: 109}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 87, Col: 109}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -324,7 +328,7 @@ func webTorrServerForm() templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Save"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 87, Col: 74}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 88, Col: 74}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
@@ -367,7 +371,7 @@ func WebTorrServers(servers []store.TorrServer) templ.Component {
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Your TorrServers"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 95, Col: 84}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 96, Col: 84}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 		if templ_7745c5c3_Err != nil {
@@ -393,7 +397,7 @@ func WebTorrServers(servers []store.TorrServer) templ.Component {
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "No TorrServer yet. Add the address of yours to list and play its torrents here."))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 99, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 100, Col: 102}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
@@ -412,7 +416,7 @@ func WebTorrServers(servers []store.TorrServer) templ.Component {
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.ResolveAttributeValue(s.URL)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 104, Col: 93}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 105, Col: 93}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 			if templ_7745c5c3_Err != nil {
@@ -425,7 +429,7 @@ func WebTorrServers(servers []store.TorrServer) templ.Component {
 			var templ_7745c5c3_Var22 string
 			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue(s.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 104, Col: 137}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 105, Col: 137}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 			if templ_7745c5c3_Err != nil {
@@ -438,7 +442,7 @@ func WebTorrServers(servers []store.TorrServer) templ.Component {
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(s.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 106, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 107, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
@@ -451,7 +455,7 @@ func WebTorrServers(servers []store.TorrServer) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(s.URL)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 107, Col: 71}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 108, Col: 71}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
@@ -464,7 +468,7 @@ func WebTorrServers(servers []store.TorrServer) templ.Component {
 			var templ_7745c5c3_Var25 string
 			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.ResolveAttributeValue(trf(ctx, "Remove %s", s.Name))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 112, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 113, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var25)
 			if templ_7745c5c3_Err != nil {
@@ -477,7 +481,7 @@ func WebTorrServers(servers []store.TorrServer) templ.Component {
 			var templ_7745c5c3_Var26 string
 			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("@delete('/api/torrservers/%s', {filterSignals: {include: /^tsSelected$/}})", s.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 113, Col: 116}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 114, Col: 116}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
 			if templ_7745c5c3_Err != nil {
@@ -534,7 +538,7 @@ func webTorrServerStatus() templ.Component {
 		var templ_7745c5c3_Var28 string
 		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Connection"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 134, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 135, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 		if templ_7745c5c3_Err != nil {
@@ -551,7 +555,7 @@ func webTorrServerStatus() templ.Component {
 		var templ_7745c5c3_Var29 string
 		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Check again"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 137, Col: 29}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 138, Col: 29}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 		if templ_7745c5c3_Err != nil {
@@ -564,7 +568,7 @@ func webTorrServerStatus() templ.Component {
 		var templ_7745c5c3_Var30 string
 		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Checking…"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 142, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 143, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 		if templ_7745c5c3_Err != nil {
@@ -585,7 +589,7 @@ func webTorrServerStatus() templ.Component {
 		var templ_7745c5c3_Var31 string
 		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.ResolveAttributeValue(trJS(ctx, "Connected") + " + ' · ' + $tsStatus.version")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 147, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 148, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
 		if templ_7745c5c3_Err != nil {
@@ -602,7 +606,7 @@ func webTorrServerStatus() templ.Component {
 		var templ_7745c5c3_Var32 string
 		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "HLS conversion available"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 151, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 152, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 		if templ_7745c5c3_Err != nil {
@@ -615,7 +619,7 @@ func webTorrServerStatus() templ.Component {
 		var templ_7745c5c3_Var33 string
 		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "This TorrServer has no GStreamer, so videos play only in formats the browser supports. Its -gst build converts the others to HLS."))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 154, Col: 228}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 155, Col: 228}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {
@@ -677,7 +681,7 @@ func tsProblem(problem, message string) templ.Component {
 		var templ_7745c5c3_Var35 string
 		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("$tsStatus.problem === %q", problem))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 173, Col: 126}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 174, Col: 126}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
 		if templ_7745c5c3_Err != nil {
@@ -698,7 +702,7 @@ func tsProblem(problem, message string) templ.Component {
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, message))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 175, Col: 26}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrserver.templ`, Line: 176, Col: 26}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 		if templ_7745c5c3_Err != nil {

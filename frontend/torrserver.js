@@ -118,3 +118,38 @@ window.tsCheck = async (el, url) => {
   if (signal.aborted) return;
   tell(el, "ts-status", status({ ok: true, version: echo.value.trim(), hls }));
 };
+
+// shown is the list each element last reported, so an unchanged list is not
+// posted again.
+const shown = new WeakMap();
+
+// tsList reads the TorrServer's torrents and, when they changed since el
+// last reported them (or force), fires ts-torrents on el with them; the page
+// posts them to the server, which renders them. Like tsCheck, it fires
+// nothing before its first await.
+window.tsList = async (el, url, force = false) => {
+  if (!url) return;
+  const signal = begin(el);
+  await Promise.resolve();
+  if (signal.aborted) return;
+  const list = await call(url, "torrents", {
+    init: { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "list" }) },
+    read: (res) => res.json(),
+    signal,
+  });
+  if (signal.aborted || list.problem || !Array.isArray(list.value)) return;
+  const key = `${url} ${JSON.stringify(list.value)}`;
+  if (!force && shown.get(el) === key) return;
+  shown.set(el, key);
+  tell(el, "ts-torrents", list.value);
+};
+
+// tsTorrentAction asks the TorrServer to drop a torrent's cache ("drop") or
+// remove it ("rem"), then lists its torrents again.
+window.tsTorrentAction = async (el, url, action, hash) => {
+  if (!url || !["drop", "rem"].includes(action)) return;
+  await call(url, "torrents", {
+    init: { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, hash }) },
+  });
+  await window.tsList(el, url, true);
+};
