@@ -55,7 +55,7 @@ templ-check:
 
 assets-check: node_modules
 	$(BUN) run assets
-	git diff --exit-code -- static/app.css static/player.js static/theme.js internal/views/icons_gen.go
+	git diff --exit-code -- static/app.css static/player.js static/theme.js static/torrserver.js internal/views/icons_gen.go
 
 lint: templ-check assets-check
 	@if command -v shellcheck >/dev/null; then shellcheck scripts/*.sh scripts/ci/*.sh macos/install-gstreamer.sh; else echo "shellcheck not installed: shell scripts not checked"; fi

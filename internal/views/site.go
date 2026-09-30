@@ -26,6 +26,7 @@ var cloudLinks = []navLink{
 	{Href: "/", Label: "Home", Icon: "house"},
 	{Href: "/search", Label: "Search", Icon: "search"},
 	{Href: "/favorites", Label: "Favourites", Icon: "heart"},
+	{Href: "/torrserver", Label: "TorrServer", Icon: "server"},
 }
 
 // navLinks are the navbar's destinations on ctx's site.

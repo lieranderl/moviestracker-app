@@ -15,8 +15,9 @@ type Memory struct {
 }
 
 type memoryUser struct {
-	prefs     Preferences
-	favorites map[string]Favorite
+	prefs       Preferences
+	favorites   map[string]Favorite
+	torrServers []TorrServer // in the order added
 }
 
 // NewMemory returns an empty in-memory store.
@@ -98,5 +99,39 @@ func (m *Memory) RemoveFavorite(_ context.Context, uid, kind string, tmdbID int)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.user(uid).favorites, id)
+	return nil
+}
+
+// TorrServers implements Store.
+func (m *Memory) TorrServers(_ context.Context, uid string) ([]TorrServer, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.user(uid).torrServers), nil
+}
+
+// SaveTorrServer implements Store.
+func (m *Memory) SaveTorrServer(_ context.Context, uid string, t TorrServer) (TorrServer, error) {
+	t, err := checkTorrServer(t)
+	if err != nil {
+		return TorrServer{}, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u := m.user(uid)
+	if i := slices.IndexFunc(u.torrServers, func(s TorrServer) bool { return s.ID == t.ID }); t.ID != "" && i >= 0 {
+		u.torrServers[i].Name, u.torrServers[i].URL = t.Name, t.URL
+		return u.torrServers[i], nil
+	}
+	t.ID, t.AddedAt = cmp.Or(t.ID, newID()), m.opts.now().UTC()
+	u.torrServers = append(u.torrServers, t)
+	return t, nil
+}
+
+// RemoveTorrServer implements Store.
+func (m *Memory) RemoveTorrServer(_ context.Context, uid, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u := m.user(uid)
+	u.torrServers = slices.DeleteFunc(u.torrServers, func(s TorrServer) bool { return s.ID == id })
 	return nil
 }

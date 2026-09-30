@@ -1,0 +1,101 @@
+package web_test
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/lieranderl/moviestracker-app/internal/store"
+	"github.com/lieranderl/moviestracker-app/internal/web"
+)
+
+// torrServers is a signed-in session in an app keeping users' data in users.
+func torrServers(t *testing.T) (h http.Handler, session *httptest.ResponseRecorder, users *store.Memory) {
+	t.Helper()
+	g := newGoogle(t)
+	cfg := g.config()
+	users = store.NewMemory()
+	cfg.Store = users
+	h = web.New(cfg)
+	return h, signIn(t, h), users
+}
+
+// sendSignals is a Datastar request carrying signals as its JSON body.
+func sendSignals(t *testing.T, h http.Handler, method, path, signals string, session *httptest.ResponseRecorder) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(method, path, strings.NewReader(signals))
+	req.Header.Set("Datastar-Request", "true")
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(sessionCookie(session))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestTheTorrServerPageListsTheUsersServers(t *testing.T) {
+	h, session, users := torrServers(t)
+	if _, err := users.SaveTorrServer(context.Background(), "1098765", store.TorrServer{Name: "Home", URL: "http://localhost:8090"}); err != nil {
+		t.Fatal(err)
+	}
+	page := getWith(t, h, "/torrserver", session)
+	body := page.Body.String()
+	if page.Code != http.StatusOK || !strings.Contains(body, "http://localhost:8090") || !strings.Contains(body, "Home") {
+		t.Fatalf("GET /torrserver = %d, want Ann's Home TorrServer listed", page.Code)
+	}
+	if !strings.Contains(body, `src="/static/torrserver.js"`) {
+		t.Error("the TorrServer page does not load the browser's TorrServer client")
+	}
+	if !strings.Contains(getWith(t, h, "/", session).Body.String(), `href="/torrserver"`) {
+		t.Error("the navbar does not link to the TorrServer page")
+	}
+}
+
+func TestAUserAddsATorrServer(t *testing.T) {
+	h, session, users := torrServers(t)
+	res := sendSignals(t, h, http.MethodPost, "/api/torrservers", `{"tsName":"NAS","tsUrl":" https://nas.example:8091/ "}`, session)
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "https://nas.example:8091") {
+		t.Fatalf("adding NAS = %d, want the list patched with it:\n%s", res.Code, res.Body)
+	}
+	list, _ := users.TorrServers(context.Background(), "1098765")
+	if len(list) != 1 || list[0].Name != "NAS" || list[0].URL != "https://nas.example:8091" {
+		t.Errorf("Ann's TorrServers = %+v, want NAS at https://nas.example:8091", list)
+	}
+}
+
+func TestATorrServerAddressMustBeAWebAddress(t *testing.T) {
+	h, session, users := torrServers(t)
+	res := sendSignals(t, h, http.MethodPost, "/api/torrservers", `{"tsName":"x","tsUrl":"nas:8090"}`, session)
+	if !strings.Contains(res.Body.String(), "tsFormError") {
+		t.Errorf("adding nas:8090 = %q, want an error for the form", res.Body.String())
+	}
+	if list, _ := users.TorrServers(context.Background(), "1098765"); len(list) != 0 {
+		t.Errorf("TorrServers = %+v, want none", list)
+	}
+}
+
+func TestAUserRemovesATorrServer(t *testing.T) {
+	h, session, users := torrServers(t)
+	home, _ := users.SaveTorrServer(context.Background(), "1098765", store.TorrServer{Name: "Home", URL: "http://localhost:8090"})
+	res := sendSignals(t, h, http.MethodDelete, "/api/torrservers/"+home.ID, `{}`, session)
+	if res.Code != http.StatusOK || strings.Contains(res.Body.String(), "http://localhost:8090") {
+		t.Errorf("removing Home = %d, want the list patched without it", res.Code)
+	}
+	if list, _ := users.TorrServers(context.Background(), "1098765"); len(list) != 0 {
+		t.Errorf("TorrServers after removing = %+v, want none", list)
+	}
+}
+
+func TestTorrServersNeedASignedInUser(t *testing.T) {
+	h, _, _ := torrServers(t)
+	if res := get(t, h, "/torrserver"); res.Code != http.StatusSeeOther {
+		t.Errorf("GET /torrserver signed out = %d, want 303", res.Code)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/torrservers", strings.NewReader(`{"tsUrl":"http://x"}`))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("POST /api/torrservers signed out = %d, want 401", rec.Code)
+	}
+}

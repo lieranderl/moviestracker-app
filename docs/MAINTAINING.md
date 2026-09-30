@@ -103,6 +103,10 @@ and serves, and that the user store works with Firestore's emulator.
 - **Favourites:** a button on movie and TV pages (`/api/favorites`, loaded
   with the page) and a Favourites page (`/favorites`); titles and posters
   are taken from TMDB when a title is added.
+- **TorrServer:** each user's TorrServer addresses are kept in Firestore
+  (`users/{uid}/torrservers`); their logins stay in the browser
+  (localStorage). `static/torrserver.js` (from `frontend/torrserver.js`)
+  reaches the TorrServer from the browser; the server never does.
 - **Users' data:** preferences and favourites in the Firestore database
   `moviestracker` (`users/{uid}`, `users/{uid}/favorites/{kind}-{id}`;
   `internal/store`), beside the catalog collections the backend writes. The
