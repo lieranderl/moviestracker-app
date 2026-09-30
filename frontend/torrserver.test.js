@@ -174,3 +174,16 @@ test("an upload rejected inside TorrServer is a failure even with HTTP 200", asy
     expect(events.at(-1)).toEqual({ adding: false, ok: false, problem: "status", status: 200 });
   }
 });
+
+test("a title page adds a release with its TMDB identity and category", async () => {
+  const { el, events } = form();
+  await client.tsAddTorrent(el, server, {
+    link: "magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10",
+    title: "Dune (2021)", poster: "https://image.tmdb.org/t/p/w500/d.jpg",
+    mediaId: 438631, mediaType: "movie",
+  });
+  const body = JSON.parse(requests.mock.calls[0][1].body);
+  expect(body.category).toBe("movie");
+  expect(JSON.parse(body.data)).toEqual({ tmdb: { id: 438631, type: "movie" } });
+  expect(events.at(-1).ok).toBe(true);
+});

@@ -1,0 +1,65 @@
+package views
+
+import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/lieranderl/moviestracker-app/internal/store"
+)
+
+func torrServerURLs(servers []store.TorrServer) string {
+	urls := make([]string, 0, len(servers))
+	for _, s := range servers {
+		urls = append(urls, s.URL)
+	}
+	data, _ := json.Marshal(urls)
+	return string(data)
+}
+
+// WebSourceSelector chooses among the signed-in user's TorrServers. A
+// stale browser selection falls back to the first saved address.
+templ WebSourceSelector(servers []store.TorrServer) {
+	{{ first := ""; if len(servers) > 0 { first = servers[0].URL } }}
+	<div id="ts-source-selector" class="flex flex-wrap items-center gap-2"
+		data-server-urls={ torrServerURLs(servers) }
+		data-first-server={ first }
+		data-init="if (!JSON.parse(el.dataset.serverUrls).includes($tsSelected)) { $tsSelected = el.dataset.firstServer }; $tsSelectorReady = true"
+	>
+		if len(servers) > 0 {
+			<select class="select select-sm w-full sm:w-auto" aria-label={ tr(ctx, "Send releases to") } data-bind:ts-selected>
+				for _, s := range servers {
+					<option value={ s.URL }>{ s.Name }</option>
+				}
+			</select>
+		} else {
+			<span class="text-sm text-base-content/70">{ tr(ctx, "Add your TorrServer to send releases to it.") }</span>
+		}
+		<a href="/torrserver" class="btn btn-ghost btn-sm">{ tr(ctx, "TorrServer") }</a>
+	</div>
+}
+
+templ webSourceProblems() {
+	<div role="status" class="flex items-center gap-2 text-sm" data-show="$_tsAddResult.adding">
+		<span class="loading loading-spinner loading-xs"></span>
+		{ tr(ctx, "Adding to TorrServer…") }
+	</div>
+	<div role="alert" class="alert alert-warning alert-soft text-sm" data-show="$_tsAddResult.problem === 'input'">
+		@Icon("triangle-alert", "size-4")
+		<span>{ tr(ctx, "That is not a magnet link.") }</span>
+	</div>
+	for _, p := range tsProblems {
+		<div role="alert" class="alert alert-warning alert-soft text-sm" data-show={ fmt.Sprintf("$_tsAddResult.problem === %q", p.Problem) }>
+			@Icon("triangle-alert", "size-4")
+			<span>{ tr(ctx, p.Message) }</span>
+		</div>
+	}
+}
+
+// WebSourceSelectorError leaves sending disabled and offers another store read.
+templ WebSourceSelectorError() {
+ <div id="ts-source-selector" role="alert" class="alert alert-warning alert-soft text-sm" data-init="$tsSelectorReady = false">
+  @Icon("triangle-alert", "size-4")
+  <span>{ tr(ctx, "Your TorrServers could not be loaded. Please try again.") }</span>
+  <button type="button" class="btn btn-sm" data-on:click="@get('/api/ts/selector', {filterSignals: {include: /^$/}})">{ tr(ctx, "Retry") }</button>
+ </div>
+}

@@ -43,6 +43,7 @@ func TestWithoutAFirestoreProjectUsersDataIsKeptInMemory(t *testing.T) {
 }
 
 func TestTheCatalogUsesTheTMDBKeyAndIMDbServiceFromTheEnvironment(t *testing.T) {
+	t.Setenv("MT_WEB_JACRED_KEY", "")
 	t.Setenv("MT_WEB_TMDB_KEY", "0123456789abcdef0123456789abcdef")
 	t.Setenv("MT_WEB_IMDB_URL", "")
 	cfg := configFromEnv()

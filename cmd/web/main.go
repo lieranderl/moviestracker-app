@@ -84,10 +84,17 @@ func listenAddr() string {
 // configFromEnv is the web app's configuration from its environment (Cloud
 // Run's service settings, or .env.web locally: see .env.web.example).
 func configFromEnv() web.Config {
+	jacredKey := strings.TrimSpace(os.Getenv("MT_WEB_JACRED_KEY"))
+	jacredURL := ""
+	if jacredKey != "" {
+		jacredURL = config.DefaultJacRedURL
+	}
 	cfg := web.Config{
 		Sources: sources.Connector{}.Connect(config.Sources{
-			TMDBKey: os.Getenv("MT_WEB_TMDB_KEY"),
-			IMDbURL: cmp.Or(os.Getenv("MT_WEB_IMDB_URL"), config.DefaultIMDbURL),
+			TMDBKey:      os.Getenv("MT_WEB_TMDB_KEY"),
+			JacRedURL:    jacredURL,
+			JacRedAPIKey: jacredKey,
+			IMDbURL:      cmp.Or(os.Getenv("MT_WEB_IMDB_URL"), config.DefaultIMDbURL),
 		}),
 		BaseURL:    strings.TrimRight(os.Getenv("MT_WEB_BASE_URL"), "/"),
 		SessionKey: []byte(os.Getenv("MT_WEB_SESSION_KEY")),

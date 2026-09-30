@@ -34,6 +34,29 @@ func (a *app) handleTorrServerPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (a *app) handleTorrServerSelector(w http.ResponseWriter, r *http.Request) {
+	user, ok := a.currentUser(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
+	defer cancel()
+	servers, err := a.cfg.Store.TorrServers(ctx, user.ID)
+	if err != nil {
+		slog.Warn("reading TorrServers failed", "error", handlers.LogError(err))
+		w.Header().Set("Cache-Control", "no-store")
+		if err := datastar.NewSSE(w, r).PatchElementTempl(views.WebSourceSelectorError()); err != nil {
+			slog.Warn("patching the TorrServer selector failed", "error", err)
+		}
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.WebSourceSelector(servers)); err != nil {
+		slog.Warn("patching the TorrServer selector failed", "error", err)
+	}
+}
+
 // torrServerSignals are the add form's fields; its login is never sent.
 type torrServerSignals struct {
 	Name string `json:"tsName"`

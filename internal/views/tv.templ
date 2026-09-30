@@ -47,7 +47,7 @@ if (a) { evt.preventDefault(); $season = +a.dataset.season; @get('/api/tv/%d/sea
 }
 
 templ TVPage(user *auth.User, t *tmdb.TVDetails, season *tmdb.Season, selected int) {
-	@Layout(PageTitle(t.MediaItem)) {
+	@layoutWithScripts(PageTitle(t.MediaItem), titleScripts(ctx)...) {
 		@Navbar(user)
 		<main class="grow pb-16" data-signals={ mediaPageSignals } data-on:click={ videoClick(ctx) }>
 			@detailHero(t.MediaItem, tvFacts(ctx, t), t.ContentRating, genreNames(t.Genres)) {
@@ -55,15 +55,12 @@ templ TVPage(user *auth.User, t *tmdb.TVDetails, season *tmdb.Season, selected i
 				@heroLink("#seasons", "list-video", tr(ctx, "Episodes"))
 				if siteOf(ctx).Cloud {
 					@favoriteSlot("tv", t.ID)
-				} else {
-					@heroLink("#sources", "magnet", tr(ctx, "Find sources"))
 				}
+				@heroLink("#sources", "magnet", tr(ctx, "Find sources"))
 			}
 			@aboutSection(t.MediaItem, t.Tagline, tvAbout(ctx, t), officialLinks("title", t.Links, t.Homepage))
 			@seasonsSection(t, season, selected)
-			if !siteOf(ctx).Cloud {
-				@sourcesSection("tv", t.ID, t.Seasons, selected)
-			}
+			@sourcesSection("tv", t.MediaItem, t.Seasons, selected)
 			@castRail(tr(ctx, "Series cast"), t.Cast)
 			@videoRail(t.Videos)
 			@mediaRail("recommendations", tr(ctx, "Recommended"), t.Recommendations)

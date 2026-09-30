@@ -130,17 +130,17 @@ type titleInfo struct {
 
 // lookupTitle resolves ?type=movie|tv&id=N through TMDB, so clients can only
 // search for real titles.
-func (s *Server) lookupTitle(ctx context.Context, r *http.Request) (titleInfo, string, error) {
+func (c *Catalog) lookupTitle(ctx context.Context, r *http.Request) (titleInfo, string, error) {
 	mediaType := r.URL.Query().Get("type")
 	id, ok := positiveInt(r.URL.Query().Get("id"))
 	if !ok || (mediaType != "movie" && mediaType != "tv") {
 		return titleInfo{}, mediaType, tmdb.ErrNotFound
 	}
-	if s.clients().Details == nil {
+	if c.clients().Details == nil {
 		return titleInfo{}, mediaType, errDetailsUnavailable
 	}
 	if mediaType == "tv" {
-		tv, err := s.clients().Details.TV(ctx, id)
+		tv, err := c.clients().Details.TV(ctx, id)
 		if err != nil {
 			return titleInfo{}, mediaType, err
 		}
@@ -153,7 +153,7 @@ func (s *Server) lookupTitle(ctx context.Context, r *http.Request) (titleInfo, s
 			tv:     tv,
 		}, mediaType, nil
 	}
-	movie, err := s.clients().Details.Movie(ctx, id)
+	movie, err := c.clients().Details.Movie(ctx, id)
 	if err != nil {
 		return titleInfo{}, mediaType, err
 	}
@@ -214,15 +214,15 @@ func scopeToSeason(title *titleInfo, r *http.Request) bool {
 // handleTorrentSearch runs only when the user asks for sources. It streams a
 // searching state immediately, then the sorted JacRed results (or an
 // explanation) once the upstream answers.
-func (s *Server) handleTorrentSearch(w http.ResponseWriter, r *http.Request) {
-	if s.apiUser(w, r) == nil {
+func (c *Catalog) handleTorrentSearch(w http.ResponseWriter, r *http.Request) {
+	if c.apiUser(w, r) == nil {
 		return
 	}
 	sse := datastar.NewSSE(w, r)
 	ctx, cancel := context.WithTimeout(r.Context(), torrentSearchTimeout)
 	defer cancel()
 
-	title, mediaType, err := s.lookupTitle(ctx, r)
+	title, mediaType, err := c.lookupTitle(ctx, r)
 	if err != nil {
 		patchTorrentError(r, sse, "This title could not be loaded from TMDB, so sources cannot be searched.")
 		return
@@ -235,12 +235,12 @@ func (s *Server) handleTorrentSearch(w http.ResponseWriter, r *http.Request) {
 		logSSEError(r, "patch torrent searching", err)
 		return
 	}
-	if s.clients().Torrents == nil {
+	if c.clients().Torrents == nil {
 		patchTorrentError(r, sse, "Torrent search is not configured on this server.")
 		return
 	}
 	title.query.Qualities, title.query.HDR = qualitiesParam(r), r.URL.Query().Get("hdr") == "1"
-	results, err := s.clients().Torrents.Search(ctx, title.query)
+	results, err := c.clients().Torrents.Search(ctx, title.query)
 	if err != nil {
 		slog.Warn("jacred search failed", "title", title.label, "error", err)
 		patchTorrentError(r, sse, jacredProblem(r.Context(), err))
@@ -255,6 +255,9 @@ func (s *Server) handleTorrentSearch(w http.ResponseWriter, r *http.Request) {
 
 // jacredProblem says why a JacRed search failed, and what to do about it.
 func jacredProblem(ctx context.Context, err error) string {
+	if views.IsCloud(ctx) && (errors.Is(err, jacred.ErrKeyNeeded) || errors.Is(err, jacred.ErrBlocked)) {
+		return i18n.T(ctx, "JacRed is unavailable right now. Please try again later.")
+	}
 	var limit *jacred.LimitError
 	switch {
 	case errors.Is(err, jacred.ErrKeyNeeded):

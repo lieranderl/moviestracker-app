@@ -28,7 +28,7 @@ func withTMDB(t *testing.T, cfg web.Config) web.Config {
 			_, _ = w.Write([]byte(`{"id":438631,"title":"Dune","original_title":"Dune","poster_path":"/d.jpg","release_date":"2021-09-15"}`))
 			return
 		case "/3/tv/95396":
-			_, _ = w.Write([]byte(`{"id":95396,"name":"Severance","original_name":"Severance","poster_path":"/s.jpg","first_air_date":"2022-02-17"}`))
+			_, _ = w.Write([]byte(`{"id":95396,"name":"Severance","original_name":"Severance","poster_path":"/s.jpg","first_air_date":"2022-02-17","seasons":[{"season_number":1,"name":"Season 1","air_date":"2022-02-17","episode_count":9}]}`))
 			return
 		case "/3/movie/1":
 			w.WriteHeader(http.StatusNotFound)
