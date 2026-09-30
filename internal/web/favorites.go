@@ -9,6 +9,7 @@ import (
 
 	"github.com/starfederation/datastar-go/datastar"
 
+	"github.com/lieranderl/moviestracker-app/internal/handlers"
 	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
@@ -50,7 +51,7 @@ func (a *app) handleFavoriteState(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	on, err := a.cfg.Store.IsFavorite(ctx, user.ID, kind, id)
 	if err != nil {
-		slog.Warn("reading a favourite failed", "error", err)
+		slog.Warn("reading a favourite failed", "error", handlers.LogError(err))
 	}
 	patchFavorite(w, r, kind, id, on)
 }
@@ -68,14 +69,14 @@ func (a *app) handleAddFavorite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		slog.Warn("looking up a favourite on TMDB failed", "error", err)
+		slog.Warn("looking up a favourite on TMDB failed", "error", handlers.LogError(err))
 		http.Error(w, i18n.T(r.Context(), "TMDB is not responding right now. Please try again."), http.StatusBadGateway)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
 	defer cancel()
 	if err := a.cfg.Store.AddFavorite(ctx, user.ID, store.Favorite{Kind: kind, TMDBID: id, Title: item.Title, Poster: item.PosterPath}); err != nil {
-		slog.Warn("adding a favourite failed", "error", err)
+		slog.Warn("adding a favourite failed", "error", handlers.LogError(err))
 		http.Error(w, i18n.T(r.Context(), "The favourite could not be saved. Please try again."), http.StatusServiceUnavailable)
 		return
 	}
@@ -91,7 +92,7 @@ func (a *app) handleRemoveFavorite(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
 	defer cancel()
 	if err := a.cfg.Store.RemoveFavorite(ctx, user.ID, kind, id); err != nil {
-		slog.Warn("removing a favourite failed", "error", err)
+		slog.Warn("removing a favourite failed", "error", handlers.LogError(err))
 		http.Error(w, i18n.T(r.Context(), "The favourite could not be removed. Please try again."), http.StatusServiceUnavailable)
 		return
 	}
