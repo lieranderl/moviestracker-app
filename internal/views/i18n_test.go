@@ -69,7 +69,7 @@ func tableTexts() []string {
 	for _, o := range themeOptions {
 		out = append(out, o.Label)
 	}
-	for _, l := range appLinks {
+	for _, l := range append(appLinks, cloudLinks...) {
 		out = append(out, l.Label)
 	}
 	for _, l := range cloudBrowseLists {

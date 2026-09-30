@@ -3,8 +3,16 @@ package i18n
 // ru translates the interface into Russian, by English text.
 var ru = map[string]string{ // #nosec G101 -- interface texts ("Password"), not credentials
 	// Shell: navigation, sign-in and setup
-	"Sign in":                               "Войти",
-	"Sign in with Google":                   "Войти через Google",
+	"Sign in":             "Войти",
+	"Sign in with Google": "Войти через Google",
+	"Favourites":          "Избранное",
+	"In favourites":       "В избранном",
+	"Add to favourites":   "В избранное",
+	"Movies and series you keep, newest first.":                              "Фильмы и сериалы, которые вы сохранили, — сначала новые.",
+	"No favourites yet. Open a movie or series and press Add to favourites.": "В избранном пока пусто. Откройте фильм или сериал и нажмите «В избранное».",
+	"TMDB is not responding right now. Please try again.":                    "TMDB сейчас не отвечает. Попробуйте ещё раз.",
+	"The favourite could not be saved. Please try again.":                    "Не удалось сохранить в избранное. Попробуйте ещё раз.",
+	"The favourite could not be removed. Please try again.":                  "Не удалось убрать из избранного. Попробуйте ещё раз.",
 	"Latest releases":                       "Свежие релизы",
 	"Movies just found on torrent trackers": "Фильмы, только что появившиеся на трекерах",
 	"In HDR10":                              "В HDR10",
