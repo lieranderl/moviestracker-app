@@ -2,14 +2,17 @@ package web_test
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"cloud.google.com/go/firestore/apiv1/firestorepb"
 	"github.com/lieranderl/moviestracker-app/internal/jacred"
 	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/web"
+	"google.golang.org/grpc"
 )
 
 func TestASignedInUserFindsMovieReleasesWithTheServersJacRedKey(t *testing.T) {
@@ -104,5 +107,37 @@ func TestJacRedFailureDoesNotSendCloudUsersToLocalSettings(t *testing.T) {
 	res := getWith(t, h, "/api/torrents?type=movie&id=438631", signIn(t, h))
 	if strings.Contains(res.Body.String(), "Settings") || !strings.Contains(res.Body.String(), "JacRed is unavailable right now") {
 		t.Fatalf("failed cloud search = %s, want a retry message without local settings", res.Body)
+	}
+}
+
+// This stand-in rejects requests at Firestore's external gRPC boundary.
+func TestAUserSeesAndCanRetryAFailedTorrServerSelector(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := grpc.NewServer()
+	firestorepb.RegisterFirestoreServer(server, &firestorepb.UnimplementedFirestoreServer{})
+	go func() { _ = server.Serve(listener) }()
+	t.Cleanup(server.Stop)
+	t.Setenv("FIRESTORE_EMULATOR_HOST", listener.Addr().String())
+	users, err := store.NewFirestore(context.Background(), "selector-test", "moviestracker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = users.Close() })
+	g := newGoogle(t)
+	cfg := g.config()
+	session := signIn(t, web.New(cfg))
+	cfg.Store = users
+	res := getWith(t, web.New(cfg), "/api/ts/selector", session)
+	body := res.Body.String()
+	for _, want := range []string{"datastar-patch-elements", `id="ts-source-selector"`, `role="alert"`, "Your TorrServers could not be loaded", "Retry", "/api/ts/selector", "$tsSelectorReady = false"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("failed selector lacks %q: %s", want, body)
+		}
+	}
+	if res.Code != http.StatusOK {
+		t.Errorf("selector error status = %d, want a renderable SSE response", res.Code)
 	}
 }

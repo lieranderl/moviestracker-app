@@ -45,7 +45,10 @@ func (a *app) handleTorrServerSelector(w http.ResponseWriter, r *http.Request) {
 	servers, err := a.cfg.Store.TorrServers(ctx, user.ID)
 	if err != nil {
 		slog.Warn("reading TorrServers failed", "error", handlers.LogError(err))
-		http.Error(w, i18n.T(r.Context(), "Your TorrServers could not be loaded. Please try again."), http.StatusServiceUnavailable)
+		w.Header().Set("Cache-Control", "no-store")
+		if err := datastar.NewSSE(w, r).PatchElementTempl(views.WebSourceSelectorError()); err != nil {
+			slog.Warn("patching the TorrServer selector failed", "error", err)
+		}
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")

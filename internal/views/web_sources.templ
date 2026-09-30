@@ -54,3 +54,12 @@ templ webSourceProblems() {
 		</div>
 	}
 }
+
+// WebSourceSelectorError leaves sending disabled and offers another store read.
+templ WebSourceSelectorError() {
+ <div id="ts-source-selector" role="alert" class="alert alert-warning alert-soft text-sm" data-init="$tsSelectorReady = false">
+  @Icon("triangle-alert", "size-4")
+  <span>{ tr(ctx, "Your TorrServers could not be loaded. Please try again.") }</span>
+  <button type="button" class="btn btn-sm" data-on:click="@get('/api/ts/selector', {filterSignals: {include: /^$/}})">{ tr(ctx, "Retry") }</button>
+ </div>
+}
