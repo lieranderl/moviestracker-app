@@ -229,7 +229,6 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/settings/users/{username}/role/{role}", s.handleUserAction)
 	s.mux.HandleFunc("POST /api/settings/users/{username}/{action}", s.handleUserAction)
 	s.mux.HandleFunc("GET /api/dashboard", s.handleDashboardStream)
-	s.mux.HandleFunc("GET /api/torrents", s.handleTorrentSearch)
 	s.mux.HandleFunc("POST /api/torrents/add", s.handleTorrentAdd)
 
 	// TorrServer API Endpoints

@@ -344,14 +344,17 @@ templ aboutSection(item tmdb.MediaItem, tagline string, facts []factItem, links 
 // torrentActions is the delegated click handler for every release row.
 // Magnets travel in data-magnet; the add URL is built from server ints.
 func torrentActions(ctx context.Context, addURL string) string {
+	send := fmt.Sprintf("$torrMagnet = b.dataset.magnet; @post('%s', {filterSignals: {include: /^torrMagnet$/}})", addURL)
+	if siteOf(ctx).Cloud {
+		send = `if ($tsSelectorReady && $tsSelected && !$sending) { const section = el.closest('#sources'); tsAddTorrent(section, $tsSelected, {link: b.dataset.magnet, title: section.dataset.title, poster: section.dataset.poster, mediaId: +section.dataset.mediaId, mediaType: section.dataset.mediaType}) }`
+	}
 	return fmt.Sprintf(`const b = evt.target.closest('button[data-action]')
 if (!b) return
 if (b.dataset.action === 'send') {
-	$torrMagnet = b.dataset.magnet
-	@post('%s', {filterSignals: {include: /^torrMagnet$/}})
+	%s
 } else if (b.dataset.action === 'copy') {
 	navigator.clipboard.writeText(b.dataset.magnet).then(() => { $toastError = false; $toast = %s }, () => { $toastError = true; $toast = %s })
-}`, addURL, trJS(ctx, "Magnet link copied"), trJS(ctx, "Copy failed"))
+}`, send, trJS(ctx, "Magnet link copied"), trJS(ctx, "Copy failed"))
 }
 
 // SourcesSearch is the Datastar expression that (re)runs the JacRed search
@@ -377,23 +380,40 @@ func TorrentAddURL(mediaType string, id int) string {
 	return fmt.Sprintf("/api/torrents/add?type=%s&id=%d", mediaType, id)
 }
 
-func sourcesSignals(mediaType string, selected int) string {
-	if mediaType == "tv" {
-		return fmt.Sprintf("{ sort: 'seeders', qual: [], hdr: false, sourcesRequested: false, sourcesLoading: false, sourceSeason: '%d' }", selected)
+func sourcesSignals(ctx context.Context, mediaType string, selected int) string {
+	cloud := ""
+	if siteOf(ctx).Cloud {
+		cloud = ", tsSelectorReady: false, tsSelected: localStorage.getItem('mt-ts-selected') || '', _tsAddResult: {adding: false, ok: false, problem: '', status: 0}"
 	}
-	return "{ sort: 'seeders', qual: [], hdr: false, sourcesRequested: false, sourcesLoading: false }"
+	if mediaType == "tv" {
+		return fmt.Sprintf("{ sort: 'seeders', qual: [], hdr: false, sourcesRequested: false, sourcesLoading: false, sourceSeason: '%d'%s }", selected, cloud)
+	}
+	return "{ sort: 'seeders', qual: [], hdr: false, sourcesRequested: false, sourcesLoading: false" + cloud + " }"
 }
 
 // sourcesSection searches JacRed only when the user asks; series search one
 // season at a time. The TorrServer status badge loads on its own.
-templ sourcesSection(mediaType string, id int, seasons []tmdb.SeasonSummary, selected int) {
-	<section id="sources" class="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-5 scroll-mt-20" data-signals={ sourcesSignals(mediaType, selected) }>
+templ sourcesSection(mediaType string, item tmdb.MediaItem, seasons []tmdb.SeasonSummary, selected int) {
+	{{ id := item.ID }}
+	<section id="sources" class="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-5 scroll-mt-20" data-signals={ sourcesSignals(ctx, mediaType, selected) } data-media-id={ fmt.Sprint(id) } data-media-type={ mediaType } data-title={ PageTitle(item) } data-poster={ item.PosterURL() }
+		if siteOf(ctx).Cloud {
+			data-effect="localStorage.setItem('mt-ts-selected', $tsSelected); tsResetAdd(el, $tsSelected)"
+			data-on:ts-added={ "$sending = evt.detail.adding; $_tsAddResult = evt.detail; if (evt.detail.ok) { $toastError = false; $toast = " + trJS(ctx, "Added to TorrServer") + " }" }
+		}
+	>
 		@sectionHeading(tr(ctx, "Sources"), tr(ctx, "Torrent releases found by JacRed. Send one to your TorrServer to watch.")) {
-			<div data-init="@get('/api/torrserver/status')">
-				@TorrServerStatus(false, "", "")
-			</div>
+			if siteOf(ctx).Cloud {
+				<div id="ts-source-selector" data-init="@get('/api/ts/selector', {filterSignals: {include: /^$/}})"></div>
+			} else {
+				<div data-init="@get('/api/torrserver/status')">
+					@TorrServerStatus(false, "", "")
+				</div>
+			}
 		}
 		<div id="torr-activity"></div>
+		if siteOf(ctx).Cloud {
+			@webSourceProblems()
+		}
 		<div class="flex flex-wrap items-center gap-2">
 			if mediaType == "tv" && len(seasons) > 0 {
 				<select
@@ -419,7 +439,11 @@ templ sourcesSection(mediaType string, id int, seasons []tmdb.SeasonSummary, sel
 				@JacRedCredit()
 			</span>
 		</div>
-		<div data-on:click={ torrentActions(ctx, TorrentAddURL(mediaType, id)) } data-indicator:sending>
+		<div data-on:click={ torrentActions(ctx, TorrentAddURL(mediaType, id)) }
+			if !siteOf(ctx).Cloud {
+				data-indicator:sending
+			}
+		>
 			<div id="torrent-results"></div>
 		</div>
 	</section>
@@ -705,7 +729,13 @@ templ torrentRow(r jacred.Result) {
 			</p>
 		</div>
 		<div class="flex items-center gap-1 max-sm:list-col-wrap max-sm:justify-end">
-			<button type="button" class="btn btn-primary btn-sm gap-1.5" data-action="send" data-magnet={ r.Magnet } data-attr:disabled="$sending" title={ tr(ctx, "Send to TorrServer") }>
+			<button type="button" class="btn btn-primary btn-sm gap-1.5" data-action="send" data-magnet={ r.Magnet }
+				if siteOf(ctx).Cloud {
+					data-attr:disabled="$sending || !$tsSelectorReady || !$tsSelected"
+				} else {
+					data-attr:disabled="$sending"
+				}
+				title={ tr(ctx, "Send to TorrServer") }>
 				@Icon("send", "size-4")
 				<span>TorrServer</span>
 			</button>

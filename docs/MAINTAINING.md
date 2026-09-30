@@ -103,6 +103,14 @@ and serves, and that the user store works with Firestore's emulator.
 - **Favourites:** a button on movie and TV pages (`/api/favorites`, loaded
   with the page) and a Favourites page (`/favorites`); titles and posters
   are taken from TMDB when a title is added.
+- **Title sources:** movie and TV pages search JacRed through the backend
+  with `MT_WEB_JACRED_KEY` (`JACRED_APIKEY`, pinned secret version 1). The
+  runtime account has access to this secret only. Search reuses the local
+  app's season, quality/HDR, tracker, voice and sort controls. The browser
+  sends a chosen release straight to the user's selected TorrServer with
+  the TMDB title, poster, category and `data` metadata:
+  `{"tmdb":{"id":438631,"type":"movie"}}`. No key or TorrServer login
+  is included in the rendered source results.
 - **TorrServer:** each user's TorrServer addresses are kept in Firestore
   (`users/{uid}/torrservers`); their logins stay in the browser
   (localStorage). `static/torrserver.js` (from `frontend/torrserver.js`)

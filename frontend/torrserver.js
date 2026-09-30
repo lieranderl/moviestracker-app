@@ -194,7 +194,7 @@ window.tsResetAdd = async (el) => {
   if (!signal.aborted) tell(el, "ts-added", { adding: false, ok: false, problem: "", status: 0 });
 };
 
-window.tsAddTorrent = async (el, url, { link = "", title = "", poster = "", file } = {}) => {
+window.tsAddTorrent = async (el, url, { link = "", title = "", poster = "", file, mediaId, mediaType } = {}) => {
   if (adding.has(el)) return;
   const signal = begin(el);
   adding.set(el, signal);
@@ -218,10 +218,13 @@ window.tsAddTorrent = async (el, url, { link = "", title = "", poster = "", file
       return;
     }
     let path = "torrents";
+    const metadata = Number.isSafeInteger(mediaId) && mediaId > 0 && ["movie", "tv"].includes(mediaType)
+      ? { category: mediaType, data: JSON.stringify({ tmdb: { id: mediaId, type: mediaType } }) }
+      : {};
     let init = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "add", link, title, poster, save_to_db: true }),
+      body: JSON.stringify({ action: "add", link, title, poster, save_to_db: true, ...metadata }),
     };
     if (file) {
       const body = new FormData();

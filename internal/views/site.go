@@ -21,6 +21,16 @@ func siteOf(ctx context.Context) Site {
 	return site
 }
 
+// IsCloud reports whether the request is for the hosted web app.
+func IsCloud(ctx context.Context) bool { return siteOf(ctx).Cloud }
+
+func titleScripts(ctx context.Context) []string {
+	if siteOf(ctx).Cloud {
+		return []string{"/static/torrserver.js"}
+	}
+	return nil
+}
+
 // cloudLinks are the web app's signed-in destinations.
 var cloudLinks = []navLink{
 	{Href: "/", Label: "Home", Icon: "house"},

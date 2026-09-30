@@ -2,12 +2,19 @@ package i18n
 
 // ru translates the interface into Russian, by English text.
 var ru = map[string]string{ // #nosec G101 -- interface texts ("Password"), not credentials
-	"Add torrent":                     "Добавить торрент",
-	"Magnet or HTTP(S) link":          "Magnet или HTTP(S)-ссылка",
-	"Or a .torrent file (up to 4 MB)": "Или файл .torrent (до 4 МБ)",
-	"Title (optional)":                "Название (необязательно)",
-	"Poster URL (optional)":           "URL постера (необязательно)",
-	"Torrent added.":                  "Торрент добавлен.",
+	"JacRed is unavailable right now. Please try again later.": "JacRed сейчас недоступен. Попробуйте позже.",
+	"Added to TorrServer":                                     "Добавлено в TorrServer",
+	"That is not a magnet link.":                              "Это не magnet-ссылка.",
+	"Send releases to":                                        "Отправлять релизы на",
+	"Add your TorrServer to send releases to it.":             "Добавьте свой TorrServer, чтобы отправлять на него релизы.",
+	"Adding to TorrServer…":                                   "Добавляем в TorrServer…",
+	"Your TorrServers could not be loaded. Please try again.": "Не удалось загрузить ваши TorrServer. Попробуйте ещё раз.",
+	"Add torrent":                                             "Добавить торрент",
+	"Magnet or HTTP(S) link":                                  "Magnet или HTTP(S)-ссылка",
+	"Or a .torrent file (up to 4 MB)":                         "Или файл .torrent (до 4 МБ)",
+	"Title (optional)":                                        "Название (необязательно)",
+	"Poster URL (optional)":                                   "URL постера (необязательно)",
+	"Torrent added.":                                          "Торрент добавлен.",
 	"Enter a magnet or HTTP(S) link, or choose one .torrent file up to 4 MB. The poster must be an HTTP(S) URL.": "Введите magnet или HTTP(S)-ссылку либо выберите один файл .torrent до 4 МБ. Постер должен быть по HTTP(S)-ссылке.",
 	// Shell: navigation, sign-in and setup
 	"Sign in":                             "Войти",
