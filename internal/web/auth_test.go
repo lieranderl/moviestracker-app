@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/web"
 )
 
@@ -289,5 +290,24 @@ func TestSigningOutEndsTheSession(t *testing.T) {
 func TestSignInIsUnavailableUntilItIsSetUp(t *testing.T) {
 	if res := get(t, web.New(web.Config{}), "/auth/google"); res.Code != http.StatusServiceUnavailable {
 		t.Errorf("GET /auth/google without a Google client = %d, want 503", res.Code)
+	}
+}
+
+func TestASignedInUsersLanguageFollowsThemToOtherBrowsers(t *testing.T) {
+	g := newGoogle(t)
+	cfg := g.config()
+	cfg.Store = store.NewMemory()
+	h := web.New(cfg)
+
+	// In one browser, Ann picks Russian.
+	req := httptest.NewRequest(http.MethodPost, "/api/language", strings.NewReader("lang=ru"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(sessionCookie(signIn(t, h)))
+	h.ServeHTTP(httptest.NewRecorder(), req)
+
+	// In another, she signs in and her pages are in Russian.
+	home := getWith(t, h, "/", signIn(t, h))
+	if body := home.Body.String(); !strings.Contains(body, "Здравствуйте, Ann Lee") {
+		t.Error("after signing in elsewhere, the home page is not in the language Ann picked")
 	}
 }

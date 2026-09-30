@@ -12,7 +12,7 @@ CONTAINER_TOOL ?= $(shell command -v docker 2>/dev/null || command -v container 
 CONTAINER_NAME ?= moviestracker-app
 CONTAINER_PORT ?= 8095
 
-.PHONY: all help torrserver dmg winapp assets templ templ-check assets-check lint test security coverage ci build run dev web web-dev clean \
+.PHONY: all help torrserver dmg winapp assets templ templ-check assets-check lint test security coverage ci build run dev web web-dev firestore test-store clean \
 	docker-build docker-smoke container-run container-stop
 
 all: ci
@@ -34,6 +34,8 @@ help:
 	@echo "  make dev             Run Air locally with secure cookies disabled"
 	@echo "  make web             Run the cloud web app (cmd/web) on http://localhost:8080"
 	@echo "  make web-dev         Run the cloud web app with Air (rebuilds on changes)"
+	@echo "  make firestore       Start the Firestore emulator on port 8086 (docker or container)"
+	@echo "  make test-store      Check the user store against that emulator"
 	@echo "  make docker-build    Build the Linux image (docker, or Apple's container CLI)"
 	@echo "  make docker-smoke    Build and test the image end to end with compose.yaml (Docker)"
 	@echo "  make container-run   Run the image on port 8095 with Apple's container CLI"
@@ -144,6 +146,18 @@ WEB_ENV = set -a; if [ -f .env.web ]; then . ./.env.web; fi; set +a;
 
 web: templ assets
 	$(WEB_ENV) $(GO) run ./cmd/web
+
+# The Firestore emulator for the web app's user store (.env.web points the
+# app at it; the image is pinned like CI's).
+FIRESTORE_EMULATOR_IMAGE ?= gcr.io/google.com/cloudsdktool/google-cloud-cli:587.0.0-emulators@sha256:8d8573471c489a409f03891d2c24d177fa531276184f7002b9a2d853d1b3ed54
+
+firestore:
+	$(CONTAINER_TOOL) run -d --rm --name moviestracker-firestore -p 8086:8086 $(FIRESTORE_EMULATOR_IMAGE) \
+		gcloud emulators firestore start --host-port=0.0.0.0:8086
+	@echo "Firestore emulator on localhost:8086; stop it with: $(notdir $(CONTAINER_TOOL)) stop moviestracker-firestore"
+
+test-store:
+	FIRESTORE_EMULATOR_HOST=localhost:8086 $(GO) test -count=1 ./internal/store/
 
 web-dev: assets
 	$(WEB_ENV) $(AIR) --build.cmd "bun run assets && go tool templ generate && go build -o ./tmp/web ./cmd/web" --build.bin "./tmp/web"

@@ -29,3 +29,15 @@ func TestSignInSettingsComeFromTheEnvironment(t *testing.T) {
 		t.Errorf("config = %+v, want the session key and Google client from the environment", cfg)
 	}
 }
+
+func TestWithoutAFirestoreProjectUsersDataIsKeptInMemory(t *testing.T) {
+	t.Setenv("MT_WEB_FIRESTORE_PROJECT", "")
+	users, err := openStore(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = users.Close() }()
+	if _, ok := users.(memoryStore); !ok {
+		t.Errorf("openStore() = %T, want the in-memory store", users)
+	}
+}

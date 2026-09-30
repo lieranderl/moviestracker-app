@@ -72,7 +72,8 @@ The cloud web app (`cmd/web`, `Dockerfile.web`) runs as the Cloud Run service
 (`europe-west1`). It has no TorrServer or GStreamer: each visitor's browser
 talks to their own TorrServer. It deploys on its own, from `main`
 (`web.yml`), independently of the local app's `v*` releases; CI's **Web app
-image** job checks on every pull request that the image builds and serves.
+image and user store** job checks on every pull request that the image builds
+and serves, and that the user store works with Firestore's emulator.
 
 - **Signing in to Google Cloud:** keyless. The Workload Identity pool
   `moviestracker-web` (provider `github`) accepts only GitHub's token for
@@ -91,6 +92,12 @@ image** job checks on every pull request that the image builds and serves.
   `MT_WEB_SESSION_KEY` (`WEB_SESSION_KEY`, signs session cookies: a new
   version signs everyone out). Locally they come from `.env.web`
   (`.env.web.example`).
+- **Users' data:** preferences and favourites in the Firestore database
+  `moviestracker` (`users/{uid}`, `users/{uid}/favorites/{kind}-{id}`;
+  `internal/store`), beside the catalog collections the backend writes. The
+  service's `MT_WEB_FIRESTORE_PROJECT` and `MT_WEB_FIRESTORE_DATABASE` name
+  it; locally `make firestore` starts the emulator and `make test-store`
+  checks the store against it.
 - **Service settings** (made once, `web.yml` changes only the image): 1 CPU,
   512 MiB, 0–3 instances, 250 requests an instance, a 3600-second request
   timeout (Datastar reconnects its streams), public.

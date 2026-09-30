@@ -132,6 +132,10 @@ func (a *app) cookie(name, value, path string, maxAge time.Duration) *http.Cooki
 		SameSite: http.SameSiteLaxMode,
 	}
 	// Plain HTTP only for local runs (http://localhost:8080).
-	c.Secure = strings.HasPrefix(a.cfg.BaseURL, "https://")
+	c.Secure = a.secure()
 	return c
 }
+
+// secure says whether the app is served over HTTPS, so its cookies may be
+// sent over HTTPS only.
+func (a *app) secure() bool { return strings.HasPrefix(a.cfg.BaseURL, "https://") }

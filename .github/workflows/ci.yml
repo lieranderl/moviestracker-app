@@ -139,7 +139,7 @@ jobs:
         run: scripts/ci/docker-e2e.sh
 
   web:
-    name: Web app image (Dockerfile.web)
+    name: Web app image and user store
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -152,8 +152,24 @@ jobs:
         run: |
           docker build -f Dockerfile.web -t moviestracker-web:ci .
           docker run -d --name web -p 8080:8080 moviestracker-web:ci
-          curl --fail --silent --show-error --retry 10 --retry-delay 1 --retry-all-errors http://localhost:8080/healthz
+          curl --fail --silent --show-error --retry 10 --retry-delay 1 --retry-all-errors http://localhost:8080/readyz
           docker rm -f web
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      # The user store's behaviors, against Firestore's emulator as well as
+      # in memory (make firestore, make test-store).
+      - name: The user store works with Firestore
+        env:
+          FIRESTORE_EMULATOR_IMAGE: gcr.io/google.com/cloudsdktool/google-cloud-cli:587.0.0-emulators@sha256:8d8573471c489a409f03891d2c24d177fa531276184f7002b9a2d853d1b3ed54
+        run: |
+          docker run -d --name firestore -p 8086:8086 "$FIRESTORE_EMULATOR_IMAGE" \
+            gcloud emulators firestore start --host-port=0.0.0.0:8086
+          curl --fail --silent --retry 60 --retry-delay 1 --retry-all-errors http://localhost:8086/
+          FIRESTORE_EMULATOR_HOST=localhost:8086 go test -count=1 -race -v ./internal/store/ | tee store.log
+          grep -q -- '--- PASS: TestAUsersLanguageIsKept/firestore' store.log
+          docker rm -f firestore
 
   workflows:
     name: Workflow security (zizmor)

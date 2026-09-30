@@ -13,6 +13,7 @@ import (
 
 	"golang.org/x/oauth2"
 
+	"github.com/lieranderl/moviestracker-app/internal/handlers"
 	"github.com/lieranderl/moviestracker-app/internal/i18n"
 )
 
@@ -87,6 +88,12 @@ func (a *app) handleSignInCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, a.cookie(sessionCookie, sealed, "/", sessionTTL))
+	// The language they picked before, on any browser.
+	if prefs, err := a.cfg.Store.Preferences(r.Context(), user.ID); err != nil {
+		slog.Warn("reading a user's preferences failed", "error", err)
+	} else if lang, ok := i18n.Parse(prefs.Language); ok {
+		handlers.RememberLanguage(w, lang, a.secure())
+	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 

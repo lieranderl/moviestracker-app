@@ -36,23 +36,31 @@ func language(next http.Handler) http.Handler {
 // handleLanguage remembers the language a visitor picked and takes them
 // back to the page they picked it on.
 func (s *Server) handleLanguage(w http.ResponseWriter, r *http.Request) {
-	SetLanguage(s.secureCookies)(w, r)
+	SetLanguage(s.secureCookies, nil)(w, r)
 }
 
 // SetLanguage handles POST /api/language: it remembers the language a
-// visitor picked (secure: the cookie only travels over HTTPS) and takes them
-// back to the page they picked it on.
-func SetLanguage(secure bool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) { setLanguage(w, r, secure) }
+// visitor picked (secure: the cookie only travels over HTTPS), tells picked
+// when it is not nil, and takes them back to the page they picked it on.
+func SetLanguage(secure bool, picked func(*http.Request, i18n.Lang)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
+		lang, ok := i18n.Parse(r.PostFormValue("lang"))
+		if !ok {
+			http.Error(w, i18n.T(r.Context(), "There is no such language."), http.StatusBadRequest)
+			return
+		}
+		RememberLanguage(w, lang, secure)
+		if picked != nil {
+			picked(r, lang)
+		}
+		http.Redirect(w, r, backTo(r.Referer()), http.StatusSeeOther) // #nosec G710 -- backTo keeps only a path on this server
+	}
 }
 
-func setLanguage(w http.ResponseWriter, r *http.Request, secure bool) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
-	lang, ok := i18n.Parse(r.PostFormValue("lang"))
-	if !ok {
-		http.Error(w, i18n.T(r.Context(), "There is no such language."), http.StatusBadRequest)
-		return
-	}
+// RememberLanguage keeps lang as the browser's interface language, in the
+// cookie the language middleware reads.
+func RememberLanguage(w http.ResponseWriter, lang i18n.Lang, secure bool) {
 	cookie := &http.Cookie{
 		Name:     langCookieName,
 		Value:    string(lang),
@@ -64,7 +72,6 @@ func setLanguage(w http.ResponseWriter, r *http.Request, secure bool) {
 	}
 	cookie.Secure = secure
 	http.SetCookie(w, cookie)
-	http.Redirect(w, r, backTo(r.Referer()), http.StatusSeeOther) // #nosec G710 -- backTo keeps only a path on this server
 }
 
 // backTo is the path of a page the Referer names, or "/" when it names none
