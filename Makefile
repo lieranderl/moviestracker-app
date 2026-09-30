@@ -138,12 +138,15 @@ run: templ assets
 dev: assets
 	$(DEV_ENV) $(AIR)
 
-# The cloud web app (cmd/web) on http://localhost:8080 (PORT changes it).
+# The cloud web app (cmd/web) on http://localhost:8080 (PORT changes it),
+# with the settings in .env.web (see .env.web.example) when it exists.
+WEB_ENV = set -a; if [ -f .env.web ]; then . ./.env.web; fi; set +a;
+
 web: templ assets
-	$(GO) run ./cmd/web
+	$(WEB_ENV) $(GO) run ./cmd/web
 
 web-dev: assets
-	$(AIR) --build.cmd "bun run assets && go tool templ generate && go build -o ./tmp/web ./cmd/web" --build.bin "./tmp/web"
+	$(WEB_ENV) $(AIR) --build.cmd "bun run assets && go tool templ generate && go build -o ./tmp/web ./cmd/web" --build.bin "./tmp/web"
 
 clean:
 	rm -rf bin tmp dist build-errors.log coverage.out

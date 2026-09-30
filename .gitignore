@@ -33,3 +33,4 @@ docs/superpowers/
 
 # Scratch scripts
 installTorrServerMac.sh
+!.env.web.example
