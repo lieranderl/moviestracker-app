@@ -96,6 +96,10 @@ and serves, and that the user store works with Firestore's emulator.
   IMDb ratings from `MT_WEB_IMDB_URL` (default: the Moviestracker rating
   service). The pages are the local app's (`handlers.Catalog`), with the web
   app's navigation (`views.Site`).
+- **Release rows:** the home page's first rows (and their browse pages) are
+  the backend's feeds of releases found on trackers, in the same database:
+  `latesttorrentsmovies`, `hdr10movies`, `dvmovies` (`internal/releases`,
+  read-only; each page kept five minutes).
 - **Users' data:** preferences and favourites in the Firestore database
   `moviestracker` (`users/{uid}`, `users/{uid}/favorites/{kind}-{id}`;
   `internal/store`), beside the catalog collections the backend writes. The

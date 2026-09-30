@@ -9,6 +9,7 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -23,23 +24,34 @@ type BrowseList struct {
 	Day                         tmdb.List // today's trending; empty for other lists
 }
 
-// BrowseLists are the home page's rows, in page order.
-var BrowseLists = browseLists()
+// BrowseLists are the local app's home rows, in page order.
+var BrowseLists = browseLists(DiscoverRails)
 
-func browseLists() []BrowseList {
+// cloudBrowseLists are the web app's.
+var cloudBrowseLists = browseLists(DiscoverRailsFor(WithSite(context.Background(), Site{Cloud: true})))
+
+func browseLists(rails []DiscoverRail) []BrowseList {
 	lists := []BrowseList{
 		{Slug: "trending-movies", Title: "Trending movies", Subtitle: "Top trending films from The Movie Database", Icon: "film", Week: tmdb.TrendingMoviesWeek, Day: tmdb.TrendingMoviesDay},
 		{Slug: "trending-series", Title: "Trending TV series", Subtitle: "Top trending episodic series and releases", Icon: "tv", Week: tmdb.TrendingSeriesWeek, Day: tmdb.TrendingSeriesDay},
 	}
-	for _, d := range DiscoverRails {
+	for _, d := range rails {
 		lists = append(lists, BrowseList{Slug: d.Slug, Title: d.Title, Subtitle: d.Subtitle, Icon: d.Icon, Week: d.List})
 	}
 	return lists
 }
 
-// FindBrowseList is the list at /browse/{slug}.
-func FindBrowseList(slug string) (BrowseList, bool) {
-	for _, l := range BrowseLists {
+// browseListsFor are the home rows of ctx's site, in page order.
+func browseListsFor(ctx context.Context) []BrowseList {
+	if siteOf(ctx).Cloud {
+		return cloudBrowseLists
+	}
+	return BrowseLists
+}
+
+// FindBrowseList is the list at /browse/{slug} on ctx's site.
+func FindBrowseList(ctx context.Context, slug string) (BrowseList, bool) {
+	for _, l := range browseListsFor(ctx) {
 		if l.Slug == slug {
 			return l, true
 		}
@@ -107,7 +119,7 @@ func allLink(slug, title string) templ.Component {
 		var templ_7745c5c3_Var2 templ.SafeURL
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/browse/" + slug))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 75, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 87, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -120,7 +132,7 @@ func allLink(slug, title string) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(trf(ctx, "All %s", title))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 75, Col: 128}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 87, Col: 128}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 		if templ_7745c5c3_Err != nil {
@@ -133,7 +145,7 @@ func allLink(slug, title string) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "All"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 76, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 88, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -194,7 +206,7 @@ func BrowsePage(user *auth.User, v BrowseView) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = categoryBar(BrowseLists, v.List.Slug).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = categoryBar(browseListsFor(ctx), v.List.Slug).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -205,7 +217,7 @@ func BrowsePage(user *auth.User, v BrowseView) templ.Component {
 			var templ_7745c5c3_Var7 templ.SafeURL
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(homeHref(ctx)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 91, Col: 44}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 103, Col: 44}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -222,7 +234,7 @@ func BrowsePage(user *auth.User, v BrowseView) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Home"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 93, Col: 24}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 105, Col: 24}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -239,7 +251,7 @@ func BrowsePage(user *auth.User, v BrowseView) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, v.List.Title))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 97, Col: 30}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 109, Col: 30}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -252,7 +264,7 @@ func BrowsePage(user *auth.User, v BrowseView) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, v.List.Subtitle))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 99, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 111, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -270,7 +282,7 @@ func BrowsePage(user *auth.User, v BrowseView) templ.Component {
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Trending over"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 102, Col: 93}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 114, Col: 93}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 				if templ_7745c5c3_Err != nil {
@@ -292,7 +304,7 @@ func BrowsePage(user *auth.User, v BrowseView) templ.Component {
 				var templ_7745c5c3_Var13 templ.SafeURL
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(v.pageURL(false)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 103, Col: 59}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 115, Col: 59}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -318,7 +330,7 @@ func BrowsePage(user *auth.User, v BrowseView) templ.Component {
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(!v.Today))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 103, Col: 148}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 115, Col: 148}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 				if templ_7745c5c3_Err != nil {
@@ -331,7 +343,7 @@ func BrowsePage(user *auth.User, v BrowseView) templ.Component {
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "This week"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 103, Col: 173}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 115, Col: 173}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 				if templ_7745c5c3_Err != nil {
@@ -353,7 +365,7 @@ func BrowsePage(user *auth.User, v BrowseView) templ.Component {
 				var templ_7745c5c3_Var18 templ.SafeURL
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(v.pageURL(true)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 104, Col: 58}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 116, Col: 58}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -379,7 +391,7 @@ func BrowsePage(user *auth.User, v BrowseView) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(v.Today))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 104, Col: 145}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 116, Col: 145}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 				if templ_7745c5c3_Err != nil {
@@ -392,7 +404,7 @@ func BrowsePage(user *auth.User, v BrowseView) templ.Component {
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Today"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 104, Col: 166}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 116, Col: 166}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -529,7 +541,7 @@ func BrowseMore(v BrowseView) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "TMDB did not answer."))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 136, Col: 44}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 148, Col: 44}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
@@ -547,7 +559,7 @@ func BrowseMore(v BrowseView) templ.Component {
 				var templ_7745c5c3_Var25 string
 				templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.ResolveAttributeValue(v.moreURL(v.Next))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 138, Col: 80}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 150, Col: 80}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var25)
 				if templ_7745c5c3_Err != nil {
@@ -560,7 +572,7 @@ func BrowseMore(v BrowseView) templ.Component {
 				var templ_7745c5c3_Var26 string
 				templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Try again"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 138, Col: 105}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 150, Col: 105}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 				if templ_7745c5c3_Err != nil {
@@ -578,7 +590,7 @@ func BrowseMore(v BrowseView) templ.Component {
 				var templ_7745c5c3_Var27 templ.SafeURL
 				templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(v.pageURL(v.Today)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 140, Col: 49}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 152, Col: 49}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 				if templ_7745c5c3_Err != nil {
@@ -591,7 +603,7 @@ func BrowseMore(v BrowseView) templ.Component {
 				var templ_7745c5c3_Var28 string
 				templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Try again"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 140, Col: 93}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 152, Col: 93}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 				if templ_7745c5c3_Err != nil {
@@ -614,7 +626,7 @@ func BrowseMore(v BrowseView) templ.Component {
 			var templ_7745c5c3_Var29 string
 			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("browse-page-%d", v.Next))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 147, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 159, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 			if templ_7745c5c3_Err != nil {
@@ -627,7 +639,7 @@ func BrowseMore(v BrowseView) templ.Component {
 			var templ_7745c5c3_Var30 string
 			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.ResolveAttributeValue(v.moreURL(v.Next))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 147, Col: 97}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 159, Col: 97}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
 			if templ_7745c5c3_Err != nil {
@@ -640,7 +652,7 @@ func BrowseMore(v BrowseView) templ.Component {
 			var templ_7745c5c3_Var31 string
 			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Loading more"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 148, Col: 103}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 160, Col: 103}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
 			if templ_7745c5c3_Err != nil {
@@ -658,7 +670,7 @@ func BrowseMore(v BrowseView) templ.Component {
 			var templ_7745c5c3_Var32 string
 			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "That is the whole list."))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 151, Col: 80}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 163, Col: 80}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 			if templ_7745c5c3_Err != nil {
@@ -687,9 +699,9 @@ func (l BrowseList) homeID() string {
 
 // rowsFrom are the ids of the home row with id and the rows below it, as a
 // JavaScript array; rowBefore is the row above it ("" for the first).
-func rowsFrom(id string) (rows, rowBefore string) {
+func rowsFrom(ctx context.Context, id string) (rows, rowBefore string) {
 	var ids []string
-	for _, l := range BrowseLists {
+	for _, l := range browseListsFor(ctx) {
 		if l.homeID() == id || len(ids) > 0 {
 			ids = append(ids, "'"+l.homeID()+"'")
 		} else {
@@ -731,7 +743,7 @@ func rowMarker(id string) templ.Component {
 			templ_7745c5c3_Var33 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		rows, before := rowsFrom(id)
+		rows, before := rowsFrom(ctx, id)
 		place := fmt.Sprintf("el.getBoundingClientRect().top < 0 ? ($homeRow = '%s') : (%s.includes($homeRow) && ($homeRow = '%s'))", id, rows, before)
 		var templ_7745c5c3_Var34 = []any{"absolute inset-x-0 h-px pointer-events-none", markerTop}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var34...)
@@ -758,7 +770,7 @@ func rowMarker(id string) templ.Component {
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.ResolveAttributeValue(place)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 195, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 207, Col: 19}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var36)
 		if templ_7745c5c3_Err != nil {
@@ -771,7 +783,7 @@ func rowMarker(id string) templ.Component {
 		var templ_7745c5c3_Var37 string
 		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.ResolveAttributeValue(place)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 196, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 208, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
 		if templ_7745c5c3_Err != nil {
@@ -791,11 +803,11 @@ func chipID(rowID string) string { return "chip-" + rowID }
 
 // homeLists are the rows the home page shows: the trending ones, and the
 // discovery rails when TMDB details are set up.
-func homeLists(discover bool) []BrowseList {
+func homeLists(ctx context.Context, discover bool) []BrowseList {
 	if discover {
-		return BrowseLists
+		return browseListsFor(ctx)
 	}
-	return BrowseLists[:2]
+	return browseListsFor(ctx)[:2]
 }
 
 // categoryBar sticks under the navbar with a chip per home row. On the
@@ -829,7 +841,7 @@ func categoryBar(lists []BrowseList, current string) templ.Component {
 		var templ_7745c5c3_Var39 string
 		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Categories"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 220, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 232, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var39)
 		if templ_7745c5c3_Err != nil {
@@ -862,7 +874,7 @@ func categoryBar(lists []BrowseList, current string) templ.Component {
 				var templ_7745c5c3_Var40 string
 				templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.ResolveAttributeValue(chipID(l.homeID()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 230, Col: 29}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 242, Col: 29}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var40)
 				if templ_7745c5c3_Err != nil {
@@ -885,7 +897,7 @@ func categoryBar(lists []BrowseList, current string) templ.Component {
 				var templ_7745c5c3_Var41 templ.SafeURL
 				templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("#" + l.homeID()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 235, Col: 45}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 247, Col: 45}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 				if templ_7745c5c3_Err != nil {
@@ -898,7 +910,7 @@ func categoryBar(lists []BrowseList, current string) templ.Component {
 				var templ_7745c5c3_Var42 string
 				templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("$homeRow == '%s'", l.homeID()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 237, Col: 75}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 249, Col: 75}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var42)
 				if templ_7745c5c3_Err != nil {
@@ -915,7 +927,7 @@ func categoryBar(lists []BrowseList, current string) templ.Component {
 				var templ_7745c5c3_Var43 string
 				templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, l.Title))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 240, Col: 25}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 252, Col: 25}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 				if templ_7745c5c3_Err != nil {
@@ -933,7 +945,7 @@ func categoryBar(lists []BrowseList, current string) templ.Component {
 				var templ_7745c5c3_Var44 templ.SafeURL
 				templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/browse/" + l.Slug))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 243, Col: 50}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 255, Col: 50}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
 				if templ_7745c5c3_Err != nil {
@@ -950,7 +962,7 @@ func categoryBar(lists []BrowseList, current string) templ.Component {
 				var templ_7745c5c3_Var45 string
 				templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, l.Title))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 245, Col: 25}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 257, Col: 25}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 				if templ_7745c5c3_Err != nil {
@@ -968,7 +980,7 @@ func categoryBar(lists []BrowseList, current string) templ.Component {
 				var templ_7745c5c3_Var46 templ.SafeURL
 				templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/browse/" + l.Slug))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 248, Col: 50}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 260, Col: 50}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 				if templ_7745c5c3_Err != nil {
@@ -985,7 +997,7 @@ func categoryBar(lists []BrowseList, current string) templ.Component {
 				var templ_7745c5c3_Var47 string
 				templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, l.Title))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 250, Col: 25}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 262, Col: 25}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 				if templ_7745c5c3_Err != nil {
@@ -1039,7 +1051,7 @@ func toTopButton() templ.Component {
 		var templ_7745c5c3_Var49 string
 		templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Back to top"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 271, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 283, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var49)
 		if templ_7745c5c3_Err != nil {
@@ -1052,7 +1064,7 @@ func toTopButton() templ.Component {
 		var templ_7745c5c3_Var50 string
 		templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Back to top"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 272, Col: 32}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/browse.templ`, Line: 284, Col: 32}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var50)
 		if templ_7745c5c3_Err != nil {

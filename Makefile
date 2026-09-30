@@ -35,7 +35,7 @@ help:
 	@echo "  make web             Run the cloud web app (cmd/web) on http://localhost:8080"
 	@echo "  make web-dev         Run the cloud web app with Air (rebuilds on changes)"
 	@echo "  make firestore       Start the Firestore emulator on port 8086 (docker or container)"
-	@echo "  make test-store      Check the user store against that emulator"
+	@echo "  make test-store      Check the user store and release feeds against that emulator"
 	@echo "  make docker-build    Build the Linux image (docker, or Apple's container CLI)"
 	@echo "  make docker-smoke    Build and test the image end to end with compose.yaml (Docker)"
 	@echo "  make container-run   Run the image on port 8095 with Apple's container CLI"
@@ -157,7 +157,7 @@ firestore:
 	@echo "Firestore emulator on localhost:8086; stop it with: $(notdir $(CONTAINER_TOOL)) stop moviestracker-firestore"
 
 test-store:
-	FIRESTORE_EMULATOR_HOST=localhost:8086 $(GO) test -count=1 ./internal/store/
+	FIRESTORE_EMULATOR_HOST=localhost:8086 $(GO) test -count=1 ./internal/store/ ./internal/releases/
 
 web-dev: assets
 	$(WEB_ENV) $(AIR) --build.cmd "bun run assets && go tool templ generate && go build -o ./tmp/web ./cmd/web" --build.bin "./tmp/web"

@@ -1,6 +1,7 @@
 package views
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -15,23 +16,34 @@ type BrowseList struct {
 	Day                         tmdb.List // today's trending; empty for other lists
 }
 
-// BrowseLists are the home page's rows, in page order.
-var BrowseLists = browseLists()
+// BrowseLists are the local app's home rows, in page order.
+var BrowseLists = browseLists(DiscoverRails)
 
-func browseLists() []BrowseList {
+// cloudBrowseLists are the web app's.
+var cloudBrowseLists = browseLists(DiscoverRailsFor(WithSite(context.Background(), Site{Cloud: true})))
+
+func browseLists(rails []DiscoverRail) []BrowseList {
 	lists := []BrowseList{
 		{Slug: "trending-movies", Title: "Trending movies", Subtitle: "Top trending films from The Movie Database", Icon: "film", Week: tmdb.TrendingMoviesWeek, Day: tmdb.TrendingMoviesDay},
 		{Slug: "trending-series", Title: "Trending TV series", Subtitle: "Top trending episodic series and releases", Icon: "tv", Week: tmdb.TrendingSeriesWeek, Day: tmdb.TrendingSeriesDay},
 	}
-	for _, d := range DiscoverRails {
+	for _, d := range rails {
 		lists = append(lists, BrowseList{Slug: d.Slug, Title: d.Title, Subtitle: d.Subtitle, Icon: d.Icon, Week: d.List})
 	}
 	return lists
 }
 
-// FindBrowseList is the list at /browse/{slug}.
-func FindBrowseList(slug string) (BrowseList, bool) {
-	for _, l := range BrowseLists {
+// browseListsFor are the home rows of ctx's site, in page order.
+func browseListsFor(ctx context.Context) []BrowseList {
+	if siteOf(ctx).Cloud {
+		return cloudBrowseLists
+	}
+	return BrowseLists
+}
+
+// FindBrowseList is the list at /browse/{slug} on ctx's site.
+func FindBrowseList(ctx context.Context, slug string) (BrowseList, bool) {
+	for _, l := range browseListsFor(ctx) {
 		if l.Slug == slug {
 			return l, true
 		}
@@ -84,7 +96,7 @@ templ BrowsePage(user *auth.User, v BrowseView) {
 	@Layout(tr(ctx, v.List.Title)) {
 		@Navbar(user)
 		<main class="grow pb-20">
-			@categoryBar(BrowseLists, v.List.Slug)
+			@categoryBar(browseListsFor(ctx), v.List.Slug)
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
 				<header class="flex flex-wrap items-end justify-between gap-4">
 					<div class="min-w-0 space-y-1">
@@ -163,9 +175,9 @@ func (l BrowseList) homeID() string {
 
 // rowsFrom are the ids of the home row with id and the rows below it, as a
 // JavaScript array; rowBefore is the row above it ("" for the first).
-func rowsFrom(id string) (rows, rowBefore string) {
+func rowsFrom(ctx context.Context, id string) (rows, rowBefore string) {
 	var ids []string
-	for _, l := range BrowseLists {
+	for _, l := range browseListsFor(ctx) {
 		if l.homeID() == id || len(ids) > 0 {
 			ids = append(ids, "'"+l.homeID()+"'")
 		} else {
@@ -187,7 +199,7 @@ const markerTop = "-top-36"
 // on load and as the page scrolls (the last scroll too, so a jump such as
 // Home or back to top lands on the right row).
 templ rowMarker(id string) {
-	{{ rows, before := rowsFrom(id) }}
+	{{ rows, before := rowsFrom(ctx, id) }}
 	{{ place := fmt.Sprintf("el.getBoundingClientRect().top < 0 ? ($homeRow = '%s') : (%s.includes($homeRow) && ($homeRow = '%s'))", id, rows, before) }}
 	<span
 		aria-hidden="true"
@@ -203,11 +215,11 @@ func chipID(rowID string) string { return "chip-" + rowID }
 
 // homeLists are the rows the home page shows: the trending ones, and the
 // discovery rails when TMDB details are set up.
-func homeLists(discover bool) []BrowseList {
+func homeLists(ctx context.Context, discover bool) []BrowseList {
 	if discover {
-		return BrowseLists
+		return browseListsFor(ctx)
 	}
-	return BrowseLists[:2]
+	return browseListsFor(ctx)[:2]
 }
 
 // categoryBar sticks under the navbar with a chip per home row. On the

@@ -43,7 +43,7 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 			} else if len(movies) > 0 {
 				@HeroBillboard(movies[:min(len(movies), 5)])
 			}
-			@categoryBar(homeLists(discover), "")
+			@categoryBar(homeLists(ctx, discover), "")
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 space-y-10 mt-10">
 				@mediaRow("trending-movies", tr(ctx, "Trending Movies"), tr(ctx, "Top trending films from The Movie Database"), "film", "text-primary", "badge-primary", tr(ctx, "No trending movies available. Please verify TMDB_API_KEY configuration."), movies, discover)
 				@mediaRow("trending-series", tr(ctx, "Trending TV Series"), tr(ctx, "Top trending episodic series and releases"), "tv", "text-accent", "badge-accent", tr(ctx, "No trending TV series available. Please verify TMDB_API_KEY configuration."), series, discover)

@@ -106,7 +106,7 @@ func Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, ser
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = categoryBar(homeLists(discover), "").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = categoryBar(homeLists(ctx, discover), "").Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
