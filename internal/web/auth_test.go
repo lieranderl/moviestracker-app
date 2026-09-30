@@ -311,3 +311,23 @@ func TestASignedInUsersLanguageFollowsThemToOtherBrowsers(t *testing.T) {
 		t.Error("after signing in elsewhere, the home page is not in the language Ann picked")
 	}
 }
+
+func TestSigningOutFromThePageMenuTakesTheBrowserHome(t *testing.T) {
+	g := newGoogle(t)
+	h := web.New(g.config())
+	req := httptest.NewRequest(http.MethodPost, "/api/logout", nil)
+	req.Header.Set("Datastar-Request", "true") // the navbar's @post('/api/logout')
+	req.AddCookie(sessionCookie(signIn(t, h)))
+	out := httptest.NewRecorder()
+	h.ServeHTTP(out, req)
+	if out.Code != http.StatusOK || !strings.Contains(out.Body.String(), `"redirectUrl":"/"`) {
+		t.Errorf("Datastar sign-out = %d %q, want a redirectUrl signal to /", out.Code, out.Body.String())
+	}
+	var cleared bool
+	for _, c := range out.Result().Cookies() {
+		cleared = cleared || (c.Name == "mt_session" && c.MaxAge < 0)
+	}
+	if !cleared {
+		t.Error("signing out from the page menu did not delete the session cookie")
+	}
+}

@@ -124,7 +124,7 @@ func (a *app) saveLanguage(r *http.Request, lang i18n.Lang) {
 // handleSignOut forgets the visitor's session.
 func (a *app) handleSignOut(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, a.cookie(sessionCookie, "", "/", -1))
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	handlers.Navigate(w, r, "/")
 }
 
 // catalogTimeout bounds the TMDB lookups of one catalog page, as in the
