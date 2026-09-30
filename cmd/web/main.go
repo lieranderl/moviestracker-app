@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,7 +21,7 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:              listenAddr(),
-		Handler:           web.New(),
+		Handler:           web.New(configFromEnv()),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    1 << 20, // 1 MB header protection
@@ -57,4 +58,21 @@ func listenAddr() string {
 		return ":" + port
 	}
 	return ":8080"
+}
+
+// configFromEnv is the web app's configuration from its environment (Cloud
+// Run's service settings, or .env.web locally: see .env.web.example).
+func configFromEnv() web.Config {
+	cfg := web.Config{
+		BaseURL:    strings.TrimRight(os.Getenv("MT_WEB_BASE_URL"), "/"),
+		SessionKey: []byte(os.Getenv("MT_WEB_SESSION_KEY")),
+		Google: web.Google{
+			ClientID:     os.Getenv("MT_WEB_GOOGLE_CLIENT_ID"),
+			ClientSecret: os.Getenv("MT_WEB_GOOGLE_CLIENT_SECRET"),
+		},
+	}
+	if cfg.Google.ClientID == "" || cfg.Google.ClientSecret == "" || len(cfg.SessionKey) < 32 || cfg.BaseURL == "" {
+		slog.Warn("sign-in is off: set MT_WEB_BASE_URL, MT_WEB_SESSION_KEY (32+ characters), MT_WEB_GOOGLE_CLIENT_ID and MT_WEB_GOOGLE_CLIENT_SECRET")
+	}
+	return cfg
 }

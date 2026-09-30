@@ -4,9 +4,19 @@
     {
       "name": "moviestracker",
       "runtimeExecutable": "make",
-      "runtimeArgs": ["dev"],
+      "runtimeArgs": [
+        "dev"
+      ],
       "port": 8095,
       "autoPort": true
+    },
+    {
+      "name": "moviestracker-web",
+      "runtimeExecutable": "make",
+      "runtimeArgs": [
+        "web"
+      ],
+      "port": 8080
     }
   ]
 }

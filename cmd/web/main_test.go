@@ -15,3 +15,17 @@ func TestTheAppListensOn8080WithoutAPort(t *testing.T) {
 		t.Fatalf("listenAddr() = %q, want %q", got, ":8080")
 	}
 }
+
+func TestSignInSettingsComeFromTheEnvironment(t *testing.T) {
+	t.Setenv("MT_WEB_BASE_URL", "https://web.example/")
+	t.Setenv("MT_WEB_SESSION_KEY", "0123456789abcdef0123456789abcdef")
+	t.Setenv("MT_WEB_GOOGLE_CLIENT_ID", "id.apps.googleusercontent.com")
+	t.Setenv("MT_WEB_GOOGLE_CLIENT_SECRET", "shh")
+	cfg := configFromEnv()
+	if cfg.BaseURL != "https://web.example" {
+		t.Errorf("BaseURL = %q, want it without the trailing slash", cfg.BaseURL)
+	}
+	if string(cfg.SessionKey) != "0123456789abcdef0123456789abcdef" || cfg.Google.ClientID != "id.apps.googleusercontent.com" || cfg.Google.ClientSecret != "shh" {
+		t.Errorf("config = %+v, want the session key and Google client from the environment", cfg)
+	}
+}

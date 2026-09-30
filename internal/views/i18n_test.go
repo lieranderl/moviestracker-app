@@ -21,7 +21,7 @@ var translated = regexp.MustCompile(`\b(?:tr|trf|trJS|i18n\.T|i18n\.Tf|trn|i18n\
 // Russian page never shows English by accident.
 func TestEveryInterfaceTextHasARussianTranslation(t *testing.T) {
 	var files []string
-	for _, pattern := range []string{"*.templ", "*.go", "../handlers/*.go"} {
+	for _, pattern := range []string{"*.templ", "*.go", "../handlers/*.go", "../web/*.go"} {
 		matches, err := filepath.Glob(pattern)
 		if err != nil {
 			t.Fatal(err)

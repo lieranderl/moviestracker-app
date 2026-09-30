@@ -34,10 +34,17 @@ templ Login(consented bool, errorMsg string) {
 
 // authPage is the centered card of the signed-out pages (sign-in, setup).
 templ authPage(title string) {
+	@authPageAt(title, "/login") {
+		{ children... }
+	}
+}
+
+// authPageAt is authPage whose brand links to home.
+templ authPageAt(title, home string) {
 	@Layout(title) {
 		<main class="relative grow bg-base-200/50 flex flex-col">
 			<div class="flex items-center justify-between px-4 sm:px-8 py-4">
-				@brand("/login")
+				@brand(home)
 				<div class="flex items-center gap-2">
 					@LanguageSwitcher()
 					@ThemeSwitcher()

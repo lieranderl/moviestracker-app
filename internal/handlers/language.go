@@ -22,6 +22,10 @@ func requestLang(r *http.Request) i18n.Lang {
 	return i18n.Negotiate(r.Header.Get("Accept-Language"))
 }
 
+// Language puts the request's language in its context, for pages and TMDB.
+// The cloud web app (internal/web) uses it too.
+func Language(next http.Handler) http.Handler { return language(next) }
+
 // language puts the request's language in its context, for pages and TMDB.
 func language(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -32,6 +36,17 @@ func language(next http.Handler) http.Handler {
 // handleLanguage remembers the language a visitor picked and takes them
 // back to the page they picked it on.
 func (s *Server) handleLanguage(w http.ResponseWriter, r *http.Request) {
+	SetLanguage(s.secureCookies)(w, r)
+}
+
+// SetLanguage handles POST /api/language: it remembers the language a
+// visitor picked (secure: the cookie only travels over HTTPS) and takes them
+// back to the page they picked it on.
+func SetLanguage(secure bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) { setLanguage(w, r, secure) }
+}
+
+func setLanguage(w http.ResponseWriter, r *http.Request, secure bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
 	lang, ok := i18n.Parse(r.PostFormValue("lang"))
 	if !ok {
@@ -47,7 +62,7 @@ func (s *Server) handleLanguage(w http.ResponseWriter, r *http.Request) {
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	}
-	cookie.Secure = s.secureCookies
+	cookie.Secure = secure
 	http.SetCookie(w, cookie)
 	http.Redirect(w, r, backTo(r.Referer()), http.StatusSeeOther) // #nosec G710 -- backTo keeps only a path on this server
 }

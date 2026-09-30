@@ -82,7 +82,15 @@ image** job checks on every pull request that the image builds and serves.
   `moviestracker` and act as the runtime account. No keys are stored in
   GitHub.
 - **Runtime account:** `movies-web@` (Firestore `moviestracker` database,
-  read and write).
+  read and write; the secrets `GOOGLE_SECRET` and `WEB_SESSION_KEY`).
+- **Sign-in:** Google, with the OAuth client the Qwik app also uses; its
+  redirect URIs list `…/auth/google/callback` for localhost:8080, the
+  service's URL and later moviestracker.net. The service's settings:
+  `MT_WEB_BASE_URL` (its URL), `MT_WEB_GOOGLE_CLIENT_ID`, and from Secret
+  Manager `MT_WEB_GOOGLE_CLIENT_SECRET` (`GOOGLE_SECRET`) and
+  `MT_WEB_SESSION_KEY` (`WEB_SESSION_KEY`, signs session cookies: a new
+  version signs everyone out). Locally they come from `.env.web`
+  (`.env.web.example`).
 - **Service settings** (made once, `web.yml` changes only the image): 1 CPU,
   512 MiB, 0–3 instances, 250 requests an instance, a 3600-second request
   timeout (Datastar reconnects its streams), public.
