@@ -56,7 +56,7 @@ changing it (it updates what exists).
 | `release.yml` | `v*` tags | Checks the tag is on `main`, runs CI, then in parallel the Docker image for linux/amd64 and linux/arm64 (pushed to `ghcr.io/lieranderl/moviestracker:<version>` with SBOM and signed provenance), the DMG and the Windows installer; checksums, signed build provenance, and a **draft** release |
 | `pins.yml` | Mondays, or by hand | `scripts/update-pins.sh` moves the TorrServer and GStreamer pins to upstream's latest stable releases once they are a week old, and opens (or refreshes) a pull request from the branch `deps/pins` as the pins app; it waits for a person (see [Dependencies](#dependencies)) |
 | `docker-latest.yml` | a release is published | Points the image's `latest` and `MAJOR.MINOR` tags at the published version (not for pre-releases) |
-| `web.yml` | pushes to `main` that touch the web app, or by hand | Builds `Dockerfile.web`, deploys it to Cloud Run as a revision without traffic, checks its `/healthz`, then moves all traffic to it (see [Web app on Cloud Run](#web-app-on-cloud-run)) |
+| `web.yml` | pushes to `main` that touch the web app, or by hand | Builds `Dockerfile.web`, deploys it to Cloud Run as a revision without traffic, checks its `/readyz` (Cloud Run answers `/healthz` itself), then moves all traffic to it (see [Web app on Cloud Run](#web-app-on-cloud-run)) |
 
 Every action is pinned to a commit SHA with its version in a comment;
 Dependabot updates the pins, Go modules, Bun tools and the Docker base images

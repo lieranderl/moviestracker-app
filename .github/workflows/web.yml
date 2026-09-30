@@ -3,7 +3,7 @@ name: Web app
 # Deploys the cloud web app (cmd/web, Dockerfile.web) to the Cloud Run service
 # moviestracker-web on every push to main that can change it. main only takes
 # pull requests whose CI passed, so this builds, deploys the new revision
-# without traffic, checks it, then moves all traffic to it. The local app's
+# without traffic, checks its /readyz, then moves all traffic to it. The local app's
 # releases (release.yml, v* tags) are separate.
 #
 # Roll back: `gcloud run services update-traffic moviestracker-web
@@ -72,11 +72,13 @@ jobs:
         run: |
           gcloud run deploy "$SERVICE" --project "$PROJECT" --region "$REGION" \
             --image "$IMAGE:$GITHUB_SHA" --no-traffic --tag candidate --quiet
+      # /readyz, not /healthz: Cloud Run reserves paths ending in "z" such as
+      # /healthz and answers them itself with a 404.
       - name: Check the new revision
         run: |
           url="$(gcloud run services describe "$SERVICE" --project "$PROJECT" --region "$REGION" --format=json \
             | jq -r '.status.traffic[] | select(.tag == "candidate") | .url')"
-          curl --fail --silent --show-error --retry 5 --retry-all-errors "$url/healthz"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors "$url/readyz"
       - name: Move all traffic to it
         run: |
           gcloud run services update-traffic "$SERVICE" --project "$PROJECT" --region "$REGION" --to-latest --quiet
