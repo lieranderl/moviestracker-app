@@ -34,6 +34,7 @@ import (
 
 // Server holds application state and dependencies for HTTP handling.
 type Server struct {
+	*Catalog        // the catalog's pages, for this server's accounts
 	mux             *http.ServeMux
 	handler         http.Handler // mux behind the setup gate and cross-origin (CSRF) protection
 	sessions        *auth.SessionManager
@@ -126,6 +127,7 @@ func NewServer(cfg Config) (*Server, error) {
 	views.SetVersion(s.version)
 	s.live = live.New(s.liveTopic(cfg.LivePolling.withDefaults()))
 	s.current.Store(&sources.Clients{Catalog: cfg.TMDB, Details: cfg.Details, Torrents: cfg.Torrents, IMDb: cfg.IMDb})
+	s.Catalog = NewCatalog(s.clients, s.userFromRequest, "/login", s.catalogTimeout)
 	s.routes()
 	// Rejects cross-origin POSTs (Sec-Fetch-Site / Origin), so no other site
 	// can submit forms or Datastar actions with a visitor's cookies.
@@ -187,6 +189,7 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /static/", http.StripPrefix("/static/", fileServer))
 
 	// Web Pages
+	s.Register(s.mux, homePath)
 	s.mux.HandleFunc("GET /{$}", s.handleRoot)
 	s.mux.HandleFunc("GET /setup", s.handleSetupPage)
 	s.mux.HandleFunc("GET /login", s.handleLoginPage)
@@ -194,14 +197,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /settings/sources", s.handleSourcesPage)
 	s.mux.HandleFunc("GET /settings/updates", s.handleUpdatesPage)
 	s.mux.HandleFunc("GET /settings/{section}", s.handleSettingsPage)
-	s.mux.HandleFunc("GET /movies", s.handleMoviesPage)
-	s.mux.HandleFunc("GET /browse/{slug}", s.handleBrowsePage)
 	s.mux.HandleFunc("GET /dashboard", s.handleDashboardPage)
 	s.mux.HandleFunc("GET /torrserver", s.handleTorrServerPage)
-	s.mux.HandleFunc("GET /movie/{id}", s.handleMoviePage)
-	s.mux.HandleFunc("GET /tv/{id}", s.handleTVPage)
-	s.mux.HandleFunc("GET /person/{id}", s.handlePersonPage)
-	s.mux.HandleFunc("GET /search", s.handleSearchPage)
 
 	// API Endpoints
 	s.mux.HandleFunc("POST /api/language", s.handleLanguage)
@@ -232,11 +229,6 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/settings/users/{username}/role/{role}", s.handleUserAction)
 	s.mux.HandleFunc("POST /api/settings/users/{username}/{action}", s.handleUserAction)
 	s.mux.HandleFunc("GET /api/dashboard", s.handleDashboardStream)
-	s.mux.HandleFunc("GET /api/movies/imdb-rating", s.handleMovieIMDbRating)
-	s.mux.HandleFunc("GET /api/tv/{id}/season/{season}", s.handleSeason)
-	s.mux.HandleFunc("GET /api/search", s.handleSearchAPI)
-	s.mux.HandleFunc("GET /api/discover", s.handleDiscover)
-	s.mux.HandleFunc("GET /api/browse/{slug}", s.handleBrowseMore)
 	s.mux.HandleFunc("GET /api/torrents", s.handleTorrentSearch)
 	s.mux.HandleFunc("POST /api/torrents/add", s.handleTorrentAdd)
 

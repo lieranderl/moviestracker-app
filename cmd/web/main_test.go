@@ -41,3 +41,18 @@ func TestWithoutAFirestoreProjectUsersDataIsKeptInMemory(t *testing.T) {
 		t.Errorf("openStore() = %T, want the in-memory store", users)
 	}
 }
+
+func TestTheCatalogUsesTheTMDBKeyAndIMDbServiceFromTheEnvironment(t *testing.T) {
+	t.Setenv("MT_WEB_TMDB_KEY", "0123456789abcdef0123456789abcdef")
+	t.Setenv("MT_WEB_IMDB_URL", "")
+	cfg := configFromEnv()
+	if cfg.Sources.Catalog == nil || cfg.Sources.Details == nil {
+		t.Error("with a TMDB key, the catalog has no TMDB client")
+	}
+	if cfg.Sources.IMDb == nil {
+		t.Error("without MT_WEB_IMDB_URL, the catalog does not use the default IMDb rating service")
+	}
+	if cfg.Sources.Torrents != nil {
+		t.Error("the web app searches torrents before it is set up to")
+	}
+}

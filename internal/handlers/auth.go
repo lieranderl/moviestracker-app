@@ -192,3 +192,16 @@ func writeRequestError(w http.ResponseWriter, err error) {
 func patchRedirect(sse *datastar.ServerSentEventGenerator, destination string) error {
 	return sse.MarshalAndPatchSignals(map[string]string{"redirectUrl": destination})
 }
+
+// Navigate sends the browser to destination: a Datastar request gets the
+// $redirectUrl signal the layout follows (Datastar would otherwise follow a
+// redirect itself and morph the page in place), a native form a 303.
+func Navigate(w http.ResponseWriter, r *http.Request, destination string) {
+	if isDatastarRequest(r) {
+		if err := patchRedirect(datastar.NewSSE(w, r), destination); err != nil {
+			logSSEError(r, "patch redirect", err)
+		}
+		return
+	}
+	http.Redirect(w, r, destination, http.StatusSeeOther)
+}

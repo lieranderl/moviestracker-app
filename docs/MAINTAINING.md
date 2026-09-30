@@ -92,6 +92,10 @@ and serves, and that the user store works with Firestore's emulator.
   `MT_WEB_SESSION_KEY` (`WEB_SESSION_KEY`, signs session cookies: a new
   version signs everyone out). Locally they come from `.env.web`
   (`.env.web.example`).
+- **Catalog:** TMDB with the key in `MT_WEB_TMDB_KEY` (secret `TMDB_API_KEY`),
+  IMDb ratings from `MT_WEB_IMDB_URL` (default: the Moviestracker rating
+  service). The pages are the local app's (`handlers.Catalog`), with the web
+  app's navigation (`views.Site`).
 - **Users' data:** preferences and favourites in the Firestore database
   `moviestracker` (`users/{uid}`, `users/{uid}/favorites/{kind}-{id}`;
   `internal/store`), beside the catalog collections the backend writes. The

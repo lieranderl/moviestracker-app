@@ -88,7 +88,7 @@ templ BrowsePage(user *auth.User, v BrowseView) {
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
 				<header class="flex flex-wrap items-end justify-between gap-4">
 					<div class="min-w-0 space-y-1">
-						<a href="/movies" class="link link-hover text-sm text-base-content/60 inline-flex items-center gap-1">
+						<a href={ templ.SafeURL(homeHref(ctx)) } class="link link-hover text-sm text-base-content/60 inline-flex items-center gap-1">
 							@Icon("arrow-left", "size-4")
 							{ tr(ctx, "Home") }
 						</a>

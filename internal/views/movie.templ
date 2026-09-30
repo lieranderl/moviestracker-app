@@ -42,10 +42,14 @@ templ MoviePage(user *auth.User, m *tmdb.MovieDetails) {
 		<main class="grow pb-16" data-signals={ mediaPageSignals } data-on:click={ videoClick(ctx) }>
 			@detailHero(m.MediaItem, movieFacts(ctx, m), m.Certification, genreNames(m.Genres)) {
 				@trailerButton(m.TrailerKey, trf(ctx, "%s trailer", m.Title))
-				@heroLink("#sources", "magnet", tr(ctx, "Find sources"))
+				if !siteOf(ctx).Cloud {
+					@heroLink("#sources", "magnet", tr(ctx, "Find sources"))
+				}
 			}
 			@aboutSection(m.MediaItem, m.Tagline, movieAbout(ctx, m), officialLinks("title", m.Links, m.Homepage))
-			@sourcesSection("movie", m.ID, nil, 0)
+			if !siteOf(ctx).Cloud {
+				@sourcesSection("movie", m.ID, nil, 0)
+			}
 			@castRail(tr(ctx, "Cast"), m.Cast)
 			@videoRail(m.Videos)
 			@collectionRail(m.Collection, m.ID)

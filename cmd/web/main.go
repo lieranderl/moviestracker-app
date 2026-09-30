@@ -3,6 +3,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"log/slog"
@@ -13,6 +14,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lieranderl/moviestracker-app/internal/config"
+	"github.com/lieranderl/moviestracker-app/internal/sources"
 	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/web"
 )
@@ -74,6 +77,10 @@ func listenAddr() string {
 // Run's service settings, or .env.web locally: see .env.web.example).
 func configFromEnv() web.Config {
 	cfg := web.Config{
+		Sources: sources.Connector{}.Connect(config.Sources{
+			TMDBKey: os.Getenv("MT_WEB_TMDB_KEY"),
+			IMDbURL: cmp.Or(os.Getenv("MT_WEB_IMDB_URL"), config.DefaultIMDbURL),
+		}),
 		BaseURL:    strings.TrimRight(os.Getenv("MT_WEB_BASE_URL"), "/"),
 		SessionKey: []byte(os.Getenv("MT_WEB_SESSION_KEY")),
 		Google: web.Google{
@@ -83,6 +90,9 @@ func configFromEnv() web.Config {
 	}
 	if cfg.Google.ClientID == "" || cfg.Google.ClientSecret == "" || len(cfg.SessionKey) < 32 || cfg.BaseURL == "" {
 		slog.Warn("sign-in is off: set MT_WEB_BASE_URL, MT_WEB_SESSION_KEY (32+ characters), MT_WEB_GOOGLE_CLIENT_ID and MT_WEB_GOOGLE_CLIENT_SECRET")
+	}
+	if cfg.Sources.Catalog == nil {
+		slog.Warn("the catalog is empty: set MT_WEB_TMDB_KEY")
 	}
 	return cfg
 }
