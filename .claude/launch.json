@@ -12,14 +12,11 @@
     },
     {
       "name": "moviestracker-web",
-      "runtimeExecutable": "env",
+      "runtimeExecutable": "make",
       "runtimeArgs": [
-        "PORT=8096",
-        "go",
-        "run",
-        "./cmd/web"
+        "web"
       ],
-      "port": 8096
+      "port": 8080
     }
   ]
 }
