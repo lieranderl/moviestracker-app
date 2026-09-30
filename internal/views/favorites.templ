@@ -1,0 +1,82 @@
+package views
+
+import (
+	"fmt"
+
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+)
+
+// favoriteURL is the favourites API for a title.
+func favoriteURL(path, kind string, id int) string {
+	return fmt.Sprintf("/api/favorites%s?type=%s&id=%d", path, kind, id)
+}
+
+// favoriteSlot is where a title page's favourite button goes in the web
+// app; it asks whether the title is a favourite when the page loads.
+templ favoriteSlot(kind string, id int) {
+	<span id="favorite-button" class="contents" data-init={ fmt.Sprintf("@get('%s')", favoriteURL("/state", kind, id)) }></span>
+}
+
+// FavoriteButton adds a title to the signed-in user's favourites or, when
+// on, removes it; each click patches the button in its new state.
+templ FavoriteButton(kind string, id int, on bool) {
+	<button
+		id="favorite-button"
+		type="button"
+		aria-pressed={ boolAttr(on) }
+		class="btn sm:btn-lg btn-ghost text-white border-white/30 hover:bg-white/10 gap-2"
+		if on {
+			data-on:click={ fmt.Sprintf("@delete('%s')", favoriteURL("", kind, id)) }
+		} else {
+			data-on:click={ fmt.Sprintf("@post('%s')", favoriteURL("", kind, id)) }
+		}
+	>
+		if on {
+			@Icon("heart", "size-5 fill-current text-error")
+		} else {
+			@Icon("heart", "size-5")
+		}
+		if on {
+			{ tr(ctx, "In favourites") }
+		} else {
+			{ tr(ctx, "Add to favourites") }
+		}
+	</button>
+}
+
+// FavoritesPage lists the signed-in user's favourites, newest first;
+// failed says they could not be read.
+templ FavoritesPage(user *auth.User, items []tmdb.MediaItem, failed bool) {
+	@Layout(tr(ctx, "Favourites")) {
+		@Navbar(user)
+		<main class="grow pb-20">
+			<div class="max-w-7xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
+				<header class="space-y-1">
+					<h1 class="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
+						@Icon("heart", "size-6 text-error")
+						{ tr(ctx, "Favourites") }
+					</h1>
+					<p class="text-sm text-base-content/60">{ tr(ctx, "Movies and series you keep, newest first.") }</p>
+				</header>
+				if failed {
+					<div role="alert" class="alert alert-error alert-soft">
+						@Icon("circle-alert", "size-5")
+						<span>{ tr(ctx, "Your favourites could not be loaded right now. Please try again in a moment.") }</span>
+					</div>
+				} else if len(items) == 0 {
+					<div role="status" class="alert alert-info alert-soft">
+						@Icon("info", "size-5")
+						<span>{ tr(ctx, "No favourites yet. Open a movie or series and press Add to favourites.") }</span>
+					</div>
+				} else {
+					<ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+						@BrowseItems(items)
+					</ul>
+				}
+			</div>
+			@toTopButton()
+		</main>
+		@siteFooter()
+	}
+}

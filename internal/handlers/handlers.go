@@ -345,6 +345,10 @@ func logValue(v string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(v, "\r", "%0D"), "\n", "%0A")
 }
 
+// LogError is an error as logs show it: its line breaks encoded, as it can
+// quote request values. The web app logs errors with it too.
+func LogError(err error) string { return logError(err) }
+
 // logError is an error as logs show it: it can quote request values (a
 // hash, an address), so its line breaks are encoded like logValue's.
 func logError(err error) string {

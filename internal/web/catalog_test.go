@@ -17,11 +17,24 @@ import (
 )
 
 // withTMDB is cfg with the catalog served by a stand-in for TMDB (the
-// external boundary), whose search finds Dune.
+// external boundary), which knows Dune and Severance and whose search finds
+// Dune.
 func withTMDB(t *testing.T, cfg web.Config) web.Config {
 	t.Helper()
 	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/3/movie/438631":
+			_, _ = w.Write([]byte(`{"id":438631,"title":"Dune","original_title":"Dune","poster_path":"/d.jpg","release_date":"2021-09-15"}`))
+			return
+		case "/3/tv/95396":
+			_, _ = w.Write([]byte(`{"id":95396,"name":"Severance","original_name":"Severance","poster_path":"/s.jpg","first_air_date":"2022-02-17"}`))
+			return
+		case "/3/movie/1":
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"status_code":34}`))
+			return
+		}
 		if r.URL.Path == "/3/search/multi" {
 			_, _ = w.Write([]byte(`{"page":1,"total_pages":1,"results":[{"media_type":"movie","id":438631,"title":"Dune","original_title":"Dune","release_date":"2021-09-15"}]}`))
 			return

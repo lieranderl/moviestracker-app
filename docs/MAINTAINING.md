@@ -100,6 +100,9 @@ and serves, and that the user store works with Firestore's emulator.
   the backend's feeds of releases found on trackers, in the same database:
   `latesttorrentsmovies`, `hdr10movies`, `dvmovies` (`internal/releases`,
   read-only; each page kept five minutes).
+- **Favourites:** a button on movie and TV pages (`/api/favorites`, loaded
+  with the page) and a Favourites page (`/favorites`); titles and posters
+  are taken from TMDB when a title is added.
 - **Users' data:** preferences and favourites in the Firestore database
   `moviestracker` (`users/{uid}`, `users/{uid}/favorites/{kind}-{id}`;
   `internal/store`), beside the catalog collections the backend writes. The

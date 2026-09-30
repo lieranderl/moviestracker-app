@@ -131,7 +131,12 @@ func MoviePage(user *auth.User, m *tmdb.MovieDetails) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if !siteOf(ctx).Cloud {
+				if siteOf(ctx).Cloud {
+					templ_7745c5c3_Err = favoriteSlot("movie", m.ID).Render(ctx, templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
 					templ_7745c5c3_Err = heroLink("#sources", "magnet", tr(ctx, "Find sources")).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
