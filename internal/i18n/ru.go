@@ -3,9 +3,10 @@ package i18n
 // ru translates the interface into Russian, by English text.
 var ru = map[string]string{ // #nosec G101 -- interface texts ("Password"), not credentials
 	// Shell: navigation, sign-in and setup
-	"Sign in":             "Войти",
-	"Sign in with Google": "Войти через Google",
-	"My TorrServer":       "Мой TorrServer",
+	"Sign in":                             "Войти",
+	"Sign in with Google":                 "Войти через Google",
+	"No torrents in this TorrServer yet.": "В этом TorrServer пока нет торрентов.",
+	"My TorrServer":                       "Мой TorrServer",
 	"Your own TorrServer streams to this browser directly: Moviestracker only keeps its address, and its login stays in this browser.": "Ваш TorrServer показывает видео прямо в этом браузере: Moviestracker хранит только его адрес, а логин остаётся в браузере.",
 	"Add TorrServer": "Добавить TorrServer",
 	"On this computer TorrServer is usually at http://localhost:8090. On another machine, use its HTTPS address.": "На этом компьютере TorrServer обычно доступен по адресу http://localhost:8090. На другом компьютере используйте его HTTPS-адрес.",
