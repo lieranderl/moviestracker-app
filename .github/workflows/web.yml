@@ -1,0 +1,81 @@
+name: Web app
+
+# Deploys the cloud web app (cmd/web, Dockerfile.web) to the Cloud Run service
+# moviestracker-web on every push to main that can change it. main only takes
+# pull requests whose CI passed, so this builds, deploys the new revision
+# without traffic, checks it, then moves all traffic to it. The local app's
+# releases (release.yml, v* tags) are separate.
+#
+# Roll back: `gcloud run services update-traffic moviestracker-web
+#   --region europe-west1 --to-revisions <revision>=100`
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - cmd/web/**
+      - internal/**
+      - frontend/**
+      - static/**
+      - go.mod
+      - go.sum
+      - package.json
+      - bun.lock
+      - Dockerfile.web
+      - .github/workflows/web.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-deploy
+  cancel-in-progress: false
+
+env:
+  PROJECT: moviestracker-f07e2
+  REGION: europe-west1
+  SERVICE: moviestracker-web
+  IMAGE: europe-west1-docker.pkg.dev/moviestracker-f07e2/moviestracker/moviestracker-web
+  # Keyless: GitHub's OIDC token for this workflow on main, nothing else
+  # (the provider's attribute condition), becomes the deployer account.
+  WORKLOAD_IDENTITY_PROVIDER: projects/695761327713/locations/global/workloadIdentityPools/moviestracker-web/providers/github
+  DEPLOYER: movies-web-deployer@moviestracker-f07e2.iam.gserviceaccount.com
+
+jobs:
+  deploy:
+    name: Build and deploy to Cloud Run
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: web
+      url: https://moviestracker-web-695761327713.europe-west1.run.app
+    permissions:
+      contents: read
+      id-token: write # sign in to Google Cloud
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.DEPLOYER }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+      - name: Build and push the image
+        run: |
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+          docker build -f Dockerfile.web -t "$IMAGE:$GITHUB_SHA" .
+          docker push "$IMAGE:$GITHUB_SHA"
+      - name: Deploy a revision without traffic
+        run: |
+          gcloud run deploy "$SERVICE" --project "$PROJECT" --region "$REGION" \
+            --image "$IMAGE:$GITHUB_SHA" --no-traffic --tag candidate --quiet
+      - name: Check the new revision
+        run: |
+          url="$(gcloud run services describe "$SERVICE" --project "$PROJECT" --region "$REGION" --format=json \
+            | jq -r '.status.traffic[] | select(.tag == "candidate") | .url')"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors "$url/healthz"
+      - name: Move all traffic to it
+        run: |
+          gcloud run services update-traffic "$SERVICE" --project "$PROJECT" --region "$REGION" --to-latest --quiet

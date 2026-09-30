@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1
+# Moviestracker's cloud web app (cmd/web) for Cloud Run: no TorrServer or
+# GStreamer inside, as each visitor's browser talks to their own TorrServer.
+#
+#   docker build -f Dockerfile.web -t moviestracker-web:local .
+#
+# .github/workflows/web.yml builds it on every push to main and deploys it to
+# the Cloud Run service moviestracker-web.
+
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.2@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1630f0546895 AS assets
+WORKDIR /src
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+COPY frontend ./frontend
+COPY internal ./internal
+COPY static ./static
+RUN bun run assets
+
+FROM --platform=$BUILDPLATFORM golang:1.27.1-bookworm@sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195 AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
+COPY . .
+COPY --from=assets /src/static/app.css /src/static/player.js /src/static/theme.js /src/static/
+COPY --from=assets /src/internal/views/icons_gen.go /src/internal/views/icons_gen.go
+ARG TARGETOS TARGETARCH
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" go build -trimpath -ldflags "-s -w" \
+      -o /out/web ./cmd/web
+
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
+COPY --from=build /out/web /web
+LABEL org.opencontainers.image.title="Moviestracker web" \
+      org.opencontainers.image.source="https://github.com/lieranderl/moviestracker-app" \
+      org.opencontainers.image.licenses="AGPL-3.0-only"
+USER nonroot:nonroot
+EXPOSE 8080
+ENTRYPOINT ["/web"]
