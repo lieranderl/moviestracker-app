@@ -2,8 +2,11 @@ package web
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 
 	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/releases"
@@ -39,11 +42,13 @@ func (l releaseLists) ListPage(ctx context.Context, list tmdb.List, page int) (t
 }
 
 // cachedFeeds keeps each page of the feeds read, in each language, for
-// feedTTL. Failed reads are not kept. It holds at most every page of three
-// feeds in two languages, so it needs no other bound.
+// feedTTL; requests that miss it at once share one read. Failed reads are
+// not kept. It holds at most every page of three feeds in two languages, so
+// it needs no other bound.
 type cachedFeeds struct {
-	src releases.Source
-	now func() time.Time
+	src     releases.Source
+	now     func() time.Time
+	reading singleflight.Group
 
 	mu    sync.Mutex
 	pages map[feedPage]cachedPage
@@ -73,12 +78,20 @@ func (c *cachedFeeds) Page(ctx context.Context, feed releases.Feed, page int) (t
 	if ok && c.now().Before(hit.expires) {
 		return hit.page, nil
 	}
-	p, err := c.src.Page(ctx, feed, page)
+	// The shared read is not cut short when the request that started it
+	// goes away: the others still wait for it.
+	v, err, _ := c.reading.Do(fmt.Sprint(key), func() (any, error) {
+		p, err := c.src.Page(context.WithoutCancel(ctx), feed, page)
+		if err != nil {
+			return tmdb.Page{}, err
+		}
+		c.mu.Lock()
+		c.pages[key] = cachedPage{page: p, expires: c.now().Add(feedTTL)}
+		c.mu.Unlock()
+		return p, nil
+	})
 	if err != nil {
 		return tmdb.Page{}, err
 	}
-	c.mu.Lock()
-	c.pages[key] = cachedPage{page: p, expires: c.now().Add(feedTTL)}
-	c.mu.Unlock()
-	return p, nil
+	return v.(tmdb.Page), nil
 }

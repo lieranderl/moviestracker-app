@@ -87,10 +87,12 @@ type countingFeeds struct {
 	reads int
 }
 
+// Page counts the read and, like Firestore, takes a moment to answer.
 func (c *countingFeeds) Page(context.Context, releases.Feed, int) (tmdb.Page, error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.reads++
+	c.mu.Unlock()
+	time.Sleep(50 * time.Millisecond)
 	return tmdb.Page{Page: 1, TotalPages: 1}, nil
 }
 
@@ -121,5 +123,27 @@ func TestReleaseFeedsAreReadAtMostEveryFiveMinutes(t *testing.T) {
 	getWith(t, h, "/api/discover", session)
 	if got := feeds.count(); got != 2*first {
 		t.Errorf("feeds read %d times after five minutes, want %d", got, 2*first)
+	}
+}
+
+func TestManyHomePagesAtOnceReadEachFeedOnce(t *testing.T) {
+	g := newGoogle(t)
+	feeds := &countingFeeds{}
+	cfg := withTMDB(t, g.config())
+	cfg.Releases = feeds
+	h := web.New(cfg)
+	cookie := sessionCookie(signIn(t, h))
+
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			req := httptest.NewRequest(http.MethodGet, "/api/discover", nil)
+			req.AddCookie(cookie)
+			h.ServeHTTP(httptest.NewRecorder(), req)
+		})
+	}
+	wg.Wait()
+	if got := feeds.count(); got != 3 {
+		t.Errorf("8 home pages at once read the feeds %d times, want 3 (once each)", got)
 	}
 }
