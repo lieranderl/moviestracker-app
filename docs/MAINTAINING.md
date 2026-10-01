@@ -111,12 +111,20 @@ and serves, and that the user store works with Firestore's emulator.
   the TMDB title, poster, category and `data` metadata:
   `{"tmdb":{"id":438631,"type":"movie"}}`. No key or TorrServer login
   is included in the rendered source results.
+- **Shared UI:** title pages, season tabs, torrent cards, the add-torrent
+  form, settings fields and player controls are the existing components in
+  `internal/views`. App and web use `frontend/player.js`; transport adapters
+  supply their different request attributes and signal namespaces. Keep
+  future changes in these shared components, rather than copying layouts.
 - **TorrServer:** each user's TorrServer addresses are kept in Firestore
   (`users/{uid}/torrservers`); their logins stay in the browser
   (localStorage). `static/torrserver.js` (from `frontend/torrserver.js`)
   reaches the TorrServer from the browser; the server never does.
-  The TorrServer tab adds one magnet/HTTP(S) link or `.torrent` file (up to
-  4 MB), with an optional title and poster URL. Uploads go straight to
+  The shared add form accepts links (one per line) and up to 20 `.torrent`
+  files (up to 4 MiB each). A custom title applies to a single torrent;
+  title-page source actions supply the title and poster automatically.
+  A batch continues after individual failures and reports added, refused
+  and failed entries in the form. Uploads go straight to
   TorrServer's `/torrent/upload`; neither the file nor its login is sent to
   Cloud Run. After an add, the browser relays the updated list for rendering.
   Files play directly from `/stream?link=…&index=…&play`, or through hls.js
@@ -131,13 +139,24 @@ and serves, and that the user store works with Firestore's emulator.
   task upstream. Unknown cache capacity omits buffer percentage.
   Tested against MatriX.145 with `--httpauth`: media routes accept streams
   without a login header; API reads use the browser's saved Basic login.
-  Safari and an HTTPS cloud page reaching HTTP localhost remain release checks.
+  On 1 October 2026, the deployed HTTPS app played HLS in Chrome through
+  an HTTPS MatriX.145 server: live stats updated, changing audio preserved
+  the playback position, and the subtitle choices and settings form loaded.
+  This does not cover HTTP localhost or native HLS in Safari.
+  Full Safari playback and an HTTPS cloud page reaching HTTP localhost
+  remain release checks; a working connection alone does not verify playback.
 - **Users' data:** preferences and favourites in the Firestore database
   `moviestracker` (`users/{uid}`, `users/{uid}/favorites/{kind}-{id}`;
   `internal/store`), beside the catalog collections the backend writes. The
   service's `MT_WEB_FIRESTORE_PROJECT` and `MT_WEB_FIRESTORE_DATABASE` name
   it; locally `make firestore` starts the emulator and `make test-store`
   checks the store against it.
+- **Firestore browser access:** checked on 1 October 2026. The deployed
+  release `cloud.firestore/moviestracker` applies `allow read, write: if
+  false` to every document. An unauthenticated REST document read returned
+  HTTP 403. The apps use service accounts, which are governed by IAM and
+  bypass these rules. Verify the named database's release when checking
+  rules; a ruleset deployed to the default database does not cover it.
 - **Service settings** (made once, `web.yml` changes only the image): 1 CPU,
   512 MiB, 0–3 instances, 250 requests an instance, a 3600-second request
   timeout (Datastar reconnects its streams), public.
