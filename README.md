@@ -242,8 +242,9 @@ install. It adds favourites and rows of new releases found on trackers
 and TorrServer addresses in your account, on every device you sign in on.
 
 It does not run a TorrServer for you. Add your own on the **TorrServer**
-page; your browser talks to it directly, so its address and login never
-reach the website (logins stay in that browser). From there you find
+page; your browser talks to it directly. The website keeps its address in
+your account but never connects to it, and its login stays in that browser.
+From there you find
 sources, send them to your TorrServer and play them, with the same player
 as the apps.
 
