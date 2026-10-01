@@ -44,6 +44,7 @@ anywhere.
 | **macOS 13+** (Apple Silicon, Intel) | `Moviestracker-<version>.dmg` | [Install on your Mac](#install-on-your-mac) |
 | **Windows 10/11** (64-bit, preview) | `Moviestracker-Setup-<version>-x64.exe` | [Windows](#windows-preview) |
 | **Linux, NAS, home servers** (amd64, arm64) | `ghcr.io/lieranderl/moviestracker` | [Docker](#linux-nas-and-home-servers-docker) |
+| **Any browser**, nothing to install | [moviestracker.net](https://moviestracker.net) | [Web version](#web-version) |
 
 Downloads are on the [latest release](https://github.com/lieranderl/moviestracker-app/releases/latest),
 with `checksums.txt`. Every file and image is built by this repository's
@@ -231,6 +232,28 @@ docker run -d --name moviestracker --restart unless-stopped -p 8095:8095 \
 HDR-to-SDR conversion needs TorrServer's `hdrtonemap` plugin, which only its
 Windows build has. The other conversions work the same as in the apps. All
 settings are in [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
+## Web version
+
+[moviestracker.net](https://moviestracker.net) is the same catalog as a
+website: sign in with Google and use it from any browser, with nothing to
+install. It adds favourites and rows of new releases found on trackers
+(latest movies, HDR10, Dolby Vision), and keeps your favourites, settings
+and TorrServer addresses in your account, on every device you sign in on.
+
+It does not run a TorrServer for you. Add your own on the **TorrServer**
+page; your browser talks to it directly, so its address and login never
+reach the website (logins stay in that browser). From there you find
+sources, send them to your TorrServer and play them, with the same player
+as the apps.
+
+- The site is served over HTTPS, so the browser only reaches a TorrServer
+  at an `https://` address (TorrServer `--ssl` with a certificate the
+  browser trusts) or one on the same computer at `http://localhost:8090`.
+  A plain `http://` TorrServer on another machine is blocked.
+- Chrome asks once to allow access to your local network; allow it.
+- With a self-signed certificate, open the TorrServer's address once in the
+  same browser and accept it.
 
 ## Finding sources and watching
 
