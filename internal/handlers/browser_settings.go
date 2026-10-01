@@ -48,8 +48,11 @@ func BrowserSettingsSection(id string, sets torrserver.Fields) (views.SettingsSe
 	}
 	v := sectionView(filtered, "")
 	v.Cost = reconnectCost
-	if id == "gstreamer" {
+	switch id {
+	case "gstreamer":
 		v.Cost = gstCost
+	case "https":
+		v.Cost = httpsCost
 	}
 	for _, f := range filtered.Fields {
 		v.Values[f.Key] = shownValue(sets, f)

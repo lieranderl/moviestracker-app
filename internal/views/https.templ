@@ -1,0 +1,112 @@
+package views
+
+import "strings"
+
+// CertificateInfo describes the certificate TorrServer serves HTTPS with.
+type CertificateInfo struct {
+	Path       string
+	Names      []string
+	Expires    string // YYYY-MM-DD
+	Expired    bool
+	SelfSigned bool
+	// Problem, when set, says why the file could not be described.
+	Problem string
+}
+
+// HTTPSView is the managed engine's HTTPS: addresses, login and certificate.
+type HTTPSView struct {
+	Serving, Reachable bool
+	Addresses          []string
+	// User and Password are TorrServer's login, given when other devices reach it.
+	User, Password string
+	// Certificate is nil until TorrServer has one (it makes a self-signed one).
+	Certificate *CertificateInfo
+	// Uploaded says the certificate is the one uploaded here.
+	Uploaded bool
+	Status   SourceStatus
+}
+
+// HTTPSCard shows how other devices reach the managed engine over HTTPS and
+// takes a certificate and key to serve it with.
+templ HTTPSCard(v HTTPSView) {
+	<section id="https-certificate" class="card bg-base-200/60 border border-base-content/10">
+		<div class="card-body gap-4">
+			<h2 class="card-title">
+				@Icon("shield-check", "size-5 text-primary")
+				{ tr(ctx, "Certificate and addresses") }
+			</h2>
+			if v.Serving {
+				<div class="space-y-1.5">
+					<p class="text-sm text-base-content/70">{ tr(ctx, "TorrServer's HTTPS address:") }</p>
+					<ul class="flex flex-wrap gap-2">
+						for _, a := range v.Addresses {
+							<li><code class="badge badge-ghost font-mono">{ a }</code></li>
+						}
+					</ul>
+				</div>
+				if v.Reachable && v.User != "" {
+					<p class="text-sm text-base-content/70">
+						{ tr(ctx, "Sign in on other devices, and in the web app's TorrServer login, as") }
+						<code class="badge badge-ghost font-mono">{ v.User }</code>
+						{ tr(ctx, "with the password") }
+						<code class="badge badge-ghost font-mono select-all">{ v.Password }</code>
+					</p>
+				}
+			} else {
+				<p class="text-sm text-base-content/70">{ tr(ctx, "Turn on Serve HTTPS below to use the certificate.") }</p>
+			}
+			if v.Certificate == nil {
+				<p class="text-sm">{ tr(ctx, "No certificate yet: TorrServer makes a self-signed one when it first serves HTTPS.") }</p>
+			} else if v.Certificate.Problem != "" {
+				<div role="alert" class="alert alert-warning alert-soft text-sm">
+					@Icon("circle-alert", "size-4")
+					<span>{ tr(ctx, v.Certificate.Problem) } <code class="font-mono">{ v.Certificate.Path }</code></span>
+				</div>
+			} else {
+				<div class="flex flex-wrap items-center gap-2 text-sm">
+					@Icon("file-badge", "size-4 text-primary")
+					<span class="font-medium">{ strings.Join(v.Certificate.Names, ", ") }</span>
+					<span class="text-base-content/70">{ trf(ctx, "valid until %s", v.Certificate.Expires) }</span>
+					if v.Certificate.Expired {
+						<span class="badge badge-error badge-soft">{ tr(ctx, "Expired") }</span>
+					}
+					if v.Certificate.SelfSigned {
+						<span class="badge badge-warning badge-soft">{ tr(ctx, "Self-signed") }</span>
+					}
+					if v.Uploaded {
+						<span class="badge badge-success badge-soft">{ tr(ctx, "Your certificate") }</span>
+					}
+				</div>
+			}
+			<form
+				class="grid gap-3 sm:grid-cols-2"
+				data-signals="{httpsUploading:false}"
+				data-indicator="httpsUploading"
+				data-on:submit="@post('/api/settings/https/certificate', {contentType: 'form'})"
+			>
+				<fieldset class="fieldset">
+					<legend class="fieldset-legend">{ tr(ctx, "Certificate (PEM, with its chain)") }</legend>
+					<input type="file" name="sslCert" required accept=".pem,.crt,.cer,application/x-pem-file" class="file-input w-full"/>
+				</fieldset>
+				<fieldset class="fieldset">
+					<legend class="fieldset-legend">{ tr(ctx, "Private key (PEM)") }</legend>
+					<input type="file" name="sslKey" required accept=".pem,.key,application/x-pem-file" class="file-input w-full"/>
+				</fieldset>
+				<div class="sm:col-span-2 flex flex-wrap items-center gap-3">
+					<button type="submit" class="btn btn-primary" data-attr:disabled="$httpsUploading">
+						<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$httpsUploading"></span>
+						@Icon("upload", "size-4")
+						{ tr(ctx, "Upload certificate") }
+					</button>
+					if v.Uploaded {
+						<button type="button" class="btn btn-ghost" data-on:click={ "confirm(" + trJS(ctx, "Remove the uploaded certificate? TorrServer makes a self-signed one instead.") + ") && @post('/api/settings/https/certificate/remove', {filterSignals: {include: /^$/}})" }>
+							{ tr(ctx, "Use a self-signed certificate") }
+						</button>
+					}
+					<span class="text-xs text-base-content/60">{ tr(ctx, "Kept in TorrServer's folder, readable by you only.") }</span>
+				</div>
+			</form>
+			@sourceStatus(v.Status)
+		</div>
+	</section>
+}

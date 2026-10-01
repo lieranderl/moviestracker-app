@@ -131,6 +131,8 @@ type EngineStartup struct {
 	PublicIPv6  string `json:"publicIPv6,omitempty"`
 	MaxSize     int64  `json:"maxSize,omitempty"`
 	TorrentsDir string `json:"torrentsDir,omitempty"`
+	HTTPS       bool   `json:"https,omitempty"`
+	Reachable   bool   `json:"reachable,omitempty"`
 }
 
 // Store is the state file of one data directory. It is safe for concurrent use.

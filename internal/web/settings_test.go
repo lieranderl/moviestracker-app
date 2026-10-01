@@ -57,3 +57,26 @@ func TestBrowserSettingsEndpointsRequireSignInAndBoundRequests(t *testing.T) {
 		}
 	}
 }
+
+func TestUserCanPointTheirTorrServerAtAnHTTPSCertificateFromTheBrowser(t *testing.T) {
+	h, session, _ := torrServers(t)
+	res := postPlayer(t, h, "/api/ts/settings", `{"section":"https","url":"http://localhost:8090","nonce":3,"values":{"SslPort":8091,"SslCert":"","SslKey":""}}`, session)
+	for _, want := range []string{"HTTPS port", "Certificate file", "Private key file", "--ssl"} {
+		if !strings.Contains(res.Body.String(), want) {
+			t.Errorf("HTTPS form lacks %q", want)
+		}
+	}
+	if strings.Contains(res.Body.String(), "Serve HTTPS") || strings.Contains(res.Body.String(), "sslCert") {
+		t.Fatal("browser offered to start TorrServer with HTTPS or to upload a certificate")
+	}
+	for _, tc := range []struct{ body, want string }{
+		{`{"section":"https","url":"http://localhost:8090","nonce":4,"values":{"SslCert":"C:\\certs\\ts.pem","SslKey":"/etc/ssl/ts.key"}}`, `tsSettingsWrite(`},
+		{`{"section":"https","values":{"SslCert":"certs/ts.pem"}}`, `full path`},
+		{`{"section":"https","values":{"HTTPS":true}}`, `unknown setting`},
+	} {
+		res := postPlayer(t, h, "/api/ts/settings/validate", tc.body, session)
+		if !strings.Contains(res.Body.String(), tc.want) {
+			t.Errorf("validate %s = %s, want %s", tc.body, res.Body, tc.want)
+		}
+	}
+}

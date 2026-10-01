@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -36,6 +38,7 @@ func fakeTorrServer() {
 	dir := fs.String("path", ".", "")
 	fs.String("logpath", "", "")
 	httpAuth := fs.Bool("httpauth", false, "")
+	ssl := fs.Bool("ssl", false, "")
 	for _, name := range []string{"proxyurl", "proxymode", "pubipv4", "pubipv6", "maxsize", "torrentsdir"} {
 		fs.String(name, "", "")
 	}
@@ -72,12 +75,41 @@ func fakeTorrServer() {
 	// /args reports the command line, so tests see the flags the engine got.
 	mux.HandleFunc("GET /args", func(w http.ResponseWriter, r *http.Request) { _ = json.NewEncoder(w).Encode(os.Args[1:]) })
 	mux.HandleFunc("GET /echo", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("MatriX.fake")) })
+	// /settings keeps what was set across restarts, as TorrServer's BTSets.
+	var setsMu sync.Mutex
+	setsFile := filepath.Join(*dir, "fake-settings.json")
+	sets := map[string]any{"CacheSize": 67108864}
+	if raw, err := os.ReadFile(setsFile); err == nil { // #nosec G304 -- test fake
+		_ = json.Unmarshal(raw, &sets)
+	}
+	// With --ssl, a certificate outside the engine folder (where uploads are
+	// kept) stops the start, as a file TorrServer cannot read does. Only the
+	// path's text is compared: the fake opens no path a request supplied.
+	if cert, _ := sets["SslCert"].(string); *ssl && cert != "" {
+		root, _ := filepath.Abs(*dir)
+		if !strings.HasPrefix(cert, root+string(filepath.Separator)) {
+			fmt.Fprintln(os.Stderr, "fake: cannot start HTTPS with", cert)
+			os.Exit(1)
+		}
+	}
 	mux.HandleFunc("POST /settings", func(w http.ResponseWriter, r *http.Request) {
 		if !authorized(r) {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		_, _ = w.Write([]byte(`{"CacheSize":67108864}`))
+		var req struct {
+			Action string         `json:"action"`
+			Sets   map[string]any `json:"sets"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		setsMu.Lock()
+		defer setsMu.Unlock()
+		if req.Action == "set" {
+			sets = req.Sets
+			raw, _ := json.Marshal(sets)
+			_ = os.WriteFile(setsFile, raw, 0o600)
+		}
+		_ = json.NewEncoder(w).Encode(sets)
 	})
 	mux.HandleFunc("POST /torrents", func(w http.ResponseWriter, r *http.Request) {
 		if !authorized(r) {

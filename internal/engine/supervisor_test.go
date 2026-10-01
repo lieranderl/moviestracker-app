@@ -379,3 +379,36 @@ func TestAFreshEngineIsSetUpOnceOnItsFirstStart(t *testing.T) {
 		t.Errorf("FirstStart ran %d times, want once for a fresh engine directory", got)
 	}
 }
+
+func TestHTTPSStartsTheEngineWithSSLAndReachableOpensItToTheNetwork(t *testing.T) {
+	sup := engine.New(engine.Config{
+		Binary:  os.Args[0],
+		Dir:     t.TempDir(),
+		Port:    freePort(t),
+		Env:     []string{enginetest.FakeEnv + "=1"},
+		Options: engine.Options{HTTPS: true},
+	})
+	t.Cleanup(func() { _ = sup.Stop() })
+	if err := sup.Start(context.Background()); err != nil {
+		t.Fatalf("Start(): %v", err)
+	}
+	if args := engineArgs(t, sup); !strings.Contains(args, "--ssl") || !strings.Contains(args, "--ip 127.0.0.1") {
+		t.Errorf("HTTPS engine args = %q, want --ssl on loopback", args)
+	}
+
+	sup.SetOptions(engine.Options{HTTPS: true, Reachable: true})
+	if err := sup.Restart(context.Background()); err != nil {
+		t.Fatalf("Restart(): %v", err)
+	}
+	if args := engineArgs(t, sup); !strings.Contains(args, "--ssl") || strings.Contains(args, "--ip") {
+		t.Errorf("reachable engine args = %q, want --ssl on every interface", args)
+	}
+
+	sup.SetOptions(engine.Options{Reachable: true})
+	if err := sup.Restart(context.Background()); err != nil {
+		t.Fatalf("Restart(): %v", err)
+	}
+	if args := engineArgs(t, sup); strings.Contains(args, "--ssl") || !strings.Contains(args, "--ip 127.0.0.1") {
+		t.Errorf("plain HTTP engine left loopback: %q", args)
+	}
+}
