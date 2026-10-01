@@ -142,9 +142,13 @@ and serves, and that the user store works with Firestore's emulator.
   Browser checks on 1 October 2026 used the deployed HTTPS Cloud Run app:
   Chrome and Safari played HLS through an HTTPS MatriX.145 server. In both,
   live stats updated, changing audio preserved the playback position, and
-  subtitle choices and the shared settings form loaded. These checks did
-  not verify visible subtitles, direct playback, playlist/Next or which
-  HLS engine Safari used.
+  subtitle choices and the shared settings form loaded. A further Chrome
+  check confirmed English subtitles rendered after seeking. A seven-video
+  HLS playlist started its first episode; Next started the second. After
+  seeking near the second episode's end and resuming playback, it
+  automatically advanced to the third. Playback restarted at the beginning
+  of each new file. Direct playback in either browser, Safari subtitle
+  rendering and playlist advance, and Safari's HLS engine remain unverified.
   Chrome also connected to `http://localhost:18103` after local-network
   access was allowed and relayed its empty torrent list. This verifies
   HTTPS-to-HTTP localhost API access, not localhost video playback. The
