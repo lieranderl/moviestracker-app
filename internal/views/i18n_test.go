@@ -99,7 +99,7 @@ func tableTexts() []string {
 // pages translate.
 var upstreamTexts = []string{
 	"Directed by", "Written by", "Genres", "Release date", "Released", "Runtime", "Status", "Original title", "Created by", "Networks",
-	"First aired", "Last aired", "Episodes", "Episode runtime",
+	"First aired", "Last aired", "Episodes", "Episode runtime", "Budget", "Box office",
 	"Rumored", "Planned", "In Production", "Post Production", "Canceled", "Returning Series", "Ended", "Pilot",
 	"Trailer", "Teaser", "Clip", "Featurette", "Behind the Scenes", "Bloopers", "Opening Credits",
 	"Acting", "Directing", "Writing", "Production", "Sound", "Camera", "Editing", "Art", "Crew",

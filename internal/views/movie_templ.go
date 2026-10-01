@@ -12,6 +12,7 @@ import (
 	"context"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+	"strconv"
 )
 
 func movieFacts(ctx context.Context, m *tmdb.MovieDetails) []string {
@@ -32,9 +33,23 @@ func movieAbout(ctx context.Context, m *tmdb.MovieDetails) []factItem {
 		{Label: "Genres", Value: genreNames(m.Genres)},
 		{Label: "Release date", Value: m.ReleaseDate},
 		{Label: "Runtime", Value: runtime(ctx, m.Runtime)},
+		{Label: "Budget", Value: movieMoney(m.Budget)},
+		{Label: "Box office", Value: movieMoney(m.Revenue)},
 		{Label: "Status", Value: tr(ctx, m.Status)},
 		{Label: "Original title", Value: originalTitle(m.OriginalTitle, m.Title)},
 	}
+}
+
+// TMDB movie finances are US dollars; zero means the amount is unknown.
+func movieMoney(amount int64) string {
+	if amount <= 0 {
+		return ""
+	}
+	digits := strconv.FormatInt(amount, 10)
+	for i := len(digits) - 3; i > 0; i -= 3 {
+		digits = digits[:i] + "," + digits[i:]
+	}
+	return "$" + digits
 }
 
 func originalTitle(original, title string) string {
@@ -88,7 +103,7 @@ func MoviePage(user *auth.User, m *tmdb.MovieDetails) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(mediaPageSignals)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movie.templ`, Line: 42, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movie.templ`, Line: 57, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 			if templ_7745c5c3_Err != nil {
@@ -101,7 +116,7 @@ func MoviePage(user *auth.User, m *tmdb.MovieDetails) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(videoClick(ctx))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movie.templ`, Line: 42, Col: 92}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movie.templ`, Line: 57, Col: 92}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 			if templ_7745c5c3_Err != nil {

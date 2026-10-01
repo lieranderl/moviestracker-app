@@ -3,11 +3,14 @@ package views_test
 import (
 	"context"
 	"html"
+	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/jacred"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
@@ -17,6 +20,63 @@ import (
 )
 
 var testUser = &auth.User{Username: "alex", Name: "Alex", Role: "admin"}
+
+func TestMoviePageShowsBudgetAndBoxOfficeFromCatalog(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id": 1, "title": "Example", "budget": 160000000, "revenue": 2923706026}`))
+	}))
+	t.Cleanup(server.Close)
+	client := tmdb.NewClient("test-key", tmdb.WithBaseURL(server.URL), tmdb.WithHTTPClient(server.Client()))
+	movie, err := client.Movie(context.Background(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, cloud := range []bool{false, true} {
+		ctx := views.WithSite(context.Background(), views.Site{Cloud: cloud})
+		var out strings.Builder
+		if err := views.MoviePage(testUser, movie).Render(ctx, &out); err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range []string{"Budget", "$160,000,000", "Box office", "$2,923,706,026"} {
+			if !strings.Contains(out.String(), want) {
+				t.Errorf("cloud=%t: movie details missing %q", cloud, want)
+			}
+		}
+	}
+}
+
+func TestMoviePageOmitsUnavailableFinances(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		budget, revenue int64
+		wantBudget      bool
+		wantBoxOffice   bool
+	}{
+		{name: "unknown"},
+		{name: "budget only", budget: 160000000, wantBudget: true},
+		{name: "box office only", revenue: 2923706026, wantBoxOffice: true},
+		{name: "invalid amounts", budget: -1, revenue: -1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			movie := &tmdb.MovieDetails{MediaItem: tmdb.MediaItem{ID: 1, Title: "Example", MediaType: "movie"}, Budget: tc.budget, Revenue: tc.revenue}
+			for _, cloud := range []bool{false, true} {
+				for _, lang := range []i18n.Lang{i18n.English, i18n.Russian} {
+					ctx := i18n.WithLang(views.WithSite(context.Background(), views.Site{Cloud: cloud}), lang)
+					var out strings.Builder
+					if err := views.MoviePage(testUser, movie).Render(ctx, &out); err != nil {
+						t.Fatal(err)
+					}
+					for label, want := range map[string]bool{"Budget": tc.wantBudget, "Box office": tc.wantBoxOffice} {
+						if got := strings.Contains(out.String(), ">"+i18n.T(ctx, label)+"</dt>"); got != want {
+							t.Errorf("cloud=%t lang=%s: %s shown=%t, want %t", cloud, lang, label, got, want)
+						}
+					}
+				}
+			}
+		})
+	}
+}
 
 const hostileName = `Evil'); alert(1); ('"<b>`
 

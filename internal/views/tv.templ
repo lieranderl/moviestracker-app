@@ -2,9 +2,9 @@ package views
 
 import (
 	"context"
+	"fmt"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
-	"fmt"
 	"strings"
 )
 
@@ -81,7 +81,7 @@ templ seasonsSection(t *tmdb.TVDetails, season *tmdb.Season, selected int) {
 		>
 			@sectionHeading(tr(ctx, "Seasons & episodes"), "")
 			<nav
-				class="tabs tabs-box w-full sm:w-fit flex-nowrap overflow-x-auto"
+				class="tabs tabs-box w-full sm:w-fit max-w-full flex-nowrap overflow-x-auto"
 				aria-label={ tr(ctx, "Seasons") }
 				data-on:click={ seasonClick(t.ID) }
 				data-indicator:season-loading
@@ -91,7 +91,7 @@ templ seasonsSection(t *tmdb.TVDetails, season *tmdb.Season, selected int) {
 						href={ templ.SafeURL(fmt.Sprintf("/tv/%d?season=%d#seasons", t.ID, s.Number)) }
 						role="tab"
 						data-season={ fmt.Sprint(s.Number) }
-						class={ "tab whitespace-nowrap", templ.KV("tab-active", s.Number == selected) }
+						class={ "tab shrink-0 whitespace-nowrap", templ.KV("tab-active", s.Number == selected) }
 						data-class={ fmt.Sprintf("{ 'tab-active': $season === %d }", s.Number) }
 					>
 						{ seasonLabel(ctx, s) }
