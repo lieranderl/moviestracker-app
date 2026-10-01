@@ -37,7 +37,7 @@ func fakeTorrServer() {
 	dir := fs.String("path", ".", "")
 	fs.String("logpath", "", "")
 	httpAuth := fs.Bool("httpauth", false, "")
-	fs.Bool("ssl", false, "")
+	ssl := fs.Bool("ssl", false, "")
 	for _, name := range []string{"proxyurl", "proxymode", "pubipv4", "pubipv6", "maxsize", "torrentsdir"} {
 		fs.String(name, "", "")
 	}
@@ -80,6 +80,13 @@ func fakeTorrServer() {
 	sets := map[string]any{"CacheSize": 67108864}
 	if raw, err := os.ReadFile(setsFile); err == nil { // #nosec G304 -- test fake
 		_ = json.Unmarshal(raw, &sets)
+	}
+	// With --ssl, a certificate file that is not there stops the start.
+	if cert, _ := sets["SslCert"].(string); *ssl && cert != "" {
+		if _, err := os.Stat(cert); err != nil {
+			fmt.Fprintln(os.Stderr, "fake: cannot start HTTPS:", err)
+			os.Exit(1)
+		}
 	}
 	mux.HandleFunc("POST /settings", func(w http.ResponseWriter, r *http.Request) {
 		if !authorized(r) {

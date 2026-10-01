@@ -87,6 +87,8 @@ type Supervisor struct {
 	password string
 	http     *http.Client
 
+	certMu sync.Mutex // serializes certificate uploads and removals
+
 	mu     sync.Mutex
 	status Status
 	run    *run // the current launch; nil when stopped

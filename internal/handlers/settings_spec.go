@@ -217,12 +217,13 @@ func optionalIPv6(v string) error {
 	return nil
 }
 
-// windowsPath is a full Windows path (C:\… or \\server\…): a TorrServer's
-// folders may be on a Windows machine whatever system this one runs.
+// windowsPath is a full Windows path (C:\… or \\server\…). A TorrServer's
+// folders may be on another system than this one, so full paths of either
+// kind are accepted everywhere.
 var windowsPath = regexp.MustCompile(`^(?:[A-Za-z]:[\\/]|\\\\[^\\]+\\)`)
 
 func optionalAbsolutePath(v string) error {
-	if v != "" && !filepath.IsAbs(v) && !windowsPath.MatchString(v) {
+	if v != "" && !filepath.IsAbs(v) && !strings.HasPrefix(v, "/") && !windowsPath.MatchString(v) {
 		return fmt.Errorf("must be a full path, like /Volumes/Media/cache")
 	}
 	if strings.ContainsRune(v, 0) {

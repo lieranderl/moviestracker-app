@@ -285,10 +285,13 @@ func (s *Server) handleSaveEngineSettings(w http.ResponseWriter, r *http.Request
 		status(failed(engineAsleep))
 		return
 	}
+	previous := map[string]any{} // what the changed settings held, to undo them
 	for key, value := range engineChanges {
 		if raw, _ := json.Marshal(value); string(raw) == string(current[key]) {
 			delete(engineChanges, key) // unchanged: no need to reconnect for it
+			continue
 		}
+		previous[key] = json.RawMessage(current[key])
 	}
 	// TorrServer reads some settings only when it starts.
 	restart := startup != before
@@ -313,7 +316,7 @@ func (s *Server) handleSaveEngineSettings(w http.ResponseWriter, r *http.Request
 			return
 		}
 		if err := s.restartWithStartup(ctx, startup); err != nil {
-			status(failed("Saved, but TorrServer did not restart: %v", err))
+			status(s.recoverEngine(ctx, before, previous, err))
 			return
 		}
 		restarted = true
@@ -346,6 +349,31 @@ func (s *Server) restartWithStartup(ctx context.Context, startup config.EngineSt
 	}
 	url, user, password := s.engine.Endpoint()
 	return s.torrServer.SetEndpoint(url, user, password)
+}
+
+// recoverEngine brings the managed engine back after it did not start with
+// new settings (startErr): it starts without HTTPS, which TorrServer may be
+// unable to serve, puts back the engine settings that were changed and the
+// startup options that were in use, and starts with them again.
+func (s *Server) recoverEngine(ctx context.Context, before config.EngineStartup, previous map[string]any, startErr error) views.SourceStatus {
+	slog.Warn("engine did not restart with new settings; restoring the previous ones", "error", startErr)
+	safe := before
+	safe.HTTPS, safe.Reachable = false, false
+	err := s.restartWithStartup(ctx, safe)
+	if err == nil && len(previous) > 0 {
+		err = s.torrServer.Client().UpdateSettings(ctx, previous)
+	}
+	if err == nil {
+		err = s.saveStartup(before)
+	}
+	if err == nil && before != safe {
+		err = s.restartWithStartup(ctx, before)
+	}
+	if err != nil {
+		slog.Error("restoring the engine's previous settings failed", "error", err)
+		return failed("Saved, but TorrServer did not restart: %v", startErr)
+	}
+	return failed("TorrServer did not start with these settings, so the previous ones are back: %v", startErr)
 }
 
 func startupValue(st config.EngineStartup, f settingField) any {

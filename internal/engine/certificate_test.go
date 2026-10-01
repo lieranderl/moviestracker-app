@@ -2,9 +2,12 @@ package engine_test
 
 import (
 	"bytes"
+	"crypto/tls"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -57,4 +60,25 @@ func file2bytes(t *testing.T, path string) []byte {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return raw
+}
+
+func TestConcurrentUploadsLeaveAMatchingCertificateAndKey(t *testing.T) {
+	sup := engine.New(engine.Config{Binary: os.Args[0], Dir: t.TempDir()})
+	var wg sync.WaitGroup
+	for i := range 8 {
+		cert, key := enginetest.Certificate(t, fmt.Sprintf("host%d.example", i), time.Now().AddDate(1, 0, 0))
+		wg.Go(func() {
+			for range 20 {
+				if _, _, err := sup.SaveCertificate(cert, key); err != nil {
+					t.Errorf("SaveCertificate(): %v", err)
+					return
+				}
+			}
+		})
+	}
+	wg.Wait()
+	certFile, keyFile := sup.CertificateFiles()
+	if _, err := tls.LoadX509KeyPair(certFile, keyFile); err != nil {
+		t.Fatalf("saved certificate and key do not match: %v", err)
+	}
 }

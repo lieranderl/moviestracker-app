@@ -157,3 +157,22 @@ func TestAnExternalTorrServerKeepsHTTPSPathsAndCannotBeStartedWithSSL(t *testing
 		t.Errorf("relative path reached TorrServer")
 	}
 }
+
+func TestAnHTTPSSettingTorrServerCannotStartWithIsUndone(t *testing.T) {
+	l, sup, admin := managedLocal(t)
+	l.action(t, "/api/settings/engine/https", `{"https":{"HTTPS":true}}`, admin)
+
+	rr := l.action(t, "/api/settings/engine/https", `{"https":{"SslCert":"/nowhere/cert.pem","SslKey":"/nowhere/key.pem"}}`, admin)
+	if !strings.Contains(rr.Body.String(), "previous ones are back") {
+		t.Errorf("a failed restart was not reported:\n%s", rr.Body.String())
+	}
+	if st := sup.Status(); st.State != engine.Running {
+		t.Fatalf("engine left stopped after the failed restart: %+v", st)
+	}
+	if sets := engineSettings(t, sup); sets.String("SslCert") != "" || sets.String("SslKey") != "" {
+		t.Errorf("the setting TorrServer could not start with was kept: %q / %q", sets.String("SslCert"), sets.String("SslKey"))
+	}
+	if o := sup.Options(); !o.HTTPS || !l.store.State().TorrServer.Startup.HTTPS {
+		t.Errorf("HTTPS was not kept as it was: %+v", o)
+	}
+}

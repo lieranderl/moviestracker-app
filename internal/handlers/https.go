@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"io"
 	"log/slog"
@@ -185,7 +186,13 @@ func (s *Server) handleRemoveCertificate(w http.ResponseWriter, r *http.Request)
 // one) and restarts the engine when it serves HTTPS, as TorrServer reads the
 // certificate when it starts. done and restarted report success either way.
 func (s *Server) useCertificate(ctx context.Context, certFile, keyFile, done, restarted string) views.SourceStatus {
-	if err := s.torrServer.Client().UpdateSettings(ctx, map[string]any{"SslCert": certFile, "SslKey": keyFile}); err != nil {
+	client := s.torrServer.Client()
+	current, err := client.Settings(ctx)
+	if err != nil {
+		return failed(engineAsleep)
+	}
+	previous := map[string]any{"SslCert": json.RawMessage(current["SslCert"]), "SslKey": json.RawMessage(current["SslKey"])}
+	if err := client.UpdateSettings(ctx, map[string]any{"SslCert": certFile, "SslKey": keyFile}); err != nil {
 		slog.Warn("saving the HTTPS certificate settings failed", "error", err)
 		return failed("TorrServer did not accept the settings: %v", err)
 	}
@@ -194,7 +201,7 @@ func (s *Server) useCertificate(ctx context.Context, certFile, keyFile, done, re
 		return succeeded(done)
 	}
 	if err := s.restartWithStartup(ctx, startup); err != nil {
-		return failed("Saved, but TorrServer did not restart: %v", err)
+		return s.recoverEngine(ctx, startup, previous, err)
 	}
 	return succeeded(restarted)
 }
