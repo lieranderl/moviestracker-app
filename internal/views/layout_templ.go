@@ -115,7 +115,7 @@ func layoutWithScripts(title string, scripts ...string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " · Moviestracker</title><link rel=\"icon\" href=\"data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎬</text></svg>\"><!-- Render-blocking by design: tiny, sets data-theme before first paint --><script src=\"/static/theme.js\"></script><link href=\"/static/app.css\" rel=\"stylesheet\"><!-- Datastar Client (v1.0.4); modules are deferred and never block rendering --><script type=\"module\" src=\"/static/datastar.js\"></script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " · Moviestracker</title><link rel=\"icon\" href=\"data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎬</text></svg>\"><!-- Render-blocking by design: tiny, sets data-theme before first paint --><script src=\"/static/theme.js\"></script><link href=\"/static/app.css\" rel=\"stylesheet\"><!-- Page modules run before Datastar (modules execute in document order):\n\t\t\t     its first scan calls their window helpers, and one ReferenceError\n\t\t\t     there would stop the scan and leave the page inert. -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -127,7 +127,7 @@ func layoutWithScripts(title string, scripts ...string) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(src)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 37, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 38, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 			if templ_7745c5c3_Err != nil {
@@ -138,14 +138,14 @@ func layoutWithScripts(title string, scripts ...string) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</head><body class=\"bg-base-100 text-base-content min-h-dvh flex flex-col font-sans antialiased selection:bg-primary selection:text-primary-content\" data-signals=\"{ redirectUrl: '', theme: localStorage.getItem('theme') || 'system' }\" data-effect=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<!-- Datastar Client (v1.0.4); modules are deferred and never block rendering --><script type=\"module\" src=\"/static/datastar.js\"></script></head><body class=\"bg-base-100 text-base-content min-h-dvh flex flex-col font-sans antialiased selection:bg-primary selection:text-primary-content\" data-signals=\"{ redirectUrl: '', theme: localStorage.getItem('theme') || 'system' }\" data-effect=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(themeEffect)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 43, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 46, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 		if templ_7745c5c3_Err != nil {
@@ -158,7 +158,7 @@ func layoutWithScripts(title string, scripts ...string) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(redirectEffect)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 45, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/layout.templ`, Line: 48, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {

@@ -65,6 +65,21 @@ func TestTitlePagesOfferBrowserSideSourcesAndTheUsersTorrServers(t *testing.T) {
 	}
 }
 
+// Datastar scans the page as soon as it runs; helpers that its expressions
+// call must already exist, or one ReferenceError leaves the page inert.
+func TestPagesLoadTheirBrowserHelpersBeforeDatastar(t *testing.T) {
+	g := newGoogle(t)
+	h := web.New(withTMDB(t, g.config()))
+	session := signIn(t, h)
+	for _, path := range []string{"/movie/438631", "/tv/95396", "/torrserver"} {
+		body := getWith(t, h, path, session).Body.String()
+		helpers, datastar := strings.Index(body, `src="/static/torrserver.js"`), strings.Index(body, `src="/static/datastar.js"`)
+		if helpers < 0 || datastar < 0 || helpers > datastar {
+			t.Errorf("%s loads torrserver.js at %d and datastar.js at %d, want the helpers first", path, helpers, datastar)
+		}
+	}
+}
+
 func TestSeriesSourcesSearchTheChosenSeasonAndRequireSignIn(t *testing.T) {
 	var season string
 	requests := 0
