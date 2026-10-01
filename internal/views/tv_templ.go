@@ -266,7 +266,7 @@ func seasonsSection(t *tmdb.TVDetails, season *tmdb.Season, selected int) templ.
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<nav class=\"tabs tabs-box w-full sm:w-fit flex-nowrap overflow-x-auto\" aria-label=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<nav class=\"tabs tabs-box w-full sm:w-fit max-w-full flex-nowrap overflow-x-auto\" aria-label=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -297,7 +297,7 @@ func seasonsSection(t *tmdb.TVDetails, season *tmdb.Season, selected int) templ.
 				return templ_7745c5c3_Err
 			}
 			for _, s := range t.Seasons {
-				var templ_7745c5c3_Var10 = []any{"tab whitespace-nowrap", templ.KV("tab-active", s.Number == selected)}
+				var templ_7745c5c3_Var10 = []any{"tab shrink-0 whitespace-nowrap", templ.KV("tab-active", s.Number == selected)}
 				templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var10...)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err

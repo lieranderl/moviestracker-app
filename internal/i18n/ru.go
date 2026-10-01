@@ -285,6 +285,8 @@ var ru = map[string]string{
 	"Written by":           "Сценарий",
 	"Genres":               "Жанры",
 	"Release date":         "Дата выхода",
+	"Budget":               "Бюджет",
+	"Box office":           "Кассовые сборы",
 	"Released":             "Вышел",
 	"Runtime":              "Длительность",
 	"Status":               "Статус",

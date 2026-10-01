@@ -96,6 +96,8 @@ type MovieDetails struct {
 	OriginalTitle   string
 	Tagline         string
 	Runtime         int
+	Budget          int64
+	Revenue         int64
 	Status          string
 	Certification   string
 	Homepage        string
@@ -156,6 +158,8 @@ type rawMovie struct {
 	} `json:"alternative_titles"`
 	Tagline      string                       `json:"tagline"`
 	Runtime      int                          `json:"runtime"`
+	Budget       int64                        `json:"budget"`
+	Revenue      int64                        `json:"revenue"`
 	Status       string                       `json:"status"`
 	ImdbID       string                       `json:"imdb_id"`
 	Homepage     string                       `json:"homepage"`
@@ -215,6 +219,8 @@ func (c *Client) movie(ctx context.Context, id int) (*MovieDetails, error) {
 			OriginalTitle:   nativeTitle(raw.OriginalTitle, raw.Language, raw.Countries, raw.AltTitles.Titles),
 			Tagline:         raw.Tagline,
 			Runtime:         raw.Runtime,
+			Budget:          raw.Budget,
+			Revenue:         raw.Revenue,
 			Status:          raw.Status,
 			Homepage:        raw.Homepage,
 			Links:           raw.ExternalIDs,
