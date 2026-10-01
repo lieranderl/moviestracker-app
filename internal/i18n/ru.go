@@ -1,7 +1,17 @@
 package i18n
 
 // ru translates the interface into Russian, by English text.
-var ru = map[string]string{ // #nosec G101 -- interface texts ("Password"), not credentials
+var ru = map[string]string{
+	"Refresh":             "Обновить",
+	"TorrServer settings": "Настройки TorrServer",
+	"Settings section":    "Раздел настроек",
+	"TorrServer asks for a login. Add its username and password in this browser.":         "TorrServer требует входа. Добавьте имя пользователя и пароль в этом браузере.",
+	"This TorrServer has no GStreamer settings.":                                          "В этом TorrServer нет настроек GStreamer.",
+	"TorrServer settings could not be read or saved. Check the connection and try again.": "Не удалось прочитать или сохранить настройки TorrServer. Проверьте соединение и попробуйте снова.",
+	"Settings saved.": "Настройки сохранены.",
+
+	"Unknown settings section.": "Неизвестный раздел настроек.",
+	"unknown setting":           "неизвестная настройка", // #nosec G101 -- interface texts ("Password"), not credentials
 	"TorrServer could not load playback information. Check the connection or login, then retry.": "Не удалось загрузить данные воспроизведения. Проверьте соединение или логин и повторите попытку.",
 	"Next":             "Далее",
 	"Open in VLC":      "Открыть в VLC",

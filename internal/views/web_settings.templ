@@ -1,0 +1,81 @@
+package views
+
+import "fmt"
+
+templ WebSettingsForm(s SettingsSection, url string, nonce int) {
+ <div id="ts-settings-form" data-url={ url } data-nonce={ fmt.Sprint(nonce) } data-section={ s.ID } data-values={ jsonSignal(s.Values) }
+  data-show="$tsSelected === el.dataset.url && $_tsSettingsNonce === Number(el.dataset.nonce) && $_tsSettingsSection === el.dataset.section"
+  data-init="if ($_tsSettingsOpen && $tsSelected === el.dataset.url && $_tsSettingsNonce === Number(el.dataset.nonce)) { $tsSettingsValues = JSON.parse(el.dataset.values) }">
+  <form class="space-y-5"
+   data-indicator="_tsSettingsValidating"
+   data-on:submit="@post('/api/ts/settings/validate', {contentType: 'json', payload: {section: $_tsSettingsSection, url: $tsSelected, nonce: $_tsSettingsNonce, values: $tsSettingsValues}})">
+
+   for _, f := range s.Fields {
+    @settingInput("tsSettingsValues", f)
+   }
+   <button type="submit" class="btn btn-primary" data-attr:disabled="$_tsSettingsState.busy || $_tsSettingsValidating">{ tr(ctx, "Save") }</button>
+   <p class="text-xs text-base-content/60">{ tr(ctx, s.Cost) }</p>
+  </form>
+ </div>
+}
+
+func jsonSignal(v any) string {
+ encoded, _ := templ.JSONString(v)
+ return encoded
+}
+
+templ WebSettingsWrite(section, url string, nonce int, changes map[string]any, problem string) {
+ <div id="ts-settings-write" data-url={ url } data-nonce={ fmt.Sprint(nonce) } data-section={ section }
+  data-changes={ jsonSignal(changes) } data-problem={ problem }>
+  if problem != "" {
+   <p class="alert alert-error alert-soft" data-show="$tsSelected === el.parentElement.dataset.url && $_tsSettingsNonce === Number(el.parentElement.dataset.nonce)">{ problem }</p>
+  } else {
+   <span data-init="if ($_tsSettingsOpen && $tsSelected === el.parentElement.dataset.url && $_tsSettingsNonce === Number(el.parentElement.dataset.nonce) && $_tsSettingsSection === el.parentElement.dataset.section) { tsSettingsWrite(el.closest('#ts-settings'), $tsSelected, $_tsSettingsSection, JSON.parse(el.parentElement.dataset.changes), $_tsSettingsNonce) }"></span>
+  }
+ </div>
+}
+
+func settingsKeys(sections []SettingsSection) string {
+ out := map[string][]string{}
+ for _, s := range sections {
+  out[s.ID] = []string{}
+  for _, f := range s.Fields { out[s.ID] = append(out[s.ID], f.Key) }
+ }
+ return jsonSignal(out)
+}
+
+templ webSettings(sections []SettingsSection) {
+ <section id="ts-settings" class="card bg-base-200/60 border border-base-content/10" data-show="$tsSelected"
+  data-keys={ settingsKeys(sections) }
+  data-signals="{_tsSettingsOpen: false, _tsSettingsSection: 'engine', _tsSettingsNonce: 0, _tsSettingsValidating: false, tsSettingsValues: {}, _tsSettingsState: {busy:false, ok:false, problem:'', status:0}}"
+  data-effect="$_tsSettingsOpen ? tsSettingsRead(el, $tsSelected, $_tsSettingsSection, JSON.parse(el.dataset.keys)[$_tsSettingsSection]) : tsSettingsCancel(el)"
+  data-on:ts-settings-loading="const d = evt.detail; if ($_tsSettingsOpen && d.url === $tsSelected && d.section === $_tsSettingsSection) { $_tsSettingsNonce = d.nonce; $_tsSettingsState = {busy:true, ok:false, problem:'', status:0} }"
+  data-on:ts-settings="const d = evt.detail; if (!$_tsSettingsOpen || d.url !== $tsSelected || d.nonce !== $_tsSettingsNonce) return; $_tsSettingsState = {busy:false, ok:false, problem:d.problem, status:d.status}; if (!d.problem) { @post('/api/ts/settings', {contentType: 'json', payload:d}) }"
+  data-on:ts-settings-saved="const d = evt.detail; if (d.url === $tsSelected && d.nonce === $_tsSettingsNonce) { $_tsSettingsState = {busy:d.busy, ok:d.ok, problem:d.problem, status:d.status} }">
+  <div class="card-body gap-4">
+   <div class="flex items-center justify-between gap-3">
+    <h2 class="card-title text-base">{ tr(ctx, "TorrServer settings") }</h2>
+    <button type="button" class="btn btn-ghost btn-sm" data-on:click="$_tsSettingsOpen = !$_tsSettingsOpen; if (!$_tsSettingsOpen) { $_tsSettingsNonce++ }">{ tr(ctx, "Settings") }</button>
+   </div>
+   <div data-show="$_tsSettingsOpen" class="space-y-5">
+    <div class="flex flex-wrap gap-3">
+     <select class="select" aria-label={ tr(ctx, "Settings section") } data-bind:_ts-settings-section>
+      for _, s := range sections {
+       <option value={ s.ID }>{ tr(ctx, s.Title) }</option>
+      }
+     </select>
+     <button type="button" class="btn btn-ghost" data-on:click="tsSettingsRead(el.closest('#ts-settings'), $tsSelected, $_tsSettingsSection, JSON.parse(el.closest('#ts-settings').dataset.keys)[$_tsSettingsSection])">{ tr(ctx, "Refresh") }</button>
+    </div>
+    <p data-show="$_tsSettingsState.busy" class="text-sm flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span>{ tr(ctx, "Checking…") }</p>
+    <div class="alert alert-error alert-soft" role="alert" data-show="$_tsSettingsState.problem">
+     <span data-show="$_tsSettingsState.problem === 'login'">{ tr(ctx, "TorrServer asks for a login. Add its username and password in this browser.") }</span>
+     <span data-show="$_tsSettingsState.problem === 'no-gstreamer'">{ tr(ctx, "This TorrServer has no GStreamer settings.") }</span>
+     <span data-show="$_tsSettingsState.problem && !['login', 'no-gstreamer'].includes($_tsSettingsState.problem)">{ tr(ctx, "TorrServer settings could not be read or saved. Check the connection and try again.") }</span>
+    </div>
+    <p role="status" class="alert alert-success alert-soft" data-show="$_tsSettingsState.ok">{ tr(ctx, "Settings saved.") }</p>
+    <div id="ts-settings-form"></div>
+    <div id="ts-settings-write"></div>
+   </div>
+  </div>
+ </section>
+}

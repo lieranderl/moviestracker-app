@@ -69,7 +69,7 @@ func TestAUserCanAddALinkOrTorrentFileFromTheBrowser(t *testing.T) {
 		`id="ts-add-torrent"`, `name="torrentFile"`, `accept=".torrent"`,
 		`data-bind:_ts-torrent-link`, `data-bind:_ts-torrent-title`, `data-bind:_ts-torrent-poster`,
 		`data-on:submit="tsAddTorrent(`, `data-on:ts-added=`, `tsResetAdd(el, $tsSelected)`,
-		`tsList(el.closest('#ts-torrents-box'), $tsSelected, true)`,
+		`tsList($_list, $tsSelected, true)`,
 		"Magnet or HTTP(S) link", "Poster URL (optional)", "Torrent added.",
 	} {
 		if !strings.Contains(page.Body.String(), want) {

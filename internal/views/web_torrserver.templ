@@ -28,11 +28,11 @@ const webTorrServerEffects = `localStorage.setItem('mt-ts-selected', $tsSelected
 
 // WebTorrServerPage is the web app's TorrServer page: the user's
 // TorrServers, reached from their browser.
-templ WebTorrServerPage(user *auth.User, servers []store.TorrServer) {
+templ WebTorrServerPage(user *auth.User, servers []store.TorrServer, settings []SettingsSection) {
 	@layoutWithScripts(tr(ctx, "TorrServer"), "/static/torrserver.js", "/static/player.js") {
 		@Navbar(user)
 		<main class="grow pb-20" data-signals={ webTorrServerSignals(servers) } data-effect={ webTorrServerEffects }>
-			<div class="max-w-5xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
+			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 space-y-6">
 				<header class="flex flex-wrap items-end justify-between gap-4">
 					<div class="space-y-1">
 						<h1 class="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
@@ -41,7 +41,11 @@ templ WebTorrServerPage(user *auth.User, servers []store.TorrServer) {
 						</h1>
 						<p class="text-sm text-base-content/60 max-w-2xl">{ tr(ctx, "Your own TorrServer streams to this browser directly: Moviestracker only keeps its address, and its login stays in this browser.") }</p>
 					</div>
-					<button type="button" class="btn btn-primary btn-sm gap-2" data-on:click="$tsAddOpen = !$tsAddOpen">
+					<button type="button" class="btn btn-primary btn-sm gap-2" data-on:click="$addModalOpen = true">
+ @Icon("plus", "size-4")
+ {tr(ctx,"Add Torrents")}
+ </button>
+ <button type="button" class="btn btn-outline btn-sm gap-2" data-on:click="$tsAddOpen = !$tsAddOpen">
 						@Icon("plus", "size-4")
 						{ tr(ctx, "Add TorrServer") }
 					</button>
@@ -49,6 +53,7 @@ templ WebTorrServerPage(user *auth.User, servers []store.TorrServer) {
 				@webTorrServerForm()
 				@WebTorrServers(servers)
 				@webTorrServerStatus()
+                @webSettings(settings)
 				<div data-signals={ webPlayerSignals() }>
 					@webTorrentsBox()
 					@webPlayer()
