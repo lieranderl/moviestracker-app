@@ -69,7 +69,10 @@ builds use no caches.
 
 The cloud web app (`cmd/web`, `Dockerfile.web`) runs as the Cloud Run service
 `moviestracker-web` in the Google Cloud project `moviestracker-f07e2`
-(`europe-west1`). It has no TorrServer or GStreamer: each visitor's browser
+(`europe-west1`) and serves `moviestracker.net` (a Cloud Run domain mapping;
+the domain's A/AAAA records point at Google's front ends). The Qwik app it
+replaced (service `moviestracker-app`) is deleted and its deploy workflow
+disabled; its images stay in Artifact Registry. It has no TorrServer or GStreamer: each visitor's browser
 talks to their own TorrServer. It deploys on its own, from `main`
 (`web.yml`), independently of the local app's `v*` releases; CI's **Web app
 image and user store** job checks on every pull request that the image builds
@@ -86,8 +89,8 @@ and serves, and that the user store works with Firestore's emulator.
   read and write; the secrets `GOOGLE_SECRET` and `WEB_SESSION_KEY`).
 - **Sign-in:** Google, with the OAuth client the Qwik app also uses; its
   redirect URIs list `…/auth/google/callback` for localhost:8080, the
-  service's URL and later moviestracker.net. The service's settings:
-  `MT_WEB_BASE_URL` (its URL), `MT_WEB_GOOGLE_CLIENT_ID`, and from Secret
+  service's URL and moviestracker.net. The service's settings:
+  `MT_WEB_BASE_URL` (`https://moviestracker.net`; sign-in redirects there), `MT_WEB_GOOGLE_CLIENT_ID`, and from Secret
   Manager `MT_WEB_GOOGLE_CLIENT_SECRET` (`GOOGLE_SECRET`) and
   `MT_WEB_SESSION_KEY` (`WEB_SESSION_KEY`, signs session cookies: a new
   version signs everyone out). Locally they come from `.env.web`
