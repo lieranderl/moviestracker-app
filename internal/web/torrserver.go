@@ -179,7 +179,16 @@ func (a *app) handleBrowserAddResult(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	message, kind := handlers.TorrentAddResult(r.Context(), data.Added, data.Refused, data.Failed)
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.TorrServerAlertFragment(message, kind)); err != nil {
+	sse := datastar.NewSSE(w, r)
+	inline := message
+	if kind == "success" {
+		inline = ""
+	}
+	if err := sse.PatchElementTempl(views.TorrServerAlertFragment(inline, kind, "torr-add-result")); err != nil {
+		slog.Warn("patching inline add result failed", "error", err)
+		return
+	}
+	if err := sse.PatchElementTempl(views.TorrServerAlertFragment(message, kind)); err != nil {
 		slog.Warn("patching add result failed", "error", err)
 	}
 }

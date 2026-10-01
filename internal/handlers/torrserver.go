@@ -263,6 +263,11 @@ func (s *Server) handleTorrServerAdd(w http.ResponseWriter, r *http.Request) {
 		echo, _ := client.Echo(ctx)
 		_ = s.patchTorrLive(sse, list, echo)
 	}
+	inline := msg
+	if kind == "success" {
+		inline = ""
+	}
+	_ = sse.PatchElementTempl(views.TorrServerAlertFragment(inline, kind, "torr-add-result"))
 	_ = sse.PatchElementTempl(views.TorrServerAlertFragment(msg, kind))
 	if added > 0 && len(refused)+len(failed) == 0 {
 		// A fresh form clears the chosen files too.

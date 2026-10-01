@@ -154,7 +154,7 @@ func TestRemovingATorrServerThatIsNotPickedKeepsThePick(t *testing.T) {
 func TestBrowserBatchesReportPartialProgressWithTheAppAlert(t *testing.T) {
 	h, session, _ := torrServers(t)
 	res := postPlayer(t, h, "/api/ts/add-result", `{"added":2,"refused":["invalid.txt"],"failed":["failed.torrent"]}`, session)
-	for _, want := range []string{`id="torr-alert-container"`, "Added 2 torrents to TorrServer.", "invalid.txt", "TorrServer could not add: failed.torrent."} {
+	for _, want := range []string{`id="torr-alert-container"`, `id="torr-add-result"`, "Added 2 torrents to TorrServer.", "invalid.txt", "TorrServer could not add: failed.torrent."} {
 		if !strings.Contains(res.Body.String(), want) {
 			t.Errorf("batch result lacks %q: %s", want, res.Body)
 		}

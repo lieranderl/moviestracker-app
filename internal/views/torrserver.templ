@@ -1059,6 +1059,7 @@ templ TorrAddForm(browser ...bool) {
 				</button>
 			</div>
 		</fieldset>
+		<div id="torr-add-result"></div>
 	</form>
 }
 
@@ -1365,30 +1366,36 @@ func trackDetails(ctx context.Context, trk torrserver.ProbeTrack) string {
 
 // TorrServerAlertFragment replaces the alert region. A fresh element id per
 // render makes Datastar re-initialise the alert (and its $torrAlert signal).
-templ TorrServerAlertFragment(msg, alertType string) {
-	<div id="torr-alert-container">
-		<div
-			id={ fmt.Sprintf("torr-alert-%d", time.Now().UnixNano()) }
-			role="alert"
-			class={ "alert alert-soft", alertClass(alertType) }
-			data-signals="{ torrAlert: true }"
-			data-show="$torrAlert"
-		>
-			if alertType == "success" {
-				@Icon("circle-check", "size-5")
-			} else {
-				@Icon("circle-alert", "size-5")
-			}
-			<span class="text-sm font-medium grow">{ msg }</span>
-			<button
-				type="button"
-				data-on:click="$torrAlert = false"
-				class="btn btn-xs btn-ghost btn-circle"
-				aria-label={ tr(ctx, "Dismiss") }
+templ TorrServerAlertFragment(msg, alertType string, container ...string) {
+	{{ id := "torr-alert-container"
+if len(container) > 0 {
+	id = container[0]
+} }}
+	<div id={ id }>
+		if msg != "" {
+			<div
+				id={ fmt.Sprintf("torr-alert-%d", time.Now().UnixNano()) }
+				role="alert"
+				class={ "alert alert-soft", alertClass(alertType) }
+				data-signals="{ torrAlert: true }"
+				data-show="$torrAlert"
 			>
-				@Icon("x", "size-4")
-			</button>
-		</div>
+				if alertType == "success" {
+					@Icon("circle-check", "size-5")
+				} else {
+					@Icon("circle-alert", "size-5")
+				}
+				<span class="text-sm font-medium grow">{ msg }</span>
+				<button
+					type="button"
+					data-on:click="$torrAlert = false"
+					class="btn btn-xs btn-ghost btn-circle"
+					aria-label={ tr(ctx, "Dismiss") }
+				>
+					@Icon("x", "size-4")
+				</button>
+			</div>
+		}
 	</div>
 }
 
