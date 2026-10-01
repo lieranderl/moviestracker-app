@@ -29,6 +29,8 @@ type User struct {
 	Username string `json:"username"`
 	Name     string `json:"name"`
 	Role     string `json:"role"`
+	// Picture is the avatar image of a Google account (web app only).
+	Picture string `json:"picture,omitempty"`
 }
 
 // IsAdmin reports whether the user may change settings and accounts.

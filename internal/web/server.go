@@ -169,7 +169,7 @@ func (a *app) catalogUser(r *http.Request) *auth.User {
 	if !ok {
 		return nil
 	}
-	return &auth.User{Username: user.Email, Name: user.Name, Role: config.RoleViewer}
+	return &auth.User{Username: user.Email, Name: user.Name, Role: config.RoleViewer, Picture: user.Picture}
 }
 
 // webSite marks every page as the web app's, so shared views show its
