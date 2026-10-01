@@ -185,6 +185,31 @@ func TestAVerifiedGoogleAccountSignsIn(t *testing.T) {
 	}
 }
 
+// The navbar shows the Google account's picture when it has one, and the
+// initials when it has none or it is not an HTTPS image.
+func TestTheAvatarShowsTheGoogleAccountsPicture(t *testing.T) {
+	const picture = "https://lh3.googleusercontent.com/a/ann=s96-c"
+	for _, tc := range []struct{ picture, want, not string }{
+		{picture, `<img src="` + picture + `"`, ""},
+		{"", "AL", "<img src="},
+		{"javascript:alert(1)", "AL", "javascript:"},
+	} {
+		g := newGoogle(t)
+		if tc.picture != "" {
+			g.claims["picture"] = tc.picture
+		}
+		h := web.New(g.config())
+		_, back := signInFrom(t, h)
+		body := getWith(t, h, "/", back).Body.String()
+		if !strings.Contains(body, tc.want) {
+			t.Errorf("picture %q: the navbar lacks %q", tc.picture, tc.want)
+		}
+		if tc.not != "" && strings.Contains(body, tc.not) {
+			t.Errorf("picture %q: the navbar shows %q", tc.picture, tc.not)
+		}
+	}
+}
+
 // sessionCookie is the session a response set, if any.
 func sessionCookie(res *httptest.ResponseRecorder) *http.Cookie {
 	for _, c := range res.Result().Cookies() {

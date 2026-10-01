@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -31,6 +32,8 @@ type User struct {
 	ID    string `json:"sub"` // Google's stable account ID
 	Email string `json:"email"`
 	Name  string `json:"name"`
+	// Picture is the account's profile image, an HTTPS URL, or "".
+	Picture string `json:"picture,omitempty"`
 }
 
 // session is what the session cookie carries, signed.
@@ -111,6 +114,7 @@ type idClaims struct {
 	Email         string          `json:"email"`
 	EmailVerified any             `json:"email_verified"` // true, or "true" in older tokens
 	Name          string          `json:"name"`
+	Picture       string          `json:"picture"`
 	Expires       int64           `json:"exp"`
 }
 
@@ -143,7 +147,15 @@ func (a *app) userFromIDToken(raw string) (User, error) {
 	case c.Email == "" || (c.EmailVerified != true && c.EmailVerified != "true"):
 		return User{}, errors.New("email not verified")
 	}
-	return User{ID: c.Subject, Email: c.Email, Name: c.Name}, nil
+	return User{ID: c.Subject, Email: c.Email, Name: c.Name, Picture: httpsURL(c.Picture)}, nil
+}
+
+// httpsURL is raw when it is an absolute HTTPS URL, else "".
+func httpsURL(raw string) string {
+	if u, err := url.Parse(raw); err != nil || u.Scheme != "https" || u.Host == "" {
+		return ""
+	}
+	return raw
 }
 
 func audienceHas(aud json.RawMessage, clientID string) bool {

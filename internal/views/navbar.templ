@@ -83,6 +83,15 @@ templ releaseBadge(rel Release) {
 	</a>
 }
 
+// avatarFace is the account's picture over its initials, which show when
+// there is no picture or it does not load.
+templ avatarFace(user *auth.User, size string) {
+	<span class={ "col-start-1 row-start-1 font-bold leading-none", size }>{ user.Initials() }</span>
+	if user.Picture != "" {
+		<img src={ user.Picture } alt="" referrerpolicy="no-referrer" class="col-start-1 row-start-1 size-full rounded-full object-cover" data-on:error="el.remove()"/>
+	}
+}
+
 // userMenu is a DaisyUI 5 popover dropdown anchored to the avatar button.
 templ userMenu(user *auth.User) {
 	<button
@@ -93,7 +102,7 @@ templ userMenu(user *auth.User) {
 	>
 		<span class="avatar avatar-placeholder avatar-online">
 			<span class="size-9 rounded-full grid place-items-center bg-primary text-primary-content ring-2 ring-primary ring-offset-base-100 ring-offset-1">
-				<span class="text-sm font-bold leading-none">{ user.Initials() }</span>
+				@avatarFace(user, "text-sm")
 			</span>
 		</span>
 	</button>
@@ -107,7 +116,7 @@ templ userMenu(user *auth.User) {
 			<div class="flex items-center gap-3">
 				<span class="avatar avatar-placeholder shrink-0">
 					<span class="size-10 rounded-full grid place-items-center bg-primary text-primary-content">
-						<span class="font-bold leading-none">{ user.Initials() }</span>
+						@avatarFace(user, "")
 					</span>
 				</span>
 				<span class="flex flex-col min-w-0">
