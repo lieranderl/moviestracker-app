@@ -2,9 +2,9 @@ package views
 
 import (
 	"context"
+	"fmt"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
-	"fmt"
 )
 
 // settingsNavItem is one entry of the settings menu.
@@ -114,43 +114,7 @@ func playingWarning(ctx context.Context, n int) string {
 templ SettingsForm(s SettingsSection, st SourceStatus) {
 	<section id={ "settings-" + s.ID } class="card bg-base-200/60 border border-base-content/10">
 		<div class="card-body gap-5">
-			if s.Unavailable != "" {
-				<div role="status" class="alert alert-warning alert-soft">
-					@Icon("plug-zap", "size-5")
-					<span>{ tr(ctx, s.Unavailable) }</span>
-				</div>
-			} else {
-				<form
-					class="space-y-5"
-					data-signals={ settingsSignals(s) }
-					data-indicator={ s.ID + "Saving" }
-					data-on:submit={ fmt.Sprintf("@post('%s', {filterSignals: {include: /^%s\\./}})", s.SaveURL, s.ID) }
-				>
-					for _, f := range s.Fields {
-						@settingInput(s.ID, f)
-					}
-					<div class="flex flex-wrap items-center gap-3 pt-2">
-						<button type="submit" class="btn btn-primary" data-attr:disabled={ "$" + s.ID + "Saving" }>
-							<span class="loading loading-spinner loading-xs hidden" data-class:hidden={ "!$" + s.ID + "Saving" }></span>
-							{ tr(ctx, "Save") }
-						</button>
-						if s.ResetURL != "" {
-							<button type="button" class="btn btn-ghost" data-on:click={ fmt.Sprintf("confirm(%s) && @post('%s', {filterSignals: {include: /^$/}})", trJS(ctx, "Restore the default settings?"), s.ResetURL) }>
-								{ tr(ctx, "Restore defaults") }
-							</button>
-						}
-						if s.Cost != "" {
-							<span class="text-xs text-base-content/60">{ tr(ctx, s.Cost) }</span>
-						}
-					</div>
-					if s.Playing > 0 {
-						<div role="status" class="alert alert-warning alert-soft text-sm py-2.5">
-							@Icon("circle-alert", "size-4")
-							<span>{ playingWarning(ctx, s.Playing) }</span>
-						</div>
-					}
-				</form>
-			}
+			@settingsFormBody(s, localSettingsTransport(s))
 			@sourceStatus(st)
 		</div>
 	</section>
@@ -264,4 +228,57 @@ templ GStreamerRuntime(echo torrserver.EchoInfo) {
 			</span>
 		}
 	</div>
+}
+
+// Shared settings markup; request attributes and signal namespaces are transport concerns.
+type settingsFormTransport struct {
+	Namespace  string
+	Busy       string
+	Attributes templ.Attributes
+}
+
+func localSettingsTransport(s SettingsSection) settingsFormTransport {
+	return settingsFormTransport{Namespace: s.ID, Busy: "$" + s.ID + "Saving", Attributes: templ.Attributes{
+		"data-signals":   settingsSignals(s),
+		"data-indicator": s.ID + "Saving",
+		"data-on:submit": fmt.Sprintf("@post('%s', {filterSignals: {include: /^%s\\./}})", s.SaveURL, s.ID),
+	}}
+}
+
+templ settingsFormBody(s SettingsSection, transport settingsFormTransport) {
+	if s.Unavailable != "" {
+		<div role="status" class="alert alert-warning alert-soft">
+			@Icon("plug-zap", "size-5")
+			<span>{ tr(ctx, s.Unavailable) }</span>
+		</div>
+	} else {
+		<form
+			class="space-y-5"
+			{ transport.Attributes... }
+		>
+			for _, f := range s.Fields {
+				@settingInput(transport.Namespace, f)
+			}
+			<div class="flex flex-wrap items-center gap-3 pt-2">
+				<button type="submit" class="btn btn-primary" data-attr:disabled={ transport.Busy }>
+					<span class="loading loading-spinner loading-xs hidden" data-class:hidden={ "!(" + transport.Busy + ")" }></span>
+					{ tr(ctx, "Save") }
+				</button>
+				if s.ResetURL != "" {
+					<button type="button" class="btn btn-ghost" data-on:click={ fmt.Sprintf("confirm(%s) && @post('%s', {filterSignals: {include: /^$/}})", trJS(ctx, "Restore the default settings?"), s.ResetURL) }>
+						{ tr(ctx, "Restore defaults") }
+					</button>
+				}
+				if s.Cost != "" {
+					<span class="text-xs text-base-content/60">{ tr(ctx, s.Cost) }</span>
+				}
+			</div>
+			if s.Playing > 0 {
+				<div role="status" class="alert alert-warning alert-soft text-sm py-2.5">
+					@Icon("circle-alert", "size-4")
+					<span>{ playingWarning(ctx, s.Playing) }</span>
+				</div>
+			}
+		</form>
+	}
 }

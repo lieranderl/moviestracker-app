@@ -174,9 +174,10 @@ const webAddress = (value) => {
 };
 
 const torrentLink = (value) => {
-  if (webAddress(value)) return true;
+  if (webAddress(value) || /^(?:[a-f0-9]{40}|[a-z2-7]{32})$/i.test(value)) return true;
   try {
     const url = new URL(value);
+    if (url.protocol === "torrs:") return true;
     return url.protocol === "magnet:" && url.searchParams.getAll("xt").some((xt) => /^urn:btih:(?:[a-f0-9]{40}|[a-z2-7]{32})$/i.test(xt));
   } catch {
     return false;
@@ -194,7 +195,7 @@ window.tsResetAdd = async (el) => {
   if (!signal.aborted) tell(el, "ts-added", { adding: false, ok: false, problem: "", status: 0 });
 };
 
-window.tsAddTorrent = async (el, url, { link = "", title = "", poster = "", file, mediaId, mediaType } = {}) => {
+window.tsAddTorrent = async (el, url, { link = "", title = "", poster = "", file, links, files, mediaId, mediaType } = {}) => {
   if (adding.has(el)) return;
   const signal = begin(el);
   adding.set(el, signal);
@@ -205,49 +206,65 @@ window.tsAddTorrent = async (el, url, { link = "", title = "", poster = "", file
     link = link.trim();
     title = title.trim();
     poster = poster.trim();
-    let valid = webAddress(url) && (!poster || webAddress(poster));
-    if (file) {
-      valid = valid && !link && /\.torrent$/i.test(file.name) && file.size > 0 && file.size <= (4 << 20);
-      if (valid) valid = (await file.slice(0, 1).text().catch(() => "")) === "d";
-    } else {
-      valid = valid && torrentLink(link);
+    const batch = links !== undefined || files !== undefined;
+    const jobs = batch
+      ? [...(links || "").split(/[\r\n]+/).map(link => link.trim().replace(/^["']|["']$/g," ").trim()).filter(Boolean).map(link => ({link})), ...Array.from(files || []).map(file => ({file}))]
+      : [{link,file}];
+    const refused = [], failed = [], accepted = [];
+    const validContext = webAddress(url) && (!poster || webAddress(poster));
+    let fileCount = 0;
+    for (const job of jobs) {
+      let valid = validContext;
+      if (job.file) {
+        valid = valid && !job.link && ++fileCount <= 20 && /\.torrent$/i.test(job.file.name) && job.file.size > 0 && job.file.size <= (4 << 20);
+        if (valid) valid = (await job.file.slice(0,1).text().catch(()=>"")) === "d";
+      } else { valid = valid && torrentLink(job.link); }
+      if (valid) accepted.push(job);
+      else refused.push((job.file?.name || job.link || "").slice(0,512));
     }
     if (signal.aborted) return;
-    if (!valid) {
-      tell(el, "ts-added", { adding: false, ok: false, problem: "input", status: 0 });
+    if (!accepted.length) {
+      tell(el, "ts-added", { adding: false, ok: false, problem: "input", status: 0, added:0, refused, failed });
       return;
     }
-    let path = "torrents";
-    const metadata = Number.isSafeInteger(mediaId) && mediaId > 0 && ["movie", "tv"].includes(mediaType)
-      ? { category: mediaType, data: JSON.stringify({ tmdb: { id: mediaId, type: mediaType } }) }
-      : {};
-    let init = {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "add", link, title, poster, save_to_db: true, ...metadata }),
-    };
-    if (file) {
-      const body = new FormData();
-      body.append("file", file, file.name);
-      body.append("save", "true");
-      body.append("title", title);
-      body.append("poster", poster);
-      path = "torrent/upload";
-      init = { method: "POST", body };
+    if (accepted.length > 1) title = poster = "";
+    let result = {}, addedCount = 0, failure = {};
+    for (const job of accepted) {
+      const {link,file}=job;
+      let path = "torrents";
+      const metadata = Number.isSafeInteger(mediaId) && mediaId > 0 && ["movie", "tv"].includes(mediaType)
+        ? { category: mediaType, data: JSON.stringify({ tmdb: { id: mediaId, type: mediaType } }) }
+        : {};
+      let init = {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "add", link, title, poster, save_to_db: true, ...metadata }),
+      };
+      if (file) {
+        const body = new FormData();
+        body.append("file", file, file.name);
+        body.append("save", "true");
+        body.append("title", title);
+        body.append("poster", poster);
+        path = "torrent/upload";
+        init = { method: "POST", body };
+      }
+      // Adding may wait for torrent metadata, unlike connection checks.
+      result = await call(url, path, {
+        init, signal, timeout: 30000,
+        read: (res) => res.json().catch(() => null),
+      });
+      if (signal.aborted) return;
+      // The upload endpoint can answer HTTP 200 with null when it rejected
+      // the file. Only a returned torrent confirms it was actually added.
+      if (!result.problem && !/^[a-f0-9]{40}$/i.test(result.value?.hash || "")) {
+        result.problem = "status";
+        result.status = 200;
+      }
+      if (result.problem) { failed.push((job.file?.name || job.link).slice(0,512)); failure = result; }
+      else addedCount++;
     }
-    // Adding may wait for torrent metadata, unlike connection checks.
-    const result = await call(url, path, {
-      init, signal, timeout: 30000,
-      read: (res) => res.json().catch(() => null),
-    });
-    if (signal.aborted) return;
-    // The upload endpoint can answer HTTP 200 with null when it rejected
-    // the file. Only a returned torrent confirms it was actually added.
-    if (!result.problem && !/^[a-f0-9]{40}$/i.test(result.value?.hash || "")) {
-      result.problem = "status";
-      result.status = 200;
-    }
-    tell(el, "ts-added", { adding: false, ok: !result.problem, problem: result.problem || "", status: result.status || 0 });
+    tell(el, "ts-added", { adding: false, ok: addedCount > 0 && !refused.length && !failed.length, problem: failure.problem || (refused.length ? "input" : ""), status: failure.status || 0, added:addedCount, refused, failed });
   } finally {
     if (adding.get(el) === signal) adding.delete(el);
   }

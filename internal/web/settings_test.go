@@ -12,7 +12,7 @@ func TestUserCanRenderBrowserReadSettingsWithoutStartupOptions(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("settings = %d %s", res.Code, res.Body)
 	}
-	for _, want := range []string{"RAM cache", `tsSettingsValues.CacheSize`, `256`, "Saving makes TorrServer reconnect"} {
+	for _, want := range []string{"RAM cache", `tsSettingsValues.CacheSize`, `256`, `loading loading-spinner loading-xs hidden`, `flex flex-wrap items-center gap-3 pt-2`, "Saving makes TorrServer reconnect"} {
 		if !strings.Contains(res.Body.String(), want) {
 			t.Errorf("form lacks %q", want)
 		}

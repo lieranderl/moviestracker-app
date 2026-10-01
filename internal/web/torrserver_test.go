@@ -66,11 +66,10 @@ func TestAUserCanAddALinkOrTorrentFileFromTheBrowser(t *testing.T) {
 		t.Fatalf("GET /torrserver = %d, want 200", page.Code)
 	}
 	for _, want := range []string{
-		`id="ts-add-torrent"`, `name="torrentFile"`, `accept=".torrent"`,
-		`data-bind:_ts-torrent-link`, `data-bind:_ts-torrent-title`, `data-bind:_ts-torrent-poster`,
+		`id="torr-add-form"`, `name="addLinks"`, `name="addFiles"`, `multiple`, `name="addTitle"`,
 		`data-on:submit="tsAddTorrent(`, `data-on:ts-added=`, `tsResetAdd(el, $tsSelected)`,
 		`tsList($_list, $tsSelected, true)`,
-		"Magnet or HTTP(S) link", "Poster URL (optional)", "Torrent added.",
+		"One per line", "Up to 20", "Custom title", "Add to TorrServer", `id="torr-alert-container"`,
 	} {
 		if !strings.Contains(page.Body.String(), want) {
 			t.Errorf("the browser add form lacks %q", want)
@@ -149,5 +148,15 @@ func TestRemovingATorrServerThatIsNotPickedKeepsThePick(t *testing.T) {
 	res := sendSignals(t, h, http.MethodDelete, "/api/torrservers/"+home.ID, `{"tsSelected":"https://other.example"}`, session).Body.String()
 	if strings.Contains(res, `"tsSelected"`) {
 		t.Errorf("removing Home changed the pick, which was another server:\n%s", res)
+	}
+}
+
+func TestBrowserBatchesReportPartialProgressWithTheAppAlert(t *testing.T) {
+	h, session, _ := torrServers(t)
+	res := postPlayer(t, h, "/api/ts/add-result", `{"added":2,"refused":["invalid.txt"],"failed":["failed.torrent"]}`, session)
+	for _, want := range []string{`id="torr-alert-container"`, `id="torr-add-result"`, "Added 2 torrents to TorrServer.", "invalid.txt", "TorrServer could not add: failed.torrent."} {
+		if !strings.Contains(res.Body.String(), want) {
+			t.Errorf("batch result lacks %q: %s", want, res.Body)
+		}
 	}
 }
