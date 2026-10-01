@@ -37,12 +37,6 @@ func TestDirectAndHLSLinksAreLabelledAndKeptApart(t *testing.T) {
 			t.Errorf("page lacks %q", want)
 		}
 	}
-	if n := strings.Count(out, `data-url="/s/hash1.1/movie.mkv"`); n != 1 {
-		t.Errorf("direct link copy once, on the file row: found %d", n)
-	}
-	if n := strings.Count(out, `data-url="/s/hash1.1/hls/master.m3u8"`); n != 1 {
-		t.Errorf("HLS link copy once, on the file row: found %d", n)
-	}
 	for _, kind := range []string{"direct", "hls"} {
 		if !strings.Contains(out, "'/api/torrserver/playlist?hash=' + encodeURIComponent($activeHash) + '&kind="+kind) {
 			t.Errorf("the player lacks the %s playlist download", kind)
@@ -68,12 +62,12 @@ func TestHLSControlsShowOnlyWithGStreamer(t *testing.T) {
 		}
 	}
 	out := torrPage(t, true)
-	hls := regexp.MustCompile(`<[a-z]+[^>]*(?:aria-label="HLS: converted by GStreamer"|data-action="probe")[^>]*>`).FindAllString(out, -1)
-	if len(hls) < 3 {
-		t.Fatalf("expected HLS groups on the file row and the player and a probe button; found %d", len(hls))
+	hls := regexp.MustCompile(`<[a-z]+[^>]*(?:aria-label="HLS: converted by GStreamer"|Copy HLS link|\$probeOpen = true")[^>]*>`).FindAllString(out, -1)
+	if len(hls) < 4 {
+		t.Fatalf("expected HLS groups on the file row and the player, and the file menu's HLS link and tracks; found %d", len(hls))
 	}
 	for _, m := range hls {
-		if !strings.Contains(m, `data-show="$gst"`) {
+		if !strings.Contains(m, `data-show="$gst`) {
 			t.Errorf("HLS control must be gated by $gst: %s", m)
 		}
 	}
@@ -505,5 +499,53 @@ func TestScrollingOverTheVideoChangesTheVolume(t *testing.T) {
 	if wheel == nil || !strings.Contains(wheel[1], "evt.deltaY") || !strings.Contains(wheel[1], ".volume =") ||
 		!strings.Contains(wheel[1], "webkitDirectionInvertedFromDevice ?? (") { // ?? cannot mix with && unparenthesised
 		t.Errorf("the player does not turn the volume with the wheel: %v", wheel)
+	}
+}
+
+// A file row stays compact: Play buttons and one menu holding the rest.
+func TestAFileRowOpensAMenuWithTheFilesLinks(t *testing.T) {
+	out := torrPage(t, true)
+	more := regexp.MustCompile(`<button[^>]*data-action="more"[^>]*>`).FindString(out)
+	for _, want := range []string{`data-hash="hash1"`, `data-index="1"`, `data-title="dir/movie.mkv"`, `data-clean="/s/hash1.1/movie.mkv"`, `data-hls="/s/hash1.1/hls/master.m3u8"`, `data-video="true"`, `aria-label="More for this file"`} {
+		if !strings.Contains(more, want) {
+			t.Errorf("the file's menu button lacks %s: %s", want, more)
+		}
+	}
+	row := regexp.MustCompile(`(?s)<li class="py-2.5.*?</li>`).FindString(out)
+	if strings.Contains(row, `data-action="copy"`) || strings.Contains(row, `data-action="probe"`) {
+		t.Error("copying links and inspecting tracks belong in the file's menu, not on the row")
+	}
+}
+
+// The file's menu opens it in VLC or IINA, copies its links and inspects
+// its tracks; VLC on a computer needs the vlc-protocol handler.
+func TestTheFileMenuOpensExternalPlayersAndCopiesLinks(t *testing.T) {
+	out := torrPage(t, true)
+	if !strings.Contains(out, `case 'more':`) || !strings.Contains(out, `$fileMenuOpen = true`) {
+		t.Error("the file's menu button does not open the menu")
+	}
+	menu := regexp.MustCompile(`(?s)<dialog id="torr-file-menu".*?</dialog>`).FindString(out)
+	if menu == "" {
+		t.Fatal("the page has no file menu")
+	}
+	for _, want := range []string{
+		`data-text="$_file.title"`,
+		`window.openInPlayer('vlc', $_file.clean, $linkOrigin)`,
+		`window.openInPlayer('iina', $_file.clean, $linkOrigin)`,
+		`window.copyLink($_file.clean, $linkOrigin)`,
+		`window.copyLink($_file.hls, $linkOrigin)`,
+		`$probeHash = $_file.hash; $probeIndex = $_file.index; $probeOpen = true`,
+		`href="https://github.com/northsea4/vlc-protocol"`,
+		"VLC must be installed",
+	} {
+		if !strings.Contains(menu, want) {
+			t.Errorf("the file menu lacks %q", want)
+		}
+	}
+	if !regexp.MustCompile(`openInPlayer\('iina'[^"]*"\s+data-show="[^"]*Macintosh`).MatchString(menu) {
+		t.Error("IINA should be offered on Macs only")
+	}
+	if !regexp.MustCompile(`<button[^>]*data-show="\$gst && \$_file\.video"[^>]*copyLink\(\$_file\.hls`).MatchString(menu) {
+		t.Error("copying the HLS link needs GStreamer")
 	}
 }

@@ -19,6 +19,7 @@ func webListActions(ctx context.Context) string {
  case 'remove': $confirmHash = d.hash; $confirmName = d.title; $confirmOpen = true; break
  case 'copy': copyLink(new URL(d.url, $tsSelected + '/').href, '').then(ok => { $toastError = !ok; $toast = ok ? d.msg : ` + trJS(ctx, "Copy failed") + ` }); break
  case 'probe': $probeHash = d.hash; $probeIndex = +d.index; $probeOpen = true; break
+ case 'more': ` + openFileMenu("new URL(d.clean, $tsSelected + '/').href", "new URL(d.hls, $tsSelected + '/').href") + `; break
  case 'playlist': evt.preventDefault(); tsDownloadPlaylist(el, $tsSelected, new URL(d.url, location.href).searchParams.get('hash'), d.kind); break
  }`
 }
