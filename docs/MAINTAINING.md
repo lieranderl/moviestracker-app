@@ -71,8 +71,8 @@ The cloud web app (`cmd/web`, `Dockerfile.web`) runs as the Cloud Run service
 `moviestracker-web` in the Google Cloud project `moviestracker-f07e2`
 (`europe-west1`) and serves `moviestracker.net` (a Cloud Run domain mapping;
 the domain's A/AAAA records point at Google's front ends). The Qwik app it
-replaced, `moviestracker-app`, is kept with internal-only ingress and its
-deploy workflow disabled; its images stay in Artifact Registry. It has no TorrServer or GStreamer: each visitor's browser
+replaced (service `moviestracker-app`) is deleted and its deploy workflow
+disabled; its images stay in Artifact Registry. It has no TorrServer or GStreamer: each visitor's browser
 talks to their own TorrServer. It deploys on its own, from `main`
 (`web.yml`), independently of the local app's `v*` releases; CI's **Web app
 image and user store** job checks on every pull request that the image builds
