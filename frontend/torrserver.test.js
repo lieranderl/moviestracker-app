@@ -386,3 +386,18 @@ test("media comparison relays the selected audio and master playlist without log
  expect(requests.mock.calls.at(-1)[0].search).toBe("?index=1&audio=1");
  await client.tsPlayerCancel(el);
 });
+
+test("a failed settings read is retried on the next tick instead of reporting no cache", async () => {
+ const el = new EventTarget(); const events = []; const hash = "08ada5a7a6183aae1e09d831df6748d566095a10";
+ el.addEventListener("ts-player-stats",evt=>events.push(evt.detail));
+ let settingsReads = 0;
+ requests.mockImplementation(async target => {
+  if (target.pathname === "/settings") return ++settingsReads === 1 ? new Response("", {status:503}) : Response.json({CacheSize:67108864});
+  return Response.json(target.pathname === "/torrents" ? {hash} : {});
+ });
+ await client.tsPlayerLease(el,server,hash,1,"direct",0);
+ await client.tsPlayerTick(el); await client.tsPlayerTick(el); await client.tsPlayerTick(el);
+ expect(events.map(e => e.cacheSize)).toEqual([0, 67108864, 67108864]);
+ expect(settingsReads).toBe(2);
+ await client.tsPlayerRelease(el);
+});

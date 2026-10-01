@@ -337,8 +337,9 @@ window.tsPlayerTick = async (el) => {
     const torrent=await getTorrent(session.url,session.hash,ctl.signal);
     if (session.cacheSize === undefined && !ctl.signal.aborted) {
       const settings = await settingsGet(session.url,"streaming",ctl.signal);
+      // A failed read is retried on the next tick; only an answer is kept.
       const capacity = settings.value?.CacheSize;
-      session.cacheSize = Number.isSafeInteger(capacity) && capacity > 0 ? capacity : 0;
+      if (!settings.problem) session.cacheSize = Number.isSafeInteger(capacity) && capacity > 0 ? capacity : 0;
     }
     let heartbeat={};
     if (session.kind==="hls" && !ctl.signal.aborted) {
