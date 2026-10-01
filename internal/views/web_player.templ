@@ -1,7 +1,6 @@
 package views
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"path"
@@ -14,108 +13,67 @@ func webStartPlay() string {
 	return `$audioTrack = -1; $subTrack = -1; $_audioMenu = false; $_subMenu = false; $streamCleanUrl = ''; $streamHlsUrl = ''; $_unplayable = ''; $_tsPlayerProblem = ''; $_tsProbeProblem = ''; $playNonce++; $playerOpen = true`
 }
 
-func webPlayFile() string {
-	return `const b = evt.target.closest('[data-action]'); if (!b) return
-if (b.dataset.action === 'files') { tsPlayerFiles(el.closest('#ts-torrents-box'), $tsSelected, b.dataset.hash) }
-if (b.dataset.action === 'play') {
- $activeHash = b.dataset.hash; $activeFileIndex = +b.dataset.index; $streamTitle = b.dataset.title
- $playKind = b.dataset.kind === 'hls' && $tsStatus.hls ? 'hls' : 'direct'
- ` + webStartPlay() + `
-}`
-}
-
 func webNext() string {
 	return `if ($_queueHash !== $activeHash || $audioTrack < 0) return; const at = $_queue.findIndex(f => f.index === +$activeFileIndex); if (at >= 0 && at + 1 < $_queue.length) { const f = $_queue[at + 1]; $activeFileIndex = f.index; $streamTitle = f.title; ` + webStartPlay() + ` }`
 }
 
 func webPlayerSignals() string {
-	return strings.TrimSuffix(torrPageSignals(false, false, ""), "}") + `, _tsPlayerProblem: '', _tsProbeProblem: '', _tsPlayerOrigin: '', _tsPlayingFile: '' }`
+	return strings.TrimSuffix(torrPageSignals(false, true, ""), "}") + `, _tsPlayerProblem: '', _tsProbeProblem: '', _tsPlayerOrigin: '', _tsPlayingFile: '' }`
+}
+
+func playerStart(browser bool) string {
+	if browser {
+		return webStartPlay()
+	}
+	return torrStartPlay
+}
+
+func playerNext(browser bool) string {
+	if browser {
+		return webNext()
+	}
+	return torrPlayNext
+}
+
+func webPlaylistPick() string {
+	return `const b = evt.target.closest('[data-at]'); if (b && $_queueHash === $activeHash) { const f = $_queue[+b.dataset.at]; if (f) { $_listMenu = false; $activeFileIndex = f.index; $streamTitle = f.title; ` + webStartPlay() + ` } }`
+}
+
+func confirmRemove(browser bool) string {
+	if browser {
+		return `tsTorrentAction($_list, $tsSelected, 'rem', $confirmHash); $confirmOpen = false`
+	}
+	return `@post('/api/torrserver/action?op=rem&hash=' + encodeURIComponent($confirmHash), {filterSignals: {include: /^$/}}); $confirmOpen = false`
 }
 
 templ webPlayer() {
-	@modalDialog("torr-player-modal", "playerOpen", "", "window.stopHlsVideo?.()", "max-w-5xl bg-base-300 p-4 sm:p-6", nil) {
-		<div
-			id="ts-player-session"
-			data-ref:_session
-			data-effect="$playerOpen ? tsPlayerLoad(el, $tsSelected, $activeHash, +$activeFileIndex, $playKind, $playNonce) : tsPlayerCancel(el)"
-			data-on:ts-player={ webPlayerLoaded() }
-			data-on:ts-player-stats="$_tsPlayerProblem = evt.detail.problem || evt.detail.heartbeatProblem; if (evt.detail.torrent) { @post('/api/ts/player-stats', {payload: evt.detail}) }"
-			data-on-interval__duration.2s="$playerOpen && tsPlayerTick(el)"
-			data-on:pagehide__window="tsPlayerCancel(el)"
-		></div>
-		<div data-effect="if ($playerOpen && $_tsPlayerOrigin && $_tsPlayerOrigin !== $tsSelected) { $playerOpen = false }; $_tsPlayerOrigin = $tsSelected"></div>
-		<div data-effect={ webPlayback() }></div>
-		<header class="flex items-center justify-between gap-3">
-			<h3 id="torr-player-modal-title" class="font-bold truncate" data-text="$streamTitle">{ tr(ctx,"Streaming") }</h3>
-			<form method="dialog">
-				<button class="btn btn-sm btn-circle btn-ghost" aria-label={ tr(ctx, "Close player") }>
-					@Icon("x", "size-5")
-				</button>
-			</form>
-		</header>
-		<video
-			id="torr-video"
-			data-ref:_video
-			class="w-full aspect-video bg-neutral rounded-box mt-3"
-			controls
-			playsinline
-			data-on:ended={ webNext() }
-			data-on:torr-subtitle="$subTrack = evt.detail"
-			data-on:torr-unplayable="$_unplayable = evt.detail"
-		></video>
-		<div class="alert alert-warning alert-soft mt-3" role="alert" data-show="$_unplayable">
-			<span>{ tr(ctx,"This browser cannot play") } <span data-text="$_unplayable"></span> { tr(ctx,"of this file.") }</span>
-		</div>
-		<div class="alert alert-warning alert-soft mt-3" role="alert" data-show="$_tsPlayerProblem || $_tsProbeProblem">
-			<span>{ tr(ctx,"TorrServer could not load playback information. Check the connection or login, then retry.") }</span>
-			<button class="btn btn-sm" type="button" data-on:click={ webStartPlay() }>{ tr(ctx,"Retry") }</button>
-		</div>
-		<span class="loading loading-spinner loading-sm mt-3" data-show="$audioTrack < 0 && !$_tsPlayerProblem"></span>
-		<div class="flex flex-wrap items-center gap-2 mt-3">
-			<div class="join" role="group" aria-label={ tr(ctx, "Stream") }>
-				<button type="button" class="btn btn-sm join-item" data-class:btn-primary="$playKind === 'direct'" data-on:click={ `if ($playKind !== 'direct') { $playKind = 'direct'; ` + webStartPlay() + ` }` }>{ tr(ctx,"Direct") }</button>
-				<button type="button" class="btn btn-sm join-item" data-show="$tsStatus.hls" data-class:btn-secondary="$playKind === 'hls'" data-on:click={ `if ($playKind !== 'hls') { $playKind = 'hls'; ` + webStartPlay() + ` }` }>HLS</button>
-			</div>
-			<div id="ts-player-controls" class="contents"></div>
-			<button type="button" class="btn btn-sm" data-attr:disabled="$_queueHash !== $activeHash || $audioTrack < 0 || $_queue.findIndex(f => f.index === +$activeFileIndex) < 0 || $_queue.findIndex(f => f.index === +$activeFileIndex) + 1 >= $_queue.length" data-on:click={ webNext() }>{ tr(ctx,"Next") }</button>
-		</div>
-		<div class="flex flex-wrap items-center gap-2 mt-3" data-show="$streamCleanUrl">
-			<button type="button" class="btn btn-sm" data-on:click={ openPlayer(ctx, "vlc", "VLC") }>{ tr(ctx,"Open in VLC") }</button>
-			<button type="button" class="btn btn-sm" data-show={ onMac } data-on:click={ openPlayer(ctx, "iina", "IINA") }>{ tr(ctx,"Open in IINA") }</button>
-			<button type="button" class="btn btn-sm" data-on:click={ webCopy(ctx, false) }>{ tr(ctx,"Copy Direct link") }</button>
-			<button type="button" class="btn btn-sm" data-show="$tsStatus.hls" data-on:click={ webCopy(ctx, true) }>{ tr(ctx,"Copy HLS link") }</button>
-		</div>
-		@TorrPlayerStats(nil, 0)
-		@appToast()
-	}
+	@torrPlayerModalFor(true)
+	@torrConfirmModalFor(true)
+	@torrProbeModalFor(true)
+	@torrToast()
 }
 
-templ webVideoFiles(t torrserver.Torrent) {
-	<div data-on:click={ webPlayFile() }>
-		<button type="button" class="btn btn-sm btn-ghost" data-action="files" data-hash={ t.Hash }>{ tr(ctx,"Files") }</button>
-		<ul class="list">
-			for _, f := range t.VideoFiles() {
-				<li class="list-row items-center">
-					<span class="list-col-grow text-sm truncate" title={ f.Path }>{ path.Base(f.Path) }</span>
-					<button type="button" class="btn btn-sm btn-primary" data-action="play" data-kind="direct" data-hash={ t.Hash } data-index={ fmt.Sprint(f.ID) } data-title={ path.Base(f.Path) }>{ tr(ctx,"Direct") }</button>
-					<button type="button" class="btn btn-sm btn-secondary" data-show="$tsStatus.hls" data-action="play" data-kind="hls" data-hash={ t.Hash } data-index={ fmt.Sprint(f.ID) } data-title={ path.Base(f.Path) }>HLS</button>
-				</li>
-			}
-		</ul>
-	</div>
+templ webPlayerTransport() {
+	<div
+		id="ts-player-session"
+		data-ref:_session
+		data-effect="$playerOpen ? tsPlayerLoad(el, $tsSelected, $activeHash, +$activeFileIndex, $playKind, $playNonce) : tsPlayerCancel(el)"
+		data-on:ts-player={ webPlayerLoaded() }
+		data-on:ts-player-stats="$_tsPlayerProblem = evt.detail.problem || evt.detail.heartbeatProblem; if (evt.detail.torrent) { @post('/api/ts/player-stats', {payload: evt.detail}) }"
+		data-on-interval__duration.2s="$playerOpen && tsPlayerTick(el)"
+		data-on:pagehide__window="tsPlayerCancel(el)"
+	></div>
+	<div data-effect="if ($playerOpen && $_tsPlayerOrigin && $_tsPlayerOrigin !== $tsSelected) { $playerOpen = false }; $_tsPlayerOrigin = $tsSelected"></div>
+	<div data-effect={ webPlayback() }></div>
+	<div id="ts-player-controls"></div>
 }
 
-// WebPlayerPlaylist picks another file without changing the chosen mode.
-templ WebPlayerPlaylist(files []torrserver.FileStat) {
-	<div id="torr-playlist" class="contents">
-		if len(files) > 1 {
-			<select class="select select-sm max-w-xs" aria-label={ tr(ctx, "Playlist") } data-bind:active-file-index data-on:change={ `const f = $_queue.find(f => f.index === +el.value); if (f) { $streamTitle = f.title; ` + webStartPlay() + ` }` }>
-				for _, f := range files {
-					<option value={ fmt.Sprint(f.ID) }>{ path.Base(f.Path) }</option>
-				}
-			</select>
-		}
+templ webPlayerProblems() {
+	<div class="alert alert-warning alert-soft mt-3" role="alert" data-show="$_tsPlayerProblem || $_tsProbeProblem">
+		<span>{ tr(ctx,"TorrServer could not load playback information. Check the connection or login, then retry.") }</span>
+		<button class="btn btn-sm" type="button" data-on:click={ webStartPlay() }>{ tr(ctx,"Retry") }</button>
 	</div>
+	<span class="loading loading-spinner loading-sm mt-3" data-show="$audioTrack < 0 && !$_tsPlayerProblem"></span>
 }
 
 func webPlayerLoaded() string {
@@ -133,21 +91,15 @@ func webPlayback() string {
  : ($playerOpen ? $_video?.pause() : (window.stopHlsVideo?.(), $_tsPlayingFile = ''), tsPlayerRelease($_session))`
 }
 
-func webCopy(ctx context.Context, hls bool) string {
-	signal := "$streamCleanUrl"
-	if hls {
-		signal = "$streamHlsUrl"
-	}
-	return `copyLink(` + signal + `, '').then(ok => { $toastError = !ok; $toast = ok ? ` + trJS(ctx, "Link copied") + ` : ` + trJS(ctx, "Copy failed") + ` })`
-}
-
 // WebPlayerControls guards late relay responses against a newer file or server.
-templ WebPlayerControls(hash string, index, nonce int, files []torrserver.FileStat, audio, subs []torrserver.ProbeTrack) {
-	{{ queue := make([]QueuedFile, len(files))
-for i, f := range files {
-	queue[i] = QueuedFile{Index: f.ID, Title: path.Base(f.Path)}
-}
-data, _ := json.Marshal(queue) }}
+templ WebPlayerControls(hash string, index, nonce int, files []torrserver.FileStat) {
+	{{
+		queue := make([]QueuedFile, len(files))
+		for i, f := range files {
+			queue[i] = QueuedFile{Index: f.ID, Title: path.Base(f.Path)}
+		}
+		data, _ := json.Marshal(queue)
+	}}
 	<div
 		id="ts-player-controls"
 		class="contents"
@@ -155,11 +107,46 @@ data, _ := json.Marshal(queue) }}
 		data-index={ fmt.Sprint(index) }
 		data-nonce={ fmt.Sprint(nonce) }
 		data-queue={ string(data) }
-		data-show="$activeHash === el.dataset.hash && +$activeFileIndex === +el.dataset.index && $playNonce === +el.dataset.nonce"
-		data-init="if ($activeHash === el.dataset.hash && +$activeFileIndex === +el.dataset.index && $playNonce === +el.dataset.nonce) { $_queue = JSON.parse(el.dataset.queue); $_queueHash = el.dataset.hash }"
-	>
-		@TorrAudioPicker(audio, 0)
-		@TorrSubtitleMenu(subs)
-		@WebPlayerPlaylist(files)
+		data-show={ webRelayCurrent }
+		data-init={ "if (" + webRelayCurrent + ") { $_queue = JSON.parse(el.dataset.queue); $_queueHash = el.dataset.hash }" }
+	></div>
+}
+
+// webRelayCurrent holds when a relayed element (its data-hash, data-index and
+// data-nonce) belongs to the file the player shows now.
+const webRelayCurrent = `$activeHash === el.dataset.hash && +$activeFileIndex === +el.dataset.index && $playNonce === +el.dataset.nonce`
+
+// WebPlayerSlot wraps a relayed player control, such as the audio picker, so
+// a late response for an earlier file or server stays hidden.
+templ WebPlayerSlot(id, hash string, index, nonce int, content templ.Component) {
+	<div id={ id } class="contents" data-hash={ hash } data-index={ fmt.Sprint(index) } data-nonce={ fmt.Sprint(nonce) } data-show={ webRelayCurrent }>
+		@content
 	</div>
+}
+
+// playerSlot is where WebPlayerSlot patches a control; the local app's player
+// patches the control itself.
+templ playerSlot(id string, browser bool) {
+	if browser {
+		<div id={ id } class="contents">
+			{ children... }
+		</div>
+	} else {
+		{ children... }
+	}
+}
+
+func probeOpenAction(browser bool) string {
+	if browser {
+		return ""
+	}
+	return `@get('/api/torrserver/probe?hash=' + encodeURIComponent($probeHash) + '&index=' + $probeIndex)`
+}
+
+templ webProbeTransport() {
+	<div
+		data-effect="$probeOpen ? tsProbe(el, $tsSelected, $probeHash, +$probeIndex) : tsProbeCancel(el)"
+		data-on:ts-probe-loading="$probeLoading = true"
+		data-on:ts-probe="const d = evt.detail; if (!$probeOpen || d.url !== $tsSelected || d.hash !== $probeHash || d.index !== +$probeIndex) return; $probeLoading = false; @post('/api/ts/probe', {payload:d})"
+	></div>
 }

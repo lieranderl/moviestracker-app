@@ -2,42 +2,44 @@ package views
 
 import (
 	"fmt"
-	"regexp"
+	"context"
+ "encoding/json"
 
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
 )
 
-// infoHash is a torrent's BitTorrent v1 info hash, as TorrServer names
-// torrents; only such hashes go into the page's actions.
-var infoHash = regexp.MustCompile(`^[0-9a-fA-F]{40}$`)
-
-// tsAction runs a TorrServer action on a torrent from the browser, then
-// lists its torrents again (tsTorrentAction in static/torrserver.js).
-func tsAction(action, hash string) string {
-	return fmt.Sprintf("tsTorrentAction(el.closest('#ts-torrents-box'), $tsSelected, '%s', '%s')", action, hash)
+// Browser transport delegates the shared card's declared actions.
+func webListActions(ctx context.Context) string {
+ return `const b = evt.target.closest('[data-action]'); if (!b) return; const d = b.dataset
+ switch (d.action) {
+ case 'play':
+  $activeHash = d.hash; $activeFileIndex = +d.index; $streamTitle = d.title; $playKind = d.kind === 'hls' && $gst ? 'hls' : 'direct'; ` + webStartPlay() + `; break
+ case 'files': tsPlayerFiles(el, $tsSelected, d.hash); break
+ case 'drop': tsTorrentAction(el, $tsSelected, 'drop', d.hash); break
+ case 'remove': $confirmHash = d.hash; $confirmName = d.title; $confirmOpen = true; break
+ case 'copy': copyLink(new URL(d.url, $tsSelected + '/').href, '').then(ok => { $toastError = !ok; $toast = ok ? d.msg : ` + trJS(ctx,"Copy failed") + ` }); break
+ case 'probe': $probeHash = d.hash; $probeIndex = +d.index; $probeOpen = true; break
+ case 'playlist': evt.preventDefault(); tsDownloadPlaylist(el, $tsSelected, new URL(d.url, location.href).searchParams.get('hash'), d.kind); break
+ }`
 }
 
-// webTorrentsBox lists the picked TorrServer's torrents: the browser reads
-// them when it is connected and every 5 seconds (tsList), and posts them
-// here when they changed; the server renders them into #ts-torrents.
 templ webTorrentsBox() {
-	<section
-		id="ts-torrents-box"
-		class="space-y-3"
-		data-show="$tsSelected && $tsStatus.ok"
-		data-signals="{ tsConfirm: '' }"
-		data-effect="$tsSelected && $tsStatus.ok && tsList(el, $tsSelected)"
-		data-on-interval__duration.5s="$tsSelected && $tsStatus.ok && tsList(el, $tsSelected)"
-		data-on:ts-files={ `if (evt.detail.url !== $tsSelected) return; if (evt.detail.torrent) { @post('/api/ts/files', {payload: {hash:evt.detail.hash, index:1, kind:'direct', torrent:evt.detail.torrent}}) } else { $toastError = true; $toast = ` + trJS(ctx, "TorrServer could not load playback information. Check the connection or login, then retry.") + ` }` }
-		data-on:ts-torrents="@post('/api/ts/torrents', {payload: {torrents: evt.detail}})"
-		aria-label={ tr(ctx, "Torrents") }
-	>
-		<h2 class="text-lg font-bold">{ tr(ctx, "Torrents") }</h2>
-		@webTorrentAddForm()
-		<div id="ts-torrents" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-			<div class="skeleton h-32 lg:col-span-2"></div>
-		</div>
-	</section>
+ <section id="ts-torrents-box" class="space-y-4" data-ref:_list
+  data-show="$tsSelected && $tsStatus.ok"
+  data-effect="$gst = $tsStatus.hls; $tsSelected && $tsStatus.ok && tsList(el, $tsSelected)"
+  data-on-interval__duration.5s="$tsSelected && $tsStatus.ok && tsList(el, $tsSelected)"
+  data-on:click={webListActions(ctx)}
+  data-on:ts-files={ `if (evt.detail.url !== $tsSelected) return; if (evt.detail.torrent) { @post('/api/ts/files', {payload: {hash:evt.detail.hash, index:1, kind:'direct', torrent:evt.detail.torrent}}) } else { $toastError = true; $toast = ` + trJS(ctx, "TorrServer could not load playback information. Check the connection or login, then retry.") + ` }` }
+  data-on:ts-torrents="@post('/api/ts/torrents', {payload: {torrents: evt.detail}})"
+  aria-label={ tr(ctx,"Torrents") }>
+  @torrListToolbar(0)
+  @streamKindsLegend()
+  <div id="torr-list-container" class="grid grid-cols-1 xl:grid-cols-2 gap-4"><div class="skeleton h-32 xl:col-span-2"></div></div>
+ </section>
+ @modalDialog("torr-add-modal", "addModalOpen", "", "", "max-w-xl", nil) {
+  @modalHeader("torr-add-modal", tr(ctx,"Add Torrents"), "plus", "text-primary")
+  @webTorrentAddForm()
+ }
 }
 
 // Inputs stay outside #ts-torrents, so list patches never replace them.
@@ -49,7 +51,7 @@ templ webTorrentAddForm() {
 		data-signals="{ _tsTorrentLink: '', _tsTorrentTitle: '', _tsTorrentPoster: '', _tsAddResult: {adding: false, ok: false, problem: '', status: 0} }"
 		data-effect="tsResetAdd(el, $tsSelected)"
 		data-on:submit="tsAddTorrent(el, $tsSelected, {link: $_tsTorrentLink, title: $_tsTorrentTitle, poster: $_tsTorrentPoster, file: el.elements.torrentFile.files[0]})"
-		data-on:ts-added="$_tsAddResult = evt.detail; if (evt.detail.ok) { el.reset(); $_tsTorrentLink = ''; $_tsTorrentTitle = ''; $_tsTorrentPoster = ''; tsList(el.closest('#ts-torrents-box'), $tsSelected, true) }"
+		data-on:ts-added="$_tsAddResult = evt.detail; if (evt.detail.ok) { el.reset(); $_tsTorrentLink = ''; $_tsTorrentTitle = ''; $_tsTorrentPoster = ''; tsList($_list, $tsSelected, true) }"
 	>
 		<div class="card-body gap-3">
 			<h3 class="card-title text-base">{ tr(ctx, "Add torrent") }</h3>
@@ -93,72 +95,27 @@ templ webTorrentAddForm() {
 	</form>
 }
 
-// WebTorrents are a TorrServer's torrents, as the browser read them.
+// webStreamLinks describes relative TorrServer paths, resolved by the browser.
+func webStreamLinks(torrents []torrserver.Torrent) StreamLinks {
+ pages := map[string]string{}
+ for _, t := range torrents {
+  var data struct { TMDB struct {ID int `json:"id"`; Type string `json:"type"`} `json:"tmdb"` }
+  if json.Unmarshal([]byte(t.Data), &data) == nil && data.TMDB.ID > 0 && (data.TMDB.Type == "movie" || data.TMDB.Type == "tv") {
+   pages[t.Hash] = fmt.Sprintf("/%s/%d",data.TMDB.Type,data.TMDB.ID)
+  }
+ }
+ return StreamLinks{Browser:true,
+ Direct:func(hash string, f torrserver.FileStat) string { return fmt.Sprintf("stream?link=%s&index=%d&play",hash,f.ID) },
+ HLS:func(hash string, f torrserver.FileStat) string { return fmt.Sprintf("gst/%s/master.m3u8?index=%d",hash,f.ID) },
+ Page:func(hash string) string {return pages[hash]},
+ }
+}
+
 templ WebTorrents(torrents []torrserver.Torrent) {
-	<div id="ts-torrents" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-		if len(torrents) == 0 {
-			<div role="status" class="alert alert-info alert-soft lg:col-span-2">
-				@Icon("info", "size-5")
-				<span>{ tr(ctx, "No torrents in this TorrServer yet.") }</span>
-			</div>
-		}
-		for _, t := range torrents {
-			@webTorrentCard(t)
-		}
-	</div>
+ @TorrServerListFragment(webStreamLinks(torrents),torrents)
+ @torrCount(len(torrents))
 }
 
-templ webTorrentCard(t torrserver.Torrent) {
-	{{ name := t.DisplayName() }}
-	<article id={ "ts-torrent-" + t.Hash } class="card bg-base-200/80 border border-base-content/10 shadow-sm">
-		<div class="card-body p-4 gap-3">
-			<div class="flex items-start gap-4 min-w-0">
-				if t.Poster != "" {
-					<img src={ t.Poster } alt="" class="w-16 h-24 rounded-field object-cover bg-base-300 shadow shrink-0" loading="lazy" decoding="async" width="64" height="96"/>
-				} else {
-					<span class="w-16 h-24 rounded-field bg-base-300 grid place-items-center text-base-content/40 shrink-0">
-						@Icon("film", "size-8")
-					</span>
-				}
-				<div class="space-y-1.5 min-w-0 grow">
-					<h3 class="font-bold leading-snug line-clamp-2" title={ name }>{ name }</h3>
-					<div class="flex flex-wrap items-center gap-2 text-xs">
-						<span class="badge badge-sm badge-soft badge-primary font-mono">{ t.FormattedSize() }</span>
-						<span class={ "badge badge-sm font-medium", t.StatusBadgeClass() }>{ tr(ctx, t.StatusLabel()) }</span>
-						if n := len(t.VideoFiles()); n > 0 {
-							<span class="badge badge-sm badge-ghost">{ trn(ctx, n, "%d video", "%d videos") }</span>
-						}
-					</div>
-					<p class="text-xs text-base-content/60 font-mono flex flex-wrap gap-x-3">
-						<span>{ tr(ctx, "Peers") } { fmt.Sprintf("%d / %d", t.ActivePeers, max(t.ActivePeers, t.TotalPeers)) }</span>
-						<span class="text-success">↓ { t.FormattedDownloadSpeed() }</span>
-					</p>
-				</div>
-			</div>
-			if infoHash.MatchString(t.Hash) {
-				@webVideoFiles(t)
-				<div class="card-actions justify-end">
-					if !t.GettingInfo() {
-						<button type="button" class="btn btn-ghost btn-sm gap-1.5 text-warning" title={ tr(ctx, "Drop active torrent cache") } data-on:click={ tsAction("drop", t.Hash) }>
-							@Icon("rotate-ccw", "size-4")
-							{ tr(ctx, "Drop cache") }
-						</button>
-					}
-					<button type="button" class="btn btn-ghost btn-sm gap-1.5 text-error" data-show={ fmt.Sprintf("$tsConfirm !== '%s'", t.Hash) } data-on:click={ fmt.Sprintf("$tsConfirm = '%s'", t.Hash) }>
-						@Icon("trash-2", "size-4")
-						{ tr(ctx, "Remove") }
-					</button>
-					<button type="button" class="btn btn-error btn-sm gap-1.5" data-show={ fmt.Sprintf("$tsConfirm === '%s'", t.Hash) } data-on:click={ "$tsConfirm = ''; " + tsAction("rem", t.Hash) }>
-						@Icon("trash-2", "size-4")
-						{ tr(ctx, "Remove from TorrServer") }
-					</button>
-				</div>
-			}
-		</div>
-	</article>
-}
-
-// WebTorrent refreshes one card after the browser asks TorrServer for files.
 templ WebTorrent(t *torrserver.Torrent) {
-	@webTorrentCard(*t)
+ @torrentCard(webStreamLinks([]torrserver.Torrent{*t}),*t)
 }

@@ -214,9 +214,9 @@ test("an HLS viewer sends heartbeats and stops them when closing", async () => {
  await client.tsPlayerTick(el);
  await client.tsPlayerRelease(el);
  await client.tsPlayerRelease(el);
- expect(requests.mock.calls.map(([target])=>target.pathname)).toEqual(["/torrents","/gst/08ada5a7a6183aae1e09d831df6748d566095a10/heartbeat"]);
+ expect(requests.mock.calls.map(([target])=>target.pathname)).toEqual(["/torrents","/settings","/gst/08ada5a7a6183aae1e09d831df6748d566095a10/heartbeat","/gst/08ada5a7a6183aae1e09d831df6748d566095a10/master.m3u8"]);
  await client.tsPlayerTick(el);
- expect(requests).toHaveBeenCalledTimes(2);
+ expect(requests).toHaveBeenCalledTimes(4);
 });
 
 test("changing an HLS audio track does not remove another viewer's shared task", async () => {
@@ -265,7 +265,7 @@ test("closing one viewer does not remove the HLS task used by another viewer", a
   expect(requests).not.toHaveBeenCalled();
   requests.mockImplementation(async target => Response.json(target.pathname === "/torrents" ? {hash} : {}));
   await client.tsPlayerTick(second);
-  expect(requests.mock.calls.map(([target]) => target.pathname)).toEqual(["/torrents", `/gst/${hash}/heartbeat`]);
+  expect(requests.mock.calls.map(([target]) => target.pathname)).toEqual(["/torrents", "/settings", `/gst/${hash}/heartbeat`, `/gst/${hash}/master.m3u8`]);
   await client.tsPlayerRelease(second);
 });
 
@@ -283,4 +283,121 @@ test("routine list polling cannot cancel the viewer's file refresh", async () =>
   await files;
   expect(events).toHaveLength(1);
   expect(events[0].torrent.file_stats[0].path).toBe("Sintel.mp4");
+});
+
+test("settings read relays only editable fields and keeps the login in the browser", async () => {
+ client.tsSaveLogin(server, "viewer", "secret");
+ requests.mockImplementation(async () => Response.json({CacheSize:268435456, TMDBApiKey:"private", NewOption:7}));
+ const el = new EventTarget();
+ const events = [];
+ el.addEventListener("ts-settings", evt => events.push(evt.detail));
+ await client.tsSettingsRead(el, server, "streaming", ["CacheSize"], 1);
+ expect(requests.mock.calls[0][0].href).toBe(server + "/settings");
+ expect(JSON.parse(requests.mock.calls[0][1].body)).toEqual({action:"get"});
+ expect(requests.mock.calls[0][1].headers.Authorization).toBe("Basic dmlld2VyOnNlY3JldA==");
+ expect(events.at(-1)).toEqual({url:server, section:"streaming", nonce:1, values:{CacheSize:268435456}, problem:"", status:0});
+});
+
+test("saving merges validated changes into fresh settings preserving future fields", async () => {
+ const el = new EventTarget(); const events = [];
+ el.addEventListener("ts-settings-saved", evt => events.push(evt.detail));
+ requests.mockImplementation(async (_target, init) => {
+  if (JSON.parse(init.body).action === "get") return Response.json({CacheSize:67108864, NewOption:{enabled:true}, TMDBApiKey:"private"});
+  return new Response("");
+ });
+ await client.tsSettingsWrite(el,server,"streaming",{CacheSize:268435456},3);
+ expect(JSON.parse(requests.mock.calls[1][1].body)).toEqual({action:"set",sets:{CacheSize:268435456,NewOption:{enabled:true},TMDBApiKey:"private"}});
+ expect(events.at(-1)).toEqual({url:server,nonce:3,busy:false,ok:true,problem:"",status:0});
+});
+
+test("GStreamer saves preserve new fields and report rejected credentials", async () => {
+ const el = new EventTarget(); const saved = [];
+ el.addEventListener("ts-settings-saved",evt => saved.push(evt.detail));
+ requests.mockImplementation(async (_target,init) => init.method === "POST" ? new Response("",{status:401}) : Response.json({built_in:true,config:{MaxTasks:4,NewCodec:true}}));
+ await client.tsSettingsWrite(el,server,"gstreamer",{MaxTasks:2},4);
+ expect(JSON.parse(requests.mock.calls[1][1].body)).toEqual({action:"set",config:{MaxTasks:2,NewCodec:true}});
+ expect(saved.at(-1).problem).toBe("login");
+ expect(saved.at(-1).ok).toBe(false);
+});
+
+test("switching servers during a settings read suppresses the old reply", async () => {
+ const el = new EventTarget(); const events = []; let oldReply;
+ el.addEventListener("ts-settings",evt => events.push(evt.detail));
+ requests.mockImplementationOnce(() => new Promise(resolve => {oldReply = resolve}));
+ requests.mockImplementationOnce(async () => Response.json({CacheSize:134217728}));
+ const old = client.tsSettingsRead(el,server,"streaming",["CacheSize"],5);
+ await Promise.resolve();
+ await client.tsSettingsRead(el,"https://other.example","streaming",["CacheSize"],6);
+ oldReply(Response.json({CacheSize:67108864})); await old;
+ expect(events).toHaveLength(1);
+ expect(events[0].url).toBe("https://other.example");
+});
+
+test("unsupported GStreamer builds and malformed settings cannot trigger saves", async () => {
+ for (const value of [null, [], {built_in:false}, {built_in:true,config:null}]) {
+  const el = new EventTarget(); const saved = [];
+  el.addEventListener("ts-settings-saved",evt => saved.push(evt.detail));
+  requests.mockClear(); requests.mockImplementation(async () => Response.json(value));
+  await client.tsSettingsWrite(el,server,"gstreamer",{MaxTasks:2},7);
+  expect(requests).toHaveBeenCalledTimes(1);
+  expect(saved.at(-1).ok).toBe(false);
+ }
+});
+
+test("closing settings during the fresh read prevents a late write", async () => {
+ const el = new EventTarget(); let reply;
+ requests.mockImplementation(() => new Promise(resolve => {reply=resolve}));
+ const save = client.tsSettingsWrite(el,server,"streaming",{CacheSize:134217728},10);
+ await Promise.resolve();
+ client.tsSettingsCancel(el);
+ reply(Response.json({CacheSize:67108864})); await save;
+ expect(requests).toHaveBeenCalledTimes(1);
+});
+
+test("shared player stats receive actual cache capacity without relaying settings secrets", async () => {
+ const el = new EventTarget(); const events = []; const hash = "08ada5a7a6183aae1e09d831df6748d566095a10";
+ el.addEventListener("ts-player-stats",evt=>events.push(evt.detail));
+ requests.mockImplementation(async target => Response.json(target.pathname === "/torrents" ? {hash,preloaded_bytes:33554432} : target.pathname === "/settings" ? {CacheSize:67108864,TMDBApiKey:"private"} : {}));
+ await client.tsPlayerLease(el,server,hash,1,"hls",0); await client.tsPlayerTick(el);
+ expect(events[0].cacheSize).toBe(67108864);
+ expect(JSON.stringify(events)).not.toContain("private");
+ await client.tsPlayerRelease(el);
+});
+
+test("media comparison relays the selected audio and master playlist without login", async () => {
+ const el = new EventTarget();
+ const events=[]; el.addEventListener("ts-player-stats",evt=>events.push(evt.detail));
+ const hash="08ada5a7a6183aae1e09d831df6748d566095a10";
+ const probe={Tracks:[{Index:1,Type:"audio",Codec:"opus"}]};
+ const master='#EXTM3U\n#EXT-X-STREAM-INF:CODECS="avc1.640028,mp4a.40.2"\nmain.m3u8\n';
+ client.tsSaveLogin(server,"viewer","browser-secret");
+ requests.mockImplementation(async target=> {
+  if(target.pathname.endsWith("/probe")) return Response.json(probe);
+  if(target.pathname.endsWith("master.m3u8")) return new Response(master);
+  return Response.json(target.pathname === "/torrents" ? {hash} : {});
+ });
+ await client.tsPlayerLoad(el,server,hash,1,"hls",1);
+ await client.tsPlayerLease(el,server,hash,1,"hls",1);
+ await client.tsPlayerTick(el);
+ expect(events[0].audio).toBe(1);
+ expect(events[0].probe).toEqual(probe);
+ expect(events[0].master).toBe(master);
+ expect(JSON.stringify(events)).not.toContain("browser-secret");
+ expect(requests.mock.calls.at(-1)[0].search).toBe("?index=1&audio=1");
+ await client.tsPlayerCancel(el);
+});
+
+test("a failed settings read is retried on the next tick instead of reporting no cache", async () => {
+ const el = new EventTarget(); const events = []; const hash = "08ada5a7a6183aae1e09d831df6748d566095a10";
+ el.addEventListener("ts-player-stats",evt=>events.push(evt.detail));
+ let settingsReads = 0;
+ requests.mockImplementation(async target => {
+  if (target.pathname === "/settings") return ++settingsReads === 1 ? new Response("", {status:503}) : Response.json({CacheSize:67108864});
+  return Response.json(target.pathname === "/torrents" ? {hash} : {});
+ });
+ await client.tsPlayerLease(el,server,hash,1,"direct",0);
+ await client.tsPlayerTick(el); await client.tsPlayerTick(el); await client.tsPlayerTick(el);
+ expect(events.map(e => e.cacheSize)).toEqual([0, 67108864, 67108864]);
+ expect(settingsReads).toBe(2);
+ await client.tsPlayerRelease(el);
 });

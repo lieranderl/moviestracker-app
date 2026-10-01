@@ -9,7 +9,7 @@ import (
 
 // twoTorrents is TorrServer's /torrents list answer, as the browser posts it.
 const twoTorrents = `{"torrents":[
-	{"hash":"aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111","title":"Dune (2021)","poster":"https://image.tmdb.org/t/p/w500/d.jpg","torrent_size":8589934592,"stat":3,"stat_string":"Torrent working","download_speed":1048576,"active_peers":12,"total_peers":40,
+	{"hash":"aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111","title":"Dune (2021)","poster":"https://image.tmdb.org/t/p/w500/d.jpg","torrent_size":8589934592,"stat":3,"stat_string":"Torrent working","download_speed":1048576,"active_peers":12,"connected_seeders":12,"total_peers":40,
 	 "file_stats":[{"id":1,"path":"Dune/Dune.2021.mkv","length":8589000000}]},
 	{"hash":"bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222","name":"Severance.S01","torrent_size":21474836480,"stat":5,"stat_string":"Torrent in db"}
 ]}`
@@ -31,10 +31,10 @@ func TestTheBrowsersTorrentListIsShownAsCards(t *testing.T) {
 	h, session, _ := torrServers(t)
 	res := postTorrents(t, h, twoTorrents, session)
 	body := res.Body.String()
-	if res.Code != http.StatusOK || !strings.Contains(body, `id="ts-torrents"`) {
+	if res.Code != http.StatusOK || !strings.Contains(body, `id="torr-list-container"`) {
 		t.Fatalf("POST /api/ts/torrents = %d, want #ts-torrents patched:\n%s", res.Code, body)
 	}
-	for _, want := range []string{"Dune (2021)", "Severance.S01", "8.00 GB", "20.00 GB", "1.00 MB/s", "12 / 40", "tsTorrentAction", "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"} {
+	for _, want := range []string{"Dune (2021)", "Severance.S01", "8.00 GB", "20.00 GB", "1.00 MB/s", "12 / 40", `data-action="drop"`, "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the torrent cards lack %q", want)
 		}

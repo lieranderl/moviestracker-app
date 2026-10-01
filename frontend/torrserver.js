@@ -256,6 +256,7 @@ window.tsAddTorrent = async (el, url, { link = "", title = "", poster = "", file
 // Player reads are browser-to-TorrServer requests; their events contain media
 // data only. Datastar posts those data to the cloud for rendering.
 const playerLoads = new WeakMap();
+const playerMedia = new WeakMap();
 const hashOK = (hash) => /^[a-f0-9]{40}$/i.test(hash);
 const playerProblem = (result) => ({ problem: result.problem || "", status: result.status || 0 });
 const withFiles = (torrent) => {
@@ -288,6 +289,7 @@ window.tsPlayerLoad = async (el, url, hash, index, kind, nonce) => {
     probe = await call(url, `gst/${hash}/probe?index=${index}`, {signal:ctl.signal, read:res=>res.json(),timeout:30000});
   }
   if (ctl.signal.aborted) return;
+  playerMedia.set(el,{url,hash,index,probe:probe.value || null});
   tell(el,"ts-player",{hash,index,kind,nonce,torrent:result.value || null,probe:probe.value || null,...playerProblem(result),probeProblem:probe.problem || ""});
 };
 
@@ -333,12 +335,24 @@ window.tsPlayerTick = async (el) => {
   session.tick=ctl;
   try {
     const torrent=await getTorrent(session.url,session.hash,ctl.signal);
+    if (session.cacheSize === undefined && !ctl.signal.aborted) {
+      const settings = await settingsGet(session.url,"streaming",ctl.signal);
+      // A failed read is retried on the next tick; only an answer is kept.
+      const capacity = settings.value?.CacheSize;
+      if (!settings.problem) session.cacheSize = Number.isSafeInteger(capacity) && capacity > 0 ? capacity : 0;
+    }
     let heartbeat={};
     if (session.kind==="hls" && !ctl.signal.aborted) {
       heartbeat=await call(session.url,`gst/${session.hash}/heartbeat`,{signal:ctl.signal,read:res=>res.json()});
     }
+    if (session.kind === "hls" && !session.master && !heartbeat.problem && !ctl.signal.aborted) {
+      const master = await call(session.url,`gst/${session.hash}/master.m3u8?index=${session.index}&audio=${session.audio}`,{signal:ctl.signal,read:res=>res.text()});
+      if (master.value?.includes("#EXT-X-STREAM-INF:") && master.value.length <= 65536) session.master = master.value;
+    }
     if (ctl.signal.aborted || playerSessions.get(el)!==session) return;
-    tell(el,"ts-player-stats",{hash:session.hash,index:session.index,kind:session.kind,torrent:torrent.value || null,...playerProblem(torrent),heartbeatProblem:heartbeat.problem || ""});
+    const media = playerMedia.get(el);
+    const probe = media?.url === session.url && media.hash === session.hash && media.index === session.index ? media.probe : null;
+    tell(el,"ts-player-stats",{hash:session.hash,index:session.index,kind:session.kind,audio:session.audio,probe,master:session.master || "",torrent:torrent.value || null,...playerProblem(torrent),heartbeatProblem:heartbeat.problem || "",cacheSize:session.cacheSize || 0});
   } finally { if (session.tick===ctl) session.tick=null; }
 };
 
@@ -353,4 +367,89 @@ window.tsPlayerFiles = async (el, url, hash) => {
   const result=await getTorrent(url,hash,signal);
   if (signal.aborted) return;
   tell(el,"ts-files",{url,hash,index:1,kind:"direct",torrent:result.value || null,...playerProblem(result)});
+};
+
+// Settings requests have their own lifetime, independent of list polling.
+const settingsLoads = new WeakMap();
+const settingsBegin = (el) => {
+  settingsLoads.get(el)?.abort();
+  const ctl = new AbortController();
+  settingsLoads.set(el, ctl);
+  return ctl.signal;
+};
+const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+const settingsGet = async (url, section, signal) => {
+  const gst = section === "gstreamer";
+  const result = await call(url, gst ? "gst/settings" : "settings", {
+    init: gst ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "get" }) },
+    read: (res) => res.json(), signal,
+  });
+  if (result.problem) return result;
+  if (gst && result.value?.built_in === false) return { problem: "no-gstreamer" };
+  const value = gst ? result.value?.config : result.value;
+  return object(value) ? { value } : { problem: "invalid" };
+};
+
+// Only the form's allowlisted fields leave the browser. Other settings may
+// contain secrets, and are retained locally only for read/merge/write.
+let settingsNonce = 0;
+window.tsSettingsRead = async (el, url, section, keys, nonce = ++settingsNonce) => {
+  const signal = settingsBegin(el);
+  await Promise.resolve();
+  if (!url || signal.aborted) return;
+  tell(el, "ts-settings-loading", {url,section,nonce});
+  const result = await settingsGet(url, section, signal);
+  if (signal.aborted) return;
+  const values = Object.fromEntries(keys.filter(key => Object.hasOwn(result.value || {}, key)).map(key => [key, result.value[key]]));
+  tell(el, "ts-settings", { url, section, nonce, values, problem: result.problem || "", status: result.status || 0 });
+};
+
+// A validated patch is merged with a fresh object immediately before saving:
+// TorrServer replaces the entire settings object, including unknown fields.
+window.tsSettingsWrite = async (el, url, section, changes, nonce) => {
+  const signal = settingsBegin(el);
+  await Promise.resolve();
+  if (!url || signal.aborted) return;
+  const report = (fields) => tell(el, "ts-settings-saved", {url, nonce, busy:false, ok:false, problem:"", status:0, ...fields});
+  report({busy:true});
+  const current = await settingsGet(url, section, signal);
+  if (signal.aborted) return;
+  if (current.problem) { report({problem:current.problem,status:current.status || 0}); return; }
+  // A version change can remove fields after the form was loaded. Do not
+  // recreate unsupported settings in the newer object.
+  if (Object.keys(changes).some(key => !Object.hasOwn(current.value,key))) { report({problem:"invalid"}); return; }
+  const merged = {...current.value, ...changes};
+  const gst = section === "gstreamer";
+  const result = await call(url, gst ? "gst/settings" : "settings", {
+    init: {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(gst ? {action:"set",config:merged} : {action:"set",sets:merged})}, signal,
+  });
+  if (signal.aborted) return;
+  report({ok:!result.problem,problem:result.problem || "",status:result.status || 0});
+};
+window.tsSettingsCancel = (el) => settingsLoads.get(el)?.abort();
+
+const probeLoads = new WeakMap();
+window.tsProbe = async (el,url,hash,index) => {
+  probeLoads.get(el)?.abort();
+  const ctl = new AbortController(); probeLoads.set(el,ctl);
+  await Promise.resolve();
+  if (ctl.signal.aborted || !webAddress(url) || !hashOK(hash) || !Number.isSafeInteger(index) || index < 1) return;
+  tell(el,"ts-probe-loading",{});
+  const result = await call(url,`gst/${hash}/probe?index=${index}`,{signal:ctl.signal,read:res=>res.json(),timeout:30000});
+  if (!ctl.signal.aborted) tell(el,"ts-probe",{url,hash,index,probe:result.value || null,...playerProblem(result)});
+};
+window.tsProbeCancel = el => probeLoads.get(el)?.abort();
+
+// A download is a browser capability: construct the same M3U entries using
+// direct TorrServer URLs rather than the local app's signed proxy URLs.
+window.tsDownloadPlaylist = async (el,url,hash,kind) => {
+  if (!webAddress(url) || !hashOK(hash) || !["direct","hls"].includes(kind)) return;
+  const result = await getTorrent(url,hash);
+  if (!result.value) return;
+  const response = await fetch("/api/ts/playlist",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url,kind,torrent:result.value})});
+  if (!response.ok) return;
+  const blob = await response.blob();
+  const href = URL.createObjectURL(blob);
+  const anchor = document.createElement("a"); anchor.href = href; anchor.download = `${hash}-${kind}.m3u8`;
+  anchor.click(); URL.revokeObjectURL(href);
 };

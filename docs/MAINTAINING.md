@@ -272,3 +272,9 @@ Waiting upstream: TorrServer copies AAC Main audio into HLS unchanged, which
 browsers refuse (the player explains it). The fix is
 [YouROK/TorrServer#879](https://github.com/YouROK/TorrServer/pull/879); once a
 release has it, move `scripts/torrserver.lock` to that release.
+
+### Cloud TorrServer settings
+
+The TorrServer tab offers torrent engine, streaming, storage, network, other-device and GStreamer settings. The browser reads settings; Cloud Run renders the form and validates only the known editable fields from `settings_spec.go`. Unrelated fields, including credentials and service keys, are not relayed to Cloud Run.
+
+Before saving, the browser reads fresh settings and merges the validated changes, preserving unknown fields because TorrServer replaces the whole object. Startup options and engine restart commands are excluded. Saving engine settings causes TorrServer's own reconnect; GStreamer changes apply to new streams. Closing the panel or changing the selected server/section cancels pending browser requests. An already accepted save cannot be undone by closing the panel.
