@@ -27,6 +27,7 @@ func torrPageSignals(gst, canRemove bool, linkOrigin string) string {
 	_audioMenu: false, _subMenu: false, audioLang: localStorage.getItem('torrAudioLang') || '',
 	addModalOpen: false,
 	probeOpen: false, probeHash: '', probeIndex: 1, probeLoading: false,
+	fileMenuOpen: false, _file: {hash: '', index: 1, title: '', clean: '', hls: '', video: false},
 	confirmOpen: false, confirmHash: '', confirmName: '',
 	filterQuery: '', toast: '', toastError: false
 }`, gst, canRemove, origin)
@@ -49,6 +50,9 @@ switch (d.action) {
 		break
 	case 'probe':
 		$probeHash = d.hash; $probeIndex = +d.index; $probeOpen = true
+		break
+	case 'more':
+		` + openFileMenu("d.clean", "d.hls") + `
 		break
 	case 'copy':
 		window.copyLink(d.url, $linkOrigin).then(ok => { $toastError = !ok; $toast = ok ? d.msg : ` + trJS(ctx, "Copy failed") + ` })
@@ -132,11 +136,22 @@ $_idle = false`
 // onMac is true in a Mac's browser, where IINA runs.
 const onMac = `/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints < 2`
 
-// openPlayer opens the file in an external player and says so when the
-// browser could not: it has no handler for the player's links.
-func openPlayer(ctx context.Context, player, name string) string {
-	return fmt.Sprintf(`window.openInPlayer('%s', $streamCleanUrl, $linkOrigin).then(opened => opened || ($toastError = true, $toast = %s))`,
-		player, jsString(trf(ctx, "%s did not open: is it installed? Copy the Direct link and open it there instead", name)))
+// openPlayer opens link (a Datastar expression) in an external player and
+// says so when the browser could not: it has no handler for the player's
+// links. VLC registers none on a computer without vlc-protocol.
+func openPlayer(ctx context.Context, player, name, link string) string {
+	msg := trf(ctx, "%s did not open: is it installed? Copy the Direct link and open it there instead", name)
+	if player == "vlc" {
+		msg = tr(ctx, "VLC did not open: is it installed, with vlc-protocol on a computer? Copy the Direct link and open it there instead")
+	}
+	return fmt.Sprintf(`window.openInPlayer('%s', %s, $linkOrigin).then(opened => opened || ($toastError = true, $toast = %s))`,
+		player, link, jsString(msg))
+}
+
+// openFileMenu opens a file row's menu from its button's dataset d; clean and
+// hls are expressions for the file's links as players open them.
+func openFileMenu(clean, hls string) string {
+	return `$_file = {hash: d.hash, index: +d.index, title: d.title, clean: ` + clean + `, hls: ` + hls + `, video: d.video === 'true'}; $fileMenuOpen = true`
 }
 
 // torrPlayback (re)starts the stream once the audio track is known: right
@@ -357,6 +372,7 @@ templ TorrServer(user *auth.User, engine, linkOrigin string, links StreamLinks, 
 			@torrPlayerModal()
 			@torrAddModal()
 			@torrProbeModal()
+			@torrFileMenu()
 			@torrConfirmModal()
 		</main>
 	}
@@ -640,25 +656,21 @@ templ torrentFileRow(links StreamLinks, hash string, f torrserver.FileStat) {
 		</div>
 		<div class="flex items-center gap-1.5 shrink-0 self-end @md:self-center">
 			if isVideo {
-				<button
-					type="button"
-					data-action="probe"
-					data-hash={ hash }
-					data-index={ fmt.Sprint(f.ID) }
-					data-show="$gst"
-					class="btn btn-xs btn-ghost btn-square text-info"
-					title={ tr(ctx, "Inspect codecs & audio/subtitle tracks") }
-					aria-label={ tr(ctx, "Inspect tracks") }
-				>
-					@Icon("info", "size-3.5")
-				</button>
+				{{ play := playAttrs(hash, f.ID, f.Path, clean, hls) }}
+				@streamGroup("direct", play)
+				@streamGroup("hls", play)
 			}
-			{{ var play templ.Attributes }}
-			if isVideo {
-				{{ play = playAttrs(hash, f.ID, f.Path, clean, hls) }}
-			}
-			@streamGroup("direct", clean, play)
-			@streamGroup("hls", hls, play)
+			<button
+				type="button"
+				data-action="more"
+				{ playAttrs(hash, f.ID, f.Path, clean, hls)... }
+				data-video={ fmt.Sprint(isVideo) }
+				class="btn btn-xs btn-ghost btn-square"
+				aria-label={ tr(ctx, "More for this file") }
+				title={ tr(ctx, "Open in VLC or IINA, copy links, inspect tracks") }
+			>
+				@Icon("ellipsis-vertical", "size-4")
+			</button>
 		</div>
 	</li>
 }
@@ -935,15 +947,16 @@ templ torrPlayerModalFor(browser bool) {
 					@Icon("download", "size-3.5")
 					.m3u8
 				</a>
-				<button type="button" data-on:click={ openPlayer(ctx, "vlc", "VLC") } class="btn btn-xs btn-outline btn-primary gap-1.5" title={ trf(ctx, "Open the original file in %s", "VLC") }>
+				<button type="button" data-on:click={ openPlayer(ctx, "vlc", "VLC", "$streamCleanUrl") } class="btn btn-xs btn-outline btn-primary gap-1.5" title={ trf(ctx, "Open the original file in %s", "VLC") }>
 					@Icon("external-link", "size-3.5")
 					VLC
 				</button>
-				<button type="button" data-on:click={ openPlayer(ctx, "iina", "IINA") } data-show={ onMac } class="btn btn-xs btn-outline btn-primary gap-1.5" title={ trf(ctx, "Open the original file in %s", "IINA") }>
+				<button type="button" data-on:click={ openPlayer(ctx, "iina", "IINA", "$streamCleanUrl") } data-show={ onMac } class="btn btn-xs btn-outline btn-primary gap-1.5" title={ trf(ctx, "Open the original file in %s", "IINA") }>
 					@Icon("external-link", "size-3.5")
 					IINA
 				</button>
 				<span class="text-xs text-base-content/60">{ tr(ctx, "The original file, full quality. For VLC and other players, and TVs.") }</span>
+				@vlcNote()
 			</div>
 			<div role="group" aria-label={ tr(ctx, "HLS: converted by GStreamer") } class="w-full flex flex-wrap items-center gap-2" data-show="$gst">
 				<span class="badge badge-sm badge-secondary badge-soft font-bold w-14 justify-center">HLS</span>
@@ -1079,6 +1092,71 @@ templ torrProbeModalFor(browser bool) {
 		<div data-class:hidden="$probeLoading">
 			<div id="torr-probe-content"></div>
 		</div>
+	}
+}
+
+// vlcNote says what opening VLC from a browser needs.
+templ vlcNote() {
+	<p class="w-full flex items-start gap-1.5 text-xs text-base-content/70">
+		@Icon("info", "size-3.5 shrink-0 mt-0.5 text-info")
+		<span>
+			{ tr(ctx, "VLC must be installed. On Windows and Mac, the browser also needs the vlc-protocol handler, installed once:") }
+			<a class="link link-primary" href="https://github.com/northsea4/vlc-protocol" target="_blank" rel="noopener noreferrer">vlc-protocol</a>
+		</span>
+	</p>
+}
+
+// copyFileLink copies one of the open file menu's links and closes the menu.
+func copyFileLink(ctx context.Context, link, copied string) string {
+	return "$fileMenuOpen = false; window.copyLink(" + link + ", $linkOrigin).then(ok => { $toastError = !ok; $toast = ok ? " + trJS(ctx, copied) + " : " + trJS(ctx, "Copy failed") + " })"
+}
+
+// torrFileMenu is a file row's menu ($_file): external players, its links
+// and its tracks, kept off the row so the list stays compact.
+templ torrFileMenu() {
+	@modalDialog("torr-file-menu", "fileMenuOpen", "", "", "max-w-md", nil) {
+		<header class="flex items-center justify-between gap-4 pb-3 border-b border-base-content/10">
+			<h3 id="torr-file-menu-title" class="font-bold flex items-center gap-2 min-w-0">
+				@Icon("file-video", "size-5 shrink-0 text-primary")
+				<span class="break-all text-sm" data-text="$_file.title"></span>
+			</h3>
+			<form method="dialog">
+				<button class="btn btn-sm btn-circle btn-ghost" aria-label={ tr(ctx, "Close") }>
+					@Icon("x", "size-4")
+				</button>
+			</form>
+		</header>
+		<section class="mt-4 space-y-2" data-show="$_file.video">
+			<h4 class="text-xs font-bold uppercase tracking-wider text-base-content/60">{ tr(ctx, "Open in a player") }</h4>
+			<div class="flex flex-wrap items-center gap-2">
+				<button type="button" data-on:click={ "$fileMenuOpen = false; " + openPlayer(ctx, "vlc", "VLC", "$_file.clean") } class="btn btn-sm btn-outline btn-primary gap-1.5" title={ trf(ctx, "Open the original file in %s", "VLC") }>
+					@Icon("external-link", "size-4")
+					VLC
+				</button>
+				<button type="button" data-on:click={ "$fileMenuOpen = false; " + openPlayer(ctx, "iina", "IINA", "$_file.clean") } data-show={ onMac } class="btn btn-sm btn-outline btn-primary gap-1.5" title={ trf(ctx, "Open the original file in %s", "IINA") }>
+					@Icon("external-link", "size-4")
+					IINA
+				</button>
+			</div>
+			@vlcNote()
+		</section>
+		<section class="mt-5 space-y-2">
+			<h4 class="text-xs font-bold uppercase tracking-wider text-base-content/60">{ tr(ctx, "Links") }</h4>
+			<div class="flex flex-wrap items-center gap-2">
+				<button type="button" data-on:click={ copyFileLink(ctx, "$_file.clean", "Direct link copied") } class="btn btn-sm btn-outline btn-primary gap-1.5">
+					@Icon("link", "size-4")
+					{ tr(ctx, "Copy Direct link") }
+				</button>
+				<button type="button" data-show="$gst && $_file.video" data-on:click={ copyFileLink(ctx, "$_file.hls", "HLS link copied") } class="btn btn-sm btn-outline btn-secondary gap-1.5">
+					@Icon("link", "size-4")
+					{ tr(ctx, "Copy HLS link") }
+				</button>
+			</div>
+		</section>
+		<button type="button" data-show="$gst && $_file.video" data-on:click="$fileMenuOpen = false; $probeHash = $_file.hash; $probeIndex = $_file.index; $probeOpen = true" class="btn btn-sm btn-ghost text-info gap-1.5 mt-4">
+			@Icon("info", "size-4")
+			{ tr(ctx, "Inspect tracks") }
+		</button>
 	}
 }
 
@@ -1440,16 +1518,15 @@ templ streamKind(label, title, text, icon string, hls bool) {
 	</div>
 }
 
-// streamGroup is one way to watch a file, labelled and coloured the same
+// streamGroup plays a file one way, labelled and coloured the same
 // everywhere: Direct (primary) or HLS (secondary, only with GStreamer).
-// play, when set, adds a Play of that kind in the browser.
-templ streamGroup(kind, link string, play templ.Attributes) {
+templ streamGroup(kind string, play templ.Attributes) {
 	{{
 		hls := kind == "hls"
-		label, aria, msg := tr(ctx, "Direct"), tr(ctx, "Direct: the original file"), tr(ctx, "Direct link copied")
+		label, aria := tr(ctx, "Direct"), tr(ctx, "Direct: the original file")
 		playHelp := tr(ctx, "Play the original file here. Browsers can't play every format: if it stays black or silent, use HLS or VLC")
 		if hls {
-			label, aria, msg = "HLS", tr(ctx, "HLS: converted by GStreamer"), tr(ctx, "HLS link copied")
+			label, aria = "HLS", tr(ctx, "HLS: converted by GStreamer")
 			playHelp = tr(ctx, "Play here, converted by GStreamer: works in every browser, picks audio tracks")
 		}
 	}}
@@ -1463,28 +1540,16 @@ templ streamGroup(kind, link string, play templ.Attributes) {
 			templ.KV("border-primary/30 bg-primary/5", !hls), templ.KV("border-secondary/30 bg-secondary/5", hls) }
 	>
 		<span class={ "pl-2 pr-1 text-[9px] font-bold uppercase tracking-wide", templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }>{ label }</span>
-		if play != nil {
-			<button
-				type="button"
-				data-action="play"
-				data-kind={ kind }
-				{ play... }
-				class={ "btn btn-xs btn-square shadow-none", templ.KV("btn-primary", !hls), templ.KV("btn-secondary", hls) }
-				aria-label={ trf(ctx, "Play %s", label) }
-				title={ playHelp }
-			>
-				@Icon("play", "size-3.5")
-			</button>
-		}
 		<button
 			type="button"
-			data-action="copy"
-			data-url={ link }
-			data-msg={ msg }
-			class={ "btn btn-ghost btn-xs btn-square", templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }
-			aria-label={ trf(ctx, "Copy %s link", label) }
+			data-action="play"
+			data-kind={ kind }
+			{ play... }
+			class={ "btn btn-xs btn-square shadow-none", templ.KV("btn-primary", !hls), templ.KV("btn-secondary", hls) }
+			aria-label={ trf(ctx, "Play %s", label) }
+			title={ playHelp }
 		>
-			@Icon("link", "size-3.5")
+			@Icon("play", "size-3.5")
 		</button>
 	</div>
 }
