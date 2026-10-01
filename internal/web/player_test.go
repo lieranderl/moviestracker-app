@@ -115,3 +115,28 @@ func TestBrowserMediaInfoShowsTheSelectedAudioAndActualHLSOutput(t *testing.T) {
 		}
 	}
 }
+
+func TestALateRelayForAnEarlierFileCannotShowItsControlsForTheCurrentOne(t *testing.T) {
+	h, session, _ := torrServers(t)
+	body := `{"hash":"aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111","index":2,"kind":"hls","nonce":7,"torrent":{"hash":"aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111","file_stats":[{"id":1,"path":"A.mp4"},{"id":2,"path":"B.mp4"}]},"probe":{"Tracks":[{"Index":0,"Type":"audio","Language":"en"},{"Index":1,"Type":"audio","Language":"ru"},{"Index":0,"Type":"sub","Language":"en"}]}}`
+	res := postPlayer(t, h, "/api/ts/player", body, session).Body.String()
+	for _, slot := range []string{"ts-player-audio", "ts-player-subtitles", "ts-player-playlist", "ts-player-media-info"} {
+		at := strings.Index(res, `id="`+slot+`"`)
+		if at < 0 {
+			t.Errorf("relay lacks the guarded %s", slot)
+			continue
+		}
+		tag := res[at : at+strings.Index(res[at:], ">")]
+		for _, want := range []string{`data-hash="aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"`, `data-index="2"`, `data-nonce="7"`, `$playNonce === +el.dataset.nonce`} {
+			if !strings.Contains(tag, want) {
+				t.Errorf("%s is not guarded by %s: %s", slot, want, tag)
+			}
+		}
+	}
+	page := getWith(t, h, "/torrserver", session).Body.String()
+	for _, slot := range []string{"ts-player-audio", "ts-player-subtitles", "ts-player-playlist", "ts-player-media-info"} {
+		if !strings.Contains(page, `id="`+slot+`"`) {
+			t.Errorf("player lacks the %s slot", slot)
+		}
+	}
+}

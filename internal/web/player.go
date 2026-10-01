@@ -79,10 +79,16 @@ func (a *app) handlePlayer(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("patching player failed", "error", err)
 		return
 	}
+	slot := func(id string, content templ.Component) templ.Component {
+		return views.WebPlayerSlot(id, data.Hash, data.Index, data.Nonce, content)
+	}
 	for _, component := range []templ.Component{
-		views.TorrAudioPicker(audio, 0), views.TorrSubtitleMenu(subs), views.TorrPlaylist(data.Torrent.VideoFiles(), true), playerMediaInfo(data),
+		slot("ts-player-audio", views.TorrAudioPicker(audio, 0)),
+		slot("ts-player-subtitles", views.TorrSubtitleMenu(subs)),
+		slot("ts-player-playlist", views.TorrPlaylist(data.Torrent.VideoFiles(), true)),
+		slot("ts-player-media-info", playerMediaInfo(data)),
 	} {
-		if err := sse.PatchElementTempl(component); err != nil {
+		if err := sse.PatchElementTempl(component, datastar.WithModeReplace()); err != nil {
 			slog.Warn("patching player controls failed", "error", err)
 			return
 		}

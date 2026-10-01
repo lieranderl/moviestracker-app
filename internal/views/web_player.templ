@@ -107,9 +107,33 @@ templ WebPlayerControls(hash string, index, nonce int, files []torrserver.FileSt
 		data-index={ fmt.Sprint(index) }
 		data-nonce={ fmt.Sprint(nonce) }
 		data-queue={ string(data) }
-		data-show="$activeHash === el.dataset.hash && +$activeFileIndex === +el.dataset.index && $playNonce === +el.dataset.nonce"
-		data-init="if ($activeHash === el.dataset.hash && +$activeFileIndex === +el.dataset.index && $playNonce === +el.dataset.nonce) { $_queue = JSON.parse(el.dataset.queue); $_queueHash = el.dataset.hash }"
+		data-show={ webRelayCurrent }
+		data-init={ "if (" + webRelayCurrent + ") { $_queue = JSON.parse(el.dataset.queue); $_queueHash = el.dataset.hash }" }
 	></div>
+}
+
+// webRelayCurrent holds when a relayed element (its data-hash, data-index and
+// data-nonce) belongs to the file the player shows now.
+const webRelayCurrent = `$activeHash === el.dataset.hash && +$activeFileIndex === +el.dataset.index && $playNonce === +el.dataset.nonce`
+
+// WebPlayerSlot wraps a relayed player control, such as the audio picker, so
+// a late response for an earlier file or server stays hidden.
+templ WebPlayerSlot(id, hash string, index, nonce int, content templ.Component) {
+	<div id={ id } class="contents" data-hash={ hash } data-index={ fmt.Sprint(index) } data-nonce={ fmt.Sprint(nonce) } data-show={ webRelayCurrent }>
+		@content
+	</div>
+}
+
+// playerSlot is where WebPlayerSlot patches a control; the local app's player
+// patches the control itself.
+templ playerSlot(id string, browser bool) {
+	if browser {
+		<div id={ id } class="contents">
+			{ children... }
+		</div>
+	} else {
+		{ children... }
+	}
 }
 
 func probeOpenAction(browser bool) string {

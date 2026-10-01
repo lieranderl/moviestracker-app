@@ -877,10 +877,16 @@ templ torrPlayerModalFor(browser bool) {
 					<span class="ml-2 font-mono text-xs tabular-nums" data-text={ torrTimeText }>0:00 / 0:00</span>
 					<div class="grow"></div>
 					<span class="contents" data-show="$playKind === 'hls' && $audioTrack >= 0">
-						@TorrAudioPicker(nil, 0)
+						@playerSlot("ts-player-audio", browser) {
+							@TorrAudioPicker(nil, 0)
+						}
 					</span>
-					@TorrSubtitleMenu(nil)
-					@TorrPlaylist(nil, browser)
+					@playerSlot("ts-player-subtitles", browser) {
+						@TorrSubtitleMenu(nil)
+					}
+					@playerSlot("ts-player-playlist", browser) {
+						@TorrPlaylist(nil, browser)
+					}
 					<button
 						type="button"
 						class="btn btn-ghost btn-sm btn-square text-primary-content"
@@ -906,7 +912,9 @@ templ torrPlayerModalFor(browser bool) {
         }
 		<div id="torr-player-stats" class="mt-3 flex flex-wrap items-center gap-2"></div>
 		<div data-show="$playKind === 'hls' && $mediaInfoOpen">
-			<div id="torr-media-info"></div>
+			@playerSlot("ts-player-media-info", browser) {
+				<div id="torr-media-info"></div>
+			}
 		</div>
 		<div class="mt-4 flex flex-wrap items-center gap-2 pt-3 border-t border-base-content/10">
 			<div role="group" aria-label={ tr(ctx, "Direct: the original file") } class="w-full flex flex-wrap items-center gap-2" data-show="$streamCleanUrl">
