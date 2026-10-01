@@ -213,6 +213,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/settings/sources/imdb", s.handleSaveIMDb)
 	s.mux.HandleFunc("POST /api/settings/sources/torrserver", s.handleSaveTorrServer)
 	s.mux.HandleFunc("POST /api/settings/engine/restart", s.handleRestartEngine)
+	s.mux.HandleFunc("POST /api/settings/https/certificate", s.handleUploadCertificate)
+	s.mux.HandleFunc("POST /api/settings/https/certificate/remove", s.handleRemoveCertificate)
 	s.mux.HandleFunc("POST /api/settings/engine/{section}", s.handleSaveEngineSettings)
 	s.mux.HandleFunc("POST /api/settings/gstreamer", s.handleSaveGStreamer)
 	s.mux.HandleFunc("POST /api/settings/gstreamer/reset", s.handleResetGStreamer)

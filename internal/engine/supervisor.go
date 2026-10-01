@@ -1,6 +1,6 @@
 // Package engine runs TorrServer as a child process of Moviestracker: bound
-// to loopback, behind generated credentials, restarted when it crashes and
-// stopped with Moviestracker.
+// to loopback (unless its HTTPS is opened to the network), behind generated
+// credentials, restarted when it crashes and stopped with Moviestracker.
 package engine
 
 import (
@@ -256,14 +256,18 @@ func (s *Supervisor) launch(ctx context.Context, stop <-chan struct{}) (*run, er
 	if err != nil {
 		return nil, fmt.Errorf("open engine output: %w", err)
 	}
-	args := []string{
-		"--ip", "127.0.0.1",
+	options := s.Options()
+	var args []string
+	if options.loopbackOnly() {
+		args = append(args, "--ip", "127.0.0.1")
+	}
+	args = append(args,
 		"--port", strconv.Itoa(port),
 		"--path", s.cfg.Dir,
 		"--logpath", filepath.Join(s.cfg.Dir, "torrserver.log"),
 		"--httpauth",
-	}
-	args = append(args, s.Options().args()...)
+	)
+	args = append(args, options.args()...)
 	cmd := exec.Command(s.cfg.Binary, args...) // #nosec G204 -- the configured TorrServer program; flags come from typed Options
 	cmd.Dir = s.cfg.Dir
 	cmd.Env = append(os.Environ(), s.cfg.Env...)

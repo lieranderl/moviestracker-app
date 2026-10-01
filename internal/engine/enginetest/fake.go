@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -36,6 +37,7 @@ func fakeTorrServer() {
 	dir := fs.String("path", ".", "")
 	fs.String("logpath", "", "")
 	httpAuth := fs.Bool("httpauth", false, "")
+	fs.Bool("ssl", false, "")
 	for _, name := range []string{"proxyurl", "proxymode", "pubipv4", "pubipv6", "maxsize", "torrentsdir"} {
 		fs.String(name, "", "")
 	}
@@ -72,12 +74,31 @@ func fakeTorrServer() {
 	// /args reports the command line, so tests see the flags the engine got.
 	mux.HandleFunc("GET /args", func(w http.ResponseWriter, r *http.Request) { _ = json.NewEncoder(w).Encode(os.Args[1:]) })
 	mux.HandleFunc("GET /echo", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("MatriX.fake")) })
+	// /settings keeps what was set across restarts, as TorrServer's BTSets.
+	var setsMu sync.Mutex
+	setsFile := filepath.Join(*dir, "fake-settings.json")
+	sets := map[string]any{"CacheSize": 67108864}
+	if raw, err := os.ReadFile(setsFile); err == nil { // #nosec G304 -- test fake
+		_ = json.Unmarshal(raw, &sets)
+	}
 	mux.HandleFunc("POST /settings", func(w http.ResponseWriter, r *http.Request) {
 		if !authorized(r) {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		_, _ = w.Write([]byte(`{"CacheSize":67108864}`))
+		var req struct {
+			Action string         `json:"action"`
+			Sets   map[string]any `json:"sets"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		setsMu.Lock()
+		defer setsMu.Unlock()
+		if req.Action == "set" {
+			sets = req.Sets
+			raw, _ := json.Marshal(sets)
+			_ = os.WriteFile(setsFile, raw, 0o600)
+		}
+		_ = json.NewEncoder(w).Encode(sets)
 	})
 	mux.HandleFunc("POST /torrents", func(w http.ResponseWriter, r *http.Request) {
 		if !authorized(r) {

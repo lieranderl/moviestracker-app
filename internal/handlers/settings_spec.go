@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -39,6 +40,9 @@ type settingField struct {
 	Choices []choice
 	// Startup marks a command-line-only option of the managed engine.
 	Startup bool
+	// AtStart marks a setting TorrServer reads only when it starts, so the
+	// managed engine restarts when it changes while it serves HTTPS.
+	AtStart bool
 	// Check validates a text field (trimmed); nil accepts anything.
 	Check func(string) error
 }
@@ -52,7 +56,7 @@ type settingsSection struct {
 // engineSections are TorrServer's engine settings (BTSets) and the managed
 // engine's startup options, grouped by what they are about. Settings that
 // duplicate Moviestracker or serve other clients (Rutor, Torznab, TorrServer's
-// TMDB key, MCP, storage backend, SSL…) are left out and kept as they are.
+// TMDB key, MCP, storage backend…) are left out and kept as they are.
 var engineSections = []settingsSection{
 	{
 		ID: "engine", Title: "Torrent engine", Icon: "cpu",
@@ -120,6 +124,17 @@ var engineSections = []settingsSection{
 			{Key: "EnableDLNA", Label: "DLNA media server", Kind: kindBool, Help: "TVs and players that browse DLNA see your torrents."},
 			{Key: "EnableBonjour", Label: "Announce with Bonjour", Kind: kindBool, Help: "Lets TorrServer apps find it. Moviestracker keeps it off for the engine it runs."},
 			{Key: "FriendlyName", Label: "Name on the network", Kind: kindText},
+		},
+	},
+	{
+		ID: "https", Title: "HTTPS", Icon: "lock",
+		Intro: "HTTPS lets browsers on other devices, and the Moviestracker web app, reach TorrServer. TorrServer serves it only when started with --ssl.",
+		Fields: []settingField{
+			{Key: "HTTPS", Label: "Serve HTTPS", Kind: kindBool, Startup: true, Help: "Without a certificate of your own, TorrServer makes a self-signed one, which each browser asks you to accept once."},
+			{Key: "Reachable", Label: "Reachable from other devices", Kind: kindBool, Startup: true, Help: "Listens on every network, not only this computer, behind TorrServer's login. Needs HTTPS; other devices should use the HTTPS address, as the plain HTTP port opens too."},
+			{Key: "SslPort", Label: "HTTPS port", Kind: kindInt, Min: 0, Max: 65535, Scale: 1, AtStart: true, Help: "0 uses TorrServer's default, 8091."},
+			{Key: "SslCert", Label: "Certificate file", Kind: kindText, AtStart: true, Check: optionalAbsolutePath, Help: "Full path, on the TorrServer machine, to a PEM certificate with its chain. Empty: TorrServer makes a self-signed one."},
+			{Key: "SslKey", Label: "Private key file", Kind: kindText, AtStart: true, Check: optionalAbsolutePath, Help: "Full path, on the TorrServer machine, to the certificate's PEM private key."},
 		},
 	},
 }
@@ -202,8 +217,12 @@ func optionalIPv6(v string) error {
 	return nil
 }
 
+// windowsPath is a full Windows path (C:\… or \\server\…): a TorrServer's
+// folders may be on a Windows machine whatever system this one runs.
+var windowsPath = regexp.MustCompile(`^(?:[A-Za-z]:[\\/]|\\\\[^\\]+\\)`)
+
 func optionalAbsolutePath(v string) error {
-	if v != "" && !filepath.IsAbs(v) {
+	if v != "" && !filepath.IsAbs(v) && !windowsPath.MatchString(v) {
 		return fmt.Errorf("must be a full path, like /Volumes/Media/cache")
 	}
 	if strings.ContainsRune(v, 0) {

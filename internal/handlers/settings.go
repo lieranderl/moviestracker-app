@@ -21,12 +21,14 @@ import (
 )
 
 const (
-	settingsTimeout = 10 * time.Second
-	reconnectCost   = "Saving makes TorrServer reconnect (about 2 seconds)."
-	startupOnly     = "Only when Moviestracker runs TorrServer (Settings → Sources)."
-	engineAsleep    = "TorrServer is not answering, so its settings cannot be shown. Check Settings → Sources."
-	gstCost         = "Applied at once to new streams."
-	gstNotBuilt     = "This TorrServer was built without GStreamer, so MKV files cannot be converted for the browser. " +
+	settingsTimeout     = 10 * time.Second
+	reconnectCost       = "Saving makes TorrServer reconnect (about 2 seconds)."
+	startupOnly         = "Only when Moviestracker runs TorrServer (Settings → Sources)."
+	reachableNeedsHTTPS = "Reachable from other devices needs HTTPS."
+	engineAsleep        = "TorrServer is not answering, so its settings cannot be shown. Check Settings → Sources."
+	gstCost             = "Applied at once to new streams."
+	httpsCost           = "TorrServer reads these when it starts with --ssl, so restart it to apply them."
+	gstNotBuilt         = "This TorrServer was built without GStreamer, so MKV files cannot be converted for the browser. " +
 		"The TorrServer Moviestracker runs (make torrserver) is the GStreamer build."
 )
 
@@ -90,6 +92,9 @@ func (s *Server) engineSectionView(ctx context.Context, sec settingsSection) vie
 			continue
 		}
 		v.Values[f.Key] = shownValue(sets, f)
+	}
+	if sec.ID == "https" && s.managed() {
+		v.Header = views.HTTPSCard(s.httpsView(sets, views.SourceStatus{}))
 	}
 	return v
 }
@@ -269,6 +274,10 @@ func (s *Server) handleSaveEngineSettings(w http.ResponseWriter, r *http.Request
 		}
 		engineChanges[f.Key] = stored
 	}
+	if startup.Reachable && !startup.HTTPS {
+		status(failed(reachableNeedsHTTPS))
+		return
+	}
 
 	client := s.torrServer.Client()
 	current, err := client.Settings(ctx)
@@ -281,6 +290,13 @@ func (s *Server) handleSaveEngineSettings(w http.ResponseWriter, r *http.Request
 			delete(engineChanges, key) // unchanged: no need to reconnect for it
 		}
 	}
+	// TorrServer reads some settings only when it starts.
+	restart := startup != before
+	for _, f := range sec.Fields {
+		if _, changed := engineChanges[f.Key]; changed && f.AtStart && startup.HTTPS && s.managed() {
+			restart = true
+		}
+	}
 	reconnected, restarted := false, false
 	if len(engineChanges) > 0 {
 		if err := client.UpdateSettings(ctx, engineChanges); err != nil {
@@ -290,7 +306,7 @@ func (s *Server) handleSaveEngineSettings(w http.ResponseWriter, r *http.Request
 		}
 		reconnected = true
 	}
-	if startup != before {
+	if restart {
 		if err := s.saveStartup(startup); err != nil {
 			slog.Error("save engine startup options failed", "error", err)
 			status(failed(saveFailed))
@@ -349,6 +365,10 @@ func startupValue(st config.EngineStartup, f settingField) any {
 		return st.MaxSize / max(f.Scale, 1)
 	case "TorrentsDir":
 		return st.TorrentsDir
+	case "HTTPS":
+		return st.HTTPS
+	case "Reachable":
+		return st.Reachable
 	}
 	return nil
 }
@@ -367,6 +387,10 @@ func setStartup(st *config.EngineStartup, key string, v any) {
 		st.MaxSize, _ = v.(int64)
 	case "TorrentsDir":
 		st.TorrentsDir, _ = v.(string)
+	case "HTTPS":
+		st.HTTPS, _ = v.(bool)
+	case "Reachable":
+		st.Reachable, _ = v.(bool)
 	}
 }
 
