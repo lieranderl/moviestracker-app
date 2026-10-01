@@ -116,6 +116,7 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("POST /api/ts/files", a.handlePlayerFiles)
 	mux.HandleFunc("POST /api/ts/probe", a.handleBrowserProbe)
 	mux.HandleFunc("POST /api/ts/playlist", a.handleBrowserPlaylist)
+	mux.HandleFunc("POST /api/ts/add-result", a.handleBrowserAddResult)
 	mux.HandleFunc("POST /api/ts/settings", a.handleBrowserSettings)
 	mux.HandleFunc("POST /api/ts/settings/validate", a.handleValidateBrowserSettings)
 	mux.HandleFunc("POST /api/language", handlers.SetLanguage(a.secure(), a.saveLanguage))

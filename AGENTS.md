@@ -4,6 +4,11 @@ A fullstack reactive web application built with Go (1.27), Templ, Datastar (v1.0
 
 ## Core UI & Frontend Principles (Strict Priority)
 
+### Shared App and Web UI (Required)
+- The self-hosted app and cloud web app must render the same existing UI components from `internal/views` and use the same player code.
+- Keep transport-specific request attributes, signal namespaces, authentication and browser-only TorrServer calls in adapters. Do not duplicate forms, controls or layouts in web templates.
+- Introduce new UI only when no existing component can be reused or extended; explain the concrete constraint first.
+
 ### 1. Datastar First (Zero-JS Preference)
 - **Datastar is PRIORITY**: Always use Datastar declarative signals and attributes (`data-signals`, `data-on:*`, `data-on-interval`, `data-class`, `data-attr:*`, `data-bind`, `data-text`, etc.) or SSE server patches.
 - **Custom JS is Strictly a Last Resort**: Write custom JavaScript ONLY if a capability fundamentally cannot be achieved with Datastar (e.g. hls.js playback in `frontend/player.js`, clipboard access, or YouTube `postMessage` player control).

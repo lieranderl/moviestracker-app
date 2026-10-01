@@ -58,7 +58,7 @@ test("a user adds a magnet directly to their TorrServer with title and poster", 
   });
   expect(events).toEqual([
     { adding: true, ok: false, problem: "", status: 0 },
-    { adding: false, ok: true, problem: "", status: 0 },
+    { adding: false, ok: true, problem: "", status: 0, added:1, refused:[], failed:[] },
   ]);
 });
 
@@ -143,7 +143,7 @@ test("TorrServer failures are reported without success and the form can retry", 
     requests.mockImplementation(reply);
     const { el, events } = form();
     await client.tsAddTorrent(el, server, { link: "http://example.com/movie.torrent" });
-    expect(events.at(-1)).toEqual({ adding: false, ok: false, problem, status });
+    expect(events.at(-1)).toMatchObject({ adding: false, ok: false, problem, status });
     requests.mockImplementation(() => new Response(added));
     await client.tsAddTorrent(el, server, { link: "http://example.com/movie.torrent" });
     expect(events.at(-1).ok).toBe(true);
@@ -171,7 +171,7 @@ test("an upload rejected inside TorrServer is a failure even with HTTP 200", asy
     requests.mockImplementation(() => new Response(body));
     const { el, events } = form();
     await client.tsAddTorrent(el, server, { file: new File(["definitely invalid torrent"], "bad.torrent") });
-    expect(events.at(-1)).toEqual({ adding: false, ok: false, problem: "status", status: 200 });
+    expect(events.at(-1)).toMatchObject({ adding: false, ok: false, problem: "status", status: 200 });
   }
 });
 
@@ -400,4 +400,26 @@ test("a failed settings read is retried on the next tick instead of reporting no
  expect(events.map(e => e.cacheSize)).toEqual([0, 67108864, 67108864]);
  expect(settingsReads).toBe(2);
  await client.tsPlayerRelease(el);
+});
+
+test("the shared add form sends multiple links and files directly to TorrServer", async () => {
+ const {el,events}=form();
+ const file = new File(["d4:infodee"],"fixture.torrent");
+ await client.tsAddTorrent(el,server,{links:`https://tracker.example/one.torrent\nhttps://tracker.example/two.torrent`,files:[file],title:"Ignored for a batch"});
+ expect(requests).toHaveBeenCalledTimes(3);
+ expect(JSON.parse(requests.mock.calls[0][1].body).title).toBe("");
+ expect(requests.mock.calls[2][0].pathname).toBe("/torrent/upload");
+ expect(requests.mock.calls[2][1].body.get("file").name).toBe("fixture.torrent");
+ expect(events.at(-1).ok).toBe(true);
+});
+
+test("a shared form batch adds valid entries and continues after a TorrServer failure", async () => {
+ const {el,events}=form();
+ requests.mockImplementation(async target => new Response(target.pathname === '/torrents' && requests.mock.calls.length === 2 ? "failure" : added,{status:requests.mock.calls.length === 2 ? 500 : 200}));
+ await client.tsAddTorrent(el,server,{links:"file:///private.txt\nhttps://tracker.example/one.torrent\nhttps://tracker.example/two.torrent\nhttps://tracker.example/three.torrent"});
+ expect(requests).toHaveBeenCalledTimes(3);
+ expect(events.at(-1).added).toBe(2);
+ expect(events.at(-1).refused).toEqual(["file:///private.txt"]);
+ expect(events.at(-1).failed).toEqual(["https://tracker.example/two.torrent"]);
+ expect(events.at(-1).ok).toBe(false);
 });

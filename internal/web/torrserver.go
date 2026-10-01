@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 
@@ -158,5 +159,27 @@ func (a *app) patchTorrServers(ctx context.Context, sse *datastar.ServerSentEven
 	}
 	if err := sse.PatchElementTempl(views.WebTorrServers(servers)); err != nil {
 		slog.Warn("patching TorrServers failed", "error", err)
+	}
+}
+
+// Relays batch outcome only; TorrServer requests and login stay in the browser.
+func (a *app) handleBrowserAddResult(w http.ResponseWriter, r *http.Request) {
+	if _, ok := a.currentUser(r); !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var data struct {
+		Added   int      `json:"added"`
+		Refused []string `json:"refused"`
+		Failed  []string `json:"failed"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 128<<10)).Decode(&data); err != nil || data.Added < 0 || data.Added > 10000 || len(data.Refused)+len(data.Failed) > 1000 {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	message, kind := handlers.TorrentAddResult(r.Context(), data.Added, data.Refused, data.Failed)
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.TorrServerAlertFragment(message, kind)); err != nil {
+		slog.Warn("patching add result failed", "error", err)
 	}
 }

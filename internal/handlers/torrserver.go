@@ -256,7 +256,7 @@ func (s *Server) handleTorrServerAdd(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/torrserver", http.StatusSeeOther)
 		return
 	}
-	msg, kind := addResult(r.Context(), added, refused, failed)
+	msg, kind := TorrentAddResult(r.Context(), added, refused, failed)
 	sse := datastar.NewSSE(w, r)
 	if added > 0 {
 		list, _ := client.ListTorrents(ctx)
@@ -289,8 +289,8 @@ func readTorrentFile(fh *multipart.FileHeader) ([]byte, error) {
 	return data, nil
 }
 
-// addResult tells what an Add Torrents form did, in one sentence or two.
-func addResult(ctx context.Context, added int, refused, failed []string) (string, string) {
+// TorrentAddResult tells what an Add Torrents form did, in one sentence or two.
+func TorrentAddResult(ctx context.Context, added int, refused, failed []string) (string, string) {
 	var parts []string
 	switch {
 	case added > 0:
