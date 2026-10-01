@@ -29,7 +29,7 @@ const webTorrServerEffects = `localStorage.setItem('mt-ts-selected', $tsSelected
 // WebTorrServerPage is the web app's TorrServer page: the user's
 // TorrServers, reached from their browser.
 templ WebTorrServerPage(user *auth.User, servers []store.TorrServer) {
-	@layoutWithScripts(tr(ctx, "TorrServer"), "/static/torrserver.js") {
+	@layoutWithScripts(tr(ctx, "TorrServer"), "/static/torrserver.js", "/static/player.js") {
 		@Navbar(user)
 		<main class="grow pb-20" data-signals={ webTorrServerSignals(servers) } data-effect={ webTorrServerEffects }>
 			<div class="max-w-5xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
@@ -49,7 +49,10 @@ templ WebTorrServerPage(user *auth.User, servers []store.TorrServer) {
 				@webTorrServerForm()
 				@WebTorrServers(servers)
 				@webTorrServerStatus()
-				@webTorrentsBox()
+				<div data-signals={ webPlayerSignals() }>
+					@webTorrentsBox()
+					@webPlayer()
+				</div>
 			</div>
 		</main>
 		@siteFooter()

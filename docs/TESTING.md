@@ -35,6 +35,10 @@ This document defines testing conventions, the test-driven development loop, sea
   public actions, outgoing requests and result events. Only browser storage and
   external network boundaries are replaced; no DOM library is needed. These
   tests run in `make test` and `make ci` before the Go race tests.
+  Player tests also cover native media events, preserving position on retry
+  and track changes, starting a new file at zero, shared HLS task preservation, file-refresh cancellation isolation and
+  suppressing late probe responses after close. Signed-in HTTP tests cover
+  rendering relayed files/tracks/stats and rejecting invalid or oversized data.
 - **Run Unit & Integration Tests**:
   ```bash
   go test -v ./...

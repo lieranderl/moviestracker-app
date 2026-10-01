@@ -187,3 +187,100 @@ test("a title page adds a release with its TMDB identity and category", async ()
   expect(JSON.parse(body.data)).toEqual({ tmdb: { id: 438631, type: "movie" } });
   expect(events.at(-1).ok).toBe(true);
 });
+
+test("a viewer loads files and HLS tracks using only their browser's TorrServer login", async () => {
+  client.tsSaveLogin(server, "viewer", "browser-secret");
+  const el = new EventTarget();
+  const events = [];
+  el.addEventListener("ts-player", (evt) => events.push(evt.detail));
+  requests.mockImplementation(async (target) => new Response(JSON.stringify(target.pathname.endsWith('/probe')
+    ? { Tracks: [{Index:0,Type:"audio",Language:"en"}] }
+    : { hash: "08ada5a7a6183aae1e09d831df6748d566095a10", file_stats: [{id:1,path:"Sintel.mp4"}] })));
+  await client.tsPlayerLoad(el, server, "08ada5a7a6183aae1e09d831df6748d566095a10", 1, "hls", 1);
+  expect(requests.mock.calls.map(([target]) => target.href)).toEqual([
+    "https://nas.example:8091/torrents",
+    "https://nas.example:8091/gst/08ada5a7a6183aae1e09d831df6748d566095a10/probe?index=1",
+  ]);
+  expect(requests.mock.calls.every(([, init]) => init.headers.Authorization === `Basic ${btoa('viewer:browser-secret')}`)).toBe(true);
+  expect(events[0].probe.Tracks[0].Language).toBe("en");
+  expect(JSON.stringify(events)).not.toContain("browser-secret");
+});
+
+test("an HLS viewer sends heartbeats and stops them when closing", async () => {
+ const el=new EventTarget();
+ client.tsSaveLogin(server,"viewer","browser-secret");
+ const links=await client.tsPlayerLease(el,server,"08ada5a7a6183aae1e09d831df6748d566095a10",1,"hls",0);
+ expect(links.stream).toBe("https://nas.example:8091/gst/08ada5a7a6183aae1e09d831df6748d566095a10/master.m3u8?index=1&audio=0");
+ await client.tsPlayerTick(el);
+ await client.tsPlayerRelease(el);
+ await client.tsPlayerRelease(el);
+ expect(requests.mock.calls.map(([target])=>target.pathname)).toEqual(["/torrents","/gst/08ada5a7a6183aae1e09d831df6748d566095a10/heartbeat"]);
+ await client.tsPlayerTick(el);
+ expect(requests).toHaveBeenCalledTimes(2);
+});
+
+test("changing an HLS audio track does not remove another viewer's shared task", async () => {
+  const el = new EventTarget();
+  const hash = "08ada5a7a6183aae1e09d831df6748d566095a10";
+  await client.tsPlayerLease(el, server, hash, 1, "hls", 0);
+  const next = await client.tsPlayerLease(el, server, hash, 1, "hls", 1);
+  expect(next.stream).toEndWith("index=1&audio=1");
+  expect(requests).not.toHaveBeenCalled();
+  await client.tsPlayerRelease(el);
+});
+
+test("closing during a slow probe prevents a late result from reopening playback",async()=>{
+ const el=new EventTarget();const events=[];
+ el.addEventListener('ts-player',evt=>events.push(evt.detail));
+ let finish;
+ requests.mockImplementation(async target=> target.pathname.endsWith('/probe') ? new Promise(resolve=>{finish=resolve}) : new Response(JSON.stringify({hash:'08ada5a7a6183aae1e09d831df6748d566095a10',file_stats:[]})));
+ const loading=client.tsPlayerLoad(el,server,'08ada5a7a6183aae1e09d831df6748d566095a10',1,'hls',1);
+ while(!finish) await new Promise(resolve=>setTimeout(resolve,1));
+ await client.tsPlayerCancel(el);
+ finish(new Response('{"Tracks":[]}'));
+ await loading;
+ expect(events).toEqual([]);
+});
+
+test("invalid playback metadata reports a failure instead of leaving the player loading", async () => {
+  const hash = "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111";
+  for (const value of [null, [], {hash:"bbbb1111bbbb1111bbbb1111bbbb1111bbbb1111"}]) {
+    globalThis.fetch = async () => Response.json(value);
+    const el = new EventTarget();
+    const events = [];
+    el.addEventListener("ts-player", evt => events.push(evt.detail));
+    await client.tsPlayerLoad(el, server, hash, 1, "direct", 1);
+    expect(events[0].problem).toBe("unreachable");
+    expect(events[0].torrent).toBeNull();
+  }
+});
+
+test("closing one viewer does not remove the HLS task used by another viewer", async () => {
+  const first = new EventTarget();
+  const second = new EventTarget();
+  const hash = "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111";
+  await client.tsPlayerLease(first, server, hash, 1, "hls", 0);
+  await client.tsPlayerLease(second, server, hash, 1, "hls", 0);
+  await client.tsPlayerRelease(first);
+  expect(requests).not.toHaveBeenCalled();
+  requests.mockImplementation(async target => Response.json(target.pathname === "/torrents" ? {hash} : {}));
+  await client.tsPlayerTick(second);
+  expect(requests.mock.calls.map(([target]) => target.pathname)).toEqual(["/torrents", `/gst/${hash}/heartbeat`]);
+  await client.tsPlayerRelease(second);
+});
+
+test("routine list polling cannot cancel the viewer's file refresh", async () => {
+  const el = new EventTarget();
+  const hash = "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111";
+  const events = [];
+  el.addEventListener("ts-files", evt => events.push(evt.detail));
+  let finish;
+  requests.mockImplementation(async (target, init) => JSON.parse(init.body).action === "get"
+    ? new Promise(resolve => {finish = resolve}) : Response.json([]));
+  const files = client.tsPlayerFiles(el, server, hash);
+  await client.tsList(el, server, true);
+  finish(Response.json({hash, file_stats:[{id:1,path:"Sintel.mp4"}]}));
+  await files;
+  expect(events).toHaveLength(1);
+  expect(events[0].torrent.file_stats[0].path).toBe("Sintel.mp4");
+});

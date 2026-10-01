@@ -119,6 +119,19 @@ and serves, and that the user store works with Firestore's emulator.
   4 MB), with an optional title and poster URL. Uploads go straight to
   TorrServer's `/torrent/upload`; neither the file nor its login is sent to
   Cloud Run. After an add, the browser relays the updated list for rendering.
+  Files play directly from `/stream?link=…&index=…&play`, or through hls.js
+  from `/gst/{hash}/master.m3u8`. The browser relays file/probe metadata and
+  live stats to signed-in rendering endpoints; audio tracks, subtitles,
+  playlist/Next, VLC/IINA and copied links use the same player helpers as
+  the local app. Datastar sends a heartbeat every two seconds and reports
+  heartbeat failures. Close, page exit or stream change stops this viewer's
+  heartbeat. TorrServer expires idle tasks: `/gst/remove` removes the shared
+  hash-wide task and would interrupt another tab/device. TorrServer also
+  shares one file/audio selection per hash; choosing another replaces that
+  task upstream. Unknown cache capacity omits buffer percentage.
+  Tested against MatriX.145 with `--httpauth`: media routes accept streams
+  without a login header; API reads use the browser's saved Basic login.
+  Safari and an HTTPS cloud page reaching HTTP localhost remain release checks.
 - **Users' data:** preferences and favourites in the Firestore database
   `moviestracker` (`users/{uid}`, `users/{uid}/favorites/{kind}-{id}`;
   `internal/store`), beside the catalog collections the backend writes. The
