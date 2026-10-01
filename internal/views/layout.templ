@@ -31,11 +31,14 @@ templ layoutWithScripts(title string, scripts ...string) {
 			<!-- Render-blocking by design: tiny, sets data-theme before first paint -->
 			<script src="/static/theme.js"></script>
 			<link href="/static/app.css" rel="stylesheet"/>
-			<!-- Datastar Client (v1.0.4); modules are deferred and never block rendering -->
-			<script type="module" src="/static/datastar.js"></script>
+			<!-- Page modules run before Datastar (modules execute in document order):
+			     its first scan calls their window helpers, and one ReferenceError
+			     there would stop the scan and leave the page inert. -->
 			for _, src := range scripts {
 				<script type="module" src={ src }></script>
 			}
+			<!-- Datastar Client (v1.0.4); modules are deferred and never block rendering -->
+			<script type="module" src="/static/datastar.js"></script>
 		</head>
 		<body
 			class="bg-base-100 text-base-content min-h-dvh flex flex-col font-sans antialiased selection:bg-primary selection:text-primary-content"
