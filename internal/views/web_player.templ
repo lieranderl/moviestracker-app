@@ -39,7 +39,7 @@ templ webPlayer() {
 			data-ref:_session
 			data-effect="$playerOpen ? tsPlayerLoad(el, $tsSelected, $activeHash, +$activeFileIndex, $playKind, $playNonce) : tsPlayerCancel(el)"
 			data-on:ts-player={ webPlayerLoaded() }
-			data-on:ts-player-stats="$_tsPlayerProblem = evt.detail.problem; if (evt.detail.torrent) { @post('/api/ts/player-stats', {payload: evt.detail}) }"
+			data-on:ts-player-stats="$_tsPlayerProblem = evt.detail.problem || evt.detail.heartbeatProblem; if (evt.detail.torrent) { @post('/api/ts/player-stats', {payload: evt.detail}) }"
 			data-on-interval__duration.2s="$playerOpen && tsPlayerTick(el)"
 			data-on:pagehide__window="tsPlayerCancel(el)"
 		></div>

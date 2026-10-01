@@ -206,7 +206,7 @@ test("a viewer loads files and HLS tracks using only their browser's TorrServer 
   expect(JSON.stringify(events)).not.toContain("browser-secret");
 });
 
-test("an HLS viewer sends heartbeats and releases the pipeline once when closing", async () => {
+test("an HLS viewer sends heartbeats and stops them when closing", async () => {
  const el=new EventTarget();
  client.tsSaveLogin(server,"viewer","browser-secret");
  const links=await client.tsPlayerLease(el,server,"08ada5a7a6183aae1e09d831df6748d566095a10",1,"hls",0);
@@ -214,27 +214,19 @@ test("an HLS viewer sends heartbeats and releases the pipeline once when closing
  await client.tsPlayerTick(el);
  await client.tsPlayerRelease(el);
  await client.tsPlayerRelease(el);
- expect(requests.mock.calls.map(([target])=>target.pathname)).toEqual(["/torrents","/gst/08ada5a7a6183aae1e09d831df6748d566095a10/heartbeat","/gst/remove"]);
- expect(requests.mock.calls[2][0].searchParams.get("hash")).toBe("08ada5a7a6183aae1e09d831df6748d566095a10");
- expect(requests.mock.calls[2][1].keepalive).toBe(true);
+ expect(requests.mock.calls.map(([target])=>target.pathname)).toEqual(["/torrents","/gst/08ada5a7a6183aae1e09d831df6748d566095a10/heartbeat"]);
  await client.tsPlayerTick(el);
- expect(requests).toHaveBeenCalledTimes(3);
+ expect(requests).toHaveBeenCalledTimes(2);
 });
 
-test("changing an HLS audio track releases the old pipeline before the new one can start", async()=>{
- const el=new EventTarget();
- await client.tsPlayerLease(el,server,"08ada5a7a6183aae1e09d831df6748d566095a10",1,"hls",0);
- let finish;
- requests.mockImplementation(()=>new Promise(resolve=>{finish=resolve}));
- let ready=false;
- const next=client.tsPlayerLease(el,server,"08ada5a7a6183aae1e09d831df6748d566095a10",1,"hls",1).then(links=>{ready=true;return links});
- await Promise.resolve();
- expect(ready).toBe(false);
- expect(requests.mock.calls[0][0].pathname).toBe('/gst/remove');
- finish(new Response('{}'));
- expect((await next).stream).toEndWith('index=1&audio=1');
- requests.mockImplementation(async()=>new Response('{}'));
- await client.tsPlayerRelease(el);
+test("changing an HLS audio track does not remove another viewer's shared task", async () => {
+  const el = new EventTarget();
+  const hash = "08ada5a7a6183aae1e09d831df6748d566095a10";
+  await client.tsPlayerLease(el, server, hash, 1, "hls", 0);
+  const next = await client.tsPlayerLease(el, server, hash, 1, "hls", 1);
+  expect(next.stream).toEndWith("index=1&audio=1");
+  expect(requests).not.toHaveBeenCalled();
+  await client.tsPlayerRelease(el);
 });
 
 test("closing during a slow probe prevents a late result from reopening playback",async()=>{
@@ -261,4 +253,34 @@ test("invalid playback metadata reports a failure instead of leaving the player 
     expect(events[0].problem).toBe("unreachable");
     expect(events[0].torrent).toBeNull();
   }
+});
+
+test("closing one viewer does not remove the HLS task used by another viewer", async () => {
+  const first = new EventTarget();
+  const second = new EventTarget();
+  const hash = "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111";
+  await client.tsPlayerLease(first, server, hash, 1, "hls", 0);
+  await client.tsPlayerLease(second, server, hash, 1, "hls", 0);
+  await client.tsPlayerRelease(first);
+  expect(requests).not.toHaveBeenCalled();
+  requests.mockImplementation(async target => Response.json(target.pathname === "/torrents" ? {hash} : {}));
+  await client.tsPlayerTick(second);
+  expect(requests.mock.calls.map(([target]) => target.pathname)).toEqual(["/torrents", `/gst/${hash}/heartbeat`]);
+  await client.tsPlayerRelease(second);
+});
+
+test("routine list polling cannot cancel the viewer's file refresh", async () => {
+  const el = new EventTarget();
+  const hash = "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111";
+  const events = [];
+  el.addEventListener("ts-files", evt => events.push(evt.detail));
+  let finish;
+  requests.mockImplementation(async (target, init) => JSON.parse(init.body).action === "get"
+    ? new Promise(resolve => {finish = resolve}) : Response.json([]));
+  const files = client.tsPlayerFiles(el, server, hash);
+  await client.tsList(el, server, true);
+  finish(Response.json({hash, file_stats:[{id:1,path:"Sintel.mp4"}]}));
+  await files;
+  expect(events).toHaveLength(1);
+  expect(events[0].torrent.file_stats[0].path).toBe("Sintel.mp4");
 });

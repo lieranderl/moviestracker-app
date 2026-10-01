@@ -10,7 +10,7 @@ import (
 func TestAUserCanChooseATorrentsFilesForDirectOrHLSPlayback(t *testing.T) {
 	h, session, _ := torrServers(t)
 	page := getWith(t, h, "/torrserver", session)
-	for _, want := range []string{`id="torr-player-modal"`, `/static/player.js`, `tsPlayerLoad`, `$_queueHash !== $activeHash`, `$audioTrack &lt; 0`} {
+	for _, want := range []string{`id="torr-player-modal"`, `/static/player.js`, `tsPlayerLoad`, `$_tsPlayerProblem = evt.detail.problem || evt.detail.heartbeatProblem`, `$_queueHash !== $activeHash`, `$audioTrack &lt; 0`} {
 		if !strings.Contains(page.Body.String(), want) {
 			t.Errorf("player page lacks %q", want)
 		}

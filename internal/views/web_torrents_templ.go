@@ -54,9 +54,9 @@ func webTorrentsBox() templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(`if (evt.detail.torrent) { @post('/api/ts/files', {payload: evt.detail}) } else { $toastError = true; $toast = ` + trJS(ctx, "TorrServer could not load playback information. Check the connection or login, then retry.") + ` }`)
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(`if (evt.detail.url !== $tsSelected) return; if (evt.detail.torrent) { @post('/api/ts/files', {payload: {hash:evt.detail.hash, index:1, kind:'direct', torrent:evt.detail.torrent}}) } else { $toastError = true; $toast = ` + trJS(ctx, "TorrServer could not load playback information. Check the connection or login, then retry.") + ` }`)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrents.templ`, Line: 31, Col: 246}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrents.templ`, Line: 31, Col: 354}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {

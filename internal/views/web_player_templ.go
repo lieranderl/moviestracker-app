@@ -86,7 +86,7 @@ func webPlayer() templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" data-on:ts-player-stats=\"$_tsPlayerProblem = evt.detail.problem; if (evt.detail.torrent) { @post('/api/ts/player-stats', {payload: evt.detail}) }\" data-on-interval__duration.2s=\"$playerOpen && tsPlayerTick(el)\" data-on:pagehide__window=\"tsPlayerCancel(el)\"></div><div data-effect=\"if ($playerOpen && $_tsPlayerOrigin && $_tsPlayerOrigin !== $tsSelected) { $playerOpen = false }; $_tsPlayerOrigin = $tsSelected\"></div><div data-effect=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" data-on:ts-player-stats=\"$_tsPlayerProblem = evt.detail.problem || evt.detail.heartbeatProblem; if (evt.detail.torrent) { @post('/api/ts/player-stats', {payload: evt.detail}) }\" data-on-interval__duration.2s=\"$playerOpen && tsPlayerTick(el)\" data-on:pagehide__window=\"tsPlayerCancel(el)\"></div><div data-effect=\"if ($playerOpen && $_tsPlayerOrigin && $_tsPlayerOrigin !== $tsSelected) { $playerOpen = false }; $_tsPlayerOrigin = $tsSelected\"></div><div data-effect=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

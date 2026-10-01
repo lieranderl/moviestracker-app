@@ -292,20 +292,17 @@ window.tsPlayerLoad = async (el, url, hash, index, kind, nonce) => {
 };
 
 const playerSessions = new WeakMap();
-const playerCleanup = new WeakMap();
 const playerLeases = new WeakMap();
 
-// Serialize release before changing a file/track on the same hash: removing
-// an old pipeline after the new manifest loads would remove the new stream.
+// TorrServer shares one HLS task per hash across tabs and devices. Stop this
+// viewer's heartbeat and let TorrServer expire an idle task; hash-wide removal
+// would interrupt another viewer that still uses it.
 window.tsPlayerRelease = (el) => {
   playerLeases.delete(el);
   const session = playerSessions.get(el);
   playerSessions.delete(el);
   session?.tick?.abort();
-  if (!session || session.kind !== "hls") return playerCleanup.get(el) || Promise.resolve();
-  const cleanup = call(session.url, `gst/remove?hash=${session.hash}`, {init:{keepalive:true}});
-  playerCleanup.set(el, cleanup);
-  return cleanup;
+  return Promise.resolve();
 };
 
 window.tsPlayerCancel = (el) => {
@@ -345,10 +342,15 @@ window.tsPlayerTick = async (el) => {
   } finally { if (session.tick===ctl) session.tick=null; }
 };
 
+const playerFileLoads = new WeakMap();
+
 window.tsPlayerFiles = async (el, url, hash) => {
   if (!webAddress(url) || !hashOK(hash)) return;
-  const signal=begin(el);
+  playerFileLoads.get(el)?.abort();
+  const ctl = new AbortController();
+  playerFileLoads.set(el, ctl);
+  const signal = ctl.signal;
   const result=await getTorrent(url,hash,signal);
   if (signal.aborted) return;
-  tell(el,"ts-files",{hash,index:1,kind:"direct",torrent:result.value || null,...playerProblem(result)});
+  tell(el,"ts-files",{url,hash,index:1,kind:"direct",torrent:result.value || null,...playerProblem(result)});
 };

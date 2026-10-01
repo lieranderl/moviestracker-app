@@ -123,9 +123,12 @@ and serves, and that the user store works with Firestore's emulator.
   from `/gst/{hash}/master.m3u8`. The browser relays file/probe metadata and
   live stats to signed-in rendering endpoints; audio tracks, subtitles,
   playlist/Next, VLC/IINA and copied links use the same player helpers as
-  the local app. Datastar sends a heartbeat every two seconds and releases
-  the HLS task on close, page exit or stream change; cleanup finishes before
-  a replacement task starts. Unknown cache capacity omits buffer percentage.
+  the local app. Datastar sends a heartbeat every two seconds and reports
+  heartbeat failures. Close, page exit or stream change stops this viewer's
+  heartbeat. TorrServer expires idle tasks: `/gst/remove` removes the shared
+  hash-wide task and would interrupt another tab/device. TorrServer also
+  shares one file/audio selection per hash; choosing another replaces that
+  task upstream. Unknown cache capacity omits buffer percentage.
   Tested against MatriX.145 with `--httpauth`: media routes accept streams
   without a login header; API reads use the browser's saved Basic login.
   Safari and an HTTPS cloud page reaching HTTP localhost remain release checks.
