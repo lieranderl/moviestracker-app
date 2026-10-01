@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -81,10 +82,13 @@ func fakeTorrServer() {
 	if raw, err := os.ReadFile(setsFile); err == nil { // #nosec G304 -- test fake
 		_ = json.Unmarshal(raw, &sets)
 	}
-	// With --ssl, a certificate file that is not there stops the start.
+	// With --ssl, a certificate outside the engine folder (where uploads are
+	// kept) stops the start, as a file TorrServer cannot read does. Only the
+	// path's text is compared: the fake opens no path a request supplied.
 	if cert, _ := sets["SslCert"].(string); *ssl && cert != "" {
-		if _, err := os.Stat(cert); err != nil {
-			fmt.Fprintln(os.Stderr, "fake: cannot start HTTPS:", err)
+		root, _ := filepath.Abs(*dir)
+		if !strings.HasPrefix(cert, root+string(filepath.Separator)) {
+			fmt.Fprintln(os.Stderr, "fake: cannot start HTTPS with", cert)
 			os.Exit(1)
 		}
 	}
