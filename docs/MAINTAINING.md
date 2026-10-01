@@ -139,12 +139,17 @@ and serves, and that the user store works with Firestore's emulator.
   task upstream. Unknown cache capacity omits buffer percentage.
   Tested against MatriX.145 with `--httpauth`: media routes accept streams
   without a login header; API reads use the browser's saved Basic login.
-  On 1 October 2026, the deployed HTTPS app played HLS in Chrome through
-  an HTTPS MatriX.145 server: live stats updated, changing audio preserved
-  the playback position, and the subtitle choices and settings form loaded.
-  This does not cover HTTP localhost or native HLS in Safari.
-  Full Safari playback and an HTTPS cloud page reaching HTTP localhost
-  remain release checks; a working connection alone does not verify playback.
+  Browser checks on 1 October 2026 used the deployed HTTPS Cloud Run app:
+  Chrome and Safari played HLS through an HTTPS MatriX.145 server. In both,
+  live stats updated, changing audio preserved the playback position, and
+  subtitle choices and the shared settings form loaded. These checks did
+  not verify visible subtitles, direct playback, playlist/Next or which
+  HLS engine Safari used.
+  Chrome also connected to `http://localhost:18103` after local-network
+  access was allowed and relayed its empty torrent list. This verifies
+  HTTPS-to-HTTP localhost API access, not localhost video playback. The
+  temporary server entry was removed and the original selection restored.
+  Safari's access to HTTP localhost remains untested.
 - **Users' data:** preferences and favourites in the Firestore database
   `moviestracker` (`users/{uid}`, `users/{uid}/favorites/{kind}-{id}`;
   `internal/store`), beside the catalog collections the backend writes. The
