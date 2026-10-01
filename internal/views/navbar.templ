@@ -84,11 +84,12 @@ templ releaseBadge(rel Release) {
 }
 
 // avatarFace is the account's picture over its initials, which show when
-// there is no picture or it does not load.
+// there is no picture or it does not load: data-init catches an image that
+// failed before Datastar listened for its error.
 templ avatarFace(user *auth.User, size string) {
 	<span class={ "col-start-1 row-start-1 font-bold leading-none", size }>{ user.Initials() }</span>
 	if user.Picture != "" {
-		<img src={ user.Picture } alt="" referrerpolicy="no-referrer" class="col-start-1 row-start-1 size-full rounded-full object-cover" data-on:error="el.remove()"/>
+		<img src={ user.Picture } alt="" referrerpolicy="no-referrer" class="col-start-1 row-start-1 size-full rounded-full object-cover" data-init="el.complete && !el.naturalWidth && el.remove()" data-on:error="el.remove()"/>
 	}
 }
 

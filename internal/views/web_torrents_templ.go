@@ -27,6 +27,7 @@ func webListActions(ctx context.Context) string {
  case 'remove': $confirmHash = d.hash; $confirmName = d.title; $confirmOpen = true; break
  case 'copy': copyLink(new URL(d.url, $tsSelected + '/').href, '').then(ok => { $toastError = !ok; $toast = ok ? d.msg : ` + trJS(ctx, "Copy failed") + ` }); break
  case 'probe': $probeHash = d.hash; $probeIndex = +d.index; $probeOpen = true; break
+ case 'more': ` + openFileMenu("new URL(d.clean, $tsSelected + '/').href", "new URL(d.hls, $tsSelected + '/').href") + `; break
  case 'playlist': evt.preventDefault(); tsDownloadPlaylist(el, $tsSelected, new URL(d.url, location.href).searchParams.get('hash'), d.kind); break
  }`
 }
@@ -59,7 +60,7 @@ func webTorrentsBox() templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(webListActions(ctx))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrents.templ`, Line: 34, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrents.templ`, Line: 35, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
@@ -72,7 +73,7 @@ func webTorrentsBox() templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(`if (evt.detail.url !== $tsSelected) return; if (evt.detail.torrent) { @post('/api/ts/files', {payload: {hash:evt.detail.hash, index:1, kind:'direct', torrent:evt.detail.torrent}}) } else { $toastError = true; $toast = ` + trJS(ctx, "TorrServer could not load playback information. Check the connection or login, then retry.") + ` }`)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrents.templ`, Line: 35, Col: 354}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrents.templ`, Line: 36, Col: 354}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 		if templ_7745c5c3_Err != nil {
@@ -85,7 +86,7 @@ func webTorrentsBox() templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Torrents"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrents.templ`, Line: 37, Col: 34}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_torrents.templ`, Line: 38, Col: 34}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {

@@ -1,6 +1,7 @@
 package web_test
 
 import (
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -138,5 +139,20 @@ func TestALateRelayForAnEarlierFileCannotShowItsControlsForTheCurrentOne(t *test
 		if !strings.Contains(page, `id="`+slot+`"`) {
 			t.Errorf("player lacks the %s slot", slot)
 		}
+	}
+}
+
+// The web app shares the file menu; its links are the user's TorrServer's.
+func TestTheWebFileMenuOpensTheUsersTorrServerLinksInPlayers(t *testing.T) {
+	h, session, _ := torrServers(t)
+	page := html.UnescapeString(getWith(t, h, "/torrserver", session).Body.String())
+	for _, want := range []string{`<dialog id="torr-file-menu"`, `window.openInPlayer('vlc', $_file.clean, $linkOrigin)`, `clean: new URL(d.clean, $tsSelected + '/').href`, `hls: new URL(d.hls, $tsSelected + '/').href`, "vlc-protocol"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("web TorrServer page lacks %q", want)
+		}
+	}
+	cards := postTorrents(t, h, twoTorrents, session).Body.String()
+	if !strings.Contains(cards, `data-action="more"`) {
+		t.Error("web file rows lack the file menu button")
 	}
 }

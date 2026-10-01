@@ -191,6 +191,7 @@ func TestTheAvatarShowsTheGoogleAccountsPicture(t *testing.T) {
 	const picture = "https://lh3.googleusercontent.com/a/ann=s96-c"
 	for _, tc := range []struct{ picture, want, not string }{
 		{picture, `<img src="` + picture + `"`, ""},
+		{picture, `data-init="el.complete && !el.naturalWidth && el.remove()" data-on:error="el.remove()"`, ""},
 		{"", "AL", "<img src="},
 		{"javascript:alert(1)", "AL", "javascript:"},
 	} {
