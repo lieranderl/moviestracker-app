@@ -134,7 +134,7 @@ window.tsList = async (el, url, force = false) => {
   if (signal.aborted) return;
   const list = await call(url, "torrents", {
     init: { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "list" }) },
-    read: (res) => res.json(),
+    read: async (res) => { const value = await res.json(); return Array.isArray(value) ? value.map(withFiles) : value; },
     signal,
   });
   if (signal.aborted || list.problem || !Array.isArray(list.value)) return;
@@ -251,4 +251,104 @@ window.tsAddTorrent = async (el, url, { link = "", title = "", poster = "", file
   } finally {
     if (adding.get(el) === signal) adding.delete(el);
   }
+};
+
+// Player reads are browser-to-TorrServer requests; their events contain media
+// data only. Datastar posts those data to the cloud for rendering.
+const playerLoads = new WeakMap();
+const hashOK = (hash) => /^[a-f0-9]{40}$/i.test(hash);
+const playerProblem = (result) => ({ problem: result.problem || "", status: result.status || 0 });
+const withFiles = (torrent) => {
+  if (!torrent || typeof torrent !== "object") return null;
+  if (!torrent.file_stats?.length && torrent.data) {
+    try { torrent.file_stats = JSON.parse(torrent.data).TorrServer?.Files || []; } catch {}
+  }
+  return torrent;
+};
+const getTorrent = (url, hash, signal) => call(url, "torrents", {
+  init: {method: "POST", headers: {"Content-Type":"application/json"}, body:JSON.stringify({action:"get",hash})},
+  read: async (res) => {
+    const torrent = withFiles(await res.json());
+    if (!torrent || torrent.hash !== hash) throw new TypeError("Invalid torrent metadata");
+    return torrent;
+  }, signal,
+});
+
+window.tsPlayerLoad = async (el, url, hash, index, kind, nonce) => {
+  if (!webAddress(url) || !hashOK(hash) || !Number.isSafeInteger(index) || index < 1 || !["direct","hls"].includes(kind)) return;
+  playerLoads.get(el)?.abort();
+  const ctl = new AbortController();
+  playerLoads.set(el, ctl);
+  await Promise.resolve();
+  if (ctl.signal.aborted) return;
+  const result = await getTorrent(url, hash, ctl.signal);
+  if (ctl.signal.aborted) return;
+  let probe = {value: null};
+  if (!result.problem && kind === "hls") {
+    probe = await call(url, `gst/${hash}/probe?index=${index}`, {signal:ctl.signal, read:res=>res.json(),timeout:30000});
+  }
+  if (ctl.signal.aborted) return;
+  tell(el,"ts-player",{hash,index,kind,nonce,torrent:result.value || null,probe:probe.value || null,...playerProblem(result),probeProblem:probe.problem || ""});
+};
+
+const playerSessions = new WeakMap();
+const playerCleanup = new WeakMap();
+const playerLeases = new WeakMap();
+
+// Serialize release before changing a file/track on the same hash: removing
+// an old pipeline after the new manifest loads would remove the new stream.
+window.tsPlayerRelease = (el) => {
+  playerLeases.delete(el);
+  const session = playerSessions.get(el);
+  playerSessions.delete(el);
+  session?.tick?.abort();
+  if (!session || session.kind !== "hls") return playerCleanup.get(el) || Promise.resolve();
+  const cleanup = call(session.url, `gst/remove?hash=${session.hash}`, {init:{keepalive:true}});
+  playerCleanup.set(el, cleanup);
+  return cleanup;
+};
+
+window.tsPlayerCancel = (el) => {
+  playerLoads.get(el)?.abort();
+  return window.tsPlayerRelease(el);
+};
+
+window.tsPlayerLease = async (el, url, hash, index, kind, audio) => {
+  if (!webAddress(url) || !hashOK(hash) || !Number.isSafeInteger(index) || index < 1 || !["direct","hls"].includes(kind) || !Number.isSafeInteger(audio) || audio < 0) return null;
+  const key=JSON.stringify([url,hash,index,kind,audio]);
+  const current=playerSessions.get(el);
+  if (current?.key===key) return null;
+  const cleanup=window.tsPlayerRelease(el);
+  const lease={};
+  playerLeases.set(el,lease);
+  await cleanup;
+  if (playerLeases.get(el)!==lease) return null;
+  playerSessions.set(el,{key,url,hash,index,kind,audio});
+  const direct=new URL(`stream?link=${hash}&index=${index}&play`,`${url}/`).href;
+  const hls=new URL(`gst/${hash}/master.m3u8?index=${index}&audio=${audio}`,`${url}/`).href;
+  return {direct,hls,file:`${hash}:${index}`,stream:kind==="hls"?hls:direct};
+};
+
+window.tsPlayerTick = async (el) => {
+  const session=playerSessions.get(el);
+  if (!session || session.tick) return;
+  const ctl=new AbortController();
+  session.tick=ctl;
+  try {
+    const torrent=await getTorrent(session.url,session.hash,ctl.signal);
+    let heartbeat={};
+    if (session.kind==="hls" && !ctl.signal.aborted) {
+      heartbeat=await call(session.url,`gst/${session.hash}/heartbeat`,{signal:ctl.signal,read:res=>res.json()});
+    }
+    if (ctl.signal.aborted || playerSessions.get(el)!==session) return;
+    tell(el,"ts-player-stats",{hash:session.hash,index:session.index,kind:session.kind,torrent:torrent.value || null,...playerProblem(torrent),heartbeatProblem:heartbeat.problem || ""});
+  } finally { if (session.tick===ctl) session.tick=null; }
+};
+
+window.tsPlayerFiles = async (el, url, hash) => {
+  if (!webAddress(url) || !hashOK(hash)) return;
+  const signal=begin(el);
+  const result=await getTorrent(url,hash,signal);
+  if (signal.aborted) return;
+  tell(el,"ts-files",{hash,index:1,kind:"direct",torrent:result.value || null,...playerProblem(result)});
 };

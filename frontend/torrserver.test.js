@@ -187,3 +187,78 @@ test("a title page adds a release with its TMDB identity and category", async ()
   expect(JSON.parse(body.data)).toEqual({ tmdb: { id: 438631, type: "movie" } });
   expect(events.at(-1).ok).toBe(true);
 });
+
+test("a viewer loads files and HLS tracks using only their browser's TorrServer login", async () => {
+  client.tsSaveLogin(server, "viewer", "browser-secret");
+  const el = new EventTarget();
+  const events = [];
+  el.addEventListener("ts-player", (evt) => events.push(evt.detail));
+  requests.mockImplementation(async (target) => new Response(JSON.stringify(target.pathname.endsWith('/probe')
+    ? { Tracks: [{Index:0,Type:"audio",Language:"en"}] }
+    : { hash: "08ada5a7a6183aae1e09d831df6748d566095a10", file_stats: [{id:1,path:"Sintel.mp4"}] })));
+  await client.tsPlayerLoad(el, server, "08ada5a7a6183aae1e09d831df6748d566095a10", 1, "hls", 1);
+  expect(requests.mock.calls.map(([target]) => target.href)).toEqual([
+    "https://nas.example:8091/torrents",
+    "https://nas.example:8091/gst/08ada5a7a6183aae1e09d831df6748d566095a10/probe?index=1",
+  ]);
+  expect(requests.mock.calls.every(([, init]) => init.headers.Authorization === `Basic ${btoa('viewer:browser-secret')}`)).toBe(true);
+  expect(events[0].probe.Tracks[0].Language).toBe("en");
+  expect(JSON.stringify(events)).not.toContain("browser-secret");
+});
+
+test("an HLS viewer sends heartbeats and releases the pipeline once when closing", async () => {
+ const el=new EventTarget();
+ client.tsSaveLogin(server,"viewer","browser-secret");
+ const links=await client.tsPlayerLease(el,server,"08ada5a7a6183aae1e09d831df6748d566095a10",1,"hls",0);
+ expect(links.stream).toBe("https://nas.example:8091/gst/08ada5a7a6183aae1e09d831df6748d566095a10/master.m3u8?index=1&audio=0");
+ await client.tsPlayerTick(el);
+ await client.tsPlayerRelease(el);
+ await client.tsPlayerRelease(el);
+ expect(requests.mock.calls.map(([target])=>target.pathname)).toEqual(["/torrents","/gst/08ada5a7a6183aae1e09d831df6748d566095a10/heartbeat","/gst/remove"]);
+ expect(requests.mock.calls[2][0].searchParams.get("hash")).toBe("08ada5a7a6183aae1e09d831df6748d566095a10");
+ expect(requests.mock.calls[2][1].keepalive).toBe(true);
+ await client.tsPlayerTick(el);
+ expect(requests).toHaveBeenCalledTimes(3);
+});
+
+test("changing an HLS audio track releases the old pipeline before the new one can start", async()=>{
+ const el=new EventTarget();
+ await client.tsPlayerLease(el,server,"08ada5a7a6183aae1e09d831df6748d566095a10",1,"hls",0);
+ let finish;
+ requests.mockImplementation(()=>new Promise(resolve=>{finish=resolve}));
+ let ready=false;
+ const next=client.tsPlayerLease(el,server,"08ada5a7a6183aae1e09d831df6748d566095a10",1,"hls",1).then(links=>{ready=true;return links});
+ await Promise.resolve();
+ expect(ready).toBe(false);
+ expect(requests.mock.calls[0][0].pathname).toBe('/gst/remove');
+ finish(new Response('{}'));
+ expect((await next).stream).toEndWith('index=1&audio=1');
+ requests.mockImplementation(async()=>new Response('{}'));
+ await client.tsPlayerRelease(el);
+});
+
+test("closing during a slow probe prevents a late result from reopening playback",async()=>{
+ const el=new EventTarget();const events=[];
+ el.addEventListener('ts-player',evt=>events.push(evt.detail));
+ let finish;
+ requests.mockImplementation(async target=> target.pathname.endsWith('/probe') ? new Promise(resolve=>{finish=resolve}) : new Response(JSON.stringify({hash:'08ada5a7a6183aae1e09d831df6748d566095a10',file_stats:[]})));
+ const loading=client.tsPlayerLoad(el,server,'08ada5a7a6183aae1e09d831df6748d566095a10',1,'hls',1);
+ while(!finish) await new Promise(resolve=>setTimeout(resolve,1));
+ await client.tsPlayerCancel(el);
+ finish(new Response('{"Tracks":[]}'));
+ await loading;
+ expect(events).toEqual([]);
+});
+
+test("invalid playback metadata reports a failure instead of leaving the player loading", async () => {
+  const hash = "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111";
+  for (const value of [null, [], {hash:"bbbb1111bbbb1111bbbb1111bbbb1111bbbb1111"}]) {
+    globalThis.fetch = async () => Response.json(value);
+    const el = new EventTarget();
+    const events = [];
+    el.addEventListener("ts-player", evt => events.push(evt.detail));
+    await client.tsPlayerLoad(el, server, hash, 1, "direct", 1);
+    expect(events[0].problem).toBe("unreachable");
+    expect(events[0].torrent).toBeNull();
+  }
+});

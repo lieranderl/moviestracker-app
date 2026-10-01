@@ -28,6 +28,7 @@ templ webTorrentsBox() {
 		data-signals="{ tsConfirm: '' }"
 		data-effect="$tsSelected && $tsStatus.ok && tsList(el, $tsSelected)"
 		data-on-interval__duration.5s="$tsSelected && $tsStatus.ok && tsList(el, $tsSelected)"
+		data-on:ts-files={ `if (evt.detail.torrent) { @post('/api/ts/files', {payload: evt.detail}) } else { $toastError = true; $toast = ` + trJS(ctx, "TorrServer could not load playback information. Check the connection or login, then retry.") + ` }` }
 		data-on:ts-torrents="@post('/api/ts/torrents', {payload: {torrents: evt.detail}})"
 		aria-label={ tr(ctx, "Torrents") }
 	>
@@ -109,7 +110,7 @@ templ WebTorrents(torrents []torrserver.Torrent) {
 
 templ webTorrentCard(t torrserver.Torrent) {
 	{{ name := t.DisplayName() }}
-	<article class="card bg-base-200/80 border border-base-content/10 shadow-sm">
+	<article id={ "ts-torrent-" + t.Hash } class="card bg-base-200/80 border border-base-content/10 shadow-sm">
 		<div class="card-body p-4 gap-3">
 			<div class="flex items-start gap-4 min-w-0">
 				if t.Poster != "" {
@@ -135,6 +136,7 @@ templ webTorrentCard(t torrserver.Torrent) {
 				</div>
 			</div>
 			if infoHash.MatchString(t.Hash) {
+				@webVideoFiles(t)
 				<div class="card-actions justify-end">
 					if !t.GettingInfo() {
 						<button type="button" class="btn btn-ghost btn-sm gap-1.5 text-warning" title={ tr(ctx, "Drop active torrent cache") } data-on:click={ tsAction("drop", t.Hash) }>
@@ -154,4 +156,9 @@ templ webTorrentCard(t torrserver.Torrent) {
 			}
 		</div>
 	</article>
+}
+
+// WebTorrent refreshes one card after the browser asks TorrServer for files.
+templ WebTorrent(t *torrserver.Torrent) {
+	@webTorrentCard(*t)
 }

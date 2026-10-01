@@ -2,6 +2,14 @@ package i18n
 
 // ru translates the interface into Russian, by English text.
 var ru = map[string]string{ // #nosec G101 -- interface texts ("Password"), not credentials
+	"TorrServer could not load playback information. Check the connection or login, then retry.": "Не удалось загрузить данные воспроизведения. Проверьте соединение или логин и повторите попытку.",
+	"Next":             "Далее",
+	"Open in VLC":      "Открыть в VLC",
+	"Open in IINA":     "Открыть в IINA",
+	"Copy Direct link": "Скопировать прямую ссылку",
+	"Copy HLS link":    "Скопировать HLS-ссылку",
+	"Files":            "Файлы",
+	"Link copied":      "Ссылка скопирована",
 	"JacRed is unavailable right now. Please try again later.": "JacRed сейчас недоступен. Попробуйте позже.",
 	"Added to TorrServer":                         "Добавлено в TorrServer",
 	"That is not a magnet link.":                  "Это не magnet-ссылка.",

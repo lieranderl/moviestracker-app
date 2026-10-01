@@ -113,11 +113,12 @@ const subtitlePreference = (tracks) => {
 // Starts playback. Reloading the same <video> (e.g. after an audio-track
 // switch, which is a new GStreamer stream) resumes at the current position.
 // Repeat calls for the stream already loaded are ignored: a second reload
-// would read currentTime after the first one reset it to 0.
-window.playHlsVideo = (url) => {
+// would read currentTime after the first one reset it to 0. The cloud player
+// explicitly forces retries after releasing its old TorrServer lease.
+window.playHlsVideo = (url, resume = true, force = false) => {
   const video = videoEl();
-  if (!url || !video || url === currentUrl) return;
-  const resumeAt = video.currentSrc || currentHls ? video.currentTime : 0;
+  if (!url || !video || (!force && url === currentUrl)) return;
+  const resumeAt = resume && (video.currentSrc || currentHls) ? video.currentTime : 0;
   destroyHls();
   currentUrl = url;
   notifyUnplayable("");

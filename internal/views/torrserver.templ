@@ -1168,10 +1168,12 @@ templ TorrPlayerStats(t *torrserver.Torrent, cacheSize int64) {
 				@Icon("arrow-down", "size-3.5")
 				{ t.FormattedDownloadSpeed() }
 			</span>
+			if cacheSize > 0 {
 			<span class={ "badge badge-sm font-mono gap-1", bufferBadgeTone(t.BufferPercent(cacheSize)) } title={ tr(ctx, "TorrServer read-ahead cache fill") }>
 				@Icon("database", "size-3.5")
 				{ trf(ctx, "Buffer %d%%", t.BufferPercent(cacheSize)) }
 			</span>
+			}
 		}
 	</div>
 }
