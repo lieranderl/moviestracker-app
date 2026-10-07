@@ -43,7 +43,7 @@ func (a *app) handleRecentTorrents(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.WebRecentTorrents(torrents)); err != nil {
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.RecentTorrents(torrents)); err != nil {
 		slog.Warn("patching recent torrents failed", "error", err)
 	}
 }

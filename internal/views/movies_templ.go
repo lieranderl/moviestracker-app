@@ -114,8 +114,8 @@ func Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, ser
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if rows := siteOf(ctx).HomeRows; rows != nil {
-				templ_7745c5c3_Err = rows.Render(ctx, templ_7745c5c3_Buffer)
+			if load := siteOf(ctx).RecentTorrents; load != nil {
+				templ_7745c5c3_Err = RecentTorrentsSlot(load).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

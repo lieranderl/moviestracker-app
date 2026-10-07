@@ -178,9 +178,10 @@ func tryAcquire(slots chan struct{}) bool {
 // appSite is the app's pages: the server runs or reaches TorrServer, so the
 // navbar asks it whether TorrServer answers, once a page (timers never ask
 // the server).
-var appSite = views.Site{TorrServerCheck: templ.OrderedAttributes{
-	{Key: "data-init", Value: "@get('/api/torrserver/state')"},
-}}
+var appSite = views.Site{
+	TorrServerCheck: templ.OrderedAttributes{{Key: "data-init", Value: "@get('/api/torrserver/state')"}},
+	RecentTorrents:  templ.OrderedAttributes{{Key: "data-init", Value: "@get('/api/torrserver/recent')"}},
+}
 
 // localSite marks every page as the app's.
 func localSite(next http.Handler) http.Handler {
@@ -261,6 +262,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/torrserver/player-stats", s.handleTorrServerPlayerStats)
 	s.mux.HandleFunc("GET /api/torrserver/status", s.handleTorrServerStatus)
 	s.mux.HandleFunc("GET /api/torrserver/state", s.handleTorrServerState)
+	s.mux.HandleFunc("GET /api/torrserver/recent", s.handleRecentTorrents)
 	s.mux.HandleFunc("GET /api/torrserver/torrent-stats", s.handleTorrentStats)
 	s.mux.HandleFunc("GET /api/torrserver/stream/", s.handleTorrServerStreamProxy)
 

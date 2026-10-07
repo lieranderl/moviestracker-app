@@ -16,8 +16,10 @@ type Site struct {
 	// by which the navbar's TorrServer status learns whether it answers:
 	// they set $_tsNav to "online", "offline" or "none". Nil shows none.
 	TorrServerCheck templ.Attributer
-	// HomeRows, from the site's adapter, come first among home's rows.
-	HomeRows templ.Component
+	// RecentTorrents are the Datastar attributes, from the site's adapter,
+	// that list the torrents last added to TorrServer into home's first row
+	// (RecentTorrentsSlot). Nil leaves the row out.
+	RecentTorrents templ.Attributer
 }
 
 type siteKey struct{}

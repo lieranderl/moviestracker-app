@@ -2,6 +2,7 @@ package web_test
 
 import (
 	"fmt"
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -27,7 +28,7 @@ func postRecent(t *testing.T, h http.Handler, body string, session *httptest.Res
 func TestTheHomePageAsksTheBrowserForTheTorrServersLatestTorrents(t *testing.T) {
 	g := newGoogle(t)
 	h := web.New(withTMDB(t, g.config()))
-	body := getWith(t, h, "/", signIn(t, h)).Body.String()
+	body := html.UnescapeString(getWith(t, h, "/", signIn(t, h)).Body.String())
 	for _, want := range []string{`id="recent-torrents"`, "tsList(el, $_tsRecentUrl)", "@post('/api/ts/recent'"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the home page lacks %q", want)

@@ -228,8 +228,17 @@ var torrServerCheck = templ.OrderedAttributes{
 	{Key: "data-on:ts-status", Value: "$_tsNav = evt.detail.checking ? 'checking' : (evt.detail.ok ? 'online' : 'offline')"},
 }
 
+// recentTorrents lists, for home's first row, the torrents of the TorrServer
+// last picked: the browser lists them (this server cannot reach it) and
+// posts them to /api/ts/recent, which renders the row.
+var recentTorrents = templ.OrderedAttributes{
+	{Key: "data-signals:_ts-recent-url", Value: "localStorage.getItem('mt-ts-selected') || ''"},
+	{Key: "data-effect", Value: "$_tsRecentUrl && tsList(el, $_tsRecentUrl)"},
+	{Key: "data-on:ts-torrents", Value: "@post('/api/ts/recent', {payload: {torrents: evt.detail}})"},
+}
+
 func webSite(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		next.ServeHTTP(w, r.WithContext(views.WithSite(r.Context(), views.Site{Cloud: true, TorrServerCheck: torrServerCheck, HomeRows: views.WebRecentTorrentsSlot()})))
+		next.ServeHTTP(w, r.WithContext(views.WithSite(r.Context(), views.Site{Cloud: true, TorrServerCheck: torrServerCheck, RecentTorrents: recentTorrents})))
 	})
 }

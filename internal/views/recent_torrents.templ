@@ -10,24 +10,19 @@ import (
 // maxRecentTorrents is how many of the last added torrents home shows.
 const maxRecentTorrents = 6
 
-// WebRecentTorrentsSlot is the web app's home row of the torrents last added
-// to the visitor's TorrServer. Only the browser can reach it: it lists the
-// TorrServer last picked and posts the list, which the server renders into
-// #recent-torrents-row (WebRecentTorrents).
-templ WebRecentTorrentsSlot() {
-	<section
-		id="recent-torrents"
-		data-signals:_ts-recent-url="localStorage.getItem('mt-ts-selected') || ''"
-		data-effect="$_tsRecentUrl && tsList(el, $_tsRecentUrl)"
-		data-on:ts-torrents="@post('/api/ts/recent', {payload: {torrents: evt.detail}})"
-	>
+// RecentTorrentsSlot is home's row of the torrents last added to TorrServer,
+// filled into #recent-torrents-row (RecentTorrents) by load: the site
+// adapter's way to list them. The app asks its server, which reaches
+// TorrServer; the web app's browser lists the visitor's and posts them.
+templ RecentTorrentsSlot(load templ.Attributer) {
+	<section id="recent-torrents" { load... }>
 		<div id="recent-torrents-row"></div>
 	</section>
 }
 
-// WebRecentTorrents is the row of the torrents added last, newest first;
+// RecentTorrents is the row of the torrents added last, newest first;
 // nothing when the TorrServer has none.
-templ WebRecentTorrents(torrents []torrserver.Torrent) {
+templ RecentTorrents(torrents []torrserver.Torrent) {
 	<div id="recent-torrents-row">
 		if recent := recentTorrents(torrents); len(recent) > 0 {
 			<div class="space-y-4">
