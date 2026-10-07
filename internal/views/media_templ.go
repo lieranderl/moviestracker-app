@@ -4091,7 +4091,7 @@ func appToast() templ.Component {
 			templ_7745c5c3_Var190 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 293, "<div popover=\"manual\" role=\"status\" aria-live=\"polite\" class=\"toast toast-end toast-bottom m-0 inset-auto bottom-0 right-0 bg-transparent border-0 overflow-visible [&:not(:popover-open)]:hidden\" data-effect=\"if ($toast) { el.matches(':popover-open') ? (el.hidePopover(), el.showPopover()) : el.showPopover() } else if (el.matches(':popover-open')) { el.hidePopover() }\" data-on-signal-patch__debounce.3s=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 293, "<div popover=\"manual\" role=\"status\" aria-live=\"polite\" class=\"toast toast-end toast-bottom m-0 inset-auto bottom-0 max-md:bottom-16 right-0 bg-transparent border-0 overflow-visible [&:not(:popover-open)]:hidden\" data-effect=\"if ($toast) { el.matches(':popover-open') ? (el.hidePopover(), el.showPopover()) : el.showPopover() } else if (el.matches(':popover-open')) { el.hidePopover() }\" data-on-signal-patch__debounce.3s=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
