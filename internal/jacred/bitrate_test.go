@@ -59,4 +59,19 @@ func TestAReleaseOfASeasonHoldsItsEpisodes(t *testing.T) {
 	if got := (Result{Title: "Severance S01-S02 1080p", Seasons: []int{1, 2}}).Episodes(seasonEpisodes); got != 0 {
 		t.Errorf("a release of two seasons holds %d episodes of one, want 0: unknown", got)
 	}
+	// JacRed may leave the seasons out: the title still says it spans several.
+	for _, title := range []string{
+		"Severance S01-S02 1080p",
+		"Severance [S01-02] 2160p",
+		"Разделение / Severance (Сезон 1-2) WEB-DL 1080p",
+		"Разделение / Severance [Сезоны: 1-2] WEBRip",
+		"Severance Seasons 1-2 Complete 720p",
+	} {
+		if got := (Result{Title: title}).Episodes(seasonEpisodes); got != 0 {
+			t.Errorf("Episodes(%q) without seasons = %d, want 0: it spans several seasons", title, got)
+		}
+	}
+	if got := (Result{Title: "Severance S02 1080p"}).Episodes(seasonEpisodes); got != seasonEpisodes {
+		t.Errorf("Episodes of a one-season title without seasons = %d, want the season's %d", got, seasonEpisodes)
+	}
 }

@@ -130,13 +130,17 @@ type Result struct {
 var (
 	episodeMarker = regexp.MustCompile(`(?i)\bS\d{1,2}E(\d{1,3})(?:\s*-\s*E?(\d{1,3}))?\b`)
 	episodesOfAll = regexp.MustCompile(`(?i)\b(\d{1,3})\s*[-–]\s*(\d{1,3})\s*(?:серии|серия|эпизоды)?\s*из\s*\d{1,3}\b`)
+	// Several seasons: "S01-S02", "S01-02", "Seasons 1-2", "Сезоны: 1-2".
+	// (Go's \b is ASCII-only, so the Russian words go without it.)
+	seasonSpan = regexp.MustCompile(`(?i)(?:\bS(\d{1,2})\s*[-–]\s*S?(\d{1,2})\b|(?:\bseasons?|сезон[ыа]?)\s*:?\s*(\d{1,2})\s*[-–]\s*(\d{1,2}))`)
 )
 
 // Episodes is how many episodes of one season the release holds, given the
 // season's episode count: a range or single episode its title names, else
-// the whole season. Zero when it spans several seasons.
+// the whole season. Zero when it spans several seasons, by JacRed's seasons
+// or, when JacRed leaves them out, by its title.
 func (r Result) Episodes(seasonEpisodes int) int {
-	if len(r.Seasons) > 1 {
+	if len(r.Seasons) > 1 || spansSeasons(r.Title) {
 		return 0
 	}
 	if m := episodeMarker.FindStringSubmatch(r.Title); m != nil {
@@ -146,6 +150,22 @@ func (r Result) Episodes(seasonEpisodes int) int {
 		return episodeSpan(m[1], m[2])
 	}
 	return seasonEpisodes
+}
+
+// spansSeasons is whether a title names a range of several seasons.
+func spansSeasons(title string) bool {
+	for _, m := range seasonSpan.FindAllStringSubmatch(title, -1) {
+		first, last := m[1], m[2]
+		if first == "" {
+			first, last = m[3], m[4]
+		}
+		a, _ := strconv.Atoi(first)
+		b, _ := strconv.Atoi(last)
+		if b > a {
+			return true
+		}
+	}
+	return false
 }
 
 // episodeSpan counts the episodes from first to last ("" for just first).
