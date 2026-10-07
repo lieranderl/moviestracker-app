@@ -69,7 +69,7 @@ templ mediaRow(id, title, subtitle, icon, iconTone, badgeTone, emptyMsg string, 
 					{ title }
 					<span class={ "badge badge-sm badge-soft font-semibold", badgeTone }>{ tr(ctx, "Weekly") }</span>
 				</h2>
-				<p class="text-sm text-base-content/60">{ subtitle }</p>
+				<p class="text-sm text-base-content/70">{ subtitle }</p>
 			</div>
 			if all {
 				@allLink(id, title)
@@ -340,7 +340,7 @@ templ mediaCard(item tmdb.MediaItem, size string) {
 			<h3 class="card-title text-sm line-clamp-1 group-hover:text-primary transition-colors leading-tight" title={ item.Title }>
 				{ item.Title }
 			</h3>
-			<div class="flex items-center justify-between text-xs text-base-content/60">
+			<div class="flex items-center justify-between text-xs text-base-content/70">
 				<span class="font-mono">{ item.ReleaseYear() }</span>
 				<span class="badge badge-neutral badge-xs font-mono uppercase">{ mediaTypeLabel(ctx, item.MediaType, tr(ctx, "TV")) }</span>
 			</div>

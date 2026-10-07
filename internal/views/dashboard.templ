@@ -178,7 +178,7 @@ templ dashRow(label string) {
 
 // dashEmpty is a card's calm "nothing here" line.
 templ dashEmpty(icon, text string) {
-	<p class="flex items-center gap-2 text-sm text-base-content/60">
+	<p class="flex items-center gap-2 text-sm text-base-content/70">
 		@Icon(icon, "size-4")
 		{ text }
 	</p>
@@ -208,9 +208,9 @@ templ DashPulseStrip(p DashPulse) {
 
 templ pulseTile(label, value, note string, spark []float64, stroke string) {
 	<div class="rounded-box bg-base-200/60 border border-base-content/10 px-4 pt-3 pb-2 flex flex-col min-w-0">
-		<span class="text-xs font-medium uppercase tracking-wide text-base-content/60">{ label }</span>
+		<span class="text-xs font-medium uppercase tracking-wide text-base-content/70">{ label }</span>
 		<span class="text-2xl font-semibold font-mono tabular-nums truncate">{ value }</span>
-		<span class="text-xs text-base-content/60 truncate min-h-4">{ note }</span>
+		<span class="text-xs text-base-content/70 truncate min-h-4">{ note }</span>
 		@sparkline(spark, stroke)
 	</div>
 }
@@ -234,7 +234,7 @@ templ DashStreamsCard(rows []DashStream) {
 						<div class="min-w-0 space-y-1">
 							<p class="font-semibold truncate">{ s.Title }</p>
 							if s.File != "" {
-								<p class="text-xs font-mono text-base-content/60 truncate">{ s.File }</p>
+								<p class="text-xs font-mono text-base-content/70 truncate">{ s.File }</p>
 							}
 							<div class="flex flex-wrap items-center gap-1.5 text-xs">
 								<span class="badge badge-sm badge-soft badge-primary">{ s.Kind }</span>
@@ -258,7 +258,7 @@ templ DashStreamsCard(rows []DashStream) {
 						</div>
 						<div class="col-start-2 sm:col-start-3 sm:row-start-1 sm:text-right space-y-0.5">
 							<p class="text-lg font-semibold font-mono tabular-nums">{ s.Position }</p>
-							<p class="text-xs text-base-content/60">{ trf(ctx, "playing for %s", s.Since) }</p>
+							<p class="text-xs text-base-content/70">{ trf(ctx, "playing for %s", s.Since) }</p>
 						</div>
 						<dl class="col-start-2 sm:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
 							@streamFact(tr(ctx, "To the player"), s.Delivery)
@@ -281,7 +281,7 @@ templ DashStreamsCard(rows []DashStream) {
 
 templ streamFact(label, value string) {
 	<div class="min-w-0">
-		<dt class="text-base-content/60">{ label }</dt>
+		<dt class="text-base-content/70">{ label }</dt>
 		<dd class="font-mono tabular-nums truncate">{ orDash(value) }</dd>
 	</div>
 }
@@ -304,16 +304,16 @@ templ DashPlayedCard(rows []DashPlayed) {
 				<ul class="divide-y divide-base-content/10 -my-2 max-h-[18rem] overflow-y-auto overscroll-contain pr-1">
 					for _, p := range rows {
 						<li class="py-2.5 grid grid-cols-[4.5rem_1fr_auto] items-baseline gap-x-4">
-							<span class="font-mono text-xs tabular-nums text-base-content/60">{ p.When }</span>
+							<span class="font-mono text-xs tabular-nums text-base-content/70">{ p.When }</span>
 							<div class="min-w-0">
 								<p class="text-sm font-medium truncate">{ p.Title }</p>
-								<p class="text-xs text-base-content/60 truncate">
+								<p class="text-xs text-base-content/70 truncate">
 									{ p.Viewer + " · " + p.Device + " · " + p.Kind }
 								</p>
 							</div>
 							<div class="text-right text-xs font-mono tabular-nums">
 								<p>{ p.Duration }</p>
-								<p class="text-base-content/60">{ p.Sent }</p>
+								<p class="text-base-content/70">{ p.Sent }</p>
 							</div>
 						</li>
 					}
@@ -364,7 +364,7 @@ templ dashTorrentRow(t DashTorrent) {
 					<li class="flex items-center gap-1.5 text-xs min-w-0">
 						@Icon("play", "size-3 text-primary shrink-0")
 						<span class="font-mono truncate">{ p.File }</span>
-						<span class="text-base-content/60 shrink-0">{ p.Viewer }</span>
+						<span class="text-base-content/70 shrink-0">{ p.Viewer }</span>
 						if p.OtherApp {
 							<span class="badge badge-xs badge-soft badge-secondary shrink-0">{ tr(ctx, "Other app") }</span>
 						}
@@ -377,10 +377,10 @@ templ dashTorrentRow(t DashTorrent) {
 
 templ swarmFigure(label, value, note string, spark []float64, stroke string) {
 	<div class="min-w-0">
-		<p class="text-xs text-base-content/60">{ label }</p>
+		<p class="text-xs text-base-content/70">{ label }</p>
 		<p class="text-xl font-semibold font-mono tabular-nums truncate">{ value }</p>
 		if note != "" {
-			<p class="text-xs text-base-content/60 truncate">{ note }</p>
+			<p class="text-xs text-base-content/70 truncate">{ note }</p>
 		}
 		if stroke != "" {
 			@sparkline(spark, stroke)
@@ -392,11 +392,11 @@ templ swarmFigure(label, value, note string, spark []float64, stroke string) {
 // of the machine, and TorrServer's caches.
 templ DashAppCard(a DashApp) {
 	@dashCard("dash-app", "clapperboard", "Moviestracker") {
-		<p class="text-xs text-base-content/60 -mt-2">{ tr(ctx, "The app and the programs it runs.") }</p>
+		<p class="text-xs text-base-content/70 -mt-2">{ tr(ctx, "The app and the programs it runs.") }</p>
 		<div class="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-2 text-sm">
-			<span class="text-xs text-base-content/60">{ tr(ctx, "Program") }</span>
-			<span class="text-xs text-base-content/60 text-right">{ tr(ctx, "Memory") }</span>
-			<span class="text-xs text-base-content/60 text-right w-10">CPU</span>
+			<span class="text-xs text-base-content/70">{ tr(ctx, "Program") }</span>
+			<span class="text-xs text-base-content/70 text-right">{ tr(ctx, "Memory") }</span>
+			<span class="text-xs text-base-content/70 text-right w-10">CPU</span>
 			for _, p := range a.Procs {
 				<div class={ "min-w-0", templ.KV("col-span-3 pl-4 border-l-2 border-base-content/10", p.Nested) }>
 					<p class="flex items-center gap-1.5 font-medium">
@@ -406,10 +406,10 @@ templ DashAppCard(a DashApp) {
 						{ p.Name }
 					</p>
 					if p.Detail != "" {
-						<p class="text-xs text-base-content/60">{ p.Detail }</p>
+						<p class="text-xs text-base-content/70">{ p.Detail }</p>
 					}
 					if p.Note != "" {
-						<p class="text-xs text-base-content/60">{ p.Note }</p>
+						<p class="text-xs text-base-content/70">{ p.Note }</p>
 					}
 				</div>
 				if !p.Nested {
@@ -425,7 +425,7 @@ templ DashAppCard(a DashApp) {
 		</div>
 		if a.Go != "" {
 			<div class="space-y-1.5 pt-3 border-t border-base-content/10">
-				<h3 class="text-xs font-medium uppercase tracking-wide text-base-content/60">{ tr(ctx, "Inside Moviestracker") }</h3>
+				<h3 class="text-xs font-medium uppercase tracking-wide text-base-content/70">{ tr(ctx, "Inside Moviestracker") }</h3>
 				@dashRow("Go") {
 					{ a.Go }
 				}
@@ -444,7 +444,7 @@ templ DashAppCard(a DashApp) {
 				@dashRow(tr(ctx, "Patches")) {
 					{ a.Patches }
 				}
-				<p class="text-xs text-base-content/60">{ tr(ctx, "Live streams are the open pages Datastar keeps current over SSE. Patches: sent · skipped because nothing changed.") }</p>
+				<p class="text-xs text-base-content/70">{ tr(ctx, "Live streams are the open pages Datastar keeps current over SSE. Patches: sent · skipped because nothing changed.") }</p>
 			</div>
 		}
 		<div class="space-y-1.5 pt-3 border-t border-base-content/10">
@@ -470,14 +470,14 @@ templ DashSystemCard(s DashSystem) {
 					@Icon("cpu", "size-5 text-primary")
 					{ tr(ctx, "This machine") }
 				</h2>
-				<p class="text-xs text-base-content/60">{ tr(ctx, "The whole computer, with every program on it.") }</p>
+				<p class="text-xs text-base-content/70">{ tr(ctx, "The whole computer, with every program on it.") }</p>
 			</header>
 			<div class="grid gap-6 sm:grid-cols-2">
 				if s.CPU != "" {
 					<div class="space-y-1">
 						@dashMeter("CPU", s.CPU, s.CPUPct)
 						if s.Load != "" {
-							<p class="text-xs text-base-content/60 text-right font-mono tabular-nums">{ trf(ctx, "Load %s", s.Load) }</p>
+							<p class="text-xs text-base-content/70 text-right font-mono tabular-nums">{ trf(ctx, "Load %s", s.Load) }</p>
 						}
 						@sparkline(s.CPUSpark, "stroke-accent")
 					</div>
@@ -530,7 +530,7 @@ templ DashPeopleCard(people []DashPerson) {
 									<span class={ "status mt-1.5 shrink-0", templ.KV("status-success", d.Live) } aria-hidden="true"></span>
 									<div class="min-w-0">
 										<p class="text-sm">{ d.Name }</p>
-										<p class="text-base-content/60"><span class="font-mono">{ d.IP }</span>{ " · " + d.Seen }</p>
+										<p class="text-base-content/70"><span class="font-mono">{ d.IP }</span>{ " · " + d.Seen }</p>
 									</div>
 								</li>
 							}
@@ -569,7 +569,7 @@ templ DashSourcesCard(rows []DashService) {
 						</span>
 					</div>
 					if r.Known {
-						<p class="text-xs text-base-content/60 pl-4">{ r.Calls }</p>
+						<p class="text-xs text-base-content/70 pl-4">{ r.Calls }</p>
 					}
 					if r.Known && !r.OK {
 						<p class="text-xs text-error pl-4 break-words">{ r.Error }</p>
@@ -592,11 +592,11 @@ templ DashProblemsCard(rows []DashProblem, engine string) {
 			<ul class="space-y-2">
 				for _, p := range rows {
 					<li class="grid grid-cols-[3rem_1fr] gap-x-3 text-xs">
-						<span class="font-mono tabular-nums text-base-content/60">{ p.Time }</span>
+						<span class="font-mono tabular-nums text-base-content/70">{ p.Time }</span>
 						<div class="min-w-0">
 							<p class={ "font-medium", templ.KV("text-error", p.Error), templ.KV("text-warning", !p.Error) }>{ p.Message }</p>
 							if p.Detail != "" {
-								<p class="text-base-content/60 break-words">{ p.Detail }</p>
+								<p class="text-base-content/70 break-words">{ p.Detail }</p>
 							}
 						</div>
 					</li>

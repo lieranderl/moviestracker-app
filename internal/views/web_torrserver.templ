@@ -39,7 +39,7 @@ templ WebTorrServerPage(user *auth.User, servers []store.TorrServer, settings []
 							@Icon("server", "size-6 text-primary")
 							TorrServer
 						</h1>
-						<p class="text-sm text-base-content/60 max-w-2xl">{ tr(ctx, "Your own TorrServer streams to this browser directly: Moviestracker only keeps its address, and its login stays in this browser.") }</p>
+						<p class="text-sm text-base-content/70 max-w-2xl">{ tr(ctx, "Your own TorrServer streams to this browser directly: Moviestracker only keeps its address, and its login stays in this browser.") }</p>
 					</div>
 					<button type="button" class="btn btn-primary btn-sm gap-2" data-on:click="$addModalOpen = true">
  @Icon("plus", "size-4")
@@ -86,7 +86,7 @@ templ webTorrServerForm() {
 					<input type="password" autocomplete="off" class="input w-full" data-bind:ts-pass/>
 				</fieldset>
 			</div>
-			<p class="text-xs text-base-content/60">{ tr(ctx, "On this computer TorrServer is usually at http://localhost:8090. On another machine, use its HTTPS address.") }</p>
+			<p class="text-xs text-base-content/70">{ tr(ctx, "On this computer TorrServer is usually at http://localhost:8090. On another machine, use its HTTPS address.") }</p>
 			<div role="alert" class="alert alert-error alert-soft text-sm" data-show="$tsFormError">
 				@Icon("circle-alert", "size-4")
 				<span data-text="$tsFormError"></span>
@@ -113,7 +113,7 @@ templ WebTorrServers(servers []store.TorrServer) {
 				<input type="radio" name="ts-selected" class="radio radio-primary radio-sm" value={ s.URL } data-bind:ts-selected aria-label={ s.Name }/>
 				<div class="min-w-0 grow">
 					<p class="font-semibold truncate">{ s.Name }</p>
-					<p class="text-xs font-mono text-base-content/60 truncate">{ s.URL }</p>
+					<p class="text-xs font-mono text-base-content/70 truncate">{ s.URL }</p>
 				</div>
 				<button
 					type="button"
@@ -146,7 +146,7 @@ templ webTorrServerStatus() {
 					{ tr(ctx, "Check again") }
 				</button>
 			</div>
-			<p class="text-sm text-base-content/60 flex items-center gap-2" data-show="$tsStatus.checking">
+			<p class="text-sm text-base-content/70 flex items-center gap-2" data-show="$tsStatus.checking">
 				<span class="loading loading-spinner loading-xs"></span>
 				{ tr(ctx, "Checking…") }
 			</p>

@@ -120,7 +120,7 @@ templ AppsLogins(v AppsView, created *NewAppLogin, st SourceStatus) {
 					<li class="flex items-center gap-3 py-2">
 						<div class="grow min-w-0">
 							<p class="text-sm font-medium truncate">{ l.Name }</p>
-							<p class="text-xs text-base-content/60">
+							<p class="text-xs text-base-content/70">
 								<span class="font-mono">{ l.User }</span> · { trf(ctx, "made %s", i18n.Date(ctx, l.CreatedAt.Local())) }
 							</p>
 						</div>
