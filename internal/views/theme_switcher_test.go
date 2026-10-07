@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"html"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -121,5 +122,82 @@ func TestTheNavbarChecksTorrServerTheWayItsSiteSays(t *testing.T) {
 	}
 	if strings.Contains(buf.String(), `id="ts-nav-status"`) {
 		t.Error("a site that gives no way to check TorrServer shows no status")
+	}
+}
+
+func TestPhonesGetATabBarOfTheSignedInDestinations(t *testing.T) {
+	user := &auth.User{Name: "Ann", Username: "ann"}
+	for _, c := range []struct {
+		site  views.Site
+		hrefs []string
+	}{
+		{views.Site{Cloud: true}, []string{`href="/"`, `href="/search"`, `href="/favorites"`, `href="/torrserver"`}},
+		{views.Site{}, []string{`href="/movies"`, `href="/search"`, `href="/dashboard"`, `href="/torrserver"`}},
+	} {
+		var buf bytes.Buffer
+		if err := views.Navbar(user).Render(views.WithSite(context.Background(), c.site), &buf); err != nil {
+			t.Fatal(err)
+		}
+		out := html.UnescapeString(buf.String())
+		dock := regexp.MustCompile(`(?s)<nav[^>]*class="dock[^"]*md:hidden[^"]*"[^>]*>.*?</nav>`).FindString(out)
+		if dock == "" {
+			t.Fatalf("cloud=%t: no tab bar hidden from wide screens", c.site.Cloud)
+		}
+		for _, href := range c.hrefs {
+			if !strings.Contains(dock, href) {
+				t.Errorf("cloud=%t: the tab bar lacks %s", c.site.Cloud, href)
+			}
+		}
+		if !strings.Contains(dock, "dock-active") || !strings.Contains(dock, "data-attr:aria-current") {
+			t.Errorf("cloud=%t: the tab bar does not mark the page it is on", c.site.Cloud)
+		}
+	}
+	var buf bytes.Buffer
+	if err := views.Navbar(nil).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), `class="dock`) {
+		t.Error("a signed-out visitor has no destinations for a tab bar")
+	}
+}
+
+func TestPagesMakeRoomForThePhonesTabBar(t *testing.T) {
+	var buf bytes.Buffer
+	if err := views.Layout("Test").Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "max-md:has-[.dock]:pb-16") {
+		t.Error("the body does not leave room at the bottom for the tab bar")
+	}
+}
+
+func TestTorrServersStatusSitsOnItsLinkNotBesideIt(t *testing.T) {
+	check := templ.OrderedAttributes{{Key: "data-init", Value: "@get('/check')"}}
+	var buf bytes.Buffer
+	ctx := views.WithSite(context.Background(), views.Site{Cloud: true, TorrServerCheck: check})
+	if err := views.Navbar(&auth.User{Name: "Ann", Username: "ann"}).Render(ctx, &buf); err != nil {
+		t.Fatal(err)
+	}
+	out := html.UnescapeString(buf.String())
+	if regexp.MustCompile(`<a[^>]*id="ts-nav-status"`).MatchString(out) {
+		t.Error("TorrServer's status is a second TorrServer link beside the first")
+	}
+	menu := regexp.MustCompile(`(?s)<ul class="menu menu-horizontal.*?</ul>`).FindString(out)
+	dock := regexp.MustCompile(`(?s)<nav[^>]*class="dock.*?</nav>`).FindString(out)
+	onLink := regexp.MustCompile(`(?s)<a href="/torrserver"[^>]*data-attr:title[^>]*>.{0,600}?class="status`)
+	for name, part := range map[string]string{"menu": menu, "tab bar": dock} {
+		if !onLink.MatchString(part) {
+			t.Errorf("the %s's TorrServer link does not carry its status", name)
+		}
+	}
+}
+
+func TestControlsPinnedToTheBottomStayAboveThePhonesTabBar(t *testing.T) {
+	var buf bytes.Buffer
+	if err := views.FavoritesPage(&auth.User{Name: "Ann"}, nil, false).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	if !regexp.MustCompile(`class="[^"]*fixed bottom-6[^"]*max-md:bottom-22`).MatchString(buf.String()) {
+		t.Error("the back-to-top button sits under the phone's tab bar")
 	}
 }
