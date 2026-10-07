@@ -177,7 +177,7 @@ func TVPage(user *auth.User, t *tmdb.TVDetails, season *tmdb.Season, selected in
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = sourcesSection("tv", t.MediaItem, t.Seasons, selected).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = sourcesSection("tv", t.MediaItem, t.Seasons, selected, tmdb.Releases{}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
