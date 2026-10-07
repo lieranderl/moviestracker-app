@@ -18,6 +18,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/releases"
 	"github.com/lieranderl/moviestracker-app/internal/sources"
 	"github.com/lieranderl/moviestracker-app/internal/store"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 	webstatic "github.com/lieranderl/moviestracker-app/static"
 )
@@ -133,10 +134,29 @@ func (a *app) handleHome(w http.ResponseWriter, r *http.Request) {
 		a.catalog.Home(w, r)
 		return
 	}
-	if err := views.WebSignIn().Render(r.Context(), w); err != nil {
+	if err := views.WebSignIn(a.signInPosters(r.Context())).Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "home", "error", err)
 	}
 }
+
+// signInPosters are this week's trending posters for the sign-in page, or
+// none when TMDB is not set up or does not answer in time.
+func (a *app) signInPosters(ctx context.Context) []tmdb.MediaItem {
+	if a.cfg.Sources.Catalog == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, signInPostersTimeout)
+	defer cancel()
+	c, err := a.cfg.Sources.Catalog.GetCatalog(ctx)
+	if err != nil {
+		slog.Warn("sign-in posters unavailable", "error", err)
+		return nil
+	}
+	return views.SignInPosters(c)
+}
+
+// signInPostersTimeout keeps a slow TMDB from holding up the sign-in page.
+const signInPostersTimeout = 2 * time.Second
 
 // saveLanguage keeps the language a signed-in user picked, so their other
 // browsers follow it when they sign in there.

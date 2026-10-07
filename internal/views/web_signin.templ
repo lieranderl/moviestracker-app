@@ -1,20 +1,75 @@
 package views
 
+import "github.com/lieranderl/moviestracker-app/internal/tmdb"
+
+// signInStep is one step of how the web app works, as the sign-in page tells it.
+type signInStep struct{ Title, Body string }
+
+var signInSteps = []signInStep{
+	{Title: "Browse what is trending", Body: "Movies and series from TMDB, with IMDb ratings."},
+	{Title: "Get its sources", Body: "Torrent releases from JacRed, with their quality, size and seeders."},
+	{Title: "Add one to your TorrServer", Body: "Then watch it from your TorrServer."},
+}
+
+// maxSignInPosters fills the poster wall's four columns three rows deep.
+const maxSignInPosters = 12
+
 // WebSignIn is the cloud web app's sign-in page (internal/web): any verified
-// Google account can sign in.
-templ WebSignIn() {
-	@authPageAt(tr(ctx, "Sign in"), "/") {
-		<div class="card-body p-6 sm:p-10 gap-6">
-			<header class="space-y-2">
-				<h1 class="text-2xl sm:text-3xl font-bold tracking-tight">{ tr(ctx, "Welcome to Moviestracker") }</h1>
-				<p class="text-sm text-base-content/70">{ tr(ctx, "Browse movies and TV, keep your favourites, and play them from your own TorrServer.") }</p>
-			</header>
-			<a href="/auth/google" class="btn btn-primary btn-block">
-				@Icon("log-in", "size-4")
-				{ tr(ctx, "Sign in with Google") }
-			</a>
-			<p class="text-xs text-base-content/60 text-center">{ tr(ctx, "Moviestracker does not host, upload, seed, or distribute media.") }</p>
-		</div>
+// Google account can sign in. Posters are this week's trending titles, shown
+// beside the steps on wide screens; without them the steps stand alone.
+templ WebSignIn(posters []tmdb.MediaItem) {
+	@Layout(tr(ctx, "Sign in")) {
+		<main class="grow flex flex-col">
+			@authTopBar("/")
+			<div class={ "grow w-full max-w-7xl mx-auto px-4 sm:px-8 py-10 lg:py-16 grid gap-12 items-center", templ.KV("lg:grid-cols-2", len(posters) > 0) }>
+				<div class={ "space-y-8 max-w-xl", templ.KV("mx-auto", len(posters) == 0) }>
+					<header class="space-y-3">
+						<p class="text-sm font-semibold text-primary">{ tr(ctx, "Welcome to Moviestracker") }</p>
+						<h1 class="text-4xl sm:text-5xl font-black tracking-tight text-balance">{ tr(ctx, "Find a film and its sources. Watch it on your own TorrServer.") }</h1>
+					</header>
+					<ol class="steps steps-vertical">
+						for _, s := range signInSteps {
+							<li class="step step-primary">
+								<span class="text-start py-2">
+									<span class="block font-semibold">{ tr(ctx, s.Title) }</span>
+									<span class="block text-sm text-base-content/70">{ tr(ctx, s.Body) }</span>
+								</span>
+							</li>
+						}
+					</ol>
+					<div class="space-y-3">
+						<a href="/auth/google" class="btn btn-primary btn-lg w-full sm:w-auto">
+							@Icon("log-in", "size-5")
+							{ tr(ctx, "Sign in with Google") }
+						</a>
+						<p class="text-xs text-base-content/70">{ tr(ctx, "Moviestracker does not host, upload, seed, or distribute media.") }</p>
+					</div>
+				</div>
+				if len(posters) > 0 {
+					<ul aria-hidden="true" class="hidden lg:grid grid-cols-4 gap-3 mask-b-from-60%">
+						for _, p := range posters {
+							<li class="even:translate-y-8">
+								<img src={ p.PosterURL() } alt="" class="aspect-[2/3] w-full rounded-box object-cover bg-base-300 shadow-lg" loading="lazy" decoding="async" width="160" height="240"/>
+							</li>
+						}
+					</ul>
+				}
+			</div>
+			@footer(false)
+		</main>
 	}
 }
 
+// SignInPosters picks the poster wall from this week's trending movies and
+// series, alternating them and skipping titles without a poster.
+func SignInPosters(c tmdb.Catalog) []tmdb.MediaItem {
+	var out []tmdb.MediaItem
+	for i := 0; len(out) < maxSignInPosters && (i < len(c.Movies) || i < len(c.Series)); i++ {
+		for _, list := range [][]tmdb.MediaItem{c.Movies, c.Series} {
+			if i < len(list) && list[i].PosterURL() != "" && len(out) < maxSignInPosters {
+				out = append(out, list[i])
+			}
+		}
+	}
+	return out
+}
