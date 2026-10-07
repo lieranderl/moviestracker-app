@@ -170,7 +170,7 @@ func MoviePage(user *auth.User, m *tmdb.MovieDetails) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = sourcesSection("movie", m.MediaItem, nil, 0).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = sourcesSection("movie", m.MediaItem, nil, 0, m.Releases).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
