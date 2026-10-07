@@ -242,6 +242,8 @@ var ru = map[string]string{
 	"DVD / Blu-ray": "DVD / Blu-ray",
 	"expected":      "ожидается",
 	"Not out digitally yet: its sources are likely only cinema recordings (CAMRip, TS).": "Цифрового релиза ещё нет: источники, скорее всего, только записи из кинотеатра (CAMRip, TS).",
+	"%s Mbps": "%s Мбит/с",
+	"Estimated: size over %d min, audio included": "Оценка: размер за %d мин, со звуком",
 	"Newest": "Новые",
 	"Size":   "Размер",
 	"Results from JacRed. Moviestracker does not host or distribute media — only access content you are legally authorized to use.": "Результаты от JacRed. Moviestracker не хранит и не распространяет медиафайлы — открывайте только тот контент, на который у вас есть законные права.",
