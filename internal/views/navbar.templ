@@ -21,7 +21,7 @@ templ brand(href string) {
 		<span class="size-8 rounded-field bg-primary text-primary-content grid place-items-center">
 			@Icon("clapperboard", "size-4.5")
 		</span>
-		<span>Movies<span class="font-light text-base-content/60">tracker</span></span>
+		<span>Movies<span class="font-light text-base-content/70">tracker</span></span>
 	</a>
 }
 
@@ -122,7 +122,7 @@ templ userMenu(user *auth.User) {
 				</span>
 				<span class="flex flex-col min-w-0">
 					<span class="font-bold text-sm truncate">{ user.Name }</span>
-					<span class="text-xs text-base-content/60 font-mono truncate">{ user.Username }</span>
+					<span class="text-xs text-base-content/70 font-mono truncate">{ user.Username }</span>
 					if !siteOf(ctx).Cloud {
 						<span class="badge badge-accent badge-xs mt-1 font-mono uppercase">{ tr(ctx, user.Role) }</span>
 					}

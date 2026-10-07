@@ -362,7 +362,7 @@ func userRow(u UserRow, me bool) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</div><div class=\"text-xs font-mono text-base-content/60\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</div><div class=\"text-xs font-mono text-base-content/70\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -595,7 +595,7 @@ func sectionHeading(title, subtitle string) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if subtitle != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<p class=\"text-sm text-base-content/60\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<p class=\"text-sm text-base-content/70\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1040,7 +1040,7 @@ func personTile(id int, name, role, imageURL string) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "<div class=\"avatar avatar-placeholder\"><div class=\"w-24 sm:w-28 rounded-full bg-base-300 text-base-content/60 ring-1 ring-base-content/10 group-hover:ring-primary transition\"><span class=\"text-2xl font-semibold\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "<div class=\"avatar avatar-placeholder\"><div class=\"w-24 sm:w-28 rounded-full bg-base-300 text-base-content/70 ring-1 ring-base-content/10 group-hover:ring-primary transition\"><span class=\"text-2xl font-semibold\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1076,7 +1076,7 @@ func personTile(id int, name, role, imageURL string) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if role != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "<span class=\"text-xs text-base-content/60 leading-tight line-clamp-2\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "<span class=\"text-xs text-base-content/70 leading-tight line-clamp-2\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1208,7 +1208,7 @@ func videoRail(videos []tmdb.Video) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "</span> <span class=\"block text-xs text-base-content/60\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "</span> <span class=\"block text-xs text-base-content/70\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -2157,7 +2157,7 @@ func TorrentSearching(title string) templ.Component {
 			templ_7745c5c3_Var97 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 151, "<div id=\"torrent-results\" class=\"space-y-3\" aria-busy=\"true\"><p class=\"text-sm text-base-content/60 inline-flex items-center gap-2\"><span class=\"loading loading-dots loading-sm text-primary\"></span> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 151, "<div id=\"torrent-results\" class=\"space-y-3\" aria-busy=\"true\"><p class=\"text-sm text-base-content/70 inline-flex items-center gap-2\"><span class=\"loading loading-dots loading-sm text-primary\"></span> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -2589,7 +2589,7 @@ func trackerFilter(results []jacred.Result) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 180, "\" class=\"basis-full order-last flex flex-wrap items-center gap-2\"><span class=\"text-xs font-medium text-base-content/60 mr-1\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 180, "\" class=\"basis-full order-last flex flex-wrap items-center gap-2\"><span class=\"text-xs font-medium text-base-content/70 mr-1\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -2725,7 +2725,7 @@ func voiceFilter(results []jacred.Result) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 190, "\" class=\"basis-full order-last flex flex-wrap items-center gap-2\"><span class=\"text-xs font-medium text-base-content/60 mr-1\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 190, "\" class=\"basis-full order-last flex flex-wrap items-center gap-2\"><span class=\"text-xs font-medium text-base-content/70 mr-1\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -2944,7 +2944,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 208, "</p><p class=\"text-xs text-base-content/60 flex flex-wrap items-center gap-x-3 gap-y-1\"><span class=\"font-mono\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 208, "</p><p class=\"text-xs text-base-content/70 flex flex-wrap items-center gap-x-3 gap-y-1\"><span class=\"font-mono\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

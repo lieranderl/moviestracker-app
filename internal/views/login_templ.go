@@ -550,7 +550,7 @@ func SignInStep(errorMsg string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</span></button></fieldset></form><a href=\"/login?review=1\" class=\"link link-hover text-xs text-base-content/60 text-center\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</span></button></fieldset></form><a href=\"/login?review=1\" class=\"link link-hover text-xs text-base-content/70 text-center\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -673,7 +673,7 @@ func disclaimerList() templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if p.Note != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<p class=\"text-xs text-base-content/60 italic\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<p class=\"text-xs text-base-content/70 italic\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

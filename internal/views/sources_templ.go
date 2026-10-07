@@ -1712,7 +1712,7 @@ func TorrServerSource(v SourcesView, st SourceStatus) templ.Component {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 130, " data-bind:torrserver-password></label></div><p class=\"text-xs text-base-content/60\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 130, " data-bind:torrserver-password></label></div><p class=\"text-xs text-base-content/70\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

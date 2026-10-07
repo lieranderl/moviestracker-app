@@ -130,7 +130,7 @@ templ SignInStep(errorMsg string) {
 				</button>
 			</fieldset>
 		</form>
-		<a href="/login?review=1" class="link link-hover text-xs text-base-content/60 text-center">{ tr(ctx, "Review the disclaimer") }</a>
+		<a href="/login?review=1" class="link link-hover text-xs text-base-content/70 text-center">{ tr(ctx, "Review the disclaimer") }</a>
 	</div>
 }
 
@@ -151,7 +151,7 @@ templ disclaimerList() {
 						}
 					</p>
 					if p.Note != "" {
-						<p class="text-xs text-base-content/60 italic">{ tr(ctx, p.Note) }</p>
+						<p class="text-xs text-base-content/70 italic">{ tr(ctx, p.Note) }</p>
 					}
 				</div>
 			</li>

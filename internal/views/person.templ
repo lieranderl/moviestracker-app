@@ -124,7 +124,7 @@ templ creditTable(kind string, credits []tmdb.Credit) {
 		data-class:hidden={ fmt.Sprintf("$credits !== '%s'", kind) }
 	>
 		if len(credits) == 0 {
-			<p class="p-4 text-sm text-base-content/60">{ tr(ctx, "No credits.") }</p>
+			<p class="p-4 text-sm text-base-content/70">{ tr(ctx, "No credits.") }</p>
 		} else {
 			<table class="table table-sm">
 				<thead>
@@ -137,7 +137,7 @@ templ creditTable(kind string, credits []tmdb.Credit) {
 				<tbody>
 					for _, c := range credits {
 						<tr class="hover:bg-base-200">
-							<td class="font-mono text-base-content/60">{ creditYear(c) }</td>
+							<td class="font-mono text-base-content/70">{ creditYear(c) }</td>
 							<td><a href={ mediaHref(c.MediaItem) } class="link link-hover font-medium">{ c.Title }</a></td>
 							<td class="text-base-content/70">{ c.Role }</td>
 						</tr>
