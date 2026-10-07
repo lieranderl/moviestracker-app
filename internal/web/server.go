@@ -84,7 +84,7 @@ func New(cfg Config) http.Handler {
 		if clock == nil {
 			clock = time.Now
 		}
-		cfg.Sources.Details = releaseLists{DetailsProvider: cfg.Sources.Details, feeds: newCachedFeeds(cfg.Releases, clock)}
+		cfg.Sources.Details = releaseLists{DetailsProvider: cfg.Sources.Details, feeds: newCachedFeeds(cfg.Releases, posterProvider(cfg.Sources.Details), clock)}
 	}
 	a := &app{cfg: cfg, signer: signer{key: cfg.SessionKey}}
 	a.catalog = handlers.NewCatalog(func() *sources.Clients { return &a.cfg.Sources }, a.catalogUser, "/", catalogTimeout)
@@ -209,6 +209,12 @@ func (a *app) catalogUser(r *http.Request) *auth.User {
 
 // webSite marks every page as the web app's, so shared views show its
 // navigation.
+// posterProvider is details' posters by language, when it gives them.
+func posterProvider(details tmdb.DetailsProvider) tmdb.PosterProvider {
+	posters, _ := details.(tmdb.PosterProvider)
+	return posters
+}
+
 // torrServerCheck is how the web app's navbar learns whether the visitor's
 // TorrServer answers: this server cannot reach it, so the browser checks the
 // one last picked ($_tsNavUrl, which the pages that pick one update), at
