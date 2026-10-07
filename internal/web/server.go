@@ -140,23 +140,37 @@ func (a *app) handleHome(w http.ResponseWriter, r *http.Request) {
 }
 
 // signInPosters are this week's trending posters for the sign-in page, or
-// none when TMDB is not set up or does not answer in time.
+// none when TMDB is not set up or does not answer in time. The catalog is
+// the one the signed-in home page shows and caches, so it is fetched with
+// the home page's own timeout, apart from this request: the page waits for
+// it only briefly, and a slow TMDB still leaves a whole catalog behind.
 func (a *app) signInPosters(ctx context.Context) []tmdb.MediaItem {
-	if a.cfg.Sources.Catalog == nil {
+	provider := a.cfg.Sources.Catalog
+	if provider == nil {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(ctx, signInPostersTimeout)
-	defer cancel()
-	c, err := a.cfg.Sources.Catalog.GetCatalog(ctx)
-	if err != nil {
-		slog.Warn("sign-in posters unavailable", "error", err)
+	fetched := make(chan []tmdb.MediaItem, 1)
+	go func() {
+		fetchCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), catalogTimeout)
+		defer cancel()
+		c, err := provider.GetCatalog(fetchCtx)
+		if err != nil {
+			slog.Warn("sign-in posters unavailable", "error", err)
+		}
+		fetched <- views.SignInPosters(c)
+	}()
+	select {
+	case posters := <-fetched:
+		return posters
+	case <-time.After(signInPostersWait):
+		return nil
+	case <-ctx.Done():
 		return nil
 	}
-	return views.SignInPosters(c)
 }
 
-// signInPostersTimeout keeps a slow TMDB from holding up the sign-in page.
-const signInPostersTimeout = 2 * time.Second
+// signInPostersWait keeps a slow TMDB from holding up the sign-in page.
+const signInPostersWait = 2 * time.Second
 
 // saveLanguage keeps the language a signed-in user picked, so their other
 // browsers follow it when they sign in there.
