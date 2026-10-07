@@ -63,7 +63,7 @@ templ MoviePage(user *auth.User, m *tmdb.MovieDetails) {
 				@heroLink("#sources", "magnet", tr(ctx, "Find sources"))
 			}
 			@aboutSection(m.MediaItem, m.Tagline, movieAbout(ctx, m), officialLinks("title", m.Links, m.Homepage))
-			@sourcesSection("movie", m.MediaItem, nil, 0)
+			@sourcesSection("movie", m.MediaItem, nil, 0, m.Releases)
 			@castRail(tr(ctx, "Cast"), m.Cast)
 			@videoRail(m.Videos)
 			@collectionRail(m.Collection, m.ID)

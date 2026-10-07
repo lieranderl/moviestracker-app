@@ -3,6 +3,8 @@ package views
 import (
 	"context"
 	"slices"
+	"time"
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"strconv"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/jacred"
@@ -394,7 +396,7 @@ func sourcesSignals(ctx context.Context, mediaType string, selected int) string 
 
 // sourcesSection searches JacRed only when the user asks; series search one
 // season at a time. The TorrServer status badge loads on its own.
-templ sourcesSection(mediaType string, item tmdb.MediaItem, seasons []tmdb.SeasonSummary, selected int) {
+templ sourcesSection(mediaType string, item tmdb.MediaItem, seasons []tmdb.SeasonSummary, selected int, releases tmdb.Releases) {
 	{{ id := item.ID }}
 	<section id="sources" class="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-5 scroll-mt-20" data-signals={ sourcesSignals(ctx, mediaType, selected) } data-media-id={ fmt.Sprint(id) } data-media-type={ mediaType } data-title={ PageTitle(item) } data-poster={ item.PosterURL() }
 		if siteOf(ctx).Cloud {
@@ -411,6 +413,7 @@ templ sourcesSection(mediaType string, item tmdb.MediaItem, seasons []tmdb.Seaso
 				</div>
 			}
 		}
+		@releaseDates(releases, time.Now())
 		<div id="torr-activity"></div>
 		if siteOf(ctx).Cloud {
 			@webSourceProblems()
@@ -448,6 +451,60 @@ templ sourcesSection(mediaType string, item tmdb.MediaItem, seasons []tmdb.Seaso
 			<div id="torrent-results"></div>
 		</div>
 	</section>
+}
+
+// releaseDates says when a movie first came out in cinemas, digitally and on
+// disc, anywhere: what kinds of releases its sources can be by now.
+templ releaseDates(rel tmdb.Releases, now time.Time) {
+	if !rel.Cinema.IsZero() || !rel.Digital.IsZero() || !rel.Physical.IsZero() {
+		<div class="space-y-2">
+			<ul class="flex flex-wrap gap-2" aria-label={ tr(ctx, "Release dates") }>
+				@releaseDate("clapperboard", "In cinemas", rel.Cinema, now)
+				@releaseDate("monitor-play", "Digital", rel.Digital, now)
+				@releaseDate("disc-3", "DVD / Blu-ray", rel.Physical, now)
+			</ul>
+			if onlyInCinemas(rel, now) {
+				<div role="note" class="alert alert-warning alert-soft text-sm">
+					@Icon("info", "size-4")
+					<span>{ tr(ctx, "Not out digitally yet: its sources are likely only cinema recordings (CAMRip, TS).") }</span>
+				</div>
+			}
+		</div>
+	}
+}
+
+templ releaseDate(icon, label string, day, now time.Time) {
+	if !day.IsZero() {
+		<li class="badge badge-lg badge-ghost gap-1.5">
+			@Icon(icon, "size-4 opacity-70")
+			<span class="text-base-content/70">{ tr(ctx, label) }</span>
+			<span class="font-medium">{ i18n.Date(ctx, day) }</span>
+			if day.After(now) {
+				<span class="text-base-content/70">({ tr(ctx, "expected") })</span>
+			}
+		</li>
+	}
+}
+
+// cinemaWindow is about how long a movie plays in cinemas before it comes
+// out digitally or on disc.
+const cinemaWindow = 120 * 24 * time.Hour
+
+// onlyInCinemas is whether a movie is out in cinemas but not yet digitally
+// or on disc, so trackers can only have recordings of a screening. A date
+// TMDB does not know is not a release still to come: it takes a home
+// release announced for later, or a cinema release recent enough that one
+// is unlikely to be out yet.
+func onlyInCinemas(rel tmdb.Releases, now time.Time) bool {
+	if rel.Cinema.IsZero() || rel.Cinema.After(now) {
+		return false
+	}
+	out := func(day time.Time) bool { return !day.IsZero() && !day.After(now) }
+	if out(rel.Digital) || out(rel.Physical) {
+		return false
+	}
+	announced := rel.Digital.After(now) || rel.Physical.After(now)
+	return announced || now.Sub(rel.Cinema) < cinemaWindow
 }
 
 // searchQualities are the qualities JacRed files releases under, as picked
