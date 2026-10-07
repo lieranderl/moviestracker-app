@@ -3,6 +3,9 @@ package views
 import (
 	"context"
 	"slices"
+	"time"
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
+	"strconv"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/jacred"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
@@ -12,7 +15,7 @@ import (
 )
 
 // mediaPageSignals is the client state shared by the movie and TV pages.
-const mediaPageSignals = `{ videoOpen: false, videoKey: '', videoTitle: '', torrMagnet: '', sending: false, trackers: [], voices: [], toast: '', toastError: false }`
+const mediaPageSignals = `{ videoOpen: false, videoKey: '', videoTitle: '', torrMagnet: '', sending: false, trackers: [], voices: [], hideRecordings: false, toast: '', toastError: false }`
 
 // videoClick opens the trailer dialog for any element carrying data-video.
 // Keys and names travel in data-* attributes, never inside the expression.
@@ -141,7 +144,7 @@ templ sectionHeading(title, subtitle string) {
 		<div>
 			<h2 class="text-xl sm:text-2xl font-bold tracking-tight">{ title }</h2>
 			if subtitle != "" {
-				<p class="text-sm text-base-content/60">{ subtitle }</p>
+				<p class="text-sm text-base-content/70">{ subtitle }</p>
 			}
 		</div>
 		{ children... }
@@ -223,14 +226,14 @@ templ personTile(id int, name, role, imageURL string) {
 			</div>
 		} else {
 			<div class="avatar avatar-placeholder">
-				<div class="w-24 sm:w-28 rounded-full bg-base-300 text-base-content/60 ring-1 ring-base-content/10 group-hover:ring-primary transition">
+				<div class="w-24 sm:w-28 rounded-full bg-base-300 text-base-content/70 ring-1 ring-base-content/10 group-hover:ring-primary transition">
 					<span class="text-2xl font-semibold">{ initials(name) }</span>
 				</div>
 			</div>
 		}
 		<span class="text-sm font-semibold leading-tight line-clamp-2 group-hover:text-primary transition-colors">{ name }</span>
 		if role != "" {
-			<span class="text-xs text-base-content/60 leading-tight line-clamp-2">{ role }</span>
+			<span class="text-xs text-base-content/70 leading-tight line-clamp-2">{ role }</span>
 		}
 	</a>
 }
@@ -261,7 +264,7 @@ templ videoRail(videos []tmdb.Video) {
 							</span>
 						</span>
 						<span class="block text-sm font-semibold line-clamp-1 group-hover:text-primary">{ v.Name }</span>
-						<span class="block text-xs text-base-content/60">{ tr(ctx, v.Type) }</span>
+						<span class="block text-xs text-base-content/70">{ tr(ctx, v.Type) }</span>
 					</button>
 				</li>
 			}
@@ -393,11 +396,11 @@ func sourcesSignals(ctx context.Context, mediaType string, selected int) string 
 
 // sourcesSection searches JacRed only when the user asks; series search one
 // season at a time. The TorrServer status badge loads on its own.
-templ sourcesSection(mediaType string, item tmdb.MediaItem, seasons []tmdb.SeasonSummary, selected int) {
+templ sourcesSection(mediaType string, item tmdb.MediaItem, seasons []tmdb.SeasonSummary, selected int, releases tmdb.Releases) {
 	{{ id := item.ID }}
 	<section id="sources" class="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-5 scroll-mt-20" data-signals={ sourcesSignals(ctx, mediaType, selected) } data-media-id={ fmt.Sprint(id) } data-media-type={ mediaType } data-title={ PageTitle(item) } data-poster={ item.PosterURL() }
 		if siteOf(ctx).Cloud {
-			data-effect="localStorage.setItem('mt-ts-selected', $tsSelected); tsResetAdd(el, $tsSelected)"
+			data-effect="localStorage.setItem('mt-ts-selected', $tsSelected); $_tsNavUrl = $tsSelected; tsResetAdd(el, $tsSelected)"
 			data-on:ts-added={ "$sending = evt.detail.adding; $_tsAddResult = evt.detail; if (evt.detail.ok) { $toastError = false; $toast = " + trJS(ctx, "Added to TorrServer") + " }" }
 		}
 	>
@@ -410,6 +413,7 @@ templ sourcesSection(mediaType string, item tmdb.MediaItem, seasons []tmdb.Seaso
 				</div>
 			}
 		}
+		@releaseDates(releases, time.Now())
 		<div id="torr-activity"></div>
 		if siteOf(ctx).Cloud {
 			@webSourceProblems()
@@ -423,7 +427,7 @@ templ sourcesSection(mediaType string, item tmdb.MediaItem, seasons []tmdb.Seaso
 					data-on:change={ researchSources(SourcesSearch(mediaType, id)) }
 				>
 					for _, s := range seasons {
-						<option value={ fmt.Sprint(s.Number) } selected?={ s.Number == selected }>{ seasonLabel(ctx, s) }</option>
+						<option value={ fmt.Sprint(s.Number) } selected?={ s.Number == selected }>{ seasonSourcesLabel(ctx, s) }</option>
 					}
 				</select>
 			}
@@ -447,6 +451,60 @@ templ sourcesSection(mediaType string, item tmdb.MediaItem, seasons []tmdb.Seaso
 			<div id="torrent-results"></div>
 		</div>
 	</section>
+}
+
+// releaseDates says when a movie first came out in cinemas, digitally and on
+// disc, anywhere: what kinds of releases its sources can be by now.
+templ releaseDates(rel tmdb.Releases, now time.Time) {
+	if !rel.Cinema.IsZero() || !rel.Digital.IsZero() || !rel.Physical.IsZero() {
+		<div class="space-y-2">
+			<ul class="flex flex-wrap gap-2" aria-label={ tr(ctx, "Release dates") }>
+				@releaseDate("clapperboard", "In cinemas", rel.Cinema, now)
+				@releaseDate("monitor-play", "Digital", rel.Digital, now)
+				@releaseDate("disc-3", "DVD / Blu-ray", rel.Physical, now)
+			</ul>
+			if onlyInCinemas(rel, now) {
+				<div role="note" class="alert alert-warning alert-soft text-sm">
+					@Icon("info", "size-4")
+					<span>{ tr(ctx, "Not out digitally yet: its sources are likely only cinema recordings (CAMRip, TS).") }</span>
+				</div>
+			}
+		</div>
+	}
+}
+
+templ releaseDate(icon, label string, day, now time.Time) {
+	if !day.IsZero() {
+		<li class="badge badge-lg badge-ghost gap-1.5">
+			@Icon(icon, "size-4 opacity-70")
+			<span class="text-base-content/70">{ tr(ctx, label) }</span>
+			<span class="font-medium">{ i18n.Date(ctx, day) }</span>
+			if day.After(now) {
+				<span class="text-base-content/70">({ tr(ctx, "expected") })</span>
+			}
+		</li>
+	}
+}
+
+// cinemaWindow is about how long a movie plays in cinemas before it comes
+// out digitally or on disc.
+const cinemaWindow = 120 * 24 * time.Hour
+
+// onlyInCinemas is whether a movie is out in cinemas but not yet digitally
+// or on disc, so trackers can only have recordings of a screening. A date
+// TMDB does not know is not a release still to come: it takes a home
+// release announced for later, or a cinema release recent enough that one
+// is unlikely to be out yet.
+func onlyInCinemas(rel tmdb.Releases, now time.Time) bool {
+	if rel.Cinema.IsZero() || rel.Cinema.After(now) {
+		return false
+	}
+	out := func(day time.Time) bool { return !day.IsZero() && !day.After(now) }
+	if out(rel.Digital) || out(rel.Physical) {
+		return false
+	}
+	announced := rel.Digital.After(now) || rel.Physical.After(now)
+	return announced || now.Sub(rel.Cinema) < cinemaWindow
 }
 
 // searchQualities are the qualities JacRed files releases under, as picked
@@ -496,7 +554,7 @@ templ TorrServerStatus(online bool, version, endpoint string) {
 
 templ TorrentSearching(title string) {
 	<div id="torrent-results" class="space-y-3" aria-busy="true">
-		<p class="text-sm text-base-content/60 inline-flex items-center gap-2">
+		<p class="text-sm text-base-content/70 inline-flex items-center gap-2">
 			<span class="loading loading-dots loading-sm text-primary"></span>
 			if title != "" {
 				<span>{ tr(ctx, "Searching JacRed for") } <span class="font-semibold">{ title }</span>…</span>
@@ -530,6 +588,30 @@ func qualityTone(label string) string {
 	default:
 		return "badge-ghost"
 	}
+}
+
+// typicalMbps are the bitrates, low to high, usual for a release of each
+// vertical resolution: below is starved, above is generous.
+var typicalMbps = []struct {
+	quality   int
+	low, high float64
+}{{2160, 12, 35}, {1080, 4, 14}, {720, 2, 6}, {0, 0.8, 2.5}}
+
+// bitrateTone colours a release's bitrate against what is usual for its
+// quality: warning when low, success when high.
+func bitrateTone(quality int, mbps float64) string {
+	for _, t := range typicalMbps {
+		if quality >= t.quality {
+			switch {
+			case mbps < t.low:
+				return "text-warning"
+			case mbps > t.high:
+				return "text-success"
+			}
+			return ""
+		}
+	}
+	return ""
 }
 
 // trackerCount is a tracker and how many releases it has.
@@ -604,6 +686,7 @@ var sortOptions = []struct{ Key, Label string }{
 	{"seeders", "Seeders"},
 	{"date", "Newest"},
 	{"size", "Size"},
+	{"bitrate", "Bitrate"},
 }
 
 // TorrentResults lists releases sorted by sort; search re-runs the query
@@ -617,14 +700,24 @@ templ TorrentResults(results []jacred.Result, sort, search string) {
 			</div>
 		} else {
 			<div class="flex flex-wrap items-center justify-between gap-3">
-			@trackerFilter(results)
-			@voiceFilter(results)
+			<div class="flex flex-wrap items-center gap-2">
+				@trackerFilter(results)
+				@voiceFilter(results)
+				if hasRecordings(results) {
+					<label class="label text-sm gap-2 cursor-pointer ml-1">
+						<input type="checkbox" class="toggle toggle-sm toggle-warning" data-bind="hideRecordings"/>
+						{ tr(ctx, "Hide cinema recordings") }
+					</label>
+				}
+			</div>
 			<div class="join" role="group" aria-label={ tr(ctx, "Sort releases") }>
 				for _, o := range sortOptions {
 					<button
 						type="button"
-						class={ "btn btn-sm join-item", templ.KV("btn-active", o.Key == sort) }
-						data-class={ fmt.Sprintf("{ 'btn-active': $sort === '%s' }", o.Key) }
+						class={ "btn btn-sm join-item", templ.KV("btn-primary", o.Key == sort) }
+						aria-pressed={ strconv.FormatBool(o.Key == sort) }
+						data-class={ fmt.Sprintf("{ 'btn-primary': $sort === '%s' }", o.Key) }
+						data-attr:aria-pressed={ fmt.Sprintf("$sort === '%s'", o.Key) }
 						data-on:click={ fmt.Sprintf("$sort = '%s'; %s", o.Key, search) }
 					>{ tr(ctx, o.Label) }</button>
 				}
@@ -650,19 +743,11 @@ templ TorrentResults(results []jacred.Result, sort, search string) {
 templ trackerFilter(results []jacred.Result) {
 	{{ trackers := trackerCounts(results) }}
 	if len(trackers) > 1 {
-		<div role="group" aria-label={ tr(ctx, "Filter by tracker") } class="basis-full order-last flex flex-wrap items-center gap-2">
-			<span class="text-xs font-medium text-base-content/60 mr-1">{ tr(ctx, "Trackers") }</span>
-			<button type="button" class="btn btn-xs sm:btn-sm gap-1.5" data-class="{ 'btn-primary': !$trackers.some(Boolean) }" data-on:click="$trackers = $trackers.map(() => '')">
-				{ tr(ctx, "All") } <span class="badge badge-xs">{ fmt.Sprint(len(results)) }</span>
-			</button>
-			for _, t := range trackers {
-				<label class="btn btn-xs sm:btn-sm gap-1.5 has-checked:btn-primary has-focus-visible:outline-2 has-focus-visible:outline-primary">
-					<input type="checkbox" class="sr-only" value={ t.Name } data-bind="trackers"/>
-					{ trackerName(t.Name) }
-					<span class="badge badge-xs">{ fmt.Sprint(t.Count) }</span>
-				</label>
-			}
-		</div>
+		{{ options := make([]filterOption, 0, len(trackers)) }}
+		for _, t := range trackers {
+			{{ options = append(options, filterOption{Value: t.Name, Label: trackerName(t.Name), Count: t.Count}) }}
+		}
+		@filterDropdown("trackers", "Trackers", "Filter by tracker", "server", options)
 	}
 }
 
@@ -672,31 +757,97 @@ templ trackerFilter(results []jacred.Result) {
 templ voiceFilter(results []jacred.Result) {
 	{{ voices := voiceCounts(results) }}
 	if len(voices) > 1 {
-		<div role="group" aria-label={ tr(ctx, "Filter by voice") } class="basis-full order-last flex flex-wrap items-center gap-2">
-			<span class="text-xs font-medium text-base-content/60 mr-1">{ tr(ctx, "Voices") }</span>
-			<button type="button" class="btn btn-xs sm:btn-sm gap-1.5" data-class="{ 'btn-primary': !$voices.some(Boolean) }" data-on:click="$voices = $voices.map(() => '')">
-				{ tr(ctx, "All") }
-			</button>
-			for _, v := range voices {
-				<label class="btn btn-xs sm:btn-sm gap-1.5 has-checked:btn-primary has-focus-visible:outline-2 has-focus-visible:outline-primary">
-					<input type="checkbox" class="sr-only" value={ v.Name } data-bind="voices"/>
-					{ v.Name }
-					<span class="badge badge-xs">{ fmt.Sprint(v.Count) }</span>
-				</label>
-			}
-		</div>
+		{{ options := make([]filterOption, 0, len(voices)) }}
+		for _, v := range voices {
+			{{ options = append(options, filterOption{Value: v.Name, Label: v.Name, Count: v.Count}) }}
+		}
+		@filterDropdown("voices", "Voices", "Filter by voice", "mic", options)
 	}
+}
+
+// filterOption is one choice of a filter dropdown: its value in the
+// signal, its name, and how many releases it has.
+type filterOption struct {
+	Value, Label string
+	Count        int
+}
+
+// filterDropdown picks any number of options into $signal, one checkbox
+// slot each; its button says how many are picked, or All. Option values
+// come from JacRed and stay in values, never in expressions.
+templ filterDropdown(signal, label, ariaLabel, icon string, options []filterOption) {
+	<div class="dropdown" role="group" aria-label={ tr(ctx, ariaLabel) }>
+		<div tabindex="0" role="button" class="btn btn-sm gap-1.5" data-class={ fmt.Sprintf("{ 'btn-primary': $%s.some(Boolean) }", signal) }>
+			@Icon(icon, "size-4")
+			{ tr(ctx, label) }
+			<span class="badge badge-xs" data-text={ fmt.Sprintf("$%s.filter(Boolean).length || %s", signal, trJS(ctx, "All")) }>{ tr(ctx, "All") }</span>
+			@Icon("chevron-down", "size-3.5 opacity-60")
+		</div>
+		<ul tabindex="-1" class="dropdown-content menu menu-sm flex-nowrap bg-base-200 rounded-box z-30 mt-1 w-64 max-h-80 overflow-y-auto p-2 shadow-xl border border-base-content/10">
+			<li>
+				<button type="button" data-class={ fmt.Sprintf("{ 'menu-active': !$%s.some(Boolean) }", signal) } data-on:click={ fmt.Sprintf("$%s = $%s.map(() => '')", signal, signal) }>{ tr(ctx, "All") }</button>
+			</li>
+			for _, o := range options {
+				<li>
+					<label class="flex justify-between gap-2">
+						<span class="flex items-center gap-2 min-w-0">
+							<input type="checkbox" class="checkbox checkbox-xs checkbox-primary" value={ o.Value } data-bind={ signal }/>
+							<span class="truncate">{ o.Label }</span>
+						</span>
+						<span class="badge badge-xs">{ fmt.Sprint(o.Count) }</span>
+					</label>
+				</li>
+			}
+		</ul>
+	</div>
+}
+
+// formatBadges are what a release's name says it is; a cinema recording's
+// source warns.
+templ formatBadges(f jacred.Format) {
+	if f.Source != "" || f.Codec != "" || f.TenBit || f.Audio != "" {
+		<p class="flex flex-wrap gap-1">
+			if f.Source != "" {
+				<span class={ "badge badge-xs font-semibold", templ.KV("badge-warning", f.Recording), templ.KV("badge-soft", !f.Recording) } title={ formatTitle(ctx, f) }>{ f.Source }</span>
+			}
+			if f.Codec != "" {
+				<span class="badge badge-xs badge-ghost">{ f.Codec }</span>
+			}
+			if f.TenBit {
+				<span class="badge badge-xs badge-ghost">10-bit</span>
+			}
+			if f.Audio != "" {
+				<span class="badge badge-xs badge-ghost">{ f.Audio }</span>
+			}
+		</p>
+	}
+}
+
+func formatTitle(ctx context.Context, f jacred.Format) string {
+	if f.Recording {
+		return tr(ctx, "Recorded in a cinema")
+	}
+	return ""
+}
+
+// hasRecordings is whether any release is a cinema recording.
+func hasRecordings(results []jacred.Result) bool {
+	return slices.ContainsFunc(results, func(r jacred.Result) bool { return r.Format().Recording })
 }
 
 // rowShown is whether a release row matches the tracker and voice filters.
 const rowShown = `(!$trackers.some(Boolean) || $trackers.includes(el.dataset.tracker)) && ` +
-	`(!$voices.some(Boolean) || el.dataset.voices.split('|').some(v => v && $voices.includes(v)))`
+	`(!$voices.some(Boolean) || el.dataset.voices.split('|').some(v => v && $voices.includes(v))) && ` +
+	`!($hideRecordings && el.dataset.recording)`
 
 templ torrentRow(r jacred.Result) {
 	<li
 		class="list-row items-center gap-3 sm:gap-4"
 		data-tracker={ r.Tracker }
 		data-voices={ strings.Join(r.Voices, "|") }
+		if r.Format().Recording {
+			data-recording="true"
+		}
 		data-show={ rowShown }
 	>
 		<div class="flex flex-col items-center gap-1 w-14">
@@ -707,10 +858,16 @@ templ torrentRow(r jacred.Result) {
 		</div>
 		<div class="min-w-0 list-col-grow space-y-1">
 			<p class="text-sm font-medium leading-snug line-clamp-2 break-words" title={ r.Title }>{ r.Title }</p>
-			<p class="text-xs text-base-content/60 flex flex-wrap items-center gap-x-3 gap-y-1">
+			@formatBadges(r.Format())
+			<p class="text-xs text-base-content/70 flex flex-wrap items-center gap-x-3 gap-y-1">
 				<span class="font-mono">{ r.Tracker }</span>
 				if r.SizeName != "" {
 					<span>{ r.SizeName }</span>
+				}
+				if mbps := r.Mbps(); mbps > 0 {
+					<span class={ "font-medium tabular-nums", bitrateTone(r.Quality, mbps) } title={ trf(ctx, "Estimated: size over %d min, audio included", int(r.Runtime.Minutes())) }>
+						≈ { trf(ctx, "%s Mbps", strconv.FormatFloat(mbps, 'f', 1, 64)) }
+					</span>
 				}
 				if !r.CreatedAt.IsZero() {
 					<span title={ tr(ctx, "Added") }>{ r.CreatedAt.Format("2006-01-02") }</span>

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/a-h/templ"
+	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 )
 
@@ -27,14 +29,12 @@ func TestThemeSwitcherRendering(t *testing.T) {
 		`class="lucide shrink-0 size-4 text-warning"`,
 		`class="lucide shrink-0 size-4 text-primary"`,
 		`class="lucide shrink-0 size-4 text-accent"`,
-		`$theme = 'githublight'`,
-		`$theme = 'githubdark'`,
+		`$theme = 'light'`,
+		`$theme = 'dark'`,
 		`$theme = 'system'`,
 		`Light`,
 		`Dark`,
 		`System`,
-		`githublight`,
-		`githubdark`,
 		`auto`,
 	}
 
@@ -56,8 +56,8 @@ func TestLayoutThemeSignals(t *testing.T) {
 
 	out := html.UnescapeString(buf.String())
 
-	// Layout should not hardcode data-theme="githubdark" on <html>
-	if strings.Contains(out, `data-theme="githubdark"`) {
+	// Layout should not hardcode data-theme on <html>
+	if strings.Contains(out, `data-theme="`) {
 		t.Errorf("Layout should not hardcode data-theme on <html> tag to allow system theme detection")
 	}
 
@@ -99,5 +99,27 @@ func TestLoginIncludesThemeSwitcher(t *testing.T) {
 
 	if !strings.Contains(html, `aria-label="Theme switcher"`) {
 		t.Errorf("Login should include ThemeSwitcher component")
+	}
+}
+
+func TestTheNavbarChecksTorrServerTheWayItsSiteSays(t *testing.T) {
+	user := &auth.User{Name: "Ann", Username: "ann"}
+	check := templ.OrderedAttributes{{Key: "data-init", Value: "@get('/check')"}}
+	var buf bytes.Buffer
+	if err := views.Navbar(user).Render(views.WithSite(context.Background(), views.Site{TorrServerCheck: check}), &buf); err != nil {
+		t.Fatal(err)
+	}
+	out := html.UnescapeString(buf.String())
+	for _, want := range []string{`id="ts-nav-status"`, `data-init="@get('/check')"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the navbar lacks %q", want)
+		}
+	}
+	buf.Reset()
+	if err := views.Navbar(user).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), `id="ts-nav-status"`) {
+		t.Error("a site that gives no way to check TorrServer shows no status")
 	}
 }

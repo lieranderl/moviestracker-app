@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/a-h/templ"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/config"
 	"github.com/lieranderl/moviestracker-app/internal/handlers"
@@ -18,6 +19,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/releases"
 	"github.com/lieranderl/moviestracker-app/internal/sources"
 	"github.com/lieranderl/moviestracker-app/internal/store"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 	webstatic "github.com/lieranderl/moviestracker-app/static"
 )
@@ -133,10 +135,43 @@ func (a *app) handleHome(w http.ResponseWriter, r *http.Request) {
 		a.catalog.Home(w, r)
 		return
 	}
-	if err := views.WebSignIn().Render(r.Context(), w); err != nil {
+	if err := views.WebSignIn(a.signInPosters(r.Context())).Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "home", "error", err)
 	}
 }
+
+// signInPosters are this week's trending posters for the sign-in page, or
+// none when TMDB is not set up or does not answer in time. The catalog is
+// the one the signed-in home page shows and caches, so it is fetched with
+// the home page's own timeout, apart from this request: the page waits for
+// it only briefly, and a slow TMDB still leaves a whole catalog behind.
+func (a *app) signInPosters(ctx context.Context) []tmdb.MediaItem {
+	provider := a.cfg.Sources.Catalog
+	if provider == nil {
+		return nil
+	}
+	fetched := make(chan []tmdb.MediaItem, 1)
+	go func() {
+		fetchCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), catalogTimeout)
+		defer cancel()
+		c, err := provider.GetCatalog(fetchCtx)
+		if err != nil {
+			slog.Warn("sign-in posters unavailable", "error", err)
+		}
+		fetched <- views.SignInPosters(c)
+	}()
+	select {
+	case posters := <-fetched:
+		return posters
+	case <-time.After(signInPostersWait):
+		return nil
+	case <-ctx.Done():
+		return nil
+	}
+}
+
+// signInPostersWait keeps a slow TMDB from holding up the sign-in page.
+const signInPostersWait = 2 * time.Second
 
 // saveLanguage keeps the language a signed-in user picked, so their other
 // browsers follow it when they sign in there.
@@ -174,8 +209,20 @@ func (a *app) catalogUser(r *http.Request) *auth.User {
 
 // webSite marks every page as the web app's, so shared views show its
 // navigation.
+// torrServerCheck is how the web app's navbar learns whether the visitor's
+// TorrServer answers: this server cannot reach it, so the browser checks the
+// one last picked ($_tsNavUrl, which the pages that pick one update), at
+// once when the pick changes and again every minute. tsCheck fires
+// ts-status on the element.
+var torrServerCheck = templ.OrderedAttributes{
+	{Key: "data-signals:_ts-nav-url", Value: "localStorage.getItem('mt-ts-selected') || ''"},
+	{Key: "data-effect", Value: "$_tsNavUrl ? tsCheck(el, $_tsNavUrl) : ($_tsNav = 'none')"},
+	{Key: "data-on-interval__duration.60s", Value: "$_tsNavUrl && tsCheck(el, $_tsNavUrl)"},
+	{Key: "data-on:ts-status", Value: "$_tsNav = evt.detail.checking ? 'checking' : (evt.detail.ok ? 'online' : 'offline')"},
+}
+
 func webSite(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		next.ServeHTTP(w, r.WithContext(views.WithSite(r.Context(), views.Site{Cloud: true})))
+		next.ServeHTTP(w, r.WithContext(views.WithSite(r.Context(), views.Site{Cloud: true, TorrServerCheck: torrServerCheck})))
 	})
 }

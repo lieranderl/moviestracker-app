@@ -43,13 +43,7 @@ templ authPage(title string) {
 templ authPageAt(title, home string) {
 	@Layout(title) {
 		<main class="relative grow bg-base-200/50 flex flex-col">
-			<div class="flex items-center justify-between px-4 sm:px-8 py-4">
-				@brand(home)
-				<div class="flex items-center gap-2">
-					@LanguageSwitcher()
-					@ThemeSwitcher()
-				</div>
-			</div>
+			@authTopBar(home)
 			<div class="grow flex items-center justify-center px-4 pb-12">
 				<div id="login-card" class="card w-full max-w-xl bg-base-100 shadow-xl border border-base-content/10">
 					{ children... }
@@ -58,6 +52,17 @@ templ authPageAt(title, home string) {
 			@footer(false)
 		</main>
 	}
+}
+
+// authTopBar is the signed-out pages' brand with the language and theme pickers.
+templ authTopBar(home string) {
+	<div class="flex items-center justify-between px-4 sm:px-8 py-4">
+		@brand(home)
+		<div class="flex items-center gap-2">
+			@LanguageSwitcher()
+			@ThemeSwitcher()
+		</div>
+	</div>
 }
 
 templ stepHeader(step, title, body string) {
@@ -130,7 +135,7 @@ templ SignInStep(errorMsg string) {
 				</button>
 			</fieldset>
 		</form>
-		<a href="/login?review=1" class="link link-hover text-xs text-base-content/60 text-center">{ tr(ctx, "Review the disclaimer") }</a>
+		<a href="/login?review=1" class="link link-hover text-xs text-base-content/70 text-center">{ tr(ctx, "Review the disclaimer") }</a>
 	</div>
 }
 
@@ -151,7 +156,7 @@ templ disclaimerList() {
 						}
 					</p>
 					if p.Note != "" {
-						<p class="text-xs text-base-content/60 italic">{ tr(ctx, p.Note) }</p>
+						<p class="text-xs text-base-content/70 italic">{ tr(ctx, p.Note) }</p>
 					}
 				</div>
 			</li>

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/i18n"
 )
@@ -19,6 +20,22 @@ type SeasonSummary struct {
 	AirDate      string `json:"air_date"`
 	PosterPath   string `json:"poster_path"`
 	Overview     string `json:"overview"`
+	// Aired is how many of its episodes are out while the season airs;
+	// zero once it has finished, or before it starts. See SeasonsSoFar.
+	Aired int `json:"-"`
+}
+
+// SeasonsSoFar are the series' seasons, the one still airing with how many
+// of its episodes are out by the latest episode.
+func (t TVDetails) SeasonsSoFar() []SeasonSummary {
+	out := slices.Clone(t.Seasons)
+	last := t.LastEpisode
+	for i, s := range out {
+		if last.Number > 0 && s.Number == last.Season && last.Number < s.EpisodeCount {
+			out[i].Aired = last.Number
+		}
+	}
+	return out
 }
 
 // PosterURL returns the w500 season poster URL or empty string.
@@ -37,14 +54,41 @@ type TVDetails struct {
 	NumberOfSeasons  int
 	NumberOfEpisodes int
 	EpisodeRuntime   int
-	Genres           []Genre
-	Creators         []CrewMember
-	Networks         []string
-	Seasons          []SeasonSummary
-	Cast             []CastMember
-	Videos           []Video
-	Recommendations  []MediaItem
-	Similar          []MediaItem
+	// LastEpisode is the latest episode aired, NextEpisode the one to air
+	// next: zero when there is none.
+	LastEpisode, NextEpisode Airing
+	Genres                   []Genre
+	Creators                 []CrewMember
+	Networks                 []string
+	Seasons                  []SeasonSummary
+	Cast                     []CastMember
+	Videos                   []Video
+	Recommendations          []MediaItem
+	Similar                  []MediaItem
+}
+
+// Airing is an episode of a series and the day it airs.
+type Airing struct {
+	Season, Number int
+	Name           string
+	AirDate        time.Time
+}
+
+// rawAiring is TMDB's last_episode_to_air or next_episode_to_air.
+type rawAiring struct {
+	Season  int    `json:"season_number"`
+	Number  int    `json:"episode_number"`
+	Name    string `json:"name"`
+	AirDate string `json:"air_date"`
+	Runtime int    `json:"runtime"`
+}
+
+func (r rawAiring) airing() Airing {
+	if r.Number == 0 {
+		return Airing{}
+	}
+	day, _ := time.Parse(time.DateOnly, r.AirDate)
+	return Airing{Season: r.Season, Number: r.Number, Name: r.Name, AirDate: day}
 }
 
 // YearRange renders "2008–2013" for ended runs, "2008–" for ongoing ones.
@@ -130,12 +174,11 @@ type rawTV struct {
 	NumberSeasons  int             `json:"number_of_seasons"`
 	NumberEpisodes int             `json:"number_of_episodes"`
 	EpisodeRunTime []int           `json:"episode_run_time"`
-	LastEpisode    struct {
-		Runtime int `json:"runtime"`
-	} `json:"last_episode_to_air"`
-	Genres    []Genre      `json:"genres"`
-	CreatedBy []CrewMember `json:"created_by"`
-	Networks  []struct {
+	LastEpisode    rawAiring       `json:"last_episode_to_air"`
+	NextEpisode    rawAiring       `json:"next_episode_to_air"`
+	Genres         []Genre         `json:"genres"`
+	CreatedBy      []CrewMember    `json:"created_by"`
+	Networks       []struct {
 		Name string `json:"name"`
 	} `json:"networks"`
 	ContentRatings struct {
@@ -192,6 +235,7 @@ func (c *Client) TV(ctx context.Context, id int) (*TVDetails, error) {
 			Recommendations:  relatedTitles(raw.Recommendations.Results, "tv"),
 			Similar:          relatedTitles(raw.Similar.Results, "tv"),
 		}
+		t.LastEpisode, t.NextEpisode = raw.LastEpisode.airing(), raw.NextEpisode.airing()
 		t.ImdbID = raw.ExternalIDs.IMDb
 		t.LogoPath = selectLogo(raw.Images.Logos, lang)
 		t.TrailerKey = selectTrailer(raw.Videos.Results, lang)

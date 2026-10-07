@@ -133,7 +133,7 @@ templ settingInput(section string, f SettingField) {
 					<label class="input w-full max-w-xs">
 						<input id={ "setting-" + section + "-" + f.Key } type="number" class="grow font-mono" min={ fmt.Sprint(f.Min) } max={ fmt.Sprint(f.Max) } data-bind={ bind } disabled?={ f.ReadOnly != "" }/>
 						if f.Unit != "" {
-							<span class="text-xs text-base-content/60">{ tr(ctx, f.Unit) }</span>
+							<span class="text-xs text-base-content/70">{ tr(ctx, f.Unit) }</span>
 						}
 					</label>
 				case "select":
@@ -150,7 +150,7 @@ templ settingInput(section string, f SettingField) {
 			if f.ReadOnly != "" {
 				<p class="text-xs text-warning">{ tr(ctx, f.ReadOnly) }</p>
 			} else if f.Help != "" {
-				<p class="text-xs text-base-content/60">{ tr(ctx, f.Help) }</p>
+				<p class="text-xs text-base-content/70">{ tr(ctx, f.Help) }</p>
 			}
 		</div>
 	</div>
@@ -271,7 +271,7 @@ templ settingsFormBody(s SettingsSection, transport settingsFormTransport) {
 					</button>
 				}
 				if s.Cost != "" {
-					<span class="text-xs text-base-content/60">{ tr(ctx, s.Cost) }</span>
+					<span class="text-xs text-base-content/70">{ tr(ctx, s.Cost) }</span>
 				}
 			</div>
 			if s.Playing > 0 {

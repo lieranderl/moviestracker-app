@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/i18n"
 )
@@ -112,6 +113,8 @@ type MovieDetails struct {
 	// Collection is the series of films the movie belongs to; nil when it
 	// belongs to none, or TMDB did not send it in time.
 	Collection *Collection
+	// Releases are when the movie first came out of each kind, anywhere.
+	Releases Releases
 
 	collectionID int
 }
@@ -174,6 +177,7 @@ type rawMovie struct {
 			Dates   []struct {
 				Certification string `json:"certification"`
 				Type          int    `json:"type"`
+				Date          string `json:"release_date"`
 			} `json:"release_dates"`
 		} `json:"results"`
 	} `json:"release_dates"`
@@ -239,6 +243,9 @@ func (c *Client) movie(ctx context.Context, id int) (*MovieDetails, error) {
 		m.LogoPath = selectLogo(raw.Images.Logos, lang)
 		m.TrailerKey = selectTrailer(raw.Videos.Results, lang)
 		for _, country := range raw.ReleaseDates.Results {
+			for _, d := range country.Dates {
+				m.Releases.add(d.Type, d.Date)
+			}
 			if country.Country != "US" {
 				continue
 			}
@@ -413,4 +420,43 @@ func (c *Client) getJSON(ctx context.Context, path string, query url.Values, out
 		return fmt.Errorf("decode tmdb %s: %w", path, err)
 	}
 	return nil
+}
+
+// Releases are a movie's first release of each kind in any country: when
+// releases of that kind start to appear. Zero when TMDB knows of none.
+type Releases struct {
+	Cinema   time.Time // limited or wide, not a premiere
+	Digital  time.Time
+	Physical time.Time // DVD, Blu-ray
+}
+
+// TMDB's release types.
+const (
+	releaseLimited  = 2
+	releaseCinema   = 3
+	releaseDigital  = 4
+	releasePhysical = 5
+)
+
+// add keeps the release of kind on date when it is that kind's earliest.
+func (r *Releases) add(kind int, date string) {
+	day, err := time.Parse(time.RFC3339, date)
+	if err != nil {
+		return
+	}
+	day = time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+	var first *time.Time
+	switch kind {
+	case releaseLimited, releaseCinema:
+		first = &r.Cinema
+	case releaseDigital:
+		first = &r.Digital
+	case releasePhysical:
+		first = &r.Physical
+	default:
+		return
+	}
+	if first.IsZero() || day.Before(*first) {
+		*first = day
+	}
 }

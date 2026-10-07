@@ -103,7 +103,7 @@ func Setup(askCode bool) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</span> <input type=\"text\" required autocomplete=\"one-time-code\" autocapitalize=\"characters\" spellcheck=\"false\" maxlength=\"32\" placeholder=\"XXXX-XXXX\" class=\"grow font-mono\" data-bind:setup-code></label><p class=\"text-xs text-base-content/60\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</span> <input type=\"text\" required autocomplete=\"one-time-code\" autocapitalize=\"characters\" spellcheck=\"false\" maxlength=\"32\" placeholder=\"XXXX-XXXX\" class=\"grow font-mono\" data-bind:setup-code></label><p class=\"text-xs text-base-content/70\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

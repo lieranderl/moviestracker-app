@@ -126,6 +126,23 @@ type titleInfo struct {
 	label  string
 	poster string
 	tv     *tmdb.TVDetails // set for series
+	// minutes a movie runs, and how many episodes the searched season has:
+	// what a release's bitrate is estimated over.
+	minutes, seasonEpisodes int
+}
+
+// withRuntimes is a copy of results (which JacRed's cache shares), each
+// timed by how long it plays: the movie, or the season's episodes it holds.
+func (t titleInfo) withRuntimes(results []jacred.Result) []jacred.Result {
+	out := slices.Clone(results)
+	for i, r := range out {
+		minutes := t.minutes
+		if t.tv != nil {
+			minutes = t.tv.EpisodeRuntime * r.Episodes(t.seasonEpisodes)
+		}
+		out[i].Runtime = time.Duration(minutes) * time.Minute
+	}
+	return out
 }
 
 // lookupTitle resolves ?type=movie|tv&id=N through TMDB, so clients can only
@@ -159,17 +176,18 @@ func (c *Catalog) lookupTitle(ctx context.Context, r *http.Request) (titleInfo, 
 	}
 	year, _ := strconv.Atoi(movie.ReleaseYear())
 	return titleInfo{
-		id:     id,
-		query:  jacred.Query{Title: movie.Title, OriginalTitle: movie.OriginalTitle, Year: year},
-		label:  views.PageTitle(movie.MediaItem),
-		poster: movie.PosterURL(),
+		id:      id,
+		query:   jacred.Query{Title: movie.Title, OriginalTitle: movie.OriginalTitle, Year: year},
+		label:   views.PageTitle(movie.MediaItem),
+		poster:  movie.PosterURL(),
+		minutes: movie.Runtime,
 	}, mediaType, nil
 }
 
 // sortParam returns a supported result order, defaulting to seeders.
 func sortParam(r *http.Request) string {
 	switch sort := r.URL.Query().Get("sort"); sort {
-	case "date", "size":
+	case "date", "size", "bitrate":
 		return sort
 	default:
 		return "seeders"
@@ -201,6 +219,7 @@ func scopeToSeason(title *titleInfo, r *http.Request) bool {
 	for _, season := range title.tv.Seasons {
 		if season.Number == n {
 			title.query.Season = n
+			title.seasonEpisodes = season.EpisodeCount
 			if len(season.AirDate) >= 4 {
 				title.query.SeasonYear, _ = strconv.Atoi(season.AirDate[:4])
 			}
@@ -248,7 +267,7 @@ func (c *Catalog) handleTorrentSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	sort := sortParam(r)
 	search := views.SourcesSearch(mediaType, title.id)
-	if err := sse.PatchElementTempl(views.TorrentResults(jacred.Sort(results, sort), sort, search)); err != nil {
+	if err := sse.PatchElementTempl(views.TorrentResults(jacred.Sort(title.withRuntimes(results), sort), sort, search)); err != nil {
 		logSSEError(r, "patch torrent results", err)
 	}
 }
@@ -384,6 +403,23 @@ func (s *Server) handleTorrServerStatus(w http.ResponseWriter, r *http.Request) 
 	sse := datastar.NewSSE(w, r)
 	if err := sse.PatchElementTempl(views.TorrServerStatus(online, echo.Version, cmp.Or(endpoint, "not configured"))); err != nil {
 		logSSEError(r, "patch torrserver status", err)
+	}
+}
+
+// handleTorrServerState sets the navbar's $_tsNav: whether the active
+// TorrServer answers.
+func (s *Server) handleTorrServerState(w http.ResponseWriter, r *http.Request) {
+	if s.apiUser(w, r) == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+	state := "offline"
+	if echo, err := s.torrServer.Client().Echo(ctx); err == nil && echo.Version != "" {
+		state = "online"
+	}
+	if err := datastar.NewSSE(w, r).MarshalAndPatchSignals(map[string]string{"_tsNav": state}); err != nil {
+		logSSEError(r, "patch torrserver state", err)
 	}
 }
 

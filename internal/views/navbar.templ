@@ -1,6 +1,11 @@
 package views
 
-import "github.com/lieranderl/moviestracker-app/internal/auth"
+import (
+	"context"
+	"fmt"
+
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+)
 
 type navLink struct {
 	Href  string
@@ -21,7 +26,7 @@ templ brand(href string) {
 		<span class="size-8 rounded-field bg-primary text-primary-content grid place-items-center">
 			@Icon("clapperboard", "size-4.5")
 		</span>
-		<span>Movies<span class="font-light text-base-content/60">tracker</span></span>
+		<span>Movies<span class="font-light text-base-content/70">tracker</span></span>
 	</a>
 }
 
@@ -58,6 +63,9 @@ templ Navbar(user *auth.User) {
 				if rel, ok := newRelease(ctx); ok && user.IsAdmin() {
 					@releaseBadge(rel)
 				}
+				if check := siteOf(ctx).TorrServerCheck; user != nil && check != nil {
+					@torrServerNavStatus(check)
+				}
 				@LanguageSwitcher()
 				@ThemeSwitcher()
 				if user != nil {
@@ -71,6 +79,36 @@ templ Navbar(user *auth.User) {
 			</div>
 		</nav>
 	</header>
+}
+
+// torrServerNavTitle says in words what the dot shows.
+func torrServerNavTitle(ctx context.Context) string {
+	return fmt.Sprintf("{ online: %s, offline: %s, none: %s }[$_tsNav] || %s",
+		trJS(ctx, "TorrServer is online"), trJS(ctx, "TorrServer does not answer"),
+		trJS(ctx, "Add your TorrServer"), trJS(ctx, "Checking TorrServer…"))
+}
+
+// torrServerNavStatus is a dot by TorrServer's name: green when it answers,
+// red when it does not, grey while checking or when none is picked yet.
+// check, from the site's adapter, sets $_tsNav.
+templ torrServerNavStatus(check templ.Attributer) {
+	<a
+		id="ts-nav-status"
+		href="/torrserver"
+		class="btn btn-ghost btn-sm gap-2 px-2"
+		data-signals="{ _tsNav: 'checking' }"
+		{ check... }
+		data-attr:title={ torrServerNavTitle(ctx) }
+		title={ tr(ctx, "Checking TorrServer…") }
+	>
+		<span
+			aria-hidden="true"
+			class="status status-md animate-pulse"
+			data-class="{ 'status-success': $_tsNav === 'online', 'status-error': $_tsNav === 'offline', 'animate-pulse': $_tsNav === 'checking' }"
+		></span>
+		<span class="hidden lg:inline">TorrServer</span>
+		<span class="sr-only lg:hidden">TorrServer</span>
+	</a>
 }
 
 // releaseBadge tells an administrator that a newer Moviestracker is out and
@@ -122,7 +160,7 @@ templ userMenu(user *auth.User) {
 				</span>
 				<span class="flex flex-col min-w-0">
 					<span class="font-bold text-sm truncate">{ user.Name }</span>
-					<span class="text-xs text-base-content/60 font-mono truncate">{ user.Username }</span>
+					<span class="text-xs text-base-content/70 font-mono truncate">{ user.Username }</span>
 					if !siteOf(ctx).Cloud {
 						<span class="badge badge-accent badge-xs mt-1 font-mono uppercase">{ tr(ctx, user.Role) }</span>
 					}

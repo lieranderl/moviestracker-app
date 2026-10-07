@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/a-h/templ"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/config"
 	"github.com/lieranderl/moviestracker-app/internal/engine"
@@ -132,7 +133,7 @@ func NewServer(cfg Config) (*Server, error) {
 	// Rejects cross-origin POSTs (Sec-Fetch-Site / Origin), so no other site
 	// can submit forms or Datastar actions with a visitor's cookies.
 	s.presence = newPresence()
-	s.handler = http.NewCrossOriginProtection().Handler(language(s.setupGate(s.presenceMiddleware(s.updateNotice(s.mux)))))
+	s.handler = http.NewCrossOriginProtection().Handler(language(localSite(s.setupGate(s.presenceMiddleware(s.updateNotice(s.mux))))))
 	return s, nil
 }
 
@@ -172,6 +173,20 @@ func tryAcquire(slots chan struct{}) bool {
 	default:
 		return false
 	}
+}
+
+// appSite is the app's pages: the server runs or reaches TorrServer, so the
+// navbar asks it whether TorrServer answers, once a page (timers never ask
+// the server).
+var appSite = views.Site{TorrServerCheck: templ.OrderedAttributes{
+	{Key: "data-init", Value: "@get('/api/torrserver/state')"},
+}}
+
+// localSite marks every page as the app's.
+func localSite(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(views.WithSite(r.Context(), appSite)))
+	})
 }
 
 // ServeHTTP implements http.Handler.
@@ -245,6 +260,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/torrserver/queue", s.handleTorrServerQueue)
 	s.mux.HandleFunc("GET /api/torrserver/player-stats", s.handleTorrServerPlayerStats)
 	s.mux.HandleFunc("GET /api/torrserver/status", s.handleTorrServerStatus)
+	s.mux.HandleFunc("GET /api/torrserver/state", s.handleTorrServerState)
 	s.mux.HandleFunc("GET /api/torrserver/torrent-stats", s.handleTorrentStats)
 	s.mux.HandleFunc("GET /api/torrserver/stream/", s.handleTorrServerStreamProxy)
 
