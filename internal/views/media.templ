@@ -423,7 +423,7 @@ templ sourcesSection(mediaType string, item tmdb.MediaItem, seasons []tmdb.Seaso
 					data-on:change={ researchSources(SourcesSearch(mediaType, id)) }
 				>
 					for _, s := range seasons {
-						<option value={ fmt.Sprint(s.Number) } selected?={ s.Number == selected }>{ seasonLabel(ctx, s) }</option>
+						<option value={ fmt.Sprint(s.Number) } selected?={ s.Number == selected }>{ seasonSourcesLabel(ctx, s) }</option>
 					}
 				</select>
 			}
