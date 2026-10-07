@@ -31,6 +31,7 @@ func (c *Catalog) Register(mux *http.ServeMux, home string) {
 		mux.HandleFunc("GET "+home, c.handleMoviesPage)
 	}
 	mux.HandleFunc("GET /browse/{slug}", c.handleBrowsePage)
+	mux.HandleFunc("GET /discover", c.handleDiscoverPage)
 	mux.HandleFunc("GET /movie/{id}", c.handleMoviePage)
 	mux.HandleFunc("GET /tv/{id}", c.handleTVPage)
 	mux.HandleFunc("GET /person/{id}", c.handlePersonPage)
@@ -41,6 +42,7 @@ func (c *Catalog) Register(mux *http.ServeMux, home string) {
 	mux.HandleFunc("GET /api/discover", c.handleDiscover)
 	mux.HandleFunc("GET /api/torrents", c.handleTorrentSearch)
 	mux.HandleFunc("GET /api/browse/{slug}", c.handleBrowseMore)
+	mux.HandleFunc("GET /api/discover/page", c.handleDiscoverMore)
 }
 
 // Home is the catalog's home page: trending titles and the discovery rows.

@@ -140,23 +140,31 @@ templ BrowseItems(items []tmdb.MediaItem) {
 // BrowseMore sits under the grid: it loads the next page when it scrolls
 // into view, says TMDB failed, or that the list ends.
 templ BrowseMore(v BrowseView) {
+	@moreLoader(v.Failed, v.Next, v.moreURL(v.Next), v.pageURL(v.Today))
+}
+
+// moreLoader is #browse-more under a grid of pages: it loads page next
+// with more when it scrolls into view, says TMDB failed (retrying with
+// more, or reloading retry when the first page failed), or that the list
+// ends.
+templ moreLoader(failed bool, next int, more, retry string) {
 	<div id="browse-more" class="flex justify-center py-8">
 		switch {
-			case v.Failed:
+			case failed:
 				<div role="alert" class="alert alert-warning alert-soft">
 					@Icon("triangle-alert", "size-5")
 					<span>{ tr(ctx, "TMDB did not answer.") }</span>
-					if v.Next > 1 {
-						<button type="button" class="btn btn-sm" data-on:click={ v.moreURL(v.Next) }>{ tr(ctx, "Try again") }</button>
+					if next > 1 {
+						<button type="button" class="btn btn-sm" data-on:click={ more }>{ tr(ctx, "Try again") }</button>
 					} else {
-						<a href={ templ.SafeURL(v.pageURL(v.Today)) } class="btn btn-sm">{ tr(ctx, "Try again") }</a>
+						<a href={ templ.SafeURL(retry) } class="btn btn-sm">{ tr(ctx, "Try again") }</a>
 					}
 				</div>
-			case v.Next > 0:
+			case next > 0:
 				// Once: scrolled away and back before the page arrives, the
 				// loader must not ask for it again. Each page's loader is a
 				// new element.
-				<div id={ fmt.Sprintf("browse-page-%d", v.Next) } data-on-intersect__once={ v.moreURL(v.Next) }>
+				<div id={ fmt.Sprintf("browse-page-%d", next) } data-on-intersect__once={ more }>
 					<span class="loading loading-spinner loading-md text-primary" aria-label={ tr(ctx, "Loading more") }></span>
 				</div>
 			default:
@@ -235,6 +243,18 @@ templ categoryBar(lists []BrowseList, current string) {
 		}
 	>
 		<ul class="max-w-7xl mx-auto px-4 sm:px-8 py-2 flex gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:none]">
+			<li class="shrink-0">
+				<a
+					href="/discover"
+					class={ "btn btn-sm btn-soft rounded-full gap-1.5", templ.KV("btn-primary", current == discoverSlug) }
+					if current == discoverSlug {
+						aria-current="page"
+					}
+				>
+					@Icon("sliders-horizontal", "size-4")
+					{ tr(ctx, "Discover") }
+				</a>
+			</li>
 			for _, l := range lists {
 				<li
 					class="shrink-0"

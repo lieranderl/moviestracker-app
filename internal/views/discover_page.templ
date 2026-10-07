@@ -1,0 +1,159 @@
+package views
+
+import (
+	"fmt"
+	"net/url"
+	"strconv"
+
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+)
+
+// discoverSlug marks the Discover page in the category bar.
+const discoverSlug = "discover"
+
+// DiscoverFirstYear is the first year Discover offers; it offers up to
+// this year.
+const DiscoverFirstYear = 1950
+
+// DiscoverView is the Discover page: TMDB's catalog filtered by Query.
+type DiscoverView struct {
+	Query    tmdb.DiscoverQuery
+	Genres   []tmdb.Genre // of Query's kind of title
+	ThisYear int
+	Items    []tmdb.MediaItem
+	Next     int  // the page to load next; 0 at the end
+	Failed   bool // TMDB did not send the page
+}
+
+// discoverParams are the filters as query parameters, page among them
+// when it is above 0.
+func (v DiscoverView) discoverParams(page int) string {
+	q := url.Values{"type": {v.Query.MediaType}, "sort": {v.Query.Sort}}
+	if v.Query.Genre > 0 {
+		q.Set("genre", strconv.Itoa(v.Query.Genre))
+	}
+	if v.Query.Year > 0 {
+		q.Set("year", strconv.Itoa(v.Query.Year))
+	}
+	if v.Query.MinRating > 0 {
+		q.Set("rating", strconv.FormatFloat(v.Query.MinRating, 'f', -1, 64))
+	}
+	if page > 0 {
+		q.Set("page", strconv.Itoa(page))
+	}
+	return q.Encode()
+}
+
+func (v DiscoverView) moreURL(page int) string {
+	return fmt.Sprintf("@get('/api/discover/page?%s')", v.discoverParams(page))
+}
+
+// years are the years to pick from, newest first.
+func (v DiscoverView) years() []int {
+	var out []int
+	for y := v.ThisYear; y >= DiscoverFirstYear; y-- {
+		out = append(out, y)
+	}
+	return out
+}
+
+// DiscoverRatings are the minimum ratings Discover offers.
+var DiscoverRatings = []float64{6, 7, 8}
+
+var discoverSorts = []struct{ Key, Label string }{
+	{"popular", "Most popular"},
+	{"rating", "Top rated"},
+	{"newest", "Newest"},
+}
+
+// DiscoverPage filters TMDB's whole catalog by kind, genre, year and
+// rating. It is a plain form: each filter's change submits it, so the
+// filtered page has its own address.
+templ DiscoverPage(user *auth.User, v DiscoverView) {
+	@Layout(tr(ctx, "Discover")) {
+		@Navbar(user)
+		<main class="grow pb-20">
+			@categoryBar(browseListsFor(ctx), discoverSlug)
+			<div class="max-w-7xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
+				<header class="space-y-1">
+					<a href={ templ.SafeURL(homeHref(ctx)) } class="link link-hover text-sm text-base-content/70 inline-flex items-center gap-1">
+						@Icon("arrow-left", "size-4")
+						{ tr(ctx, "Home") }
+					</a>
+					<h1 class="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
+						@Icon("sliders-horizontal", "size-6 text-primary")
+						{ tr(ctx, "Discover") }
+					</h1>
+					<p class="text-sm text-base-content/70">{ tr(ctx, "Filter TMDB's whole catalog by genre, year and rating.") }</p>
+				</header>
+				<form action="/discover" method="GET" class="flex flex-wrap items-center gap-2" data-on:change="el.requestSubmit()" aria-label={ tr(ctx, "Filters") }>
+					<div class="join" role="radiogroup" aria-label={ tr(ctx, "Kind") }>
+						<label class="btn btn-sm join-item has-checked:btn-primary has-focus-visible:outline-2 has-focus-visible:outline-primary">
+							<input type="radio" class="sr-only" name="type" value="movie" checked?={ v.Query.MediaType != "tv" }/>
+							{ tr(ctx, "Movies") }
+						</label>
+						<label class="btn btn-sm join-item has-checked:btn-primary has-focus-visible:outline-2 has-focus-visible:outline-primary">
+							<input type="radio" class="sr-only" name="type" value="tv" checked?={ v.Query.MediaType == "tv" }/>
+							{ tr(ctx, "Series") }
+						</label>
+					</div>
+					<label class="select select-sm w-auto">
+						<span class="label">{ tr(ctx, "Genre") }</span>
+						<select name="genre">
+							<option value="">{ tr(ctx, "Any") }</option>
+							for _, g := range v.Genres {
+								<option value={ strconv.Itoa(g.ID) } selected?={ g.ID == v.Query.Genre }>{ g.Name }</option>
+							}
+						</select>
+					</label>
+					<label class="select select-sm w-auto">
+						<span class="label">{ tr(ctx, "Year") }</span>
+						<select name="year">
+							<option value="">{ tr(ctx, "Any") }</option>
+							for _, y := range v.years() {
+								<option value={ strconv.Itoa(y) } selected?={ y == v.Query.Year }>{ strconv.Itoa(y) }</option>
+							}
+						</select>
+					</label>
+					<label class="select select-sm w-auto">
+						<span class="label">{ tr(ctx, "Rating") }</span>
+						<select name="rating">
+							<option value="">{ tr(ctx, "Any") }</option>
+							for _, r := range DiscoverRatings {
+								<option value={ strconv.FormatFloat(r, 'f', -1, 64) } selected?={ r == v.Query.MinRating }>{ fmt.Sprintf("%g+", r) }</option>
+							}
+						</select>
+					</label>
+					<label class="select select-sm w-auto">
+						<span class="label">{ tr(ctx, "Sort") }</span>
+						<select name="sort">
+							for _, o := range discoverSorts {
+								<option value={ o.Key } selected?={ o.Key == v.Query.Sort }>{ tr(ctx, o.Label) }</option>
+							}
+						</select>
+					</label>
+					<button type="submit" class="btn btn-sm btn-ghost">{ tr(ctx, "Apply") }</button>
+				</form>
+				if !v.Failed && len(v.Items) == 0 {
+					@emptyState("search-x", tr(ctx, "Nothing matches these filters"), tr(ctx, "Try another genre or year, or a lower rating.")) {
+						<a href="/discover" class="btn btn-primary btn-sm">{ tr(ctx, "Clear filters") }</a>
+					}
+				}
+				<ul id="browse-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+					@BrowseItems(v.Items)
+				</ul>
+				if v.Failed || len(v.Items) > 0 {
+					@DiscoverMore(v)
+				}
+			</div>
+			@toTopButton()
+		</main>
+		@siteFooter()
+	}
+}
+
+// DiscoverMore is the loader under Discover's grid.
+templ DiscoverMore(v DiscoverView) {
+	@moreLoader(v.Failed, v.Next, v.moreURL(v.Next), "/discover?"+v.discoverParams(0))
+}
