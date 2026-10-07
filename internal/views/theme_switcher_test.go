@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/a-h/templ"
+	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 )
 
@@ -97,5 +99,27 @@ func TestLoginIncludesThemeSwitcher(t *testing.T) {
 
 	if !strings.Contains(html, `aria-label="Theme switcher"`) {
 		t.Errorf("Login should include ThemeSwitcher component")
+	}
+}
+
+func TestTheNavbarChecksTorrServerTheWayItsSiteSays(t *testing.T) {
+	user := &auth.User{Name: "Ann", Username: "ann"}
+	check := templ.OrderedAttributes{{Key: "data-init", Value: "@get('/check')"}}
+	var buf bytes.Buffer
+	if err := views.Navbar(user).Render(views.WithSite(context.Background(), views.Site{TorrServerCheck: check}), &buf); err != nil {
+		t.Fatal(err)
+	}
+	out := html.UnescapeString(buf.String())
+	for _, want := range []string{`id="ts-nav-status"`, `data-init="@get('/check')"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the navbar lacks %q", want)
+		}
+	}
+	buf.Reset()
+	if err := views.Navbar(user).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), `id="ts-nav-status"`) {
+		t.Error("a site that gives no way to check TorrServer shows no status")
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/a-h/templ"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/config"
 	"github.com/lieranderl/moviestracker-app/internal/handlers"
@@ -208,8 +209,20 @@ func (a *app) catalogUser(r *http.Request) *auth.User {
 
 // webSite marks every page as the web app's, so shared views show its
 // navigation.
+// torrServerCheck is how the web app's navbar learns whether the visitor's
+// TorrServer answers: this server cannot reach it, so the browser checks the
+// one last picked ($_tsNavUrl, which the pages that pick one update), at
+// once when the pick changes and again every minute. tsCheck fires
+// ts-status on the element.
+var torrServerCheck = templ.OrderedAttributes{
+	{Key: "data-signals:_ts-nav-url", Value: "localStorage.getItem('mt-ts-selected') || ''"},
+	{Key: "data-effect", Value: "$_tsNavUrl ? tsCheck(el, $_tsNavUrl) : ($_tsNav = 'none')"},
+	{Key: "data-on-interval__duration.60s", Value: "$_tsNavUrl && tsCheck(el, $_tsNavUrl)"},
+	{Key: "data-on:ts-status", Value: "$_tsNav = evt.detail.checking ? 'checking' : (evt.detail.ok ? 'online' : 'offline')"},
+}
+
 func webSite(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		next.ServeHTTP(w, r.WithContext(views.WithSite(r.Context(), views.Site{Cloud: true})))
+		next.ServeHTTP(w, r.WithContext(views.WithSite(r.Context(), views.Site{Cloud: true, TorrServerCheck: torrServerCheck})))
 	})
 }
