@@ -748,7 +748,7 @@ templ filterDropdown(signal, label, ariaLabel, icon string, options []filterOpti
 // formatBadges are what a release's name says it is; a cinema recording's
 // source warns.
 templ formatBadges(f jacred.Format) {
-	if f.Source != "" || f.Codec != "" || f.Audio != "" {
+	if f.Source != "" || f.Codec != "" || f.TenBit || f.Audio != "" {
 		<p class="flex flex-wrap gap-1">
 			if f.Source != "" {
 				<span class={ "badge badge-xs font-semibold", templ.KV("badge-warning", f.Recording), templ.KV("badge-soft", !f.Recording) } title={ formatTitle(ctx, f) }>{ f.Source }</span>

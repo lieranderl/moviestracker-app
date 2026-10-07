@@ -134,3 +134,10 @@ func TestTrackerAndVoiceFiltersAreDropdownsSayingHowManyArePicked(t *testing.T) 
 		}
 	}
 }
+
+func TestAReleaseKnownOnlyAsTenBitStillSaysSo(t *testing.T) {
+	rs := []jacred.Result{{Tracker: "knaben", Title: "Movie.2026.1080p.10bit", Quality: 1080}}
+	if out := render(t, views.TorrentResults(rs, "seeders", "")); !strings.Contains(out, ">10-bit<") {
+		t.Error("a release whose only known format is 10-bit lacks its badge")
+	}
+}
