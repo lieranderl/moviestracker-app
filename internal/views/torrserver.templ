@@ -702,7 +702,7 @@ templ torrToast() {
 		popover="manual"
 		role="status"
 		aria-live="polite"
-		class="toast toast-end toast-bottom m-0 inset-auto bottom-0 right-0 bg-transparent border-0 overflow-visible [&:not(:popover-open)]:hidden"
+		class="toast toast-end toast-bottom m-0 inset-auto bottom-0 max-md:bottom-16 right-0 bg-transparent border-0 overflow-visible [&:not(:popover-open)]:hidden"
 		data-effect="if ($toast) { el.matches(':popover-open') ? (el.hidePopover(), el.showPopover()) : el.showPopover() } else if (el.matches(':popover-open')) { el.hidePopover() }"
 		data-on-signal-patch__debounce.3s={ toastAutoHide }
 		data-on-signal-patch-filter="{ include: /^toast$/ }"
