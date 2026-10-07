@@ -235,3 +235,46 @@ func TestPickingAnotherTorrServerChecksItInTheNavbarAtOnce(t *testing.T) {
 		}
 	}
 }
+
+func TestASlowTMDBDoesNotHoldUpTheReleaseRows(t *testing.T) {
+	// TMDB answers Dune's poster at once but never Arrival's.
+	stuck := make(chan struct{})
+	t.Cleanup(func() { close(stuck) })
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/3/movie/438631":
+			_, _ = w.Write([]byte(`{"id":438631,"poster_path":"/dune-en.jpg"}`))
+		case "/3/movie/329865":
+			select {
+			case <-stuck:
+			case <-r.Context().Done():
+			}
+		default:
+			_, _ = w.Write([]byte(`{"page":1,"total_pages":1,"results":[]}`))
+		}
+	}))
+	t.Cleanup(fake.Close)
+	g := newGoogle(t)
+	cfg := g.config()
+	cfg.Sources = sources.Connector{TMDBBaseURL: fake.URL}.Connect(config.Sources{TMDBKey: "tmdb-key"})
+	cfg.Releases = releases.NewMemory(map[releases.Feed][]releases.Release{
+		releases.Latest: {
+			{ID: 438631, Title: "Дюна", OriginalTitle: "Dune", PosterPath: "/dune-ru.jpg", FoundAt: now},
+			{ID: 329865, Title: "Прибытие", OriginalTitle: "Arrival", PosterPath: "/arrival-ru.jpg", FoundAt: now.Add(-time.Hour)},
+		},
+	})
+	h := web.New(cfg)
+	session := signIn(t, h)
+
+	start := time.Now()
+	body := getWith(t, h, "/api/discover", session).Body.String()
+	if took := time.Since(start); took > 4*time.Second {
+		t.Errorf("the release rows took %s: a slow poster should not hold them up past the page's wait", took.Round(time.Second))
+	}
+	for _, want := range []string{"/dune-en.jpg", "/arrival-ru.jpg"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the latest releases lack %s: an answered poster is used, an unanswered one stays the backend's", want)
+		}
+	}
+}
