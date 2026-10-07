@@ -13,7 +13,7 @@ import (
 )
 
 // mediaPageSignals is the client state shared by the movie and TV pages.
-const mediaPageSignals = `{ videoOpen: false, videoKey: '', videoTitle: '', torrMagnet: '', sending: false, trackers: [], voices: [], toast: '', toastError: false }`
+const mediaPageSignals = `{ videoOpen: false, videoKey: '', videoTitle: '', torrMagnet: '', sending: false, trackers: [], voices: [], hideRecordings: false, toast: '', toastError: false }`
 
 // videoClick opens the trailer dialog for any element carrying data-video.
 // Keys and names travel in data-* attributes, never inside the expression.
@@ -643,8 +643,16 @@ templ TorrentResults(results []jacred.Result, sort, search string) {
 			</div>
 		} else {
 			<div class="flex flex-wrap items-center justify-between gap-3">
-			@trackerFilter(results)
-			@voiceFilter(results)
+			<div class="flex flex-wrap items-center gap-2">
+				@trackerFilter(results)
+				@voiceFilter(results)
+				if hasRecordings(results) {
+					<label class="label text-sm gap-2 cursor-pointer ml-1">
+						<input type="checkbox" class="toggle toggle-sm toggle-warning" data-bind="hideRecordings"/>
+						{ tr(ctx, "Hide cinema recordings") }
+					</label>
+				}
+			</div>
 			<div class="join" role="group" aria-label={ tr(ctx, "Sort releases") }>
 				for _, o := range sortOptions {
 					<button
@@ -678,19 +686,11 @@ templ TorrentResults(results []jacred.Result, sort, search string) {
 templ trackerFilter(results []jacred.Result) {
 	{{ trackers := trackerCounts(results) }}
 	if len(trackers) > 1 {
-		<div role="group" aria-label={ tr(ctx, "Filter by tracker") } class="basis-full order-last flex flex-wrap items-center gap-2">
-			<span class="text-xs font-medium text-base-content/70 mr-1">{ tr(ctx, "Trackers") }</span>
-			<button type="button" class="btn btn-xs sm:btn-sm gap-1.5" data-class="{ 'btn-primary': !$trackers.some(Boolean) }" data-on:click="$trackers = $trackers.map(() => '')">
-				{ tr(ctx, "All") } <span class="badge badge-xs">{ fmt.Sprint(len(results)) }</span>
-			</button>
-			for _, t := range trackers {
-				<label class="btn btn-xs sm:btn-sm gap-1.5 has-checked:btn-primary has-focus-visible:outline-2 has-focus-visible:outline-primary">
-					<input type="checkbox" class="sr-only" value={ t.Name } data-bind="trackers"/>
-					{ trackerName(t.Name) }
-					<span class="badge badge-xs">{ fmt.Sprint(t.Count) }</span>
-				</label>
-			}
-		</div>
+		{{ options := make([]filterOption, 0, len(trackers)) }}
+		for _, t := range trackers {
+			{{ options = append(options, filterOption{Value: t.Name, Label: trackerName(t.Name), Count: t.Count}) }}
+		}
+		@filterDropdown("trackers", "Trackers", "Filter by tracker", "server", options)
 	}
 }
 
@@ -700,31 +700,97 @@ templ trackerFilter(results []jacred.Result) {
 templ voiceFilter(results []jacred.Result) {
 	{{ voices := voiceCounts(results) }}
 	if len(voices) > 1 {
-		<div role="group" aria-label={ tr(ctx, "Filter by voice") } class="basis-full order-last flex flex-wrap items-center gap-2">
-			<span class="text-xs font-medium text-base-content/70 mr-1">{ tr(ctx, "Voices") }</span>
-			<button type="button" class="btn btn-xs sm:btn-sm gap-1.5" data-class="{ 'btn-primary': !$voices.some(Boolean) }" data-on:click="$voices = $voices.map(() => '')">
-				{ tr(ctx, "All") }
-			</button>
-			for _, v := range voices {
-				<label class="btn btn-xs sm:btn-sm gap-1.5 has-checked:btn-primary has-focus-visible:outline-2 has-focus-visible:outline-primary">
-					<input type="checkbox" class="sr-only" value={ v.Name } data-bind="voices"/>
-					{ v.Name }
-					<span class="badge badge-xs">{ fmt.Sprint(v.Count) }</span>
-				</label>
-			}
-		</div>
+		{{ options := make([]filterOption, 0, len(voices)) }}
+		for _, v := range voices {
+			{{ options = append(options, filterOption{Value: v.Name, Label: v.Name, Count: v.Count}) }}
+		}
+		@filterDropdown("voices", "Voices", "Filter by voice", "mic", options)
 	}
+}
+
+// filterOption is one choice of a filter dropdown: its value in the
+// signal, its name, and how many releases it has.
+type filterOption struct {
+	Value, Label string
+	Count        int
+}
+
+// filterDropdown picks any number of options into $signal, one checkbox
+// slot each; its button says how many are picked, or All. Option values
+// come from JacRed and stay in values, never in expressions.
+templ filterDropdown(signal, label, ariaLabel, icon string, options []filterOption) {
+	<div class="dropdown" role="group" aria-label={ tr(ctx, ariaLabel) }>
+		<div tabindex="0" role="button" class="btn btn-sm gap-1.5" data-class={ fmt.Sprintf("{ 'btn-primary': $%s.some(Boolean) }", signal) }>
+			@Icon(icon, "size-4")
+			{ tr(ctx, label) }
+			<span class="badge badge-xs" data-text={ fmt.Sprintf("$%s.filter(Boolean).length || %s", signal, trJS(ctx, "All")) }>{ tr(ctx, "All") }</span>
+			@Icon("chevron-down", "size-3.5 opacity-60")
+		</div>
+		<ul tabindex="-1" class="dropdown-content menu menu-sm flex-nowrap bg-base-200 rounded-box z-30 mt-1 w-64 max-h-80 overflow-y-auto p-2 shadow-xl border border-base-content/10">
+			<li>
+				<button type="button" data-class={ fmt.Sprintf("{ 'menu-active': !$%s.some(Boolean) }", signal) } data-on:click={ fmt.Sprintf("$%s = $%s.map(() => '')", signal, signal) }>{ tr(ctx, "All") }</button>
+			</li>
+			for _, o := range options {
+				<li>
+					<label class="flex justify-between gap-2">
+						<span class="flex items-center gap-2 min-w-0">
+							<input type="checkbox" class="checkbox checkbox-xs checkbox-primary" value={ o.Value } data-bind={ signal }/>
+							<span class="truncate">{ o.Label }</span>
+						</span>
+						<span class="badge badge-xs">{ fmt.Sprint(o.Count) }</span>
+					</label>
+				</li>
+			}
+		</ul>
+	</div>
+}
+
+// formatBadges are what a release's name says it is; a cinema recording's
+// source warns.
+templ formatBadges(f jacred.Format) {
+	if f.Source != "" || f.Codec != "" || f.Audio != "" {
+		<p class="flex flex-wrap gap-1">
+			if f.Source != "" {
+				<span class={ "badge badge-xs font-semibold", templ.KV("badge-warning", f.Recording), templ.KV("badge-soft", !f.Recording) } title={ formatTitle(ctx, f) }>{ f.Source }</span>
+			}
+			if f.Codec != "" {
+				<span class="badge badge-xs badge-ghost">{ f.Codec }</span>
+			}
+			if f.TenBit {
+				<span class="badge badge-xs badge-ghost">10-bit</span>
+			}
+			if f.Audio != "" {
+				<span class="badge badge-xs badge-ghost">{ f.Audio }</span>
+			}
+		</p>
+	}
+}
+
+func formatTitle(ctx context.Context, f jacred.Format) string {
+	if f.Recording {
+		return tr(ctx, "Recorded in a cinema")
+	}
+	return ""
+}
+
+// hasRecordings is whether any release is a cinema recording.
+func hasRecordings(results []jacred.Result) bool {
+	return slices.ContainsFunc(results, func(r jacred.Result) bool { return r.Format().Recording })
 }
 
 // rowShown is whether a release row matches the tracker and voice filters.
 const rowShown = `(!$trackers.some(Boolean) || $trackers.includes(el.dataset.tracker)) && ` +
-	`(!$voices.some(Boolean) || el.dataset.voices.split('|').some(v => v && $voices.includes(v)))`
+	`(!$voices.some(Boolean) || el.dataset.voices.split('|').some(v => v && $voices.includes(v))) && ` +
+	`!($hideRecordings && el.dataset.recording)`
 
 templ torrentRow(r jacred.Result) {
 	<li
 		class="list-row items-center gap-3 sm:gap-4"
 		data-tracker={ r.Tracker }
 		data-voices={ strings.Join(r.Voices, "|") }
+		if r.Format().Recording {
+			data-recording="true"
+		}
 		data-show={ rowShown }
 	>
 		<div class="flex flex-col items-center gap-1 w-14">
@@ -735,6 +801,7 @@ templ torrentRow(r jacred.Result) {
 		</div>
 		<div class="min-w-0 list-col-grow space-y-1">
 			<p class="text-sm font-medium leading-snug line-clamp-2 break-words" title={ r.Title }>{ r.Title }</p>
+			@formatBadges(r.Format())
 			<p class="text-xs text-base-content/70 flex flex-wrap items-center gap-x-3 gap-y-1">
 				<span class="font-mono">{ r.Tracker }</span>
 				if r.SizeName != "" {
