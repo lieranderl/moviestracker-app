@@ -79,6 +79,9 @@ templ Navbar(user *auth.User) {
 			</div>
 		</nav>
 	</header>
+	if user != nil {
+		@tabBar()
+	}
 }
 
 // torrServerNavTitle says in words what the dot shows.
@@ -109,6 +112,34 @@ templ torrServerNavStatus(check templ.Attributer) {
 		<span class="hidden lg:inline">TorrServer</span>
 		<span class="sr-only lg:hidden">TorrServer</span>
 	</a>
+}
+
+// tabBar is the signed-in destinations at the bottom of a phone's screen,
+// where the navbar has no room for them. It sits outside the navbar: the
+// navbar's backdrop blur would hold a fixed element to itself. Views do not
+// know the page, so the browser marks the tab it is on.
+templ tabBar() {
+	<nav class="dock dock-md md:hidden z-50 bg-base-200/95 backdrop-blur-md border-t border-base-content/10" aria-label={ tr(ctx, "Main") }>
+		for _, l := range navLinks(ctx) {
+			<a
+				href={ templ.SafeURL(l.Href) }
+				data-class={ "{ 'dock-active': " + onPage(l.Href) + " }" }
+				data-attr:aria-current={ onPage(l.Href) + " ? 'page' : null" }
+			>
+				@Icon(l.Icon, "size-5")
+				<span class="dock-label">{ tr(ctx, l.Label) }</span>
+			</a>
+		}
+	</nav>
+}
+
+// onPage is whether the browser is on href or a page under it; the home
+// page "/" only by itself.
+func onPage(href string) string {
+	if href == "/" {
+		return "location.pathname === '/'"
+	}
+	return fmt.Sprintf("(location.pathname === '%[1]s' || location.pathname.startsWith('%[1]s/'))", href)
 }
 
 // releaseBadge tells an administrator that a newer Moviestracker is out and

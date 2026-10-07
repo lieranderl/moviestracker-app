@@ -41,7 +41,7 @@ templ layoutWithScripts(title string, scripts ...string) {
 			<script type="module" src="/static/datastar.js"></script>
 		</head>
 		<body
-			class="bg-base-100 text-base-content min-h-dvh flex flex-col font-sans antialiased selection:bg-primary selection:text-primary-content"
+			class="bg-base-100 text-base-content min-h-dvh flex flex-col font-sans antialiased selection:bg-primary selection:text-primary-content max-md:has-[.dock]:pb-16"
 			data-signals="{ redirectUrl: '', theme: localStorage.getItem('theme') || 'system' }"
 			data-effect={ themeEffect }
 		>
