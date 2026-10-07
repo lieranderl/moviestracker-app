@@ -35,9 +35,30 @@ type fakeTMDBDetails struct {
 	pages     map[tmdb.List]int
 	pageItems map[tmdb.List]map[int][]tmdb.MediaItem
 	err       error
+	// discovered is what Discover answers: its titles and page count;
+	// genres are each kind's genres.
+	discovered tmdb.Page
+	genres     map[string][]tmdb.Genre
 
-	mu    sync.Mutex
-	asked []string // "list page" asked of ListPage
+	mu       sync.Mutex
+	asked    []string // "list page" asked of ListPage
+	discover []string // "query page" asked of Discover
+}
+
+func (f *fakeTMDBDetails) Discover(_ context.Context, q tmdb.DiscoverQuery, page int) (tmdb.Page, error) {
+	f.mu.Lock()
+	f.discover = append(f.discover, fmt.Sprintf("%+v %d", q, page))
+	f.mu.Unlock()
+	if f.err != nil {
+		return tmdb.Page{}, f.err
+	}
+	p := f.discovered
+	p.Page = page
+	return p, nil
+}
+
+func (f *fakeTMDBDetails) Genres(_ context.Context, mediaType string) ([]tmdb.Genre, error) {
+	return f.genres[mediaType], f.err
 }
 
 func (f *fakeTMDBDetails) ListPage(_ context.Context, list tmdb.List, page int) (tmdb.Page, error) {

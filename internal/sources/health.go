@@ -154,6 +154,14 @@ func (w watchedTMDB) List(ctx context.Context, list tmdb.List) ([]tmdb.MediaItem
 	return watch(w.h, "TMDB", func() ([]tmdb.MediaItem, error) { return w.c.List(ctx, list) })
 }
 
+func (w watchedTMDB) Discover(ctx context.Context, q tmdb.DiscoverQuery, page int) (tmdb.Page, error) {
+	return watch(w.h, "TMDB", func() (tmdb.Page, error) { return w.c.Discover(ctx, q, page) })
+}
+
+func (w watchedTMDB) Genres(ctx context.Context, mediaType string) ([]tmdb.Genre, error) {
+	return watch(w.h, "TMDB", func() ([]tmdb.Genre, error) { return w.c.Genres(ctx, mediaType) })
+}
+
 func (w watchedTMDB) ListPage(ctx context.Context, list tmdb.List, page int) (tmdb.Page, error) {
 	return watch(w.h, "TMDB", func() (tmdb.Page, error) { return w.c.ListPage(ctx, list, page) })
 }
