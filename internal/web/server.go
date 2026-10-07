@@ -18,6 +18,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/releases"
 	"github.com/lieranderl/moviestracker-app/internal/sources"
 	"github.com/lieranderl/moviestracker-app/internal/store"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 	webstatic "github.com/lieranderl/moviestracker-app/static"
 )
@@ -133,10 +134,43 @@ func (a *app) handleHome(w http.ResponseWriter, r *http.Request) {
 		a.catalog.Home(w, r)
 		return
 	}
-	if err := views.WebSignIn().Render(r.Context(), w); err != nil {
+	if err := views.WebSignIn(a.signInPosters(r.Context())).Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "home", "error", err)
 	}
 }
+
+// signInPosters are this week's trending posters for the sign-in page, or
+// none when TMDB is not set up or does not answer in time. The catalog is
+// the one the signed-in home page shows and caches, so it is fetched with
+// the home page's own timeout, apart from this request: the page waits for
+// it only briefly, and a slow TMDB still leaves a whole catalog behind.
+func (a *app) signInPosters(ctx context.Context) []tmdb.MediaItem {
+	provider := a.cfg.Sources.Catalog
+	if provider == nil {
+		return nil
+	}
+	fetched := make(chan []tmdb.MediaItem, 1)
+	go func() {
+		fetchCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), catalogTimeout)
+		defer cancel()
+		c, err := provider.GetCatalog(fetchCtx)
+		if err != nil {
+			slog.Warn("sign-in posters unavailable", "error", err)
+		}
+		fetched <- views.SignInPosters(c)
+	}()
+	select {
+	case posters := <-fetched:
+		return posters
+	case <-time.After(signInPostersWait):
+		return nil
+	case <-ctx.Done():
+		return nil
+	}
+}
+
+// signInPostersWait keeps a slow TMDB from holding up the sign-in page.
+const signInPostersWait = 2 * time.Second
 
 // saveLanguage keeps the language a signed-in user picked, so their other
 // browsers follow it when they sign in there.
