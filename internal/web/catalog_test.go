@@ -167,8 +167,13 @@ func TestEverySignedInPageCanCheckTheVisitorsTorrServer(t *testing.T) {
 	session := signIn(t, h)
 	for _, path := range []string{"/", "/search?q=dune", "/favorites", "/movie/438631", "/torrserver"} {
 		body := getWith(t, h, path, session).Body.String()
-		if !strings.Contains(body, `id="ts-nav-status"`) {
-			t.Errorf("%s has no TorrServer status in its navbar", path)
+		for _, want := range []string{`id="ts-nav-status"`, "tsCheck(el, $_tsNavUrl)", "localStorage.getItem(&#39;mt-ts-selected&#39;)"} {
+			if !strings.Contains(body, want) {
+				t.Errorf("%s: the navbar does not check the picked TorrServer from the browser: lacks %q", path, want)
+			}
+		}
+		if strings.Contains(body, "/api/torrserver/state") {
+			t.Errorf("%s asks the server for a TorrServer only the browser can reach", path)
 		}
 		helpers, datastar := strings.Index(body, `src="/static/torrserver.js"`), strings.Index(body, `src="/static/datastar.js"`)
 		if helpers < 0 || helpers > datastar {
@@ -176,6 +181,17 @@ func TestEverySignedInPageCanCheckTheVisitorsTorrServer(t *testing.T) {
 		}
 		if n := strings.Count(body, `src="/static/torrserver.js"`); n > 1 {
 			t.Errorf("%s loads torrserver.js %d times", path, n)
+		}
+	}
+}
+
+func TestPickingAnotherTorrServerChecksItInTheNavbarAtOnce(t *testing.T) {
+	g := newGoogle(t)
+	h := web.New(withTMDB(t, g.config()))
+	session := signIn(t, h)
+	for _, path := range []string{"/torrserver", "/movie/438631"} {
+		if body := getWith(t, h, path, session).Body.String(); !strings.Contains(body, "$_tsNavUrl = $tsSelected") {
+			t.Errorf("%s: picking a TorrServer does not tell the navbar", path)
 		}
 	}
 }

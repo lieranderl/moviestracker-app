@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/a-h/templ"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 )
@@ -101,19 +102,24 @@ func TestLoginIncludesThemeSwitcher(t *testing.T) {
 	}
 }
 
-func TestTheWebAppsNavbarChecksTheChosenTorrServerFromTheBrowser(t *testing.T) {
+func TestTheNavbarChecksTorrServerTheWayItsSiteSays(t *testing.T) {
+	user := &auth.User{Name: "Ann", Username: "ann"}
+	check := templ.OrderedAttributes{{Key: "data-init", Value: "@get('/check')"}}
 	var buf bytes.Buffer
-	ctx := views.WithSite(context.Background(), views.Site{Cloud: true})
-	if err := views.Navbar(&auth.User{Name: "Ann", Username: "ann"}).Render(ctx, &buf); err != nil {
+	if err := views.Navbar(user).Render(views.WithSite(context.Background(), views.Site{TorrServerCheck: check}), &buf); err != nil {
 		t.Fatal(err)
 	}
 	out := html.UnescapeString(buf.String())
-	for _, want := range []string{`id="ts-nav-status"`, "localStorage.getItem('mt-ts-selected')", "tsCheck(el,", "data-on:ts-status"} {
+	for _, want := range []string{`id="ts-nav-status"`, `data-init="@get('/check')"`} {
 		if !strings.Contains(out, want) {
-			t.Errorf("the web app's navbar lacks %q", want)
+			t.Errorf("the navbar lacks %q", want)
 		}
 	}
-	if strings.Contains(out, "/api/torrserver/state") {
-		t.Error("the web app cannot reach its visitors' TorrServers from the server")
+	buf.Reset()
+	if err := views.Navbar(user).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), `id="ts-nav-status"`) {
+		t.Error("a site that gives no way to check TorrServer shows no status")
 	}
 }

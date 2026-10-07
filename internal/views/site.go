@@ -3,6 +3,8 @@ package views
 import (
 	"context"
 	"slices"
+
+	"github.com/a-h/templ"
 )
 
 // Site is which app a page belongs to: the local app (the zero value) or
@@ -10,6 +12,10 @@ import (
 // TorrServer from the browser.
 type Site struct {
 	Cloud bool
+	// TorrServerCheck are the Datastar attributes, from the site's adapter,
+	// by which the navbar's TorrServer status learns whether it answers:
+	// they set $_tsNav to "online", "offline" or "none". Nil shows none.
+	TorrServerCheck templ.Attributer
 }
 
 type siteKey struct{}
