@@ -65,10 +65,9 @@ templ FavoritesPage(user *auth.User, items []tmdb.MediaItem, failed bool) {
 						<span>{ tr(ctx, "Your favourites could not be loaded right now. Please try again in a moment.") }</span>
 					</div>
 				} else if len(items) == 0 {
-					<div role="status" class="alert alert-info alert-soft">
-						@Icon("info", "size-5")
-						<span>{ tr(ctx, "No favourites yet. Open a movie or series and press Add to favourites.") }</span>
-					</div>
+					@emptyState("heart", tr(ctx, "No favourites yet"), tr(ctx, "Open a movie or series and press Add to favourites.")) {
+						@browseTrendingLink()
+					}
 				} else {
 					<ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
 						@BrowseItems(items)
