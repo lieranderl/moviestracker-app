@@ -170,3 +170,24 @@ func TestPagesMakeRoomForThePhonesTabBar(t *testing.T) {
 		t.Error("the body does not leave room at the bottom for the tab bar")
 	}
 }
+
+func TestTorrServersStatusSitsOnItsLinkNotBesideIt(t *testing.T) {
+	check := templ.OrderedAttributes{{Key: "data-init", Value: "@get('/check')"}}
+	var buf bytes.Buffer
+	ctx := views.WithSite(context.Background(), views.Site{Cloud: true, TorrServerCheck: check})
+	if err := views.Navbar(&auth.User{Name: "Ann", Username: "ann"}).Render(ctx, &buf); err != nil {
+		t.Fatal(err)
+	}
+	out := html.UnescapeString(buf.String())
+	if regexp.MustCompile(`<a[^>]*id="ts-nav-status"`).MatchString(out) {
+		t.Error("TorrServer's status is a second TorrServer link beside the first")
+	}
+	menu := regexp.MustCompile(`(?s)<ul class="menu menu-horizontal.*?</ul>`).FindString(out)
+	dock := regexp.MustCompile(`(?s)<nav[^>]*class="dock.*?</nav>`).FindString(out)
+	onLink := regexp.MustCompile(`(?s)<a href="/torrserver"[^>]*data-attr:title[^>]*>.{0,600}?class="status`)
+	for name, part := range map[string]string{"menu": menu, "tab bar": dock} {
+		if !onLink.MatchString(part) {
+			t.Errorf("the %s's TorrServer link does not carry its status", name)
+		}
+	}
+}

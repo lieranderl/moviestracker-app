@@ -31,7 +31,12 @@ templ brand(href string) {
 }
 
 templ Navbar(user *auth.User) {
+	{{ check := siteOf(ctx).TorrServerCheck }}
+	{{ status := user != nil && check != nil }}
 	<header id="main-navbar" class="sticky top-0 z-50 w-full backdrop-blur-md bg-base-100/80 border-b border-base-content/10">
+		if status {
+			@torrServerCheck(check)
+		}
 		<nav class="navbar max-w-7xl mx-auto px-4 sm:px-8 min-h-16 gap-2" aria-label={ tr(ctx, "Main") }>
 			<div class="navbar-start gap-4">
 				if user != nil {
@@ -39,9 +44,17 @@ templ Navbar(user *auth.User) {
 					<ul class="menu menu-horizontal flex-nowrap whitespace-nowrap gap-1 text-sm font-medium hidden md:flex">
 						for _, l := range navLinks(ctx) {
 							<li>
-								<a href={ templ.SafeURL(l.Href) }>
+								<a
+									href={ templ.SafeURL(l.Href) }
+									if status && l.Href == torrServerHref {
+										data-attr:title={ torrServerNavTitle(ctx) }
+									}
+								>
 									@Icon(l.Icon, "size-4")
 									{ tr(ctx, l.Label) }
+									if status && l.Href == torrServerHref {
+										@torrServerDot()
+									}
 								</a>
 							</li>
 						}
@@ -63,9 +76,6 @@ templ Navbar(user *auth.User) {
 				if rel, ok := newRelease(ctx); ok && user.IsAdmin() {
 					@releaseBadge(rel)
 				}
-				if check := siteOf(ctx).TorrServerCheck; user != nil && check != nil {
-					@torrServerNavStatus(check)
-				}
 				@LanguageSwitcher()
 				@ThemeSwitcher()
 				if user != nil {
@@ -80,7 +90,7 @@ templ Navbar(user *auth.User) {
 		</nav>
 	</header>
 	if user != nil {
-		@tabBar()
+		@tabBar(status)
 	}
 }
 
@@ -91,43 +101,49 @@ func torrServerNavTitle(ctx context.Context) string {
 		trJS(ctx, "Add your TorrServer"), trJS(ctx, "Checking TorrServer…"))
 }
 
-// torrServerNavStatus is a dot by TorrServer's name: green when it answers,
+// torrServerHref is the TorrServer page, whose link carries its status.
+const torrServerHref = "/torrserver"
+
+// torrServerCheck holds $_tsNav, which check, from the site's adapter,
+// sets: whether TorrServer answers. It shows nothing itself; the dot on
+// the TorrServer link does.
+templ torrServerCheck(check templ.Attributer) {
+	<span id="ts-nav-status" class="hidden" data-signals="{ _tsNav: 'checking' }" { check... }></span>
+}
+
+// torrServerDot is TorrServer's status by its link: green when it answers,
 // red when it does not, grey while checking or when none is picked yet.
-// check, from the site's adapter, sets $_tsNav.
-templ torrServerNavStatus(check templ.Attributer) {
-	<a
-		id="ts-nav-status"
-		href="/torrserver"
-		class="btn btn-ghost btn-sm gap-2 px-2"
-		data-signals="{ _tsNav: 'checking' }"
-		{ check... }
-		data-attr:title={ torrServerNavTitle(ctx) }
-		title={ tr(ctx, "Checking TorrServer…") }
-	>
-		<span
-			aria-hidden="true"
-			class="status status-md animate-pulse"
-			data-class="{ 'status-success': $_tsNav === 'online', 'status-error': $_tsNav === 'offline', 'animate-pulse': $_tsNav === 'checking' }"
-		></span>
-		<span class="hidden lg:inline">TorrServer</span>
-		<span class="sr-only lg:hidden">TorrServer</span>
-	</a>
+templ torrServerDot() {
+	<span
+		aria-hidden="true"
+		class="status status-md animate-pulse"
+		data-class="{ 'status-success': $_tsNav === 'online', 'status-error': $_tsNav === 'offline', 'animate-pulse': $_tsNav === 'checking' }"
+	></span>
+	<span class="sr-only" data-text={ torrServerNavTitle(ctx) }></span>
 }
 
 // tabBar is the signed-in destinations at the bottom of a phone's screen,
 // where the navbar has no room for them. It sits outside the navbar: the
 // navbar's backdrop blur would hold a fixed element to itself. Views do not
 // know the page, so the browser marks the tab it is on.
-templ tabBar() {
+templ tabBar(status bool) {
 	<nav class="dock dock-md md:hidden z-50 bg-base-200/95 backdrop-blur-md border-t border-base-content/10" aria-label={ tr(ctx, "Main") }>
 		for _, l := range navLinks(ctx) {
 			<a
 				href={ templ.SafeURL(l.Href) }
 				data-class={ "{ 'dock-active': " + onPage(l.Href) + " }" }
 				data-attr:aria-current={ onPage(l.Href) + " ? 'page' : null" }
+				if status && l.Href == torrServerHref {
+					data-attr:title={ torrServerNavTitle(ctx) }
+				}
 			>
 				@Icon(l.Icon, "size-5")
-				<span class="dock-label">{ tr(ctx, l.Label) }</span>
+				<span class="dock-label inline-flex items-center gap-1">
+					{ tr(ctx, l.Label) }
+					if status && l.Href == torrServerHref {
+						@torrServerDot()
+					}
+				</span>
 			</a>
 		}
 	</nav>
