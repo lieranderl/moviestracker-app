@@ -45,6 +45,9 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 			}
 			@categoryBar(homeLists(ctx, discover), "")
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 space-y-10 mt-10">
+				if load := siteOf(ctx).RecentTorrents; load != nil {
+					@RecentTorrentsSlot(load)
+				}
 				@mediaRow("trending-movies", tr(ctx, "Trending Movies"), tr(ctx, "Top trending films from The Movie Database"), "film", "text-primary", "badge-primary", tr(ctx, "No trending movies available. Please verify TMDB_API_KEY configuration."), movies, discover)
 				@mediaRow("trending-series", tr(ctx, "Trending TV Series"), tr(ctx, "Top trending episodic series and releases"), "tv", "text-accent", "badge-accent", tr(ctx, "No trending TV series available. Please verify TMDB_API_KEY configuration."), series, discover)
 				if discover {
