@@ -434,7 +434,7 @@ templ TorrServerListFragment(links StreamLinks, torrents []torrserver.Torrent) {
 					</span>
 					<div class="max-w-md space-y-1">
 						<h3 class="text-lg font-bold">{ tr(ctx, "No torrents added yet") }</h3>
-						<p class="text-sm text-base-content/60">
+						<p class="text-sm text-base-content/70">
 							{ tr(ctx, "Add one or multiple torrents via HTTP/HTTPS download links or magnet URLs to stream directly in your browser.") }
 						</p>
 					</div>
@@ -575,7 +575,7 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 						</ul>
 						<div class="mt-3 pt-3 border-t border-base-content/10 flex flex-wrap items-center justify-between gap-2 text-xs">
 							if videoCount > 1 {
-								<span class="text-base-content/60">{ trf(ctx, "All %d videos", videoCount) }</span>
+								<span class="text-base-content/70">{ trf(ctx, "All %d videos", videoCount) }</span>
 							}
 							<div class="flex flex-wrap items-center gap-2 ml-auto">
 								if videoCount > 1 {
@@ -608,7 +608,7 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 					</div>
 				</details>
 			} else {
-				<div class="flex items-center justify-between text-xs text-base-content/60 bg-base-100/50 p-2.5 rounded-field border border-base-content/10 mt-auto">
+				<div class="flex items-center justify-between text-xs text-base-content/70 bg-base-100/50 p-2.5 rounded-field border border-base-content/10 mt-auto">
 					<span class="flex items-center gap-2 font-mono">
 						@Icon("folder", "size-3.5 opacity-50")
 						{ tr(ctx, "Files: not loaded") }
@@ -646,7 +646,7 @@ templ torrentFileRow(links StreamLinks, hash string, f torrserver.FileStat) {
 			<span class="font-mono text-xs text-base-content/40 w-6 shrink-0 text-right">{ fmt.Sprint(f.ID) }.</span>
 			<div class="min-w-0 grow">
 				<div class="text-xs sm:text-sm font-medium truncate" title={ f.Path }>{ f.Path }</div>
-				<div class="flex items-center gap-2 text-[11px] font-mono text-base-content/60">
+				<div class="flex items-center gap-2 text-[11px] font-mono text-base-content/70">
 					{ f.FormattedLength() }
 					if isVideo {
 						<span class="badge badge-xs badge-soft badge-primary">{ tr(ctx, "Video") }</span>
@@ -955,7 +955,7 @@ templ torrPlayerModalFor(browser bool) {
 					@Icon("external-link", "size-3.5")
 					IINA
 				</button>
-				<span class="text-xs text-base-content/60">{ tr(ctx, "The original file, full quality. For VLC and other players, and TVs.") }</span>
+				<span class="text-xs text-base-content/70">{ tr(ctx, "The original file, full quality. For VLC and other players, and TVs.") }</span>
 				@vlcNote()
 			</div>
 			<div role="group" aria-label={ tr(ctx, "HLS: converted by GStreamer") } class="w-full flex flex-wrap items-center gap-2" data-show="$gst">
@@ -975,7 +975,7 @@ templ torrPlayerModalFor(browser bool) {
 					@Icon("download", "size-3.5")
 					.m3u8
 				</a>
-				<span class="text-xs text-base-content/60">{ tr(ctx, "Converted by GStreamer as it plays. Plays in any browser, on phones and TVs.") }</span>
+				<span class="text-xs text-base-content/70">{ tr(ctx, "Converted by GStreamer as it plays. Plays in any browser, on phones and TVs.") }</span>
 			</div>
 			<div class="w-full flex flex-wrap items-center gap-2 pt-2 border-t border-base-content/10" data-show="$gst">
 				<button
@@ -1035,7 +1035,7 @@ templ TorrAddForm(browser ...bool) {
 			<label class="flex flex-col gap-1.5">
 				<span class="label justify-between font-semibold text-sm text-base-content">
 					{ tr(ctx, "Links") }
-					<span class="text-xs font-normal text-base-content/60">{ tr(ctx, "One per line") }</span>
+					<span class="text-xs font-normal text-base-content/70">{ tr(ctx, "One per line") }</span>
 				</span>
 				<textarea
 					name="addLinks"
@@ -1043,19 +1043,19 @@ templ TorrAddForm(browser ...bool) {
 					class="textarea w-full font-mono text-xs"
 					placeholder="magnet:?xt=urn:btih:…&#10;https://tracker.example/file.torrent"
 				></textarea>
-				<span class="text-xs text-base-content/60">{ tr(ctx, "Magnet links, http(s) links to .torrent files, torrs:// links or info-hashes") }</span>
+				<span class="text-xs text-base-content/70">{ tr(ctx, "Magnet links, http(s) links to .torrent files, torrs:// links or info-hashes") }</span>
 			</label>
 			<label class="flex flex-col gap-1.5">
 				<span class="label justify-between font-semibold text-sm text-base-content">
 					{ tr(ctx, ".torrent files") }
-					<span class="text-xs font-normal text-base-content/60">{ tr(ctx, "Up to 20") }</span>
+					<span class="text-xs font-normal text-base-content/70">{ tr(ctx, "Up to 20") }</span>
 				</span>
 				<input id="torr-add-files" type="file" name="addFiles" multiple accept=".torrent,application/x-bittorrent" class="file-input w-full"/>
 			</label>
 			<label class="flex flex-col gap-1.5">
 				<span class="label justify-between font-semibold text-sm text-base-content">
 					{ tr(ctx, "Custom title") }
-					<span class="text-xs font-normal text-base-content/60">{ tr(ctx, "Optional, single torrent only") }</span>
+					<span class="text-xs font-normal text-base-content/70">{ tr(ctx, "Optional, single torrent only") }</span>
 				</span>
 				<input
 					type="text"
@@ -1127,7 +1127,7 @@ templ torrFileMenu() {
 			</form>
 		</header>
 		<section class="mt-4 space-y-2" data-show="$_file.video">
-			<h4 class="text-xs font-bold uppercase tracking-wider text-base-content/60">{ tr(ctx, "Open in a player") }</h4>
+			<h4 class="text-xs font-bold uppercase tracking-wider text-base-content/70">{ tr(ctx, "Open in a player") }</h4>
 			<div class="flex flex-wrap items-center gap-2">
 				<button type="button" data-on:click={ "$fileMenuOpen = false; " + openPlayer(ctx, "vlc", "VLC", "$_file.clean") } class="btn btn-sm btn-outline btn-primary gap-1.5" title={ trf(ctx, "Open the original file in %s", "VLC") }>
 					@Icon("external-link", "size-4")
@@ -1141,7 +1141,7 @@ templ torrFileMenu() {
 			@vlcNote()
 		</section>
 		<section class="mt-5 space-y-2">
-			<h4 class="text-xs font-bold uppercase tracking-wider text-base-content/60">{ tr(ctx, "Links") }</h4>
+			<h4 class="text-xs font-bold uppercase tracking-wider text-base-content/70">{ tr(ctx, "Links") }</h4>
 			<div class="flex flex-wrap items-center gap-2">
 				<button type="button" data-on:click={ copyFileLink(ctx, "$_file.clean", "Direct link copied") } class="btn btn-sm btn-outline btn-primary gap-1.5">
 					@Icon("link", "size-4")
@@ -1190,12 +1190,12 @@ templ torrConfirmModalFor(browser bool) {
 templ TorrServerProbeFragment(res *torrserver.ProbeResult) {
 	<div id="torr-probe-content" class="mt-4 space-y-4">
 		<dl class="bg-base-100 p-4 rounded-box border border-base-content/10 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
-			<div><dt class="inline text-base-content/60">{ tr(ctx, "Container:") } </dt><dd class="inline font-bold text-primary">{ res.Container }</dd></div>
-			<div><dt class="inline text-base-content/60">{ tr(ctx, "Duration:") } </dt><dd class="inline font-bold text-accent">{ res.DurationFormatted() }</dd></div>
-			<div><dt class="inline text-base-content/60">{ tr(ctx, "Size:") } </dt><dd class="inline font-bold">{ torrserver.FormatBytes(res.FileSize) }</dd></div>
+			<div><dt class="inline text-base-content/70">{ tr(ctx, "Container:") } </dt><dd class="inline font-bold text-primary">{ res.Container }</dd></div>
+			<div><dt class="inline text-base-content/70">{ tr(ctx, "Duration:") } </dt><dd class="inline font-bold text-accent">{ res.DurationFormatted() }</dd></div>
+			<div><dt class="inline text-base-content/70">{ tr(ctx, "Size:") } </dt><dd class="inline font-bold">{ torrserver.FormatBytes(res.FileSize) }</dd></div>
 		</dl>
 		<div class="space-y-2">
-			<h4 class="text-xs font-bold uppercase tracking-wider text-base-content/60">{ tr(ctx, "Discovered Media Tracks") }</h4>
+			<h4 class="text-xs font-bold uppercase tracking-wider text-base-content/70">{ tr(ctx, "Discovered Media Tracks") }</h4>
 			<ul class="space-y-2">
 				for _, trk := range res.Tracks {
 					<li class="p-3 rounded-box bg-base-100 border border-base-content/10 flex items-start justify-between gap-3 text-xs">
@@ -1216,7 +1216,7 @@ templ TorrServerProbeFragment(res *torrserver.ProbeResult) {
 										{ trk.CapsName }
 									}
 								</div>
-								<div class="text-[11px] text-base-content/60 font-mono">{ trackDetails(ctx, trk) }</div>
+								<div class="text-[11px] text-base-content/70 font-mono">{ trackDetails(ctx, trk) }</div>
 								if caps := trackCaps(trk.Codec); caps != "" {
 									<p class="text-[11px] text-base-content/50 font-mono break-all whitespace-normal">{ caps }</p>
 								}
@@ -1243,7 +1243,7 @@ templ TorrServerProbeError(msg string) {
 templ TorrMediaInfo(probe *torrserver.ProbeResult, audioIndex int, output *torrserver.HLSOutput) {
 	<div id="torr-media-info" class="mt-3 overflow-x-auto rounded-box border border-base-content/10 bg-base-200">
 		if probe == nil {
-			<p class="p-3 text-xs text-base-content/60">{ tr(ctx, "Media info unavailable — the file may still be buffering.") }</p>
+			<p class="p-3 text-xs text-base-content/70">{ tr(ctx, "Media info unavailable — the file may still be buffering.") }</p>
 		} else {
 			<table class="table table-xs font-mono">
 				<thead>
@@ -1256,7 +1256,7 @@ templ TorrMediaInfo(probe *torrserver.ProbeResult, audioIndex int, output *torrs
 				<tbody>
 					for _, row := range newMediaInfo(probe, audioIndex, output).Rows {
 						<tr>
-							<th class="font-sans text-base-content/60">{ tr(ctx, row.Label) }</th>
+							<th class="font-sans text-base-content/70">{ tr(ctx, row.Label) }</th>
 							<td>{ row.Source }</td>
 							<td class={ row.OutputTone }>{ tr(ctx, row.Output) }</td>
 						</tr>

@@ -185,7 +185,7 @@ templ gstProgress(v GStreamerSetup) {
 			<span>{ trf(ctx, "Downloading GStreamer %s…", v.Pinned) } { v.Progress }</span>
 			<span class="font-mono tabular-nums">{ fmt.Sprint(v.Percent) }%</span>
 		</p>
-		<p class="text-xs text-base-content/60">{ tr(ctx, "It continues if you leave this page.") }</p>
+		<p class="text-xs text-base-content/70">{ tr(ctx, "It continues if you leave this page.") }</p>
 	</div>
 }
 
@@ -196,10 +196,10 @@ templ gstButton(v GStreamerSetup, compact bool, icon, label string) {
 				@Icon(icon, "size-4")
 				{ label }
 			</button>
-			<span class="text-xs text-base-content/60">{ tr(ctx, "From gstreamer.freedesktop.org, about 350 MB on disk. No admin password.") }</span>
+			<span class="text-xs text-base-content/70">{ tr(ctx, "From gstreamer.freedesktop.org, about 350 MB on disk. No admin password.") }</span>
 		</div>
 	} else {
-		<p class="text-sm text-base-content/60">{ tr(ctx, "Ask an administrator to install it.") }</p>
+		<p class="text-sm text-base-content/70">{ tr(ctx, "Ask an administrator to install it.") }</p>
 	}
 }
 

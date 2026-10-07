@@ -1,1 +1,1 @@
-try{let t=localStorage.getItem("theme");if(t&&t!=="system")document.documentElement.setAttribute("data-theme",t)}catch{}
+try{let t=localStorage.getItem("theme"),e={githublight:"light",githubdark:"dark"}[t];if(e)t=e,localStorage.setItem("theme",t);if(t&&t!=="system")document.documentElement.setAttribute("data-theme",t)}catch{}

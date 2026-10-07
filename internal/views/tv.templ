@@ -123,7 +123,7 @@ templ SeasonEpisodes(s *tmdb.Season) {
 			<p class="text-sm text-base-content/70 max-w-3xl leading-relaxed">{ s.Overview }</p>
 		}
 		if len(s.Episodes) == 0 {
-			<p class="text-sm text-base-content/60">{ tr(ctx, "No episodes announced yet.") }</p>
+			<p class="text-sm text-base-content/70">{ tr(ctx, "No episodes announced yet.") }</p>
 		}
 		<ol class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 			for _, e := range s.Episodes {
@@ -136,7 +136,7 @@ templ SeasonEpisodes(s *tmdb.Season) {
 						}
 					</figure>
 					<div class="card-body p-3 sm:p-4 gap-1 min-w-0">
-						<p class="text-xs font-mono text-base-content/60 flex flex-wrap gap-x-2">
+						<p class="text-xs font-mono text-base-content/70 flex flex-wrap gap-x-2">
 							<span class="font-semibold text-primary">{ e.Code() }</span>
 							if r := runtime(ctx, e.Runtime); r != "" {
 								<span>{ r }</span>

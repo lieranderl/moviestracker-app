@@ -107,13 +107,13 @@ templ torrInstallTabs() {
 			<ol class="space-y-4 text-sm">
 				@installStep(1, tr(ctx, "Install GStreamer with Homebrew")) {
 					@shellCommand(macGStreamerCommand)
-					<p class="text-xs text-base-content/60">
+					<p class="text-xs text-base-content/70">
 						{ tr(ctx, "No Homebrew? Install the") } <a href={ templ.SafeURL(gstreamerMacURL) } target="_blank" rel="noopener noreferrer" class="link">{ tr(ctx, "official GStreamer runtime") }</a> { tr(ctx, "instead.") }
 					</p>
 				}
 				@installStep(2, tr(ctx, "Install TorrServer, GStreamer build, in Terminal")) {
 					@shellCommand(macTorrServerCommand)
-					<p class="text-xs text-base-content/60">{ tr(ctx, "Works on Apple Silicon and Intel Macs.") }</p>
+					<p class="text-xs text-base-content/70">{ tr(ctx, "Works on Apple Silicon and Intel Macs.") }</p>
 				}
 				@installStep(3, tr(ctx, "Check that it runs")) {
 					@openTorrServer()
@@ -182,7 +182,7 @@ templ gstreamerWhy() {
 		<summary class="collapse-title text-sm font-semibold">{ tr(ctx, "Why GStreamer?") }</summary>
 		<div class="collapse-content space-y-4">
 			@gstreamerBenefitList()
-			<p class="text-xs text-base-content/60">
+			<p class="text-xs text-base-content/70">
 				{ tr(ctx, "Without it, TorrServer still streams, but only to external players such as VLC.") }
 				<a href={ templ.SafeURL(torrServerGstURL) } target="_blank" rel="noopener noreferrer" class="link">{ tr(ctx, "More about the GStreamer build") }</a>
 			</p>

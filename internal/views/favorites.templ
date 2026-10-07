@@ -57,7 +57,7 @@ templ FavoritesPage(user *auth.User, items []tmdb.MediaItem, failed bool) {
 						@Icon("heart", "size-6 text-error")
 						{ tr(ctx, "Favourites") }
 					</h1>
-					<p class="text-sm text-base-content/60">{ tr(ctx, "Movies and series you keep, newest first.") }</p>
+					<p class="text-sm text-base-content/70">{ tr(ctx, "Movies and series you keep, newest first.") }</p>
 				</header>
 				if failed {
 					<div role="alert" class="alert alert-error alert-soft">

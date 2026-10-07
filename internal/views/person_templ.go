@@ -671,7 +671,7 @@ func creditTable(kind string, credits []tmdb.Credit) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if len(credits) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<p class=\"p-4 text-sm text-base-content/60\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<p class=\"p-4 text-sm text-base-content/70\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -733,7 +733,7 @@ func creditTable(kind string, credits []tmdb.Credit) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			for _, c := range credits {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<tr class=\"hover:bg-base-200\"><td class=\"font-mono text-base-content/60\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<tr class=\"hover:bg-base-200\"><td class=\"font-mono text-base-content/70\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

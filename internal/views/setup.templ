@@ -25,7 +25,7 @@ templ Setup(askCode bool) {
 							<span class="sr-only">{ tr(ctx, "Setup code") }</span>
 							<input type="text" required autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="32" placeholder="XXXX-XXXX" class="grow font-mono" data-bind:setup-code/>
 						</label>
-						<p class="text-xs text-base-content/60">
+						<p class="text-xs text-base-content/70">
 							{ tr(ctx, "You are setting up from another device, so Moviestracker asks for the code it printed when it started. Find it in its log:") }
 							<code class="font-mono">docker compose logs moviestracker</code> ({ tr(ctx, "or") } <code class="font-mono">docker logs &lt;container&gt;</code>),
 							{ tr(ctx, "or the terminal it runs in. On the machine itself, open") } <code class="font-mono">http://localhost:8095</code> { tr(ctx, "instead: no code needed.") }

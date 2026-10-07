@@ -100,7 +100,7 @@ templ BrowsePage(user *auth.User, v BrowseView) {
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
 				<header class="flex flex-wrap items-end justify-between gap-4">
 					<div class="min-w-0 space-y-1">
-						<a href={ templ.SafeURL(homeHref(ctx)) } class="link link-hover text-sm text-base-content/60 inline-flex items-center gap-1">
+						<a href={ templ.SafeURL(homeHref(ctx)) } class="link link-hover text-sm text-base-content/70 inline-flex items-center gap-1">
 							@Icon("arrow-left", "size-4")
 							{ tr(ctx, "Home") }
 						</a>
@@ -108,7 +108,7 @@ templ BrowsePage(user *auth.User, v BrowseView) {
 							@Icon(v.List.Icon, "size-6 text-primary")
 							{ tr(ctx, v.List.Title) }
 						</h1>
-						<p class="text-sm text-base-content/60">{ tr(ctx, v.List.Subtitle) }</p>
+						<p class="text-sm text-base-content/70">{ tr(ctx, v.List.Subtitle) }</p>
 					</div>
 					if v.List.Day != "" {
 						<nav role="tablist" class="tabs tabs-box tabs-sm" aria-label={ tr(ctx, "Trending over") }>
@@ -160,7 +160,7 @@ templ BrowseMore(v BrowseView) {
 					<span class="loading loading-spinner loading-md text-primary" aria-label={ tr(ctx, "Loading more") }></span>
 				</div>
 			default:
-				<p class="text-sm text-base-content/60">{ tr(ctx, "That is the whole list.") }</p>
+				<p class="text-sm text-base-content/70">{ tr(ctx, "That is the whole list.") }</p>
 		}
 	</div>
 }
