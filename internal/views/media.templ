@@ -3,6 +3,7 @@ package views
 import (
 	"context"
 	"slices"
+	"strconv"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/jacred"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
@@ -532,6 +533,30 @@ func qualityTone(label string) string {
 	}
 }
 
+// typicalMbps are the bitrates, low to high, usual for a release of each
+// vertical resolution: below is starved, above is generous.
+var typicalMbps = []struct {
+	quality   int
+	low, high float64
+}{{2160, 12, 35}, {1080, 4, 14}, {720, 2, 6}, {0, 0.8, 2.5}}
+
+// bitrateTone colours a release's bitrate against what is usual for its
+// quality: warning when low, success when high.
+func bitrateTone(quality int, mbps float64) string {
+	for _, t := range typicalMbps {
+		if quality >= t.quality {
+			switch {
+			case mbps < t.low:
+				return "text-warning"
+			case mbps > t.high:
+				return "text-success"
+			}
+			return ""
+		}
+	}
+	return ""
+}
+
 // trackerCount is a tracker and how many releases it has.
 type trackerCount struct {
 	Name  string
@@ -604,6 +629,7 @@ var sortOptions = []struct{ Key, Label string }{
 	{"seeders", "Seeders"},
 	{"date", "Newest"},
 	{"size", "Size"},
+	{"bitrate", "Bitrate"},
 }
 
 // TorrentResults lists releases sorted by sort; search re-runs the query
@@ -623,8 +649,10 @@ templ TorrentResults(results []jacred.Result, sort, search string) {
 				for _, o := range sortOptions {
 					<button
 						type="button"
-						class={ "btn btn-sm join-item", templ.KV("btn-active", o.Key == sort) }
-						data-class={ fmt.Sprintf("{ 'btn-active': $sort === '%s' }", o.Key) }
+						class={ "btn btn-sm join-item", templ.KV("btn-primary", o.Key == sort) }
+						aria-pressed={ strconv.FormatBool(o.Key == sort) }
+						data-class={ fmt.Sprintf("{ 'btn-primary': $sort === '%s' }", o.Key) }
+						data-attr:aria-pressed={ fmt.Sprintf("$sort === '%s'", o.Key) }
 						data-on:click={ fmt.Sprintf("$sort = '%s'; %s", o.Key, search) }
 					>{ tr(ctx, o.Label) }</button>
 				}
@@ -711,6 +739,11 @@ templ torrentRow(r jacred.Result) {
 				<span class="font-mono">{ r.Tracker }</span>
 				if r.SizeName != "" {
 					<span>{ r.SizeName }</span>
+				}
+				if mbps := r.Mbps(); mbps > 0 {
+					<span class={ "font-medium tabular-nums", bitrateTone(r.Quality, mbps) } title={ trf(ctx, "Estimated: size over %d min, audio included", int(r.Runtime.Minutes())) }>
+						≈ { trf(ctx, "%s Mbps", strconv.FormatFloat(mbps, 'f', 1, 64)) }
+					</span>
 				}
 				if !r.CreatedAt.IsZero() {
 					<span title={ tr(ctx, "Added") }>{ r.CreatedAt.Format("2006-01-02") }</span>
