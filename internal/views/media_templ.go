@@ -2115,11 +2115,25 @@ func releaseDate(icon, label string, day, now time.Time) templ.Component {
 	})
 }
 
+// cinemaWindow is about how long a movie plays in cinemas before it comes
+// out digitally or on disc.
+const cinemaWindow = 120 * 24 * time.Hour
+
 // onlyInCinemas is whether a movie is out in cinemas but not yet digitally
-// or on disc, so trackers can only have recordings of a screening.
+// or on disc, so trackers can only have recordings of a screening. A date
+// TMDB does not know is not a release still to come: it takes a home
+// release announced for later, or a cinema release recent enough that one
+// is unlikely to be out yet.
 func onlyInCinemas(rel tmdb.Releases, now time.Time) bool {
-	notYet := func(day time.Time) bool { return day.IsZero() || day.After(now) }
-	return !rel.Cinema.IsZero() && !rel.Cinema.After(now) && notYet(rel.Digital) && notYet(rel.Physical)
+	if rel.Cinema.IsZero() || rel.Cinema.After(now) {
+		return false
+	}
+	out := func(day time.Time) bool { return !day.IsZero() && !day.After(now) }
+	if out(rel.Digital) || out(rel.Physical) {
+		return false
+	}
+	announced := rel.Digital.After(now) || rel.Physical.After(now)
+	return announced || now.Sub(rel.Cinema) < cinemaWindow
 }
 
 // searchQualities are the qualities JacRed files releases under, as picked
@@ -2160,7 +2174,7 @@ func searchFilters(search string) templ.Component {
 		var templ_7745c5c3_Var94 string
 		templ_7745c5c3_Var94, templ_7745c5c3_Err = templ.ResolveAttributeValue(researchSources(search))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 507, Col: 88}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 521, Col: 88}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var94)
 		if templ_7745c5c3_Err != nil {
@@ -2173,7 +2187,7 @@ func searchFilters(search string) templ.Component {
 		var templ_7745c5c3_Var95 string
 		templ_7745c5c3_Var95, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Search for qualities"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 508, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 522, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var95)
 		if templ_7745c5c3_Err != nil {
@@ -2191,7 +2205,7 @@ func searchFilters(search string) templ.Component {
 			var templ_7745c5c3_Var96 string
 			templ_7745c5c3_Var96, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(q.Value))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 511, Col: 71}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 525, Col: 71}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var96)
 			if templ_7745c5c3_Err != nil {
@@ -2204,7 +2218,7 @@ func searchFilters(search string) templ.Component {
 			var templ_7745c5c3_Var97 string
 			templ_7745c5c3_Var97, templ_7745c5c3_Err = templ.JoinStringErrs(q.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 512, Col: 14}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 526, Col: 14}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var97))
 			if templ_7745c5c3_Err != nil {
@@ -2226,7 +2240,7 @@ func searchFilters(search string) templ.Component {
 		var templ_7745c5c3_Var98 string
 		templ_7745c5c3_Var98, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "HDR only"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 519, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 533, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var98))
 		if templ_7745c5c3_Err != nil {
@@ -2270,7 +2284,7 @@ func TorrServerStatus(online bool, version, endpoint string) templ.Component {
 		var templ_7745c5c3_Var100 string
 		templ_7745c5c3_Var100, templ_7745c5c3_Err = templ.ResolveAttributeValue(endpoint)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 527, Col: 174}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 541, Col: 174}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var100)
 		if templ_7745c5c3_Err != nil {
@@ -2288,7 +2302,7 @@ func TorrServerStatus(online bool, version, endpoint string) templ.Component {
 			var templ_7745c5c3_Var101 string
 			templ_7745c5c3_Var101, templ_7745c5c3_Err = templ.JoinStringErrs(version)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 530, Col: 23}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 544, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var101))
 			if templ_7745c5c3_Err != nil {
@@ -2302,7 +2316,7 @@ func TorrServerStatus(online bool, version, endpoint string) templ.Component {
 			var templ_7745c5c3_Var102 string
 			templ_7745c5c3_Var102, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "TorrServer Offline"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 533, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 547, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var102))
 			if templ_7745c5c3_Err != nil {
@@ -2316,7 +2330,7 @@ func TorrServerStatus(online bool, version, endpoint string) templ.Component {
 			var templ_7745c5c3_Var103 string
 			templ_7745c5c3_Var103, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Checking TorrServer…"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 536, Col: 38}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 550, Col: 38}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var103))
 			if templ_7745c5c3_Err != nil {
@@ -2364,7 +2378,7 @@ func TorrentSearching(title string) templ.Component {
 			var templ_7745c5c3_Var105 string
 			templ_7745c5c3_Var105, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Searching JacRed for"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 546, Col: 43}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 560, Col: 43}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var105))
 			if templ_7745c5c3_Err != nil {
@@ -2377,7 +2391,7 @@ func TorrentSearching(title string) templ.Component {
 			var templ_7745c5c3_Var106 string
 			templ_7745c5c3_Var106, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 546, Col: 81}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 560, Col: 81}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var106))
 			if templ_7745c5c3_Err != nil {
@@ -2395,7 +2409,7 @@ func TorrentSearching(title string) templ.Component {
 			var templ_7745c5c3_Var107 string
 			templ_7745c5c3_Var107, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Searching JacRed…"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 548, Col: 42}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 562, Col: 42}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var107))
 			if templ_7745c5c3_Err != nil {
@@ -2460,7 +2474,7 @@ func TorrentSearchError(message string) templ.Component {
 		var templ_7745c5c3_Var109 string
 		templ_7745c5c3_Var109, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 562, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 576, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var109))
 		if templ_7745c5c3_Err != nil {
@@ -2629,7 +2643,7 @@ func TorrentResults(results []jacred.Result, sort, search string) templ.Componen
 			var templ_7745c5c3_Var111 string
 			templ_7745c5c3_Var111, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "No releases found on JacRed for this title."))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 685, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 699, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var111))
 			if templ_7745c5c3_Err != nil {
@@ -2659,7 +2673,7 @@ func TorrentResults(results []jacred.Result, sort, search string) templ.Componen
 			var templ_7745c5c3_Var112 string
 			templ_7745c5c3_Var112, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Sort releases"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 691, Col: 71}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 705, Col: 71}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var112)
 			if templ_7745c5c3_Err != nil {
@@ -2695,7 +2709,7 @@ func TorrentResults(results []jacred.Result, sort, search string) templ.Componen
 				var templ_7745c5c3_Var115 string
 				templ_7745c5c3_Var115, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.FormatBool(o.Key == sort))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 696, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 710, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var115)
 				if templ_7745c5c3_Err != nil {
@@ -2708,7 +2722,7 @@ func TorrentResults(results []jacred.Result, sort, search string) templ.Componen
 				var templ_7745c5c3_Var116 string
 				templ_7745c5c3_Var116, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("{ 'btn-primary': $sort === '%s' }", o.Key))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 697, Col: 74}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 711, Col: 74}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var116)
 				if templ_7745c5c3_Err != nil {
@@ -2721,7 +2735,7 @@ func TorrentResults(results []jacred.Result, sort, search string) templ.Componen
 				var templ_7745c5c3_Var117 string
 				templ_7745c5c3_Var117, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("$sort === '%s'", o.Key))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 698, Col: 67}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 712, Col: 67}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var117)
 				if templ_7745c5c3_Err != nil {
@@ -2734,7 +2748,7 @@ func TorrentResults(results []jacred.Result, sort, search string) templ.Componen
 				var templ_7745c5c3_Var118 string
 				templ_7745c5c3_Var118, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("$sort = '%s'; %s", o.Key, search))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 699, Col: 68}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 713, Col: 68}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var118)
 				if templ_7745c5c3_Err != nil {
@@ -2747,7 +2761,7 @@ func TorrentResults(results []jacred.Result, sort, search string) templ.Componen
 				var templ_7745c5c3_Var119 string
 				templ_7745c5c3_Var119, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, o.Label))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 700, Col: 24}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 714, Col: 24}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var119))
 				if templ_7745c5c3_Err != nil {
@@ -2775,7 +2789,7 @@ func TorrentResults(results []jacred.Result, sort, search string) templ.Componen
 			var templ_7745c5c3_Var120 string
 			templ_7745c5c3_Var120, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Results from JacRed. Moviestracker does not host or distribute media — only access content you are legally authorized to use."))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 710, Col: 144}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 724, Col: 144}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var120))
 			if templ_7745c5c3_Err != nil {
@@ -2829,7 +2843,7 @@ func trackerFilter(results []jacred.Result) templ.Component {
 			var templ_7745c5c3_Var122 string
 			templ_7745c5c3_Var122, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Filter by tracker"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 724, Col: 61}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 738, Col: 61}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var122)
 			if templ_7745c5c3_Err != nil {
@@ -2842,7 +2856,7 @@ func trackerFilter(results []jacred.Result) templ.Component {
 			var templ_7745c5c3_Var123 string
 			templ_7745c5c3_Var123, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Trackers"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 725, Col: 84}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 739, Col: 84}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var123))
 			if templ_7745c5c3_Err != nil {
@@ -2855,7 +2869,7 @@ func trackerFilter(results []jacred.Result) templ.Component {
 			var templ_7745c5c3_Var124 string
 			templ_7745c5c3_Var124, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "All"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 727, Col: 20}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 741, Col: 20}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var124))
 			if templ_7745c5c3_Err != nil {
@@ -2868,7 +2882,7 @@ func trackerFilter(results []jacred.Result) templ.Component {
 			var templ_7745c5c3_Var125 string
 			templ_7745c5c3_Var125, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(len(results)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 727, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 741, Col: 78}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var125))
 			if templ_7745c5c3_Err != nil {
@@ -2886,7 +2900,7 @@ func trackerFilter(results []jacred.Result) templ.Component {
 				var templ_7745c5c3_Var126 string
 				templ_7745c5c3_Var126, templ_7745c5c3_Err = templ.ResolveAttributeValue(t.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 731, Col: 58}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 745, Col: 58}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var126)
 				if templ_7745c5c3_Err != nil {
@@ -2899,7 +2913,7 @@ func trackerFilter(results []jacred.Result) templ.Component {
 				var templ_7745c5c3_Var127 string
 				templ_7745c5c3_Var127, templ_7745c5c3_Err = templ.JoinStringErrs(trackerName(t.Name))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 732, Col: 26}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 746, Col: 26}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var127))
 				if templ_7745c5c3_Err != nil {
@@ -2912,7 +2926,7 @@ func trackerFilter(results []jacred.Result) templ.Component {
 				var templ_7745c5c3_Var128 string
 				templ_7745c5c3_Var128, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(t.Count))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 733, Col: 55}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 747, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var128))
 				if templ_7745c5c3_Err != nil {
@@ -2965,7 +2979,7 @@ func voiceFilter(results []jacred.Result) templ.Component {
 			var templ_7745c5c3_Var130 string
 			templ_7745c5c3_Var130, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Filter by voice"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 746, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 760, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var130)
 			if templ_7745c5c3_Err != nil {
@@ -2978,7 +2992,7 @@ func voiceFilter(results []jacred.Result) templ.Component {
 			var templ_7745c5c3_Var131 string
 			templ_7745c5c3_Var131, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Voices"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 747, Col: 82}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 761, Col: 82}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var131))
 			if templ_7745c5c3_Err != nil {
@@ -2991,7 +3005,7 @@ func voiceFilter(results []jacred.Result) templ.Component {
 			var templ_7745c5c3_Var132 string
 			templ_7745c5c3_Var132, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "All"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 749, Col: 20}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 763, Col: 20}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var132))
 			if templ_7745c5c3_Err != nil {
@@ -3009,7 +3023,7 @@ func voiceFilter(results []jacred.Result) templ.Component {
 				var templ_7745c5c3_Var133 string
 				templ_7745c5c3_Var133, templ_7745c5c3_Err = templ.ResolveAttributeValue(v.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 753, Col: 58}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 767, Col: 58}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var133)
 				if templ_7745c5c3_Err != nil {
@@ -3022,7 +3036,7 @@ func voiceFilter(results []jacred.Result) templ.Component {
 				var templ_7745c5c3_Var134 string
 				templ_7745c5c3_Var134, templ_7745c5c3_Err = templ.JoinStringErrs(v.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 754, Col: 13}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 768, Col: 13}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var134))
 				if templ_7745c5c3_Err != nil {
@@ -3035,7 +3049,7 @@ func voiceFilter(results []jacred.Result) templ.Component {
 				var templ_7745c5c3_Var135 string
 				templ_7745c5c3_Var135, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(v.Count))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 755, Col: 55}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 769, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var135))
 				if templ_7745c5c3_Err != nil {
@@ -3087,7 +3101,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var137 string
 		templ_7745c5c3_Var137, templ_7745c5c3_Err = templ.ResolveAttributeValue(r.Tracker)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 769, Col: 26}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 783, Col: 26}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var137)
 		if templ_7745c5c3_Err != nil {
@@ -3100,7 +3114,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var138 string
 		templ_7745c5c3_Var138, templ_7745c5c3_Err = templ.ResolveAttributeValue(strings.Join(r.Voices, "|"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 770, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 784, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var138)
 		if templ_7745c5c3_Err != nil {
@@ -3113,7 +3127,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var139 string
 		templ_7745c5c3_Var139, templ_7745c5c3_Err = templ.ResolveAttributeValue(rowShown)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 771, Col: 22}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 785, Col: 22}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var139)
 		if templ_7745c5c3_Err != nil {
@@ -3148,7 +3162,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var142 string
 		templ_7745c5c3_Var142, templ_7745c5c3_Err = templ.JoinStringErrs(r.QualityLabel())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 774, Col: 113}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 788, Col: 113}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var142))
 		if templ_7745c5c3_Err != nil {
@@ -3171,7 +3185,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var143 string
 		templ_7745c5c3_Var143, templ_7745c5c3_Err = templ.ResolveAttributeValue(r.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 780, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 794, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var143)
 		if templ_7745c5c3_Err != nil {
@@ -3184,7 +3198,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var144 string
 		templ_7745c5c3_Var144, templ_7745c5c3_Err = templ.JoinStringErrs(r.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 780, Col: 99}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 794, Col: 99}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var144))
 		if templ_7745c5c3_Err != nil {
@@ -3197,7 +3211,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var145 string
 		templ_7745c5c3_Var145, templ_7745c5c3_Err = templ.JoinStringErrs(r.Tracker)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 782, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 796, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var145))
 		if templ_7745c5c3_Err != nil {
@@ -3215,7 +3229,7 @@ func torrentRow(r jacred.Result) templ.Component {
 			var templ_7745c5c3_Var146 string
 			templ_7745c5c3_Var146, templ_7745c5c3_Err = templ.JoinStringErrs(r.SizeName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 784, Col: 23}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 798, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var146))
 			if templ_7745c5c3_Err != nil {
@@ -3252,7 +3266,7 @@ func torrentRow(r jacred.Result) templ.Component {
 			var templ_7745c5c3_Var149 string
 			templ_7745c5c3_Var149, templ_7745c5c3_Err = templ.ResolveAttributeValue(trf(ctx, "Estimated: size over %d min, audio included", int(r.Runtime.Minutes())))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 787, Col: 167}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 801, Col: 167}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var149)
 			if templ_7745c5c3_Err != nil {
@@ -3265,7 +3279,7 @@ func torrentRow(r jacred.Result) templ.Component {
 			var templ_7745c5c3_Var150 string
 			templ_7745c5c3_Var150, templ_7745c5c3_Err = templ.JoinStringErrs(trf(ctx, "%s Mbps", strconv.FormatFloat(mbps, 'f', 1, 64)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 788, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 802, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var150))
 			if templ_7745c5c3_Err != nil {
@@ -3284,7 +3298,7 @@ func torrentRow(r jacred.Result) templ.Component {
 			var templ_7745c5c3_Var151 string
 			templ_7745c5c3_Var151, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Added"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 792, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 806, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var151)
 			if templ_7745c5c3_Err != nil {
@@ -3297,7 +3311,7 @@ func torrentRow(r jacred.Result) templ.Component {
 			var templ_7745c5c3_Var152 string
 			templ_7745c5c3_Var152, templ_7745c5c3_Err = templ.JoinStringErrs(r.CreatedAt.Format("2006-01-02"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 792, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 806, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var152))
 			if templ_7745c5c3_Err != nil {
@@ -3315,7 +3329,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var153 string
 		templ_7745c5c3_Var153, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Seeders"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 794, Col: 88}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 808, Col: 88}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var153)
 		if templ_7745c5c3_Err != nil {
@@ -3332,7 +3346,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var154 string
 		templ_7745c5c3_Var154, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(r.Seeders))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 796, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 810, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var154))
 		if templ_7745c5c3_Err != nil {
@@ -3345,7 +3359,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var155 string
 		templ_7745c5c3_Var155, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Peers"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 798, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 812, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var155)
 		if templ_7745c5c3_Err != nil {
@@ -3362,7 +3376,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var156 string
 		templ_7745c5c3_Var156, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(r.Peers))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 800, Col: 26}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 814, Col: 26}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var156))
 		if templ_7745c5c3_Err != nil {
@@ -3380,7 +3394,7 @@ func torrentRow(r jacred.Result) templ.Component {
 			var templ_7745c5c3_Var157 string
 			templ_7745c5c3_Var157, templ_7745c5c3_Err = templ.JoinStringErrs(strings.Join(r.Voices, ", "))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 803, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 817, Col: 67}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var157))
 			if templ_7745c5c3_Err != nil {
@@ -3398,7 +3412,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var158 string
 		templ_7745c5c3_Var158, templ_7745c5c3_Err = templ.ResolveAttributeValue(r.Magnet)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 808, Col: 105}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 822, Col: 105}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var158)
 		if templ_7745c5c3_Err != nil {
@@ -3426,7 +3440,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var159 string
 		templ_7745c5c3_Var159, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Send to TorrServer"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 814, Col: 41}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 828, Col: 41}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var159)
 		if templ_7745c5c3_Err != nil {
@@ -3447,7 +3461,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var160 string
 		templ_7745c5c3_Var160, templ_7745c5c3_Err = templ.ResolveAttributeValue(r.Magnet)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 818, Col: 106}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 832, Col: 106}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var160)
 		if templ_7745c5c3_Err != nil {
@@ -3460,7 +3474,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var161 string
 		templ_7745c5c3_Var161, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Copy magnet link"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 818, Col: 144}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 832, Col: 144}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var161)
 		if templ_7745c5c3_Err != nil {
@@ -3473,7 +3487,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var162 string
 		templ_7745c5c3_Var162, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Copy magnet link"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 818, Col: 187}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 832, Col: 187}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var162)
 		if templ_7745c5c3_Err != nil {
@@ -3494,7 +3508,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var163 templ.SafeURL
 		templ_7745c5c3_Var163, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(r.SourceURL))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 821, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 835, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var163))
 		if templ_7745c5c3_Err != nil {
@@ -3507,7 +3521,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var164 string
 		templ_7745c5c3_Var164, templ_7745c5c3_Err = templ.ResolveAttributeValue(trf(ctx, "Open on %s", r.Tracker))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 821, Col: 174}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 835, Col: 174}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var164)
 		if templ_7745c5c3_Err != nil {
@@ -3520,7 +3534,7 @@ func torrentRow(r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var165 string
 		templ_7745c5c3_Var165, templ_7745c5c3_Err = templ.ResolveAttributeValue(trf(ctx, "Open source page on %s", r.Tracker))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 821, Col: 235}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 835, Col: 235}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var165)
 		if templ_7745c5c3_Err != nil {
@@ -3572,7 +3586,7 @@ func TorrActivity(hash, title string) templ.Component {
 		var templ_7745c5c3_Var167 string
 		templ_7745c5c3_Var167, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("@get('%s')", TorrentStatsURL(hash)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 831, Col: 138}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 845, Col: 138}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var167)
 		if templ_7745c5c3_Err != nil {
@@ -3593,7 +3607,7 @@ func TorrActivity(hash, title string) templ.Component {
 		var templ_7745c5c3_Var168 string
 		templ_7745c5c3_Var168, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 837, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 851, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var168))
 		if templ_7745c5c3_Err != nil {
@@ -3618,7 +3632,7 @@ func TorrActivity(hash, title string) templ.Component {
 		var templ_7745c5c3_Var169 string
 		templ_7745c5c3_Var169, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Open player"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 842, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 856, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var169))
 		if templ_7745c5c3_Err != nil {
@@ -3670,7 +3684,7 @@ func TorrActivityStats(t *torrserver.Torrent) templ.Component {
 			var templ_7745c5c3_Var171 string
 			templ_7745c5c3_Var171, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Waiting for TorrServer…"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 858, Col: 42}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 872, Col: 42}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var171))
 			if templ_7745c5c3_Err != nil {
@@ -3706,7 +3720,7 @@ func TorrActivityStats(t *torrserver.Torrent) templ.Component {
 			var templ_7745c5c3_Var174 string
 			templ_7745c5c3_Var174, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, t.StatusLabel()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 861, Col: 84}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 875, Col: 84}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var174))
 			if templ_7745c5c3_Err != nil {
@@ -3723,7 +3737,7 @@ func TorrActivityStats(t *torrserver.Torrent) templ.Component {
 			var templ_7745c5c3_Var175 string
 			templ_7745c5c3_Var175, templ_7745c5c3_Err = templ.JoinStringErrs(t.FormattedPeers())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 864, Col: 24}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 878, Col: 24}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var175))
 			if templ_7745c5c3_Err != nil {
@@ -3736,7 +3750,7 @@ func TorrActivityStats(t *torrserver.Torrent) templ.Component {
 			var templ_7745c5c3_Var176 string
 			templ_7745c5c3_Var176, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "peers"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 864, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 878, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var176))
 			if templ_7745c5c3_Err != nil {
@@ -3753,7 +3767,7 @@ func TorrActivityStats(t *torrserver.Torrent) templ.Component {
 			var templ_7745c5c3_Var177 string
 			templ_7745c5c3_Var177, templ_7745c5c3_Err = templ.JoinStringErrs(t.FormattedDownloadSpeed())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 868, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 882, Col: 32}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var177))
 			if templ_7745c5c3_Err != nil {
@@ -3771,7 +3785,7 @@ func TorrActivityStats(t *torrserver.Torrent) templ.Component {
 				var templ_7745c5c3_Var178 string
 				templ_7745c5c3_Var178, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(t.LoadedSize))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 872, Col: 88}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 886, Col: 88}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var178)
 				if templ_7745c5c3_Err != nil {
@@ -3784,7 +3798,7 @@ func TorrActivityStats(t *torrserver.Torrent) templ.Component {
 				var templ_7745c5c3_Var179 string
 				templ_7745c5c3_Var179, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(t.TorrentSize))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 872, Col: 122}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 886, Col: 122}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var179)
 				if templ_7745c5c3_Err != nil {
@@ -3797,7 +3811,7 @@ func TorrActivityStats(t *torrserver.Torrent) templ.Component {
 				var templ_7745c5c3_Var180 string
 				templ_7745c5c3_Var180, templ_7745c5c3_Err = templ.JoinStringErrs(torrserver.FormatBytes(t.LoadedSize))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 873, Col: 85}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 887, Col: 85}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var180))
 				if templ_7745c5c3_Err != nil {
@@ -3810,7 +3824,7 @@ func TorrActivityStats(t *torrserver.Torrent) templ.Component {
 				var templ_7745c5c3_Var181 string
 				templ_7745c5c3_Var181, templ_7745c5c3_Err = templ.JoinStringErrs(t.FormattedSize())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 873, Col: 109}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 887, Col: 109}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var181))
 				if templ_7745c5c3_Err != nil {
@@ -3859,7 +3873,7 @@ func appToast() templ.Component {
 		var templ_7745c5c3_Var183 string
 		templ_7745c5c3_Var183, templ_7745c5c3_Err = templ.ResolveAttributeValue(toastAutoHide)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 888, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 902, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var183)
 		if templ_7745c5c3_Err != nil {

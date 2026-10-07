@@ -40,3 +40,22 @@ func TestAMovieOnlyInCinemasWarnsThatItsSourcesAreCinemaRecordings(t *testing.T)
 		}
 	}
 }
+
+func TestAnOlderMovieWithoutKnownHomeReleasesDoesNotWarnAboutCinemaRecordings(t *testing.T) {
+	for name, c := range map[string]struct {
+		releases tmdb.Releases
+		warns    bool
+	}{
+		"an old film TMDB knows only the cinema date of":   {tmdb.Releases{Cinema: time.Date(2010, time.July, 15, 0, 0, 0, 0, time.UTC)}, false},
+		"a film in cinemas for a month, nothing announced": {tmdb.Releases{Cinema: time.Now().AddDate(0, -1, 0)}, true},
+		"a film whose disc is out though digital is not":   {tmdb.Releases{Cinema: time.Now().AddDate(0, -3, 0), Physical: time.Now().AddDate(0, 0, -5)}, false},
+	} {
+		movie := *inception
+		movie.Releases = c.releases
+		server := newMediaServer(t, &fakeTMDBDetails{movies: map[int]*tmdb.MovieDetails{27205: &movie}}, &fakeJacRed{}, "")
+		body := get(t, server, "/movie/27205", true).Body.String()
+		if got := strings.Contains(body, "Not out digitally yet"); got != c.warns {
+			t.Errorf("%s: warns about cinema recordings = %t, want %t", name, got, c.warns)
+		}
+	}
+}

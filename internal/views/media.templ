@@ -486,11 +486,25 @@ templ releaseDate(icon, label string, day, now time.Time) {
 	}
 }
 
+// cinemaWindow is about how long a movie plays in cinemas before it comes
+// out digitally or on disc.
+const cinemaWindow = 120 * 24 * time.Hour
+
 // onlyInCinemas is whether a movie is out in cinemas but not yet digitally
-// or on disc, so trackers can only have recordings of a screening.
+// or on disc, so trackers can only have recordings of a screening. A date
+// TMDB does not know is not a release still to come: it takes a home
+// release announced for later, or a cinema release recent enough that one
+// is unlikely to be out yet.
 func onlyInCinemas(rel tmdb.Releases, now time.Time) bool {
-	notYet := func(day time.Time) bool { return day.IsZero() || day.After(now) }
-	return !rel.Cinema.IsZero() && !rel.Cinema.After(now) && notYet(rel.Digital) && notYet(rel.Physical)
+	if rel.Cinema.IsZero() || rel.Cinema.After(now) {
+		return false
+	}
+	out := func(day time.Time) bool { return !day.IsZero() && !day.After(now) }
+	if out(rel.Digital) || out(rel.Physical) {
+		return false
+	}
+	announced := rel.Digital.After(now) || rel.Physical.After(now)
+	return announced || now.Sub(rel.Cinema) < cinemaWindow
 }
 
 // searchQualities are the qualities JacRed files releases under, as picked
