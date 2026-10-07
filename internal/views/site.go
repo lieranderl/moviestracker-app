@@ -16,6 +16,8 @@ type Site struct {
 	// by which the navbar's TorrServer status learns whether it answers:
 	// they set $_tsNav to "online", "offline" or "none". Nil shows none.
 	TorrServerCheck templ.Attributer
+	// HomeRows, from the site's adapter, come first among home's rows.
+	HomeRows templ.Component
 }
 
 type siteKey struct{}

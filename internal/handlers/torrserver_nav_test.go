@@ -30,3 +30,15 @@ func TestTheNavbarShowsWhetherTorrServerAnswers(t *testing.T) {
 		t.Error("a signed-out visitor should not learn the TorrServer's state")
 	}
 }
+
+func TestTheAppsHomeHasNoBrowserListedTorrServerRow(t *testing.T) {
+	cfg := validTestConfig(t)
+	server := newTestServerWithConfig(t, cfg)
+	body := get(t, server, "/movies", true).Body.String()
+	if !strings.Contains(body, `id="trending-movies"`) {
+		t.Fatal("the app's home did not render its rows")
+	}
+	if strings.Contains(body, `id="recent-torrents"`) {
+		t.Error("the app's home has the web app's row of the browser's TorrServer torrents")
+	}
+}

@@ -27,9 +27,33 @@ const (
 // TorrServer (tsList), into #ts-torrents. The server itself never reaches
 // the TorrServer.
 func (a *app) handleTorrents(w http.ResponseWriter, r *http.Request) {
+	torrents, ok := a.readTorrents(w, r)
+	if !ok {
+		return
+	}
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.WebTorrents(torrents)); err != nil {
+		slog.Warn("patching torrents failed", "error", err)
+	}
+}
+
+// handleRecentTorrents renders home's row of the torrents last added to the
+// TorrServer the browser listed.
+func (a *app) handleRecentTorrents(w http.ResponseWriter, r *http.Request) {
+	torrents, ok := a.readTorrents(w, r)
+	if !ok {
+		return
+	}
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.WebRecentTorrents(torrents)); err != nil {
+		slog.Warn("patching recent torrents failed", "error", err)
+	}
+}
+
+// readTorrents is the signed-in visitor's torrent list the browser posted,
+// within bounds; otherwise it answers the request and returns false.
+func (a *app) readTorrents(w http.ResponseWriter, r *http.Request) ([]torrserver.Torrent, bool) {
 	if _, ok := a.currentUser(r); !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		return nil, false
 	}
 	var list struct {
 		Torrents []torrserver.Torrent `json:"torrents"`
@@ -38,17 +62,15 @@ func (a *app) handleTorrents(w http.ResponseWriter, r *http.Request) {
 	var tooBig *http.MaxBytesError
 	if errors.As(err, &tooBig) {
 		http.Error(w, "Request Entity Too Large", http.StatusRequestEntityTooLarge)
-		return
+		return nil, false
 	}
 	if err != nil {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
+		return nil, false
 	}
 	if len(list.Torrents) > maxTorrents || slices.ContainsFunc(list.Torrents, func(t torrserver.Torrent) bool { return len(t.FileStats) > maxFilesPerTorrent }) {
 		http.Error(w, "Request Entity Too Large", http.StatusRequestEntityTooLarge)
-		return
+		return nil, false
 	}
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.WebTorrents(list.Torrents)); err != nil {
-		slog.Warn("patching torrents failed", "error", err)
-	}
+	return list.Torrents, true
 }
