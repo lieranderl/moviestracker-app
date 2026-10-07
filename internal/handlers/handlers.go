@@ -245,6 +245,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/torrserver/queue", s.handleTorrServerQueue)
 	s.mux.HandleFunc("GET /api/torrserver/player-stats", s.handleTorrServerPlayerStats)
 	s.mux.HandleFunc("GET /api/torrserver/status", s.handleTorrServerStatus)
+	s.mux.HandleFunc("GET /api/torrserver/state", s.handleTorrServerState)
 	s.mux.HandleFunc("GET /api/torrserver/torrent-stats", s.handleTorrentStats)
 	s.mux.HandleFunc("GET /api/torrserver/stream/", s.handleTorrServerStreamProxy)
 

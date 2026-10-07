@@ -34,7 +34,7 @@ templ layoutWithScripts(title string, scripts ...string) {
 			<!-- Page modules run before Datastar (modules execute in document order):
 			     its first scan calls their window helpers, and one ReferenceError
 			     there would stop the scan and leave the page inert. -->
-			for _, src := range scripts {
+			for _, src := range pageScripts(ctx, scripts) {
 				<script type="module" src={ src }></script>
 			}
 			<!-- Datastar Client (v1.0.4); modules are deferred and never block rendering -->

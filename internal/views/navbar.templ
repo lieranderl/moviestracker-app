@@ -1,6 +1,11 @@
 package views
 
-import "github.com/lieranderl/moviestracker-app/internal/auth"
+import (
+	"context"
+	"fmt"
+
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+)
 
 type navLink struct {
 	Href  string
@@ -58,6 +63,9 @@ templ Navbar(user *auth.User) {
 				if rel, ok := newRelease(ctx); ok && user.IsAdmin() {
 					@releaseBadge(rel)
 				}
+				if user != nil {
+					@torrServerNavStatus()
+				}
 				@LanguageSwitcher()
 				@ThemeSwitcher()
 				if user != nil {
@@ -71,6 +79,51 @@ templ Navbar(user *auth.User) {
 			</div>
 		</nav>
 	</header>
+}
+
+// torrServerNavCheck sets $_tsNav to whether TorrServer answers. The app
+// asks its server, which runs or reaches TorrServer, once a page (timers
+// never ask the server); the web app's server cannot reach a visitor's
+// TorrServer, so the browser checks the one last picked there, again every
+// minute (tsCheck fires ts-status on el).
+func torrServerNavCheck(ctx context.Context) string {
+	if siteOf(ctx).Cloud {
+		return "const url = localStorage.getItem('mt-ts-selected'); if (url) { tsCheck(el, url) } else { $_tsNav = 'none' }"
+	}
+	return "@get('/api/torrserver/state')"
+}
+
+// torrServerNavTitle says in words what the dot shows.
+func torrServerNavTitle(ctx context.Context) string {
+	return fmt.Sprintf("{ online: %s, offline: %s, none: %s }[$_tsNav] || %s",
+		trJS(ctx, "TorrServer is online"), trJS(ctx, "TorrServer does not answer"),
+		trJS(ctx, "Add your TorrServer"), trJS(ctx, "Checking TorrServer…"))
+}
+
+// torrServerNavStatus is a dot by TorrServer's name: green when it answers,
+// red when it does not, grey when none is picked yet.
+templ torrServerNavStatus() {
+	<a
+		id="ts-nav-status"
+		href="/torrserver"
+		class="btn btn-ghost btn-sm gap-2 px-2"
+		data-signals="{ _tsNav: 'checking' }"
+		data-init={ torrServerNavCheck(ctx) }
+		if siteOf(ctx).Cloud {
+			data-on-interval__duration.60s={ torrServerNavCheck(ctx) }
+			data-on:ts-status="$_tsNav = evt.detail.checking ? 'checking' : (evt.detail.ok ? 'online' : 'offline')"
+		}
+		data-attr:title={ torrServerNavTitle(ctx) }
+		title={ tr(ctx, "Checking TorrServer…") }
+	>
+		<span
+			aria-hidden="true"
+			class="status status-md animate-pulse"
+			data-class="{ 'status-success': $_tsNav === 'online', 'status-error': $_tsNav === 'offline', 'animate-pulse': $_tsNav === 'checking' }"
+		></span>
+		<span class="hidden lg:inline">TorrServer</span>
+		<span class="sr-only lg:hidden">TorrServer</span>
+	</a>
 }
 
 // releaseBadge tells an administrator that a newer Moviestracker is out and

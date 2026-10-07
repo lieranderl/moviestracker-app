@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 )
 
@@ -97,5 +98,22 @@ func TestLoginIncludesThemeSwitcher(t *testing.T) {
 
 	if !strings.Contains(html, `aria-label="Theme switcher"`) {
 		t.Errorf("Login should include ThemeSwitcher component")
+	}
+}
+
+func TestTheWebAppsNavbarChecksTheChosenTorrServerFromTheBrowser(t *testing.T) {
+	var buf bytes.Buffer
+	ctx := views.WithSite(context.Background(), views.Site{Cloud: true})
+	if err := views.Navbar(&auth.User{Name: "Ann", Username: "ann"}).Render(ctx, &buf); err != nil {
+		t.Fatal(err)
+	}
+	out := html.UnescapeString(buf.String())
+	for _, want := range []string{`id="ts-nav-status"`, "localStorage.getItem('mt-ts-selected')", "tsCheck(el,", "data-on:ts-status"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the web app's navbar lacks %q", want)
+		}
+	}
+	if strings.Contains(out, "/api/torrserver/state") {
+		t.Error("the web app cannot reach its visitors' TorrServers from the server")
 	}
 }

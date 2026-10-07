@@ -160,3 +160,22 @@ func TestManyHomePagesAtOnceReadEachFeedOnce(t *testing.T) {
 		t.Errorf("8 home pages at once read the feeds %d times, want 3 (once each)", got)
 	}
 }
+
+func TestEverySignedInPageCanCheckTheVisitorsTorrServer(t *testing.T) {
+	g := newGoogle(t)
+	h := web.New(withTMDB(t, g.config()))
+	session := signIn(t, h)
+	for _, path := range []string{"/", "/search?q=dune", "/favorites", "/movie/438631", "/torrserver"} {
+		body := getWith(t, h, path, session).Body.String()
+		if !strings.Contains(body, `id="ts-nav-status"`) {
+			t.Errorf("%s has no TorrServer status in its navbar", path)
+		}
+		helpers, datastar := strings.Index(body, `src="/static/torrserver.js"`), strings.Index(body, `src="/static/datastar.js"`)
+		if helpers < 0 || helpers > datastar {
+			t.Errorf("%s loads torrserver.js at %d and datastar.js at %d: the navbar's check needs the helpers first", path, helpers, datastar)
+		}
+		if n := strings.Count(body, `src="/static/torrserver.js"`); n > 1 {
+			t.Errorf("%s loads torrserver.js %d times", path, n)
+		}
+	}
+}
