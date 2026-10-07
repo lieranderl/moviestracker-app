@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -120,6 +121,58 @@ type Result struct {
 	Voices    []string
 	Seasons   []int
 	CreatedAt time.Time
+	// Runtime is how long the release plays, from TMDB: zero when unknown.
+	Runtime time.Duration
+}
+
+// Episode markers in release titles: "S02E05", "S02E01-E03" or "S02E07-08",
+// and Russian trackers' "1-8 из 10" (episodes 1 to 8 of 10).
+var (
+	episodeMarker = regexp.MustCompile(`(?i)\bS\d{1,2}E(\d{1,3})(?:\s*-\s*E?(\d{1,3}))?\b`)
+	episodesOfAll = regexp.MustCompile(`(?i)\b(\d{1,3})\s*[-–]\s*(\d{1,3})\s*(?:серии|серия|эпизоды)?\s*из\s*\d{1,3}\b`)
+)
+
+// Episodes is how many episodes of one season the release holds, given the
+// season's episode count: a range or single episode its title names, else
+// the whole season. Zero when it spans several seasons.
+func (r Result) Episodes(seasonEpisodes int) int {
+	if len(r.Seasons) > 1 {
+		return 0
+	}
+	if m := episodeMarker.FindStringSubmatch(r.Title); m != nil {
+		return episodeSpan(m[1], m[2])
+	}
+	if m := episodesOfAll.FindStringSubmatch(r.Title); m != nil {
+		return episodeSpan(m[1], m[2])
+	}
+	return seasonEpisodes
+}
+
+// episodeSpan counts the episodes from first to last ("" for just first).
+func episodeSpan(first, last string) int {
+	a, _ := strconv.Atoi(first)
+	b, err := strconv.Atoi(last)
+	if err != nil || b < a {
+		return 1
+	}
+	return b - a + 1
+}
+
+// Plausible bitrates, in Mbps: outside them the size and runtime are not
+// of the same thing (a season pack timed as one episode, a sample).
+const minMbps, maxMbps = 0.3, 150
+
+// Mbps estimates the release's bitrate, audio included, as its size over
+// its runtime; zero when either is unknown or the two cannot belong together.
+func (r Result) Mbps() float64 {
+	if r.Size <= 0 || r.Runtime <= 0 {
+		return 0
+	}
+	mbps := float64(r.Size) * 8 / 1e6 / r.Runtime.Seconds()
+	if mbps < minMbps || mbps > maxMbps {
+		return 0
+	}
+	return mbps
 }
 
 // QualityLabel renders the vertical resolution as a familiar label.
@@ -515,7 +568,8 @@ func nearYear(released, year int) bool {
 }
 
 // Sort returns a copy of results ordered by "seeders" (default), "date"
-// (newest first) or "size" (largest first).
+// (newest first), "size" (largest first) or "bitrate" (highest first, the
+// releases without one last).
 func Sort(results []Result, by string) []Result {
 	out := slices.Clone(results)
 	slices.SortStableFunc(out, func(a, b Result) int {
@@ -524,6 +578,8 @@ func Sort(results []Result, by string) []Result {
 			return cmp.Or(b.CreatedAt.Compare(a.CreatedAt), cmp.Compare(b.Seeders, a.Seeders))
 		case "size":
 			return cmp.Or(cmp.Compare(b.Size, a.Size), cmp.Compare(b.Seeders, a.Seeders))
+		case "bitrate":
+			return cmp.Or(cmp.Compare(b.Mbps(), a.Mbps()), cmp.Compare(b.Seeders, a.Seeders))
 		default:
 			return cmp.Or(cmp.Compare(b.Seeders, a.Seeders), cmp.Compare(b.Quality, a.Quality))
 		}
