@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -47,6 +48,7 @@ func (l releaseLists) ListPage(ctx context.Context, list tmdb.List, page int) (t
 // it needs no other bound.
 type cachedFeeds struct {
 	src     releases.Source
+	posters tmdb.PosterProvider // nil keeps the backend's posters
 	now     func() time.Time
 	reading singleflight.Group
 
@@ -65,8 +67,40 @@ type cachedPage struct {
 	expires time.Time
 }
 
-func newCachedFeeds(src releases.Source, now func() time.Time) *cachedFeeds {
-	return &cachedFeeds{src: src, now: now, pages: map[feedPage]cachedPage{}}
+func newCachedFeeds(src releases.Source, posters tmdb.PosterProvider, now func() time.Time) *cachedFeeds {
+	return &cachedFeeds{src: src, posters: posters, now: now, pages: map[feedPage]cachedPage{}}
+}
+
+// Poster lookups for a feed page: a few at a time, each briefly.
+const (
+	posterLookups      = 4
+	posterLookupWithin = 3 * time.Second
+)
+
+// localizePosters gives a page's releases their posters in ctx's language.
+// The backend keeps each release's Russian poster, as it titles them; a
+// poster TMDB does not give in time stays Russian.
+func (c *cachedFeeds) localizePosters(ctx context.Context, p tmdb.Page) tmdb.Page {
+	if c.posters == nil || i18n.FromContext(ctx) == i18n.Russian {
+		return p
+	}
+	items := slices.Clone(p.Items)
+	slots := make(chan struct{}, posterLookups)
+	var wg sync.WaitGroup
+	for i := range items {
+		wg.Go(func() {
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			lookup, cancel := context.WithTimeout(ctx, posterLookupWithin)
+			defer cancel()
+			if poster, err := c.posters.MoviePoster(lookup, items[i].ID); err == nil && poster != "" {
+				items[i].PosterPath = poster
+			}
+		})
+	}
+	wg.Wait()
+	p.Items = items
+	return p
 }
 
 // Page implements releases.Source.
@@ -85,6 +119,7 @@ func (c *cachedFeeds) Page(ctx context.Context, feed releases.Feed, page int) (t
 		if err != nil {
 			return tmdb.Page{}, err
 		}
+		p = c.localizePosters(context.WithoutCancel(ctx), p)
 		c.mu.Lock()
 		c.pages[key] = cachedPage{page: p, expires: c.now().Add(feedTTL)}
 		c.mu.Unlock()

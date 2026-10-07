@@ -83,7 +83,7 @@ func New(cfg Config) http.Handler {
 		if clock == nil {
 			clock = time.Now
 		}
-		cfg.Sources.Details = releaseLists{DetailsProvider: cfg.Sources.Details, feeds: newCachedFeeds(cfg.Releases, clock)}
+		cfg.Sources.Details = releaseLists{DetailsProvider: cfg.Sources.Details, feeds: newCachedFeeds(cfg.Releases, posterProvider(cfg.Sources.Details), clock)}
 	}
 	a := &app{cfg: cfg, signer: signer{key: cfg.SessionKey}}
 	a.catalog = handlers.NewCatalog(func() *sources.Clients { return &a.cfg.Sources }, a.catalogUser, "/", catalogTimeout)
@@ -208,6 +208,12 @@ func (a *app) catalogUser(r *http.Request) *auth.User {
 
 // webSite marks every page as the web app's, so shared views show its
 // navigation.
+// posterProvider is details' posters by language, when it gives them.
+func posterProvider(details tmdb.DetailsProvider) tmdb.PosterProvider {
+	posters, _ := details.(tmdb.PosterProvider)
+	return posters
+}
+
 func webSite(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		next.ServeHTTP(w, r.WithContext(views.WithSite(r.Context(), views.Site{Cloud: true})))

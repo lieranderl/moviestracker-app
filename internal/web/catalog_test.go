@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -158,5 +159,44 @@ func TestManyHomePagesAtOnceReadEachFeedOnce(t *testing.T) {
 	wg.Wait()
 	if got := feeds.count(); got != 3 {
 		t.Errorf("8 home pages at once read the feeds %d times, want 3 (once each)", got)
+	}
+}
+
+func TestReleaseRowsShowPostersInTheVisitorsLanguage(t *testing.T) {
+	// TMDB, the external boundary, has Dune's poster in each language; the
+	// backend keeps the Russian one with the release.
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/3/movie/438631" {
+			poster := "/dune-en.jpg"
+			if strings.HasPrefix(r.URL.Query().Get("language"), "ru") {
+				poster = "/dune-ru.jpg"
+			}
+			_, _ = w.Write([]byte(`{"id":438631,"title":"Dune","poster_path":"` + poster + `"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"page":1,"total_pages":1,"results":[]}`))
+	}))
+	t.Cleanup(fake.Close)
+	g := newGoogle(t)
+	cfg := g.config()
+	cfg.Sources = sources.Connector{TMDBBaseURL: fake.URL}.Connect(config.Sources{TMDBKey: "tmdb-key"})
+	cfg.Releases = releases.NewMemory(map[releases.Feed][]releases.Release{
+		releases.Latest: {{ID: 438631, Title: "Дюна", OriginalTitle: "Dune", PosterPath: "/dune-ru.jpg", FoundAt: now}},
+	})
+	h := web.New(cfg)
+	session := signIn(t, h)
+
+	for lang, want := range map[string]string{"en": "/dune-en.jpg", "ru": "/dune-ru.jpg"} {
+		req := httptest.NewRequest(http.MethodGet, "/api/discover", nil)
+		req.Header.Set("Accept-Language", lang)
+		for _, c := range session.Result().Cookies() {
+			req.AddCookie(c)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if body := rec.Body.String(); !strings.Contains(body, want) {
+			t.Errorf("%s visitor: the latest releases lack the poster %s; images: %v", lang, want, regexp.MustCompile(`image.tmdb.org[^"]*`).FindAllString(body, -1))
+		}
 	}
 }
