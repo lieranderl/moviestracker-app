@@ -423,6 +423,24 @@ func (s *Server) handleTorrServerState(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleRecentTorrents fills home's row of the torrents last added to the
+// active TorrServer; a TorrServer that does not answer leaves it empty.
+func (s *Server) handleRecentTorrents(w http.ResponseWriter, r *http.Request) {
+	if s.apiUser(w, r) == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+	torrents, err := s.torrServer.Client().ListTorrents(ctx)
+	if err != nil {
+		slog.Debug("listing recent torrents failed", "error", err)
+		torrents = nil
+	}
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.RecentTorrents(torrents)); err != nil {
+		logSSEError(r, "patch recent torrents", err)
+	}
+}
+
 // handleTorrentStats shows one torrent's download stats. With stream=true it
 // follows the shared torrent list until the page closes, making no TorrServer
 // requests of its own.
