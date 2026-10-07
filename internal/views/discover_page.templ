@@ -12,8 +12,9 @@ import (
 // discoverSlug marks the Discover page in the category bar.
 const discoverSlug = "discover"
 
-// oldestYear is the first year Discover offers.
-const oldestYear = 1950
+// DiscoverFirstYear is the first year Discover offers; it offers up to
+// this year.
+const DiscoverFirstYear = 1950
 
 // DiscoverView is the Discover page: TMDB's catalog filtered by Query.
 type DiscoverView struct {
@@ -51,13 +52,14 @@ func (v DiscoverView) moreURL(page int) string {
 // years are the years to pick from, newest first.
 func (v DiscoverView) years() []int {
 	var out []int
-	for y := v.ThisYear; y >= oldestYear; y-- {
+	for y := v.ThisYear; y >= DiscoverFirstYear; y-- {
 		out = append(out, y)
 	}
 	return out
 }
 
-var discoverRatings = []float64{6, 7, 8}
+// DiscoverRatings are the minimum ratings Discover offers.
+var DiscoverRatings = []float64{6, 7, 8}
 
 var discoverSorts = []struct{ Key, Label string }{
 	{"popular", "Most popular"},
@@ -118,7 +120,7 @@ templ DiscoverPage(user *auth.User, v DiscoverView) {
 						<span class="label">{ tr(ctx, "Rating") }</span>
 						<select name="rating">
 							<option value="">{ tr(ctx, "Any") }</option>
-							for _, r := range discoverRatings {
+							for _, r := range DiscoverRatings {
 								<option value={ strconv.FormatFloat(r, 'f', -1, 64) } selected?={ r == v.Query.MinRating }>{ fmt.Sprintf("%g+", r) }</option>
 							}
 						</select>

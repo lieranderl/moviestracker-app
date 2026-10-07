@@ -20,8 +20,9 @@ import (
 // discoverSlug marks the Discover page in the category bar.
 const discoverSlug = "discover"
 
-// oldestYear is the first year Discover offers.
-const oldestYear = 1950
+// DiscoverFirstYear is the first year Discover offers; it offers up to
+// this year.
+const DiscoverFirstYear = 1950
 
 // DiscoverView is the Discover page: TMDB's catalog filtered by Query.
 type DiscoverView struct {
@@ -59,13 +60,14 @@ func (v DiscoverView) moreURL(page int) string {
 // years are the years to pick from, newest first.
 func (v DiscoverView) years() []int {
 	var out []int
-	for y := v.ThisYear; y >= oldestYear; y-- {
+	for y := v.ThisYear; y >= DiscoverFirstYear; y-- {
 		out = append(out, y)
 	}
 	return out
 }
 
-var discoverRatings = []float64{6, 7, 8}
+// DiscoverRatings are the minimum ratings Discover offers.
+var DiscoverRatings = []float64{6, 7, 8}
 
 var discoverSorts = []struct{ Key, Label string }{
 	{"popular", "Most popular"},
@@ -128,7 +130,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var3 templ.SafeURL
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(homeHref(ctx)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 78, Col: 43}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 80, Col: 43}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -145,7 +147,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Home"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 80, Col: 23}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 82, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -162,7 +164,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Discover"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 84, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 86, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -175,7 +177,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Filter TMDB's whole catalog by genre, year and rating."))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 86, Col: 112}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 88, Col: 112}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -188,7 +190,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Filters"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 88, Col: 151}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 90, Col: 151}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 			if templ_7745c5c3_Err != nil {
@@ -201,7 +203,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Kind"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 89, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 91, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 			if templ_7745c5c3_Err != nil {
@@ -224,7 +226,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Movies"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 92, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 94, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -247,7 +249,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Series"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 96, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 98, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -260,7 +262,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Genre"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 100, Col: 44}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 102, Col: 44}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -273,7 +275,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Any"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 102, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 104, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -291,7 +293,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.Itoa(g.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 104, Col: 42}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 106, Col: 42}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 				if templ_7745c5c3_Err != nil {
@@ -314,7 +316,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(g.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 104, Col: 89}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 106, Col: 89}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -332,7 +334,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Year"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 109, Col: 43}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 111, Col: 43}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -345,7 +347,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Any"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 111, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 113, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -363,7 +365,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 				var templ_7745c5c3_Var17 string
 				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.Itoa(y))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 113, Col: 39}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 115, Col: 39}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 				if templ_7745c5c3_Err != nil {
@@ -386,7 +388,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(y))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 113, Col: 91}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 115, Col: 91}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -404,7 +406,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Rating"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 118, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 120, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
@@ -417,7 +419,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Any"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 120, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 122, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
@@ -427,7 +429,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			for _, r := range discoverRatings {
+			for _, r := range DiscoverRatings {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<option value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -435,7 +437,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.FormatFloat(r, 'f', -1, 64))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 122, Col: 59}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 124, Col: 59}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 				if templ_7745c5c3_Err != nil {
@@ -458,7 +460,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%g+", r))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 122, Col: 122}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 124, Col: 122}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
@@ -476,7 +478,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Sort"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 127, Col: 43}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 129, Col: 43}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
@@ -494,7 +496,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 				var templ_7745c5c3_Var24 string
 				templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.ResolveAttributeValue(o.Key)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 130, Col: 29}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 132, Col: 29}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
 				if templ_7745c5c3_Err != nil {
@@ -517,7 +519,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 				var templ_7745c5c3_Var25 string
 				templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, o.Label))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 130, Col: 86}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 132, Col: 86}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 				if templ_7745c5c3_Err != nil {
@@ -535,7 +537,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			var templ_7745c5c3_Var26 string
 			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Apply"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 134, Col: 74}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 136, Col: 74}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 			if templ_7745c5c3_Err != nil {
@@ -565,7 +567,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 					var templ_7745c5c3_Var28 string
 					templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Clear filters"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 138, Col: 83}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/discover_page.templ`, Line: 140, Col: 83}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 					if templ_7745c5c3_Err != nil {
