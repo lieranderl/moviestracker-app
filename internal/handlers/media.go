@@ -406,6 +406,23 @@ func (s *Server) handleTorrServerStatus(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// handleTorrServerState sets the navbar's $_tsNav: whether the active
+// TorrServer answers.
+func (s *Server) handleTorrServerState(w http.ResponseWriter, r *http.Request) {
+	if s.apiUser(w, r) == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+	state := "offline"
+	if echo, err := s.torrServer.Client().Echo(ctx); err == nil && echo.Version != "" {
+		state = "online"
+	}
+	if err := datastar.NewSSE(w, r).MarshalAndPatchSignals(map[string]string{"_tsNav": state}); err != nil {
+		logSSEError(r, "patch torrserver state", err)
+	}
+}
+
 // handleTorrentStats shows one torrent's download stats. With stream=true it
 // follows the shared torrent list until the page closes, making no TorrServer
 // requests of its own.

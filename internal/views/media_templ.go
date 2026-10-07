@@ -1689,7 +1689,7 @@ func sourcesSection(mediaType string, item tmdb.MediaItem, seasons []tmdb.Season
 			return templ_7745c5c3_Err
 		}
 		if siteOf(ctx).Cloud {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 111, " data-effect=\"localStorage.setItem('mt-ts-selected', $tsSelected); tsResetAdd(el, $tsSelected)\" data-on:ts-added=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 111, " data-effect=\"localStorage.setItem('mt-ts-selected', $tsSelected); $_tsNavUrl = $tsSelected; tsResetAdd(el, $tsSelected)\" data-on:ts-added=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
