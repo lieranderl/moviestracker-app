@@ -464,7 +464,8 @@ func IMDbRatingFragment(targetID string, rating string, votes string) templ.Comp
 }
 
 // emptyState says a list is empty and what to do about it; its children
-// are that action, a link or button.
+// are that action, a link or button. It is a live status: patched in when
+// the last item goes, it is announced.
 func emptyState(icon, title, body string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -486,7 +487,7 @@ func emptyState(icon, title, body string) templ.Component {
 			templ_7745c5c3_Var23 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<div data-empty-state class=\"card bg-base-200/50 border border-base-content/10\"><div class=\"card-body items-center text-center gap-4 p-8 sm:p-12\"><span class=\"size-16 rounded-box bg-base-300 grid place-items-center text-base-content/40\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<div data-empty-state role=\"status\" class=\"card bg-base-200/50 border border-base-content/10\"><div class=\"card-body items-center text-center gap-4 p-8 sm:p-12\"><span class=\"size-16 rounded-box bg-base-300 grid place-items-center text-base-content/40\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -501,7 +502,7 @@ func emptyState(icon, title, body string) templ.Component {
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components.templ`, Line: 94, Col: 41}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components.templ`, Line: 95, Col: 41}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
@@ -514,7 +515,7 @@ func emptyState(icon, title, body string) templ.Component {
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(body)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components.templ`, Line: 95, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components.templ`, Line: 96, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
@@ -565,7 +566,7 @@ func browseTrendingLink() templ.Component {
 		var templ_7745c5c3_Var27 templ.SafeURL
 		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(homeHref(ctx)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components.templ`, Line: 104, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components.templ`, Line: 105, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 		if templ_7745c5c3_Err != nil {
@@ -582,7 +583,7 @@ func browseTrendingLink() templ.Component {
 		var templ_7745c5c3_Var28 string
 		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Browse trending"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components.templ`, Line: 106, Col: 30}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/components.templ`, Line: 107, Col: 30}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 		if templ_7745c5c3_Err != nil {

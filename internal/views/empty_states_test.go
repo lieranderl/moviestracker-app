@@ -47,6 +47,9 @@ func TestNoTorrServerYetOffersToAddOne(t *testing.T) {
 	if !strings.Contains(card, `data-on:click="$tsAddOpen = true"`) || !strings.Contains(card, "Add TorrServer") {
 		t.Error("the empty TorrServer list does not offer to add one")
 	}
+	if !strings.Contains(card, `role="status"`) {
+		t.Error("removing the last TorrServer is not announced: the empty list is no live status")
+	}
 }
 
 func TestASearchWithNoMatchesLeadsBackToTrending(t *testing.T) {

@@ -83,9 +83,10 @@ templ IMDbRatingFragment(targetID string, rating string, votes string) {
 }
 
 // emptyState says a list is empty and what to do about it; its children
-// are that action, a link or button.
+// are that action, a link or button. It is a live status: patched in when
+// the last item goes, it is announced.
 templ emptyState(icon, title, body string) {
-	<div data-empty-state class="card bg-base-200/50 border border-base-content/10">
+	<div data-empty-state role="status" class="card bg-base-200/50 border border-base-content/10">
 		<div class="card-body items-center text-center gap-4 p-8 sm:p-12">
 			<span class="size-16 rounded-box bg-base-300 grid place-items-center text-base-content/40">
 				@Icon(icon, "size-8")
