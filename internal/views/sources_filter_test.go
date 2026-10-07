@@ -28,7 +28,7 @@ func TestReleasesCanBeFilteredByOneOrMoreTrackers(t *testing.T) {
 	}
 	for _, want := range []string{
 		`aria-label="Filter by tracker"`, `data-bind="trackers"`, "Knaben", "BitRu",
-		`data-on:click="$trackers = $trackers.map(() => '')"`, `data-class="{ 'btn-primary': !$trackers.some(Boolean) }"`,
+		`data-on:click="$trackers = $trackers.map(() => '')"`, `data-class="{ 'menu-active': !$trackers.some(Boolean) }"`,
 		`data-tracker="knaben"`, "$trackers.includes(el.dataset.tracker)",
 	} {
 		if !strings.Contains(out, want) {
@@ -83,5 +83,61 @@ func TestReleasesCanBeFilteredByVoice(t *testing.T) {
 	}
 	if strings.Contains(out, `aria-label="Filter by quality"`) || strings.Contains(out, "$q ===") {
 		t.Error("the quality tabs should be gone: quality is picked before searching")
+	}
+}
+
+func TestEachReleaseShowsItsSourceCodecAndAudio(t *testing.T) {
+	rs := []jacred.Result{
+		{Tracker: "knaben", Title: "Spider-Man.2026.1080p.WEBRip.AAC5.1.10bits.x265", Quality: 1080, Seeders: 9},
+		{Tracker: "knaben", Title: "Spider-Man (2026) CAMRip", Quality: 720, Seeders: 3},
+	}
+	out := html.UnescapeString(render(t, views.TorrentResults(rs, "seeders", "")))
+	for _, want := range []string{">WEBRip<", ">HEVC<", ">10-bit<", ">5.1<", ">CAM<"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("rows lack the badge %q", want)
+		}
+	}
+	if !regexp.MustCompile(`badge-warning[^"]*"[^>]*>CAM<`).MatchString(out) {
+		t.Error("a cinema recording's CAM badge should warn")
+	}
+}
+
+func TestCinemaRecordingsCanBeHidden(t *testing.T) {
+	rs := []jacred.Result{
+		{Tracker: "knaben", Title: "Spider-Man (2026) WEB-DL 1080p", Quality: 1080},
+		{Tracker: "knaben", Title: "Spider-Man (2026) CAMRip", Quality: 720},
+	}
+	out := html.UnescapeString(render(t, views.TorrentResults(rs, "seeders", "")))
+	for _, want := range []string{`data-bind="hideRecordings"`, "Hide cinema recordings", `data-recording="true"`, "!($hideRecordings && el.dataset.recording)"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("results lack %q", want)
+		}
+	}
+	none := html.UnescapeString(render(t, views.TorrentResults(rs[:1], "seeders", "")))
+	if strings.Contains(none, "Hide cinema recordings") {
+		t.Error("with no cinema recordings, there is nothing to hide")
+	}
+}
+
+func TestTrackerAndVoiceFiltersAreDropdownsSayingHowManyArePicked(t *testing.T) {
+	rs := []jacred.Result{
+		{Tracker: "knaben", Title: "A", Voices: []string{"Дубляж"}},
+		{Tracker: "bitru", Title: "B", Voices: []string{"LostFilm"}},
+	}
+	out := html.UnescapeString(render(t, views.TorrentResults(rs, "seeders", "")))
+	if n := strings.Count(out, `class="dropdown"`); n != 2 {
+		t.Errorf("filter dropdowns = %d, want one for trackers and one for voices", n)
+	}
+	for _, want := range []string{"$trackers.filter(Boolean).length || 'All'", "$voices.filter(Boolean).length || 'All'"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("a dropdown does not say how many are picked: lacks %q", want)
+		}
+	}
+}
+
+func TestAReleaseKnownOnlyAsTenBitStillSaysSo(t *testing.T) {
+	rs := []jacred.Result{{Tracker: "knaben", Title: "Movie.2026.1080p.10bit", Quality: 1080}}
+	if out := render(t, views.TorrentResults(rs, "seeders", "")); !strings.Contains(out, ">10-bit<") {
+		t.Error("a release whose only known format is 10-bit lacks its badge")
 	}
 }
