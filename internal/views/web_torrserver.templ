@@ -22,9 +22,10 @@ func webTorrServerSignals(servers []store.TorrServer) string {
 // the name and address.
 const webTorrServerAdd = `tsSaveLogin($tsUrl.trim().replace(/\/+$/, ''), $tsUser.trim(), $tsPass); @post('/api/torrservers', {filterSignals: {include: /^ts(Name|Url)$/}})`
 
-// webTorrServerEffects keep the pick in this browser, and forget the login
+// webTorrServerEffects keep the pick in this browser and tell the navbar's
+// status ($_tsNavUrl), and forget the login
 // of a TorrServer the server has removed ($tsForget).
-const webTorrServerEffects = `localStorage.setItem('mt-ts-selected', $tsSelected); if ($tsForget) { tsForgetLogin($tsForget); $tsForget = '' }`
+const webTorrServerEffects = `localStorage.setItem('mt-ts-selected', $tsSelected); $_tsNavUrl = $tsSelected; if ($tsForget) { tsForgetLogin($tsForget); $tsForget = '' }`
 
 // WebTorrServerPage is the web app's TorrServer page: the user's
 // TorrServers, reached from their browser.

@@ -1,12 +1,21 @@
 package views
 
-import "context"
+import (
+	"context"
+	"slices"
+
+	"github.com/a-h/templ"
+)
 
 // Site is which app a page belongs to: the local app (the zero value) or
 // the cloud web app, whose visitors sign in with Google and use their own
 // TorrServer from the browser.
 type Site struct {
 	Cloud bool
+	// TorrServerCheck are the Datastar attributes, from the site's adapter,
+	// by which the navbar's TorrServer status learns whether it answers:
+	// they set $_tsNav to "online", "offline" or "none". Nil shows none.
+	TorrServerCheck templ.Attributer
 }
 
 type siteKey struct{}
@@ -23,6 +32,17 @@ func siteOf(ctx context.Context) Site {
 
 // IsCloud reports whether the request is for the hosted web app.
 func IsCloud(ctx context.Context) bool { return siteOf(ctx).Cloud }
+
+// pageScripts are a page's module scripts. Every web app page loads
+// torrserver.js: its navbar checks the visitor's TorrServer from the browser.
+func pageScripts(ctx context.Context, scripts []string) []string {
+	if !siteOf(ctx).Cloud || slices.Contains(scripts, torrServerScript) {
+		return scripts
+	}
+	return append([]string{torrServerScript}, scripts...)
+}
+
+const torrServerScript = "/static/torrserver.js"
 
 func titleScripts(ctx context.Context) []string {
 	if siteOf(ctx).Cloud {
