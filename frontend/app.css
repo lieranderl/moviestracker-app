@@ -8,12 +8,12 @@
 @source inline("cursor-none");
 
 @plugin "daisyui" {
-  themes: githublight --default, githubdark --prefersdark;
+  themes: false;
   logs: false;
 }
 
 @plugin "daisyui/theme" {
-  name: "githublight";
+  name: "light";
   default: true;
   prefersdark: false;
   color-scheme: "light";
@@ -48,9 +48,9 @@
 }
 
 @plugin "daisyui/theme" {
-    name: "githubdark";
+    name: "dark";
     default: false;
-    prefersdark: false;
+    prefersdark: true;
     color-scheme: "dark";
     --color-base-100: #0f1317;
     --color-base-200: #161b22;
