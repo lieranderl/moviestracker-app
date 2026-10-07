@@ -106,6 +106,7 @@ func (h *Health) trim(service string, now time.Time) {
 type tmdbClient interface {
 	tmdb.CatalogProvider
 	tmdb.DetailsProvider
+	tmdb.PosterProvider
 }
 
 // watchedTMDB records the health of every TMDB call.
@@ -127,6 +128,10 @@ func (w watchedTMDB) GetCatalog(ctx context.Context) (tmdb.Catalog, error) {
 
 func (w watchedTMDB) Movie(ctx context.Context, id int) (*tmdb.MovieDetails, error) {
 	return watch(w.h, "TMDB", func() (*tmdb.MovieDetails, error) { return w.c.Movie(ctx, id) })
+}
+
+func (w watchedTMDB) MoviePoster(ctx context.Context, id int) (string, error) {
+	return watch(w.h, "TMDB", func() (string, error) { return w.c.MoviePoster(ctx, id) })
 }
 
 func (w watchedTMDB) TV(ctx context.Context, id int) (*tmdb.TVDetails, error) {
