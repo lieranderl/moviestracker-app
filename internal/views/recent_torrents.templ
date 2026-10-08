@@ -8,7 +8,7 @@ import (
 )
 
 // maxRecentTorrents is how many of the last added torrents home shows.
-const maxRecentTorrents = 6
+const maxRecentTorrents = 10
 
 // RecentTorrentsSlot is home's row of the torrents last added to TorrServer,
 // filled into #recent-torrents-row (RecentTorrents) by load: the site
@@ -36,10 +36,10 @@ templ RecentTorrents(torrents []torrserver.Torrent) {
 						@Icon("chevron-right", "size-4")
 					</a>
 				</header>
-				<ul class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+				@carousel() {
 					for _, t := range recent {
-						<li>
-							<a href="/torrserver" class="card bg-base-200/60 hover:bg-base-200 border border-base-content/5 shadow-md transition group focus-visible:outline-2 focus-visible:outline-primary">
+						<li class="carousel-item">
+							<a href="/torrserver" class="card w-40 sm:w-48 shrink-0 bg-base-200/60 hover:bg-base-200 border border-base-content/5 shadow-md transition group focus-visible:outline-2 focus-visible:outline-primary">
 								<figure class="aspect-[2/3] bg-base-300">
 									if t.Poster != "" {
 										<img src={ t.Poster } alt="" class="size-full object-cover" loading="lazy" decoding="async"/>
@@ -54,7 +54,7 @@ templ RecentTorrents(torrents []torrserver.Torrent) {
 							</a>
 						</li>
 					}
-				</ul>
+				}
 			</div>
 		}
 	</div>
