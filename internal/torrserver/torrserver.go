@@ -93,6 +93,8 @@ type Torrent struct {
 	Downloaded int64      `json:"bytes_read_data"`
 	Uploaded   int64      `json:"bytes_written_data"`
 	FileStats  []FileStat `json:"file_stats,omitempty"`
+	// Timestamp is when the torrent was added (Unix seconds).
+	Timestamp int64 `json:"timestamp,omitempty"`
 }
 
 // DisplayName returns Title if available, otherwise Name, otherwise Hash.

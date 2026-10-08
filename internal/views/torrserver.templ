@@ -427,26 +427,13 @@ templ torrStatus(echo torrserver.EchoInfo) {
 templ TorrServerListFragment(links StreamLinks, torrents []torrserver.Torrent) {
 	<div id="torr-list-container" class="grid grid-cols-1 xl:grid-cols-2 gap-4">
 		if len(torrents) == 0 {
-			<div class="card bg-base-200/50 border border-base-content/10 xl:col-span-2">
-				<div class="card-body items-center text-center gap-4 p-12">
-					<span class="size-16 rounded-box bg-base-300 grid place-items-center text-base-content/40">
-						@Icon("film", "size-8")
-					</span>
-					<div class="max-w-md space-y-1">
-						<h3 class="text-lg font-bold">{ tr(ctx, "No torrents added yet") }</h3>
-						<p class="text-sm text-base-content/70">
-							{ tr(ctx, "Add one or multiple torrents via HTTP/HTTPS download links or magnet URLs to stream directly in your browser.") }
-						</p>
-					</div>
-					<button
-						type="button"
-						data-on:click="$addModalOpen = true"
-						class="btn btn-primary btn-sm gap-2"
-					>
+			<div class="xl:col-span-2">
+				@emptyState("film", tr(ctx, "No torrents added yet"), tr(ctx, "Add one or multiple torrents via HTTP/HTTPS download links or magnet URLs to stream directly in your browser.")) {
+					<button type="button" data-on:click="$addModalOpen = true" class="btn btn-primary btn-sm gap-2">
 						@Icon("plus", "size-4")
 						{ tr(ctx, "Add First Torrent") }
 					</button>
-				</div>
+				}
 			</div>
 		} else {
 			for _, t := range torrents {
@@ -715,7 +702,7 @@ templ torrToast() {
 		popover="manual"
 		role="status"
 		aria-live="polite"
-		class="toast toast-end toast-bottom m-0 inset-auto bottom-0 right-0 bg-transparent border-0 overflow-visible [&:not(:popover-open)]:hidden"
+		class="toast toast-end toast-bottom m-0 inset-auto bottom-0 max-md:bottom-16 right-0 bg-transparent border-0 overflow-visible [&:not(:popover-open)]:hidden"
 		data-effect="if ($toast) { el.matches(':popover-open') ? (el.hidePopover(), el.showPopover()) : el.showPopover() } else if (el.matches(':popover-open')) { el.hidePopover() }"
 		data-on-signal-patch__debounce.3s={ toastAutoHide }
 		data-on-signal-patch-filter="{ include: /^toast$/ }"

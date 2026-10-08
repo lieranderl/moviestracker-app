@@ -64,9 +64,11 @@ templ SearchResults(v SearchView) {
 				@mediaRail("trending-movies", tr(ctx, "Trending movies"), v.TrendingMovies)
 				@mediaRail("trending-series", tr(ctx, "Trending series"), v.TrendingSeries)
 			case v.Results == nil || v.Results.Empty():
-				<p class="max-w-7xl mx-auto px-4 sm:px-8 py-6 text-base-content/70">
-					{ tr(ctx, "No matches for") } <span class="font-semibold">“{ v.Query }”</span>. { tr(ctx, "Try another title or name.") }
-				</p>
+				<div class="max-w-7xl mx-auto px-4 sm:px-8 py-6">
+					@emptyState("search-x", trf(ctx, "No matches for “%s”", v.Query), tr(ctx, "Try another title or name.")) {
+						@browseTrendingLink()
+					}
+				</div>
 			default:
 				@mediaRail("movie-results", trf(ctx, "Movies · %d", len(v.Results.Movies)), v.Results.Movies)
 				@mediaRail("tv-results", trf(ctx, "TV series · %d", len(v.Results.Series)), v.Results.Series)

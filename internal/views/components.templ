@@ -81,3 +81,29 @@ templ IMDbRatingFragment(targetID string, rating string, votes string) {
 		}
 	</div>
 }
+
+// emptyState says a list is empty and what to do about it; its children
+// are that action, a link or button. It is a live status: patched in when
+// the last item goes, it is announced.
+templ emptyState(icon, title, body string) {
+	<div data-empty-state role="status" class="card bg-base-200/50 border border-base-content/10">
+		<div class="card-body items-center text-center gap-4 p-8 sm:p-12">
+			<span class="size-16 rounded-box bg-base-300 grid place-items-center text-base-content/40">
+				@Icon(icon, "size-8")
+			</span>
+			<div class="max-w-md space-y-1">
+				<h2 class="text-lg font-bold">{ title }</h2>
+				<p class="text-sm text-base-content/70">{ body }</p>
+			</div>
+			{ children... }
+		</div>
+	</div>
+}
+
+// browseTrendingLink leads from an empty list to the trending titles.
+templ browseTrendingLink() {
+	<a href={ templ.SafeURL(homeHref(ctx)) } class="btn btn-primary btn-sm gap-2">
+		@Icon("trending-up", "size-4")
+		{ tr(ctx, "Browse trending") }
+	</a>
+}

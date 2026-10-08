@@ -104,10 +104,12 @@ templ webTorrServerForm() {
 templ WebTorrServers(servers []store.TorrServer) {
 	<section id="ts-servers" class="space-y-2" aria-label={ tr(ctx, "Your TorrServers") }>
 		if len(servers) == 0 {
-			<div role="status" class="alert alert-info alert-soft">
-				@Icon("info", "size-5")
-				<span>{ tr(ctx, "No TorrServer yet. Add the address of yours to list and play its torrents here.") }</span>
-			</div>
+			@emptyState("server", tr(ctx, "No TorrServer yet"), tr(ctx, "Add the address of yours to list and play its torrents here.")) {
+				<button type="button" class="btn btn-primary btn-sm gap-2" data-on:click="$tsAddOpen = true">
+					@Icon("plus", "size-4")
+					{ tr(ctx, "Add TorrServer") }
+				</button>
+			}
 		}
 		for _, s := range servers {
 			<div class="flex items-center gap-3 rounded-box bg-base-200/60 border border-base-content/10 px-4 py-3">
