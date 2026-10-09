@@ -88,6 +88,9 @@ func tableTexts() []string {
 		out = append(out, row.Label)
 	}
 	out = append(out, "Open the TV page", "Open the movie page", "Waiting for stream…", "Moviestracker development build", "Official website")
+	for _, source := range []string{torrserver.CertSelfSigned, torrserver.CertUploaded, torrserver.CertFromFiles, torrserver.CertNone} {
+		out = append(out, certSourceLabel(source))
+	}
 	for _, item := range settingsNav {
 		out = append(out, item.Title)
 	}

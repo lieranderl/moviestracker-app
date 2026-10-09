@@ -149,3 +149,24 @@ func TestTorrServersReasonForRefusingACertificateReachesTheUser(t *testing.T) {
 		t.Errorf("error = %v, want TorrServer's own reason", err)
 	}
 }
+
+func TestACertificateIsFlaggedTwoWeeksBeforeItExpires(t *testing.T) {
+	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		notAfter      time.Time
+		soon, expired bool
+		days          int
+	}{
+		{now.AddDate(0, 0, 30), false, false, 30}, // Let's Encrypt renews about now
+		{now.AddDate(0, 0, 13), true, false, 13},  // the renewal failed
+		{now.Add(-time.Hour), false, true, 0},
+	} {
+		c := torrserver.CertInfo{NotAfter: tc.notAfter}
+		if c.ExpiresSoon(now) != tc.soon || c.Expired(now) != tc.expired || c.DaysLeft(now) != tc.days {
+			t.Errorf("until %v: soon %v, expired %v, %d days; want %v, %v, %d", tc.notAfter, c.ExpiresSoon(now), c.Expired(now), c.DaysLeft(now), tc.soon, tc.expired, tc.days)
+		}
+	}
+	if (torrserver.CertInfo{}).ExpiresSoon(now) || (torrserver.CertInfo{}).Expired(now) {
+		t.Errorf("no certificate at all is flagged as expiring")
+	}
+}

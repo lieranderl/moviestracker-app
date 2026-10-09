@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -64,7 +65,7 @@ func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		templ.Handler(views.SettingsPage(user, s.engineSectionView(ctx, sec))).ServeHTTP(w, r)
+		templ.Handler(views.SettingsPage(user, s.engineSectionView(ctx, r, sec))).ServeHTTP(w, r)
 	}
 }
 
@@ -74,7 +75,7 @@ func (s *Server) managed() bool {
 }
 
 // engineSectionView shows a section with TorrServer's current values.
-func (s *Server) engineSectionView(ctx context.Context, sec settingsSection) views.SettingsSection {
+func (s *Server) engineSectionView(ctx context.Context, r *http.Request, sec settingsSection) views.SettingsSection {
 	v := sectionView(sec, "/api/settings/engine/"+sec.ID)
 	v.Cost, v.Playing = reconnectCost, int(s.playing.Load())
 	sets, err := s.torrServer.Client().Settings(ctx)
@@ -93,8 +94,13 @@ func (s *Server) engineSectionView(ctx context.Context, sec settingsSection) vie
 		}
 		v.Values[f.Key] = shownValue(sets, f)
 	}
-	if sec.ID == "https" && s.managed() {
-		v.Header = views.HTTPSCard(s.httpsView(sets, views.SourceStatus{}))
+	if sec.ID == "https" {
+		ssl := sslStatus(ctx, s.torrServer.Client())
+		v.Header = views.HTTPSCard(s.httpsView(r, sets, ssl, views.SourceStatus{}))
+		if ssl != nil {
+			// The card sets these, with TorrServer checking the pair first.
+			v.Fields = slices.DeleteFunc(v.Fields, func(f views.SettingField) bool { return f.Key == "SslCert" || f.Key == "SslKey" })
+		}
 	}
 	return v
 }
@@ -251,7 +257,7 @@ func (s *Server) handleSaveEngineSettings(w http.ResponseWriter, r *http.Request
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
 	status := func(st views.SourceStatus) {
-		patchSource(w, r, views.SettingsForm(s.engineSectionView(ctx, sec), st), nil)
+		patchSource(w, r, views.SettingsForm(s.engineSectionView(ctx, r, sec), st), nil)
 	}
 
 	// Check everything before changing anything.

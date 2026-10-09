@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -38,7 +39,7 @@ func fakeTorrServer() {
 	dir := fs.String("path", ".", "")
 	fs.String("logpath", "", "")
 	httpAuth := fs.Bool("httpauth", false, "")
-	ssl := fs.Bool("ssl", false, "")
+	sslOn := fs.Bool("ssl", false, "")
 	for _, name := range []string{"proxyurl", "proxymode", "pubipv4", "pubipv6", "maxsize", "torrentsdir"} {
 		fs.String(name, "", "")
 	}
@@ -82,10 +83,29 @@ func fakeTorrServer() {
 	if raw, err := os.ReadFile(setsFile); err == nil { // #nosec G304 -- test fake
 		_ = json.Unmarshal(raw, &sets)
 	}
+	saveSets := func() {
+		raw, _ := json.Marshal(sets)
+		_ = os.WriteFile(setsFile, raw, 0o600)
+	}
+	ssl := newFakeSSL(*sslOn, *dir, *port, func() map[string]any {
+		setsMu.Lock()
+		defer setsMu.Unlock()
+		return maps.Clone(sets)
+	}, func(cert, key string) {
+		setsMu.Lock()
+		defer setsMu.Unlock()
+		sets["SslCert"], sets["SslKey"] = cert, key
+		saveSets()
+	}, authorized)
+	if err := ssl.start(); err != nil {
+		fmt.Fprintln(os.Stderr, "fake:", err)
+		os.Exit(1)
+	}
+	ssl.routes(mux)
 	// With --ssl, a certificate outside the engine folder (where uploads are
 	// kept) stops the start, as a file TorrServer cannot read does. Only the
 	// path's text is compared: the fake opens no path a request supplied.
-	if cert, _ := sets["SslCert"].(string); *ssl && cert != "" {
+	if cert, _ := sets["SslCert"].(string); *sslOn && cert != "" {
 		root, _ := filepath.Abs(*dir)
 		if !strings.HasPrefix(cert, root+string(filepath.Separator)) {
 			fmt.Fprintln(os.Stderr, "fake: cannot start HTTPS with", cert)
@@ -106,8 +126,7 @@ func fakeTorrServer() {
 		defer setsMu.Unlock()
 		if req.Action == "set" {
 			sets = req.Sets
-			raw, _ := json.Marshal(sets)
-			_ = os.WriteFile(setsFile, raw, 0o600)
+			saveSets()
 		}
 		_ = json.NewEncoder(w).Encode(sets)
 	})

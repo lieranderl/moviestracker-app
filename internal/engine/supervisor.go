@@ -87,7 +87,7 @@ type Supervisor struct {
 	password string
 	http     *http.Client
 
-	certMu sync.Mutex // serializes certificate uploads and removals
+	certMu sync.Mutex // serializes removing the old certificate
 
 	mu     sync.Mutex
 	status Status

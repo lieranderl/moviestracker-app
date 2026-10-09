@@ -173,3 +173,25 @@ func (c *Client) sslDo(ctx context.Context, method, path, contentType string, bo
 		return nil, fmt.Errorf("torrserver %s returned status %d", path, resp.StatusCode)
 	}
 }
+
+// CertExpiryWarning is how long before it expires a certificate is flagged:
+// Let's Encrypt renews 30 days ahead, so 14 days left means a renewal failed.
+const CertExpiryWarning = 14 * 24 * time.Hour
+
+// Expired reports whether the certificate has expired.
+func (c CertInfo) Expired(now time.Time) bool {
+	return !c.NotAfter.IsZero() && !now.Before(c.NotAfter)
+}
+
+// ExpiresSoon reports whether the certificate expires within CertExpiryWarning.
+func (c CertInfo) ExpiresSoon(now time.Time) bool {
+	return !c.NotAfter.IsZero() && !c.Expired(now) && c.NotAfter.Sub(now) < CertExpiryWarning
+}
+
+// DaysLeft is how many whole days the certificate stays valid (0 when expired).
+func (c CertInfo) DaysLeft(now time.Time) int {
+	if c.Expired(now) {
+		return 0
+	}
+	return int(c.NotAfter.Sub(now) / (24 * time.Hour))
+}

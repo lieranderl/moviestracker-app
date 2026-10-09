@@ -35,10 +35,9 @@ func TestSettingsAndMessagesHaveRussianTranslations(t *testing.T) {
 			}
 		}
 	}
-	texts = append(texts, reconnectCost, startupOnly, engineAsleep, gstCost, httpsCost, reachableNeedsHTTPS, certMismatch, gstNotBuilt, noToneMapper, saveFailed,
-		"The certificate file cannot be read.", "The certificate file is not a PEM certificate.",
-		"Certificate saved. TorrServer uses it once it serves HTTPS.", "Certificate saved. TorrServer restarted with it.",
-		"Certificate removed. TorrServer makes a self-signed one.", "Certificate removed. TorrServer restarted with a self-signed one.",
+	texts = append(texts, reconnectCost, startupOnly, engineAsleep, gstCost, httpsCost, reachableNeedsHTTPS, gstNotBuilt, noToneMapper, saveFailed,
+		"Certificate uploaded. TorrServer serves it now.", "TorrServer serves the certificate from these files now.",
+		"TorrServer serves its self-signed certificate now.", "New self-signed certificate made. Browsers ask to accept it again.",
 		"must be between %d and %d %s", "contains an invalid character", sharedViewer, "A browser")
 	for _, err := range []error{auth.ErrInvalidCredentials, auth.ErrInvalidAccount, auth.ErrAccountExists,
 		auth.ErrInvalidRole, auth.ErrNoAccount, auth.ErrLastAdmin} {

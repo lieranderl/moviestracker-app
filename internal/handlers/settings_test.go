@@ -27,6 +27,10 @@ type settingsEngine struct {
 	gstDefs int
 	hold    chan struct{} // when set, /stream blocks until closed
 	toneMap bool          // GStreamer has the hdrtonemap element
+	// ssl is the JSON /ssl answers with (MatriX.146 on); empty: an older
+	// TorrServer without that API.
+	ssl      string
+	sslCalls []string
 }
 
 func newSettingsEngine(t *testing.T, gst bool) *settingsEngine {
@@ -48,6 +52,11 @@ func newSettingsEngine(t *testing.T, gst bool) *settingsEngine {
 		}
 		e.mu.Lock()
 		defer e.mu.Unlock()
+		if strings.HasPrefix(r.URL.Path, "/ssl/") && e.ssl != "" {
+			e.sslCalls = append(e.sslCalls, r.Method+" "+r.URL.Path)
+			_, _ = w.Write([]byte(e.ssl))
+			return
+		}
 		var req map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		switch r.URL.Path {
