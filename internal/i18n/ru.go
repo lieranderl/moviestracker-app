@@ -1097,6 +1097,7 @@ var ru = map[string]string{
 	"trusted":                                "доверенный",
 	"self-signed: browsers ask to accept it": "самоподписанный: браузеры просят его принять",
 	"valid until %s":                         "действует до %s",
+	"HTTPS certificate":                      "HTTPS-сертификат",
 }
 
 // ruPlural holds the one, few and many forms of counts, by English one form.
