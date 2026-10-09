@@ -191,6 +191,8 @@ func TestAppsPlayAddAndRemoveButCannotStopOrReconfigureTorrServer(t *testing.T) 
 		{http.MethodPost, "/settings", `{"action":"get"}`},
 		{http.MethodGet, "/gst/settings", ""},
 		{http.MethodGet, "/playlistall/all.m3u", ""},
+		{http.MethodGet, "/ssl/status", ""},
+		{http.MethodGet, "/ssl/cert", ""},
 	}
 	for _, tc := range allowed {
 		if rec := s.ask(t, tc.method, tc.target, tc.body, user, password, tv); rec.Code != http.StatusOK {
@@ -208,6 +210,12 @@ func TestAppsPlayAddAndRemoveButCannotStopOrReconfigureTorrServer(t *testing.T) 
 		{http.MethodPost, "/gst/settings", `{}`},
 		{http.MethodPost, "/waf", `{}`},
 		{http.MethodPost, "/torznab/test", `{}`},
+		// MatriX.146's certificate API: the certificate is Moviestracker's too.
+		{http.MethodPost, "/ssl/upload", "cert"},
+		{http.MethodPost, "/ssl/paths", `{"cert":"/etc/ssl/a.pem","key":"/etc/ssl/a.key"}`},
+		{http.MethodPost, "/ssl/selfsigned", ""},
+		{http.MethodPost, "/ssl/regenerate", ""},
+		{http.MethodDelete, "/ssl/anything", ""},
 		{http.MethodPost, "/torrents", `{"action":"list","pad":"` + strings.Repeat("x", 1<<20) + `"}`},
 	}
 	before := len(s.engine.asked())

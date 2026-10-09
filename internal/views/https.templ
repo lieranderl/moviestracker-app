@@ -49,13 +49,7 @@ templ HTTPSCard(v HTTPSView) {
 					}
 				default:
 					@CertificateDetails(*v.SSL, v.Now)
-					if v.SSL.CertFromFlags {
-						<p class="text-sm text-base-content/70">{ tr(ctx, "TorrServer's --sslcert and --sslkey set this certificate each time it starts: change it there.") }</p>
-					} else if v.SSL.ReadOnly {
-						<p class="text-sm text-base-content/70">{ tr(ctx, "TorrServer runs read-only (--rdb), so its certificate cannot change.") }</p>
-					} else {
-						@certificateActions(v)
-					}
+					@CertificateActions(*v.SSL, v.PlainHTTP, localCertificateTransport())
 			}
 			@sourceStatus(v.Status)
 		</div>
@@ -106,8 +100,12 @@ templ CertificateDetails(st torrserver.SSLStatus, now time.Time) {
 				<dd class="tabular-nums">{ trf(ctx, "%s to %s", c.NotBefore.UTC().Format(time.DateOnly), c.NotAfter.UTC().Format(time.DateOnly)) }</dd>
 			}
 			if st.Port != "" {
-				<dt class="text-base-content/70">{ tr(ctx, "HTTPS port") }</dt>
-				<dd class="font-mono tabular-nums">{ st.Port }</dd>
+				<dt class="text-base-content/70">{ tr(ctx, "Mode") }</dt>
+				if st.HTTPEnabled && st.HTTPPort != "" {
+					<dd class="tabular-nums">{ trf(ctx, "HTTPS on port %s, HTTP on port %s", st.Port, st.HTTPPort) }</dd>
+				} else {
+					<dd class="tabular-nums">{ trf(ctx, "HTTPS only, on port %s", st.Port) }</dd>
+				}
 			}
 			if c.CertFile != "" {
 				<dt class="text-base-content/70">{ tr(ctx, "Files") }</dt>
@@ -120,11 +118,53 @@ templ CertificateDetails(st torrserver.SSLStatus, now time.Time) {
 	</div>
 }
 
-// certificateActions change the certificate: upload one, use files on the
-// TorrServer machine, or go back to the self-signed one.
-templ certificateActions(v HTTPSView) {
-	{{ selfSigned := v.SSL.Cert.Source == torrserver.CertSelfSigned }}
-	if v.PlainHTTP {
+// CertificateTransport is how the certificate actions reach TorrServer: the
+// app's settings post to its server, which calls the TorrServer it runs; the
+// web app calls the visitor's TorrServer from their browser (tsSSLChange), so
+// a private key never passes through Moviestracker.
+type CertificateTransport struct {
+	// Upload and Files are the requests of the upload and file-path forms.
+	Upload, Files templ.Attributes
+	// UploadBusy and FilesBusy are Datastar expressions, true while they run.
+	UploadBusy, FilesBusy string
+	// SelfSigned and Regenerate are Datastar expressions run once confirmed.
+	SelfSigned, Regenerate string
+	// Download are the download link's attributes.
+	Download templ.Attributes
+}
+
+func localCertificateTransport() CertificateTransport {
+	return CertificateTransport{
+		Upload: templ.Attributes{
+			"data-signals:https-uploading": "false",
+			"data-indicator":               "httpsUploading",
+			"data-on:submit":               "@post('/api/settings/https/certificate', {contentType: 'form'})",
+		},
+		Files: templ.Attributes{
+			"data-signals:https-using-files": "false",
+			"data-indicator":                 "httpsUsingFiles",
+			"data-on:submit":                 "@post('/api/settings/https/certificate/files', {filterSignals: {include: /^https(Cert|Key)File$/}})",
+		},
+		UploadBusy: "$httpsUploading",
+		FilesBusy:  "$httpsUsingFiles",
+		SelfSigned: "@post('/api/settings/https/certificate/self-signed', {filterSignals: {include: /^$/}})",
+		Regenerate: "@post('/api/settings/https/certificate/regenerate', {filterSignals: {include: /^$/}})",
+		Download:   templ.Attributes{"href": "/api/settings/https/certificate", "download": true},
+	}
+}
+
+// CertificateActions change the certificate: upload one, use files on the
+// TorrServer machine, or go back to the self-signed one. Like TorrServer's
+// own page, a certificate set at startup (--sslcert/--sslkey) or a read-only
+// TorrServer (--rdb) shows them disabled; it can still be downloaded.
+templ CertificateActions(st torrserver.SSLStatus, plainHTTP bool, t CertificateTransport) {
+	{{ selfSigned := st.Cert.Source == torrserver.CertSelfSigned }}
+	{{ locked := st.CertFromFlags || st.ReadOnly }}
+	if st.CertFromFlags {
+		<p class="text-sm text-base-content/70">{ tr(ctx, "TorrServer's --sslcert and --sslkey set this certificate each time it starts: change it there.") }</p>
+	} else if st.ReadOnly {
+		<p class="text-sm text-base-content/70">{ tr(ctx, "TorrServer runs read-only (--rdb), so its certificate cannot change.") }</p>
+	} else if plainHTTP {
 		<div role="alert" class="alert alert-warning alert-soft text-sm">
 			@Icon("triangle-alert", "size-4")
 			<span>{ tr(ctx, "This page is open over plain HTTP, so an uploaded private key would cross the network unencrypted. Upload it on the TorrServer machine, or over HTTPS.") }</span>
@@ -133,71 +173,67 @@ templ certificateActions(v HTTPSView) {
 	<div class="tabs tabs-box tabs-sm">
 		<input type="radio" name="https-certificate-source" class="tab" aria-label={ tr(ctx, "Upload") } checked/>
 		<div class="tab-content bg-base-100 border-base-content/10 rounded-box p-4">
-			<form
-				class="grid gap-3 sm:grid-cols-2"
-				data-signals="{httpsUploading:false}"
-				data-indicator="httpsUploading"
-				data-on:submit="@post('/api/settings/https/certificate', {contentType: 'form'})"
-			>
-				<fieldset class="fieldset">
-					<legend class="fieldset-legend">{ tr(ctx, "Certificate (PEM, with its chain)") }</legend>
-					<input type="file" name="sslCert" required accept=".pem,.crt,.cer,application/x-pem-file" class="file-input w-full"/>
+			<form { t.Upload... }>
+				<fieldset disabled?={ locked } class="grid gap-3 sm:grid-cols-2">
+					<fieldset class="fieldset">
+						<legend class="fieldset-legend">{ tr(ctx, "Certificate (PEM, with its chain)") }</legend>
+						<input type="file" name="sslCert" required accept=".pem,.crt,.cer,application/x-pem-file" class="file-input w-full"/>
+					</fieldset>
+					<fieldset class="fieldset">
+						<legend class="fieldset-legend">{ tr(ctx, "Private key (PEM)") }</legend>
+						<input type="file" name="sslKey" required accept=".pem,.key,application/x-pem-file" class="file-input w-full"/>
+					</fieldset>
+					<div class="sm:col-span-2 flex flex-wrap items-center gap-3">
+						<button type="submit" class="btn btn-primary" data-attr:disabled={ t.UploadBusy }>
+							<span class="loading loading-spinner loading-xs hidden" data-class:hidden={ "!(" + t.UploadBusy + ")" }></span>
+							@Icon("upload", "size-4")
+							{ tr(ctx, "Upload certificate") }
+						</button>
+						<span class="text-xs text-base-content/70">{ tr(ctx, "TorrServer keeps it in its folder and serves it at once.") }</span>
+					</div>
 				</fieldset>
-				<fieldset class="fieldset">
-					<legend class="fieldset-legend">{ tr(ctx, "Private key (PEM)") }</legend>
-					<input type="file" name="sslKey" required accept=".pem,.key,application/x-pem-file" class="file-input w-full"/>
-				</fieldset>
-				<div class="sm:col-span-2 flex flex-wrap items-center gap-3">
-					<button type="submit" class="btn btn-primary" data-attr:disabled="$httpsUploading">
-						<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$httpsUploading"></span>
-						@Icon("upload", "size-4")
-						{ tr(ctx, "Upload certificate") }
-					</button>
-					<span class="text-xs text-base-content/70">{ tr(ctx, "TorrServer keeps it in its folder and serves it at once.") }</span>
-				</div>
 			</form>
 		</div>
 		<input type="radio" name="https-certificate-source" class="tab" aria-label={ tr(ctx, "Files on the TorrServer machine") }/>
 		<div class="tab-content bg-base-100 border-base-content/10 rounded-box p-4">
-			<form
-				class="grid gap-3 sm:grid-cols-2"
-				data-signals="{httpsCertFile:'', httpsKeyFile:'', httpsUsingFiles:false}"
-				data-indicator="httpsUsingFiles"
-				data-on:submit="@post('/api/settings/https/certificate/files', {filterSignals: {include: /^https(Cert|Key)File$/}})"
-			>
-				<fieldset class="fieldset">
-					<legend class="fieldset-legend">{ tr(ctx, "Certificate file") }</legend>
-					<input type="text" required autocomplete="off" spellcheck="false" placeholder="/etc/letsencrypt/live/example.com/fullchain.pem" class="input w-full font-mono" data-bind:https-cert-file/>
+			<form data-signals="{httpsCertFile:'', httpsKeyFile:''}" { t.Files... }>
+				<fieldset disabled?={ locked } class="grid gap-3 sm:grid-cols-2">
+					<fieldset class="fieldset">
+						<legend class="fieldset-legend">{ tr(ctx, "Certificate file") }</legend>
+						<input type="text" required autocomplete="off" spellcheck="false" placeholder="/etc/letsencrypt/live/example.com/fullchain.pem" class="input w-full font-mono" data-bind:https-cert-file/>
+					</fieldset>
+					<fieldset class="fieldset">
+						<legend class="fieldset-legend">{ tr(ctx, "Private key file") }</legend>
+						<input type="text" required autocomplete="off" spellcheck="false" placeholder="/etc/letsencrypt/live/example.com/privkey.pem" class="input w-full font-mono" data-bind:https-key-file/>
+					</fieldset>
+					<div class="sm:col-span-2 flex flex-wrap items-center gap-3">
+						<button type="submit" class="btn btn-primary" data-attr:disabled={ t.FilesBusy }>
+							<span class="loading loading-spinner loading-xs hidden" data-class:hidden={ "!(" + t.FilesBusy + ")" }></span>
+							{ tr(ctx, "Use these files") }
+						</button>
+						<span class="text-xs text-base-content/70">{ tr(ctx, "Full paths on the TorrServer machine. TorrServer picks up their renewals by certbot or acme.sh itself.") }</span>
+					</div>
 				</fieldset>
-				<fieldset class="fieldset">
-					<legend class="fieldset-legend">{ tr(ctx, "Private key file") }</legend>
-					<input type="text" required autocomplete="off" spellcheck="false" placeholder="/etc/letsencrypt/live/example.com/privkey.pem" class="input w-full font-mono" data-bind:https-key-file/>
-				</fieldset>
-				<div class="sm:col-span-2 flex flex-wrap items-center gap-3">
-					<button type="submit" class="btn btn-primary" data-attr:disabled="$httpsUsingFiles">
-						<span class="loading loading-spinner loading-xs hidden" data-class:hidden="!$httpsUsingFiles"></span>
-						{ tr(ctx, "Use these files") }
-					</button>
-					<span class="text-xs text-base-content/70">{ tr(ctx, "Full paths on the TorrServer machine. TorrServer picks up their renewals by certbot or acme.sh itself.") }</span>
-				</div>
 			</form>
 		</div>
 		<input type="radio" name="https-certificate-source" class="tab" aria-label={ tr(ctx, "Self-signed") }/>
-		<div class="tab-content bg-base-100 border-base-content/10 rounded-box p-4 space-y-3">
-			<p class="text-sm text-base-content/70">{ tr(ctx, "TorrServer makes its own certificate for this machine's names and addresses. Each browser asks to accept it once; download it to trust it on a device for good.") }</p>
-			if selfSigned {
-				<button type="button" class="btn btn-ghost border-base-content/20" data-on:click={ "confirm(" + trJS(ctx, "Make a new self-signed certificate? Devices that trust the current one must accept the new one.") + ") && @post('/api/settings/https/certificate/regenerate', {filterSignals: {include: /^$/}})" }>
-					@Icon("refresh-cw", "size-4")
-					{ tr(ctx, "Make a new self-signed certificate") }
-				</button>
-			} else {
-				<button type="button" class="btn btn-ghost border-base-content/20" data-on:click={ "confirm(" + trJS(ctx, "Serve the self-signed certificate instead? An uploaded certificate is deleted.") + ") && @post('/api/settings/https/certificate/self-signed', {filterSignals: {include: /^$/}})" }>
-					{ tr(ctx, "Use the self-signed certificate") }
-				</button>
-			}
+		<div class="tab-content bg-base-100 border-base-content/10 rounded-box p-4">
+			<fieldset disabled?={ locked } class="space-y-3">
+				<p class="text-sm text-base-content/70">{ tr(ctx, "TorrServer makes its own certificate for this machine's names and addresses. Each browser asks to accept it once; download it to trust it on a device for good.") }</p>
+				if selfSigned {
+					<button type="button" class="btn btn-ghost border-base-content/20" data-on:click={ "confirm(" + trJS(ctx, "Make a new self-signed certificate? Devices that trust the current one must accept the new one.") + ") && " + t.Regenerate }>
+						@Icon("refresh-cw", "size-4")
+						{ tr(ctx, "Make a new self-signed certificate") }
+					</button>
+				} else {
+					<button type="button" class="btn btn-ghost border-base-content/20" data-on:click={ "confirm(" + trJS(ctx, "Serve the self-signed certificate instead? An uploaded certificate is deleted.") + ") && " + t.SelfSigned }>
+						{ tr(ctx, "Use the self-signed certificate") }
+					</button>
+				}
+			</fieldset>
 		</div>
 	</div>
-	<a href="/api/settings/https/certificate" download class="link link-primary text-sm inline-flex items-center gap-1.5 w-fit">
+	<a class="link link-primary text-sm inline-flex items-center gap-1.5 w-fit" { t.Download... }>
 		@Icon("download", "size-4")
 		{ tr(ctx, "Download the certificate, to trust it on a device") }
 	</a>

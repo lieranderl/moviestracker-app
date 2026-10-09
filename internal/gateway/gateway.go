@@ -201,6 +201,10 @@ func refused(r *http.Request) string {
 		return "Moviestracker runs TorrServer: apps cannot stop it."
 	case r.Method == http.MethodGet || r.Method == http.MethodHead:
 		return ""
+	case p == "/ssl" || strings.HasPrefix(p, "/ssl/"):
+		// MatriX.146's certificate API: reading it is fine, changing it is
+		// Settings → HTTPS's.
+		return managedByMoviestracker
 	}
 	switch p {
 	case "/settings":
