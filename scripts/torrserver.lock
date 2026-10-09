@@ -1,10 +1,10 @@
 # TorrServer release Moviestracker is tested with, and the SHA-256 GitHub
 # publishes for each file. Update all lines together.
-version MatriX.145
-TorrServer-gst-darwin-amd64 a473e143a0e0fd28723ff0f8a410b0e9d4f70b64d4bd2f2617c35d0444831c19
-TorrServer-gst-darwin-arm64 31676f26a3ba06990e26a4aedde15f78c7e5dc61cb4df83fd4d13a6a2af46ca4
-TorrServer-gst-linux-amd64 4c9f47111dfa73f64b5d82540970d308e7218f62fb1a74674304b3247799e4ea
-TorrServer-gst-linux-arm64 5bf400335d40f5b5d93ece2c2c81df2d8a30097481fa669d6eb61dbf0490ceab
-TorrServer-gst-windows-amd64.exe 71b5c0bfdbf7cf52204c4578cbc4c3a944030ce80b839d1c4ceaf0d493405050
+version MatriX.146
+TorrServer-gst-darwin-amd64 0e20a2ceaf0ac66930e934106fbed0993478ce703d021665ed3995a98658f60c
+TorrServer-gst-darwin-arm64 416bb92436dae906c108f4b355820059fbf4b679ab634a261305a322ea6cf5e9
+TorrServer-gst-linux-amd64 ebac3457763ed7b8c39b799231065717d0c45ba95e56917b5dd810de09da48b4
+TorrServer-gst-linux-arm64 66569ed8fb469ec8fd82d63331c90f4bbe7a15ab5626ff9349658ae13ce23f9d
+TorrServer-gst-windows-amd64.exe 4f867732f56bfeff532e6fd9ef9562c42cf0761be109bd340d9602ce0390df74
 # TorrServer's licence (GPL-3.0) at that tag, shipped next to its binary.
 LICENSE 8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903
