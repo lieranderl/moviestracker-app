@@ -120,6 +120,11 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Moviestracker lets apps in from the home network only (Settings → Other apps).", http.StatusForbidden)
 		return
 	}
+	// From the internet, logins and streams cross it encrypted only.
+	if !atHome(addr) && r.TLS == nil {
+		http.Error(w, "From the internet, use TorrServer's HTTPS address (Settings → Other apps).", http.StatusForbidden)
+		return
+	}
 	if isPreflight(r) {
 		allowPreflight(w, r)
 		return

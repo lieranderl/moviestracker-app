@@ -40,6 +40,7 @@ func fakeTorrServer() {
 	fs.String("logpath", "", "")
 	httpAuth := fs.Bool("httpauth", false, "")
 	sslOn := fs.Bool("ssl", false, "")
+	sslPort := fs.Int("sslport", 0, "")
 	for _, name := range []string{"proxyurl", "proxymode", "pubipv4", "pubipv6", "maxsize", "torrentsdir"} {
 		fs.String(name, "", "")
 	}
@@ -86,6 +87,11 @@ func fakeTorrServer() {
 	saveSets := func() {
 		raw, _ := json.Marshal(sets)
 		_ = os.WriteFile(setsFile, raw, 0o600)
+	}
+	// --sslport is kept in the settings, as TorrServer keeps it in its db.
+	if *sslOn && *sslPort > 0 {
+		sets["SslPort"] = float64(*sslPort)
+		saveSets()
 	}
 	ssl := newFakeSSL(*sslOn, *dir, *port, func() map[string]any {
 		setsMu.Lock()

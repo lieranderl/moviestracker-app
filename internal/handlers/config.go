@@ -69,6 +69,9 @@ type Config struct {
 	// AppsPort is the gateway's port, where other apps (TorrServe, Lampa)
 	// reach TorrServer once an admin turns it on; nil hides Other apps.
 	AppsPort *gateway.Port
+	// AppsTLSPort is the gateway's HTTPS port, opened and shut with AppsPort;
+	// it serves the certificate TorrServer serves. Nil without one.
+	AppsTLSPort *gateway.Port
 	// LANAddress returns this machine's address on the local network, used in
 	// links copied while browsing via localhost; nil finds it from the
 	// default route.

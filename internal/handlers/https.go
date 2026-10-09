@@ -11,9 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
-	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -26,34 +24,18 @@ import (
 const (
 	// maxPEMBytes bounds one uploaded certificate (chain included) or key.
 	maxPEMBytes = 256 << 10
-	// defaultSSLPort is TorrServer's HTTPS port when SslPort is 0.
-	defaultSSLPort = 8091
 	// certificateTimeout bounds one certificate change: TorrServer checks
 	// the pair and serves it without a restart.
 	certificateTimeout = 20 * time.Second
 )
 
-// httpsView describes TorrServer's HTTPS: for the managed engine, where
-// other devices reach it and how they sign in; for any TorrServer, the
-// certificate it serves (ssl is nil when it predates MatriX.146).
-func (s *Server) httpsView(r *http.Request, sets torrserver.Fields, ssl *torrserver.SSLStatus, st views.SourceStatus) views.HTTPSView {
+// httpsView describes TorrServer's HTTPS: for the managed engine, whether it
+// serves it (other devices reach it through Other apps); for any TorrServer,
+// the certificate it serves (ssl is nil when it predates MatriX.146).
+func (s *Server) httpsView(r *http.Request, ssl *torrserver.SSLStatus, st views.SourceStatus) views.HTTPSView {
 	v := views.HTTPSView{Managed: s.managed(), SSL: ssl, Now: time.Now(), PlainHTTP: plainHTTPFromElsewhere(r), Status: st}
-	if !v.Managed {
-		return v
-	}
-	startup := s.store.State().TorrServer.Startup
-	port := sets.Int("SslPort")
-	if port == 0 {
-		port = defaultSSLPort
-	}
-	v.Serving, v.Reachable = startup.HTTPS, startup.HTTPS && startup.Reachable
-	hosts := []string{"localhost"}
-	if v.Reachable {
-		hosts = networkAddresses()
-		_, v.User, v.Password = s.engine.Endpoint()
-	}
-	for _, h := range hosts {
-		v.Addresses = append(v.Addresses, "https://"+net.JoinHostPort(h, strconv.Itoa(port)))
+	if v.Managed {
+		v.Serving = s.store.State().TorrServer.Startup.HTTPS
 	}
 	return v
 }
@@ -83,31 +65,13 @@ func plainHTTPFromElsewhere(r *http.Request) bool {
 	return name != "localhost" && !strings.HasSuffix(name, ".localhost") && (ipErr != nil || !ip.IsLoopback())
 }
 
-// networkAddresses are this computer's addresses on its networks.
-func networkAddresses() []string {
-	var out []string
-	addrs, _ := net.InterfaceAddrs()
-	for _, a := range addrs {
-		if ip, ok := a.(*net.IPNet); ok && !ip.IP.IsLoopback() && !ip.IP.IsLinkLocalUnicast() && ip.IP.To4() != nil {
-			out = append(out, ip.IP.String())
-		}
-	}
-	if len(out) == 0 {
-		if name, err := os.Hostname(); err == nil {
-			out = append(out, name)
-		}
-	}
-	return out
-}
-
 // patchHTTPS replaces the HTTPS card.
 func (s *Server) patchHTTPS(w http.ResponseWriter, r *http.Request, ctx context.Context, st views.SourceStatus) {
 	client := s.torrServer.Client()
-	sets, err := client.Settings(ctx)
-	if err != nil && st.OK {
+	if _, err := client.Settings(ctx); err != nil && st.OK {
 		st = failed(engineAsleep)
 	}
-	v := s.httpsView(r, sets, sslStatus(ctx, client), st)
+	v := s.httpsView(r, sslStatus(ctx, client), st)
 	if err := datastar.NewSSE(w, r).PatchElementTempl(views.HTTPSCard(v)); err != nil {
 		logSSEError(r, "patch HTTPS card", err)
 	}

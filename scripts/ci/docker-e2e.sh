@@ -30,6 +30,7 @@ services:
     container_name: $project
     ports:
       - "8090:8090"
+      - "8091:8091"
 EOF
 cleanup() {
   "${compose[@]}" down --volumes >/dev/null 2>&1 || true
@@ -97,9 +98,11 @@ step "Start with compose.yaml"
 wait_healthy
 [ "$(in_container moviestracker --health && echo ok)" = ok ] || fail "moviestracker --health fails"
 published="$(docker port "$project" | sed 's/ ->.*//' | sort -u | tr '\n' ' ')"
-[ "$published" = "8090/tcp 8095/tcp " ] || fail "published ports: $published (want 8095/tcp, and 8090/tcp from the test's override)"
+[ "$published" = "8090/tcp 8091/tcp 8095/tcp " ] || fail "published ports: $published (want 8095/tcp, and 8090/tcp and 8091/tcp from the test's override)"
 [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8090/echo)" = 000 ] ||
   fail "TorrServer for other apps answers before anyone switched it on"
+[ "$(curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1:8091/echo)" = 000 ] ||
+  fail "TorrServer for other apps answers over HTTPS before anyone switched it on"
 
 step "Moviestracker runs the bundled TorrServer on loopback, all as uid 1000"
 port="$(engine_port "$project")"

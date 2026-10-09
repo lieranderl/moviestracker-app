@@ -1,29 +1,88 @@
 package handlers
 
 import (
+	"context"
+	"crypto/tls"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
 	"slices"
+	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/config"
 	"github.com/lieranderl/moviestracker-app/internal/gateway"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 )
 
-// openAppsPort opens the gateway's port at startup when an admin left it on.
+// letReachableDevicesInThroughApps moves an install that opened TorrServer
+// itself to other devices (before the engine stayed on loopback) to Other
+// apps, where they now come in.
+func (s *Server) letReachableDevicesInThroughApps() {
+	if !s.store.State().TorrServer.Startup.Reachable {
+		return
+	}
+	if err := s.store.Update(func(st *config.State) error {
+		st.TorrServer.Startup.Reachable = false
+		st.Gateway.Enabled = st.Gateway.Enabled || s.appsPort != nil
+		return nil
+	}); err != nil {
+		slog.Error("move devices that reached TorrServer to Other apps", "error", err)
+		return
+	}
+	slog.Info("TorrServer stays on this computer now; other devices come in through Settings → Other apps")
+}
+
+// openAppsPort opens the gateway's ports at startup when an admin left it on.
 func (s *Server) openAppsPort() {
 	if s.appsPort == nil || !s.store.State().Gateway.Enabled {
 		return
 	}
-	if err := s.appsPort.Open(); err != nil {
+	if err := s.openAppsPorts(); err != nil {
 		problem := err.Error()
 		s.appsProblem.Store(&problem)
 		slog.Error("TorrServer for other apps is on, but its port did not open", "error", err)
 		return
 	}
-	slog.Info("TorrServer is open to other apps", "port", s.appsPort.Number())
+	slog.Info("TorrServer is open to other apps", "port", s.appsPort.Number(), "https_port", s.appsHTTPSPort())
+}
+
+// openAppsPorts opens the gateway's HTTP port, then its HTTPS one; HTTPS
+// failing to open leaves HTTP open (appsTLSProblem says why).
+func (s *Server) openAppsPorts() error {
+	if err := s.appsPort.Open(); err != nil {
+		return err
+	}
+	s.appsTLSProblem.Store(nil)
+	if s.appsTLSPort == nil {
+		return nil
+	}
+	if err := s.appsTLSPort.Open(); err != nil {
+		problem := err.Error()
+		s.appsTLSProblem.Store(&problem)
+		slog.Error("TorrServer for other apps is open, but its HTTPS port did not open", "error", err)
+	}
+	return nil
+}
+
+// shutAppsPorts shuts both of the gateway's ports.
+func (s *Server) shutAppsPorts() {
+	for _, p := range []*gateway.Port{s.appsPort, s.appsTLSPort} {
+		if p == nil {
+			continue
+		}
+		if err := p.Shut(); err != nil {
+			slog.Warn("shut the port for other apps", "error", err)
+		}
+	}
+}
+
+// appsHTTPSPort is the gateway's HTTPS port number, or "" while it is shut.
+func (s *Server) appsHTTPSPort() string {
+	if s.appsTLSPort == nil || s.appsTLSPort.Addr() == "" {
+		return ""
+	}
+	return s.appsTLSPort.Number()
 }
 
 // appsView describes Other apps for the page opened with r.
@@ -32,10 +91,17 @@ func (s *Server) appsView(r *http.Request) views.AppsView {
 	v := views.AppsView{
 		On:       st.Enabled && s.appsPort.Addr() != "",
 		Internet: st.Internet,
-		Address:  s.appsAddress(r),
+		Address:  s.appsAddress(r, "http", s.appsPort.Number()),
 	}
 	if p := s.appsProblem.Load(); p != nil && st.Enabled && !v.On {
 		v.Problem = *p
+	}
+	if v.On {
+		if p := s.appsTLSProblem.Load(); p != nil {
+			v.HTTPSProblem = *p
+		} else if port := s.appsHTTPSPort(); port != "" && s.torrServerCertificateHere(r.Context()) {
+			v.HTTPSAddress = s.appsAddress(r, "https", port)
+		}
 	}
 	for _, l := range st.Logins {
 		v.Logins = append(v.Logins, views.AppLogin{Name: l.Name, User: l.User, CreatedAt: l.CreatedAt})
@@ -44,13 +110,26 @@ func (s *Server) appsView(r *http.Request) views.AppsView {
 }
 
 // appsAddress is where apps reach the gateway: this machine as TVs see it
-// (as for copied links), on the gateway's port.
-func (s *Server) appsAddress(r *http.Request) string {
+// (as for copied links), on one of the gateway's ports.
+func (s *Server) appsAddress(r *http.Request, scheme, port string) string {
 	origin, err := url.Parse(s.linkOrigin(r))
 	if err != nil {
 		return ""
 	}
-	return "http://" + net.JoinHostPort(origin.Hostname(), s.appsPort.Number())
+	return scheme + "://" + net.JoinHostPort(origin.Hostname(), port)
+}
+
+// torrServerCertificateHere reports whether TorrServer serves HTTPS with a
+// certificate this machine can read, which the gateway's HTTPS port serves.
+func (s *Server) torrServerCertificateHere(ctx context.Context) bool {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	cert, key, err := s.torrServer.CertificateFiles(ctx)
+	if err != nil {
+		return false
+	}
+	_, err = tls.LoadX509KeyPair(cert, key)
+	return err == nil
 }
 
 // appsAction reads an Other apps action's signals: nil when the request was
@@ -77,12 +156,12 @@ func (s *Server) handleSwitchApps(w http.ResponseWriter, r *http.Request) {
 		patchSource(w, r, views.AppsSwitch(v, st), map[string]any{"appsOn": v.On, "appsInternet": v.Internet})
 	}
 	if sig.On {
-		if err := s.appsPort.Open(); err != nil {
+		if err := s.openAppsPorts(); err != nil {
 			patch(failed("%v", err))
 			return
 		}
-	} else if err := s.appsPort.Shut(); err != nil {
-		slog.Warn("shut the port for other apps", "error", err)
+	} else {
+		s.shutAppsPorts()
 	}
 	s.appsProblem.Store(nil)
 	if err := s.store.Update(func(st *config.State) error {

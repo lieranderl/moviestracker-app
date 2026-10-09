@@ -15,6 +15,5 @@ func EngineOptions(st config.EngineStartup) engine.Options {
 		MaxSize:     st.MaxSize,
 		TorrentsDir: st.TorrentsDir,
 		HTTPS:       st.HTTPS,
-		Reachable:   st.Reachable,
 	}
 }

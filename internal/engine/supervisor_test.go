@@ -289,6 +289,30 @@ func TestAPortTakenBySomethingElseIsLeftAlone(t *testing.T) {
 	}
 }
 
+func TestAPortHeldOnEveryInterfaceIsLeftAlone(t *testing.T) {
+	// Another TorrServer listening on every interface (*:port), as one
+	// started without --ip does. macOS still lets 127.0.0.1:port be bound,
+	// and then answers on loopback from the other one.
+	ln, err := net.Listen("tcp", ":0") // #nosec G102 -- test: the other program listens on every interface
+	if err != nil {
+		t.Fatal(err)
+	}
+	foreign := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}), ReadHeaderTimeout: time.Second}
+	go func() { _ = foreign.Serve(ln) }()
+	t.Cleanup(func() { _ = foreign.Close() })
+	taken := ln.Addr().(*net.TCPAddr).Port
+
+	sup := newSupervisor(t, t.TempDir(), taken)
+	if err := sup.Start(context.Background()); err != nil {
+		t.Fatalf("Start(): %v", err)
+	}
+	if st := sup.Status(); st.Port == taken || st.State != engine.Running {
+		t.Errorf("Status() = %+v, want running on another port than %d", st, taken)
+	}
+}
+
 func TestAMissingBinaryIsReported(t *testing.T) {
 	sup := engine.New(engine.Config{Binary: filepath.Join(t.TempDir(), "torrserver"), Dir: t.TempDir()})
 	err := sup.Start(context.Background())
@@ -380,11 +404,12 @@ func TestAFreshEngineIsSetUpOnceOnItsFirstStart(t *testing.T) {
 	}
 }
 
-func TestHTTPSStartsTheEngineWithSSLAndReachableOpensItToTheNetwork(t *testing.T) {
+func TestTheEngineStaysOnLoopbackAndServesHTTPSOnAPortOfItsOwn(t *testing.T) {
+	port := freePort(t)
 	sup := engine.New(engine.Config{
 		Binary:  os.Args[0],
 		Dir:     t.TempDir(),
-		Port:    freePort(t),
+		Port:    port,
 		Env:     []string{enginetest.FakeEnv + "=1"},
 		Options: engine.Options{HTTPS: true},
 	})
@@ -392,23 +417,18 @@ func TestHTTPSStartsTheEngineWithSSLAndReachableOpensItToTheNetwork(t *testing.T
 	if err := sup.Start(context.Background()); err != nil {
 		t.Fatalf("Start(): %v", err)
 	}
-	if args := engineArgs(t, sup); !strings.Contains(args, "--ssl") || !strings.Contains(args, "--ip 127.0.0.1") {
-		t.Errorf("HTTPS engine args = %q, want --ssl on loopback", args)
+	// 8091 is where other apps find HTTPS (the gateway); the engine's own
+	// HTTPS stays on a loopback port nobody else uses.
+	args := engineArgs(t, sup)
+	if !strings.Contains(args, "--ssl") || !strings.Contains(args, "--ip 127.0.0.1") || !strings.Contains(args, "--sslport ") || strings.Contains(args, "--sslport 8091") {
+		t.Errorf("HTTPS engine args = %q, want --ssl on loopback with a private --sslport", args)
 	}
 
-	sup.SetOptions(engine.Options{HTTPS: true, Reachable: true})
-	if err := sup.Restart(context.Background()); err != nil {
-		t.Fatalf("Restart(): %v", err)
-	}
-	if args := engineArgs(t, sup); !strings.Contains(args, "--ssl") || strings.Contains(args, "--ip") {
-		t.Errorf("reachable engine args = %q, want --ssl on every interface", args)
-	}
-
-	sup.SetOptions(engine.Options{Reachable: true})
+	sup.SetOptions(engine.Options{})
 	if err := sup.Restart(context.Background()); err != nil {
 		t.Fatalf("Restart(): %v", err)
 	}
 	if args := engineArgs(t, sup); strings.Contains(args, "--ssl") || !strings.Contains(args, "--ip 127.0.0.1") {
-		t.Errorf("plain HTTP engine left loopback: %q", args)
+		t.Errorf("plain HTTP engine args = %q, want loopback without --ssl", args)
 	}
 }

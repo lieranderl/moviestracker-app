@@ -56,44 +56,33 @@ func uploadCertificate(t *testing.T, l *local, cookie *http.Cookie, cert, key []
 	return l.do(t, req, cookie)
 }
 
-func TestTheAdminCanServeTheManagedEngineOverHTTPSToOtherDevices(t *testing.T) {
+func TestTheManagedEngineServesHTTPSOnThisComputerOnly(t *testing.T) {
 	l, sup, admin := managedLocal(t)
-	page := html.UnescapeString(l.do(t, httptest.NewRequest(http.MethodGet, "/settings/https", nil), admin).Body.String())
-	if !strings.Contains(page, "Serve HTTPS") || !strings.Contains(page, "Reachable from other devices") {
-		t.Fatalf("HTTPS settings page lacks the HTTPS switches")
+	page := httpsPage(t, l, admin)
+	if !strings.Contains(page, "Serve HTTPS") {
+		t.Fatalf("HTTPS settings page lacks the HTTPS switch")
 	}
-
-	rr := l.action(t, "/api/settings/engine/https", `{"https":{"HTTPS":false,"Reachable":true}}`, admin)
-	if !strings.Contains(rr.Body.String(), "needs HTTPS") || l.store.State().TorrServer.Startup.Reachable {
-		t.Fatalf("plain HTTP was opened to the network:\n%s", rr.Body.String())
+	// Other devices come in through Other apps, with logins of their own;
+	// TorrServer's port and login stay Moviestracker's.
+	for _, gone := range []string{"Reachable from other devices", "HTTPS port"} {
+		if strings.Contains(page, gone) {
+			t.Errorf("the managed engine's HTTPS settings still offer %q", gone)
+		}
 	}
 
 	before := sup.Status().PID
-	rr = l.action(t, "/api/settings/engine/https", `{"https":{"HTTPS":true,"Reachable":true,"SslPort":18443}}`, admin)
-	if st := l.store.State().TorrServer.Startup; !st.HTTPS || !st.Reachable {
-		t.Fatalf("HTTPS not saved (%+v):\n%s", st, rr.Body.String())
+	rr := l.action(t, "/api/settings/engine/https", `{"https":{"HTTPS":true,"Reachable":true}}`, admin)
+	if st := l.store.State().TorrServer.Startup; !st.HTTPS || st.Reachable {
+		t.Fatalf("startup = %+v, want HTTPS and nothing opened to the network:\n%s", st, rr.Body.String())
 	}
-	if o := sup.Options(); !o.HTTPS || !o.Reachable || sup.Status().PID == before {
+	if o := sup.Options(); !o.HTTPS || sup.Status().PID == before {
 		t.Errorf("engine not restarted with HTTPS: %+v", o)
 	}
-	if got := engineSettings(t, sup).Int("SslPort"); got != 18443 {
-		t.Errorf("SslPort = %d, want 18443", got)
-	}
 
-	page = html.UnescapeString(l.do(t, httptest.NewRequest(http.MethodGet, "/settings/https", nil), admin).Body.String())
-	_, user, password := sup.Endpoint()
-	if !strings.Contains(page, user) || !strings.Contains(page, password) || !strings.Contains(page, ":18443") {
-		t.Errorf("page does not tell how other devices sign in to TorrServer")
-	}
-}
-
-func TestChangingTheHTTPSPortRestartsAnEngineServingHTTPS(t *testing.T) {
-	l, sup, admin := managedLocal(t)
-	l.action(t, "/api/settings/engine/https", `{"https":{"HTTPS":true,"SslPort":18443}}`, admin)
-	before := sup.Status().PID
-	rr := l.action(t, "/api/settings/engine/https", `{"https":{"SslPort":18444}}`, admin)
-	if sup.Status().PID == before || !strings.Contains(rr.Body.String(), "restarted") {
-		t.Errorf("the new HTTPS port waits for a restart nobody asked for:\n%s", rr.Body.String())
+	page = httpsPage(t, l, admin)
+	_, _, password := sup.Endpoint()
+	if strings.Contains(page, password) || !strings.Contains(page, "/settings/apps") {
+		t.Errorf("the HTTPS page shows TorrServer's own password, or does not send other devices to Other apps")
 	}
 }
 

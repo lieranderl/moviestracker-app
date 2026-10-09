@@ -174,6 +174,20 @@ func (c *Client) sslDo(ctx context.Context, method, path, contentType string, bo
 	}
 }
 
+// CertificateFiles names the certificate and key the TorrServer in use
+// serves HTTPS with, for the gateway's HTTPS port to serve them too; an
+// error when it serves no HTTPS or cannot say (before MatriX.146).
+func (m *Manager) CertificateFiles(ctx context.Context) (cert, key string, err error) {
+	st, err := m.Client().SSLStatus(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	if !st.Enabled || st.Cert.CertFile == "" || st.Cert.KeyFile == "" {
+		return "", "", errors.New("TorrServer serves no HTTPS")
+	}
+	return st.Cert.CertFile, st.Cert.KeyFile, nil
+}
+
 // CertExpiryWarning is how long before it expires a certificate is flagged:
 // Let's Encrypt renews 30 days ahead, so 14 days left means a renewal failed.
 const CertExpiryWarning = 14 * 24 * time.Hour

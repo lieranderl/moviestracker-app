@@ -1,6 +1,5 @@
 // Package engine runs TorrServer as a child process of Moviestracker: bound
-// to loopback (unless its HTTPS is opened to the network), behind generated
-// credentials, restarted when it crashes and stopped with Moviestracker.
+// to loopback, behind generated credentials, restarted when it crashes and stopped with Moviestracker.
 package engine
 
 import (
@@ -259,17 +258,24 @@ func (s *Supervisor) launch(ctx context.Context, stop <-chan struct{}) (*run, er
 		return nil, fmt.Errorf("open engine output: %w", err)
 	}
 	options := s.Options()
-	var args []string
-	if options.loopbackOnly() {
-		args = append(args, "--ip", "127.0.0.1")
-	}
-	args = append(args,
+	// Loopback only: other devices go through the gateway, with logins of
+	// their own (internal/gateway).
+	args := []string{
+		"--ip", "127.0.0.1",
 		"--port", strconv.Itoa(port),
 		"--path", s.cfg.Dir,
 		"--logpath", filepath.Join(s.cfg.Dir, "torrserver.log"),
 		"--httpauth",
-	)
+	}
 	args = append(args, options.args()...)
+	if options.HTTPS {
+		sslPort, err := loopbackPort(port + 1)
+		if err != nil {
+			_ = out.Close()
+			return nil, err
+		}
+		args = append(args, "--sslport", strconv.Itoa(sslPort))
+	}
 	cmd := exec.Command(s.cfg.Binary, args...) // #nosec G204 -- the configured TorrServer program; flags come from typed Options
 	cmd.Dir = s.cfg.Dir
 	cmd.Env = append(os.Environ(), s.cfg.Env...)
@@ -428,6 +434,19 @@ func (s *Supervisor) choosePort(ctx context.Context) (int, error) {
 	return ln.Addr().(*net.TCPAddr).Port, nil
 }
 
+// loopbackPort is preferred when it is free on loopback, else any free port.
+func loopbackPort(preferred int) (int, error) {
+	if portFree(preferred) {
+		return preferred, nil
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, fmt.Errorf("find a free port: %w", err)
+	}
+	defer func() { _ = ln.Close() }()
+	return ln.Addr().(*net.TCPAddr).Port, nil
+}
+
 // ownEngineOn reports whether port is held by a TorrServer that accepts our
 // credentials but refuses wrong ones: one started with our accs.db. Anything
 // else (such as someone's own TorrServer without auth) is left alone.
@@ -481,12 +500,21 @@ func (s *Supervisor) authorized(ctx context.Context, port int, user, password st
 }
 
 func portFree(port int) bool {
-	ln, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+	addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return false
 	}
 	_ = ln.Close()
-	return true
+	// macOS lets 127.0.0.1:port be bound while another program listens on
+	// every interface (*:port), which then answers on loopback too: a port
+	// anyone answers on is not free.
+	conn, err := net.DialTimeout("tcp", addr, 200*time.Millisecond)
+	if err != nil {
+		return true
+	}
+	_ = conn.Close()
+	return false
 }
 
 func baseURL(port int) string {

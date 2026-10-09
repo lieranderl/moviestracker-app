@@ -216,7 +216,7 @@ docker run -d --name moviestracker --restart unless-stopped -p 8095:8095 \
   moviestracker`), or set `user:` in `compose.yaml` to the folder's owner.
 - **Only port 8095** is published. TorrServer stays inside the container,
   behind a password Moviestracker generates; to let
-  [TorrServer apps](#torrserver-apps-torrserve-lampa) in, publish 8090 too.
+  [TorrServer apps](#torrserver-apps-torrserve-lampa) in, publish 8090 and 8091 too.
 - **Names and links:** Moviestracker answers to IP addresses and `localhost`.
   To use a name such as `http://nas.local:8095`, add it to `MT_HOSTNAMES` in
   `compose.yaml`. If you open it as `localhost`, set `MT_LAN_ADDRESS` to the
@@ -251,7 +251,9 @@ as the apps.
 - The site is served over HTTPS, so the browser only reaches a TorrServer
   at an `https://` address (TorrServer `--ssl` with a certificate the
   browser trusts) or one on the same computer at `http://localhost:8090`.
-  A plain `http://` TorrServer on another machine is blocked.
+  A plain `http://` TorrServer on another machine is blocked. For the
+  TorrServer the Moviestracker app runs, use the HTTPS address and a login
+  from its **Settings → Other apps**.
 - Chrome asks once to allow access to your local network; allow it.
 - With a self-signed certificate, open the TorrServer's address once in the
   same browser and accept it.
@@ -324,8 +326,10 @@ other way round.
 1. In **Settings → Other apps**, switch on **Open TorrServer to other apps**.
 2. Under **Logins for apps**, make a login for the TV or app (for example
    *Living room TV*). Its password is shown once: enter it in the app then.
-3. In the app, add the address the page shows, such as
-   `http://192.168.1.20:8090`, with that username and password.
+3. In the app, add an address the page shows, with that username and
+   password: `http://192.168.1.20:8090`, or `https://192.168.1.20:8091`
+   once **Serve HTTPS** is on in **Settings → HTTPS** (with that page's
+   certificate).
 
 - Apps can play, add and remove torrents. TorrServer's settings stay
   Moviestracker's, and apps cannot stop it.
@@ -333,16 +337,23 @@ other way round.
   itself, but only for torrents already saved.
 - Only devices on your home network (and your
   [Tailscale](https://tailscale.com) network) get in. **Also allow from the
-  internet** opens it further. Logins then travel unencrypted, so for access
-  away from home a VPN such as Tailscale or WireGuard is the safer way.
+  internet** opens it further, over HTTPS only, so logins never cross the
+  internet unencrypted. Still, for access away from home a VPN such as
+  Tailscale or WireGuard is the safer way.
+- Some TV apps refuse a self-signed certificate: use the HTTP address at
+  home for them, or upload a certificate of your own (Let's Encrypt) in
+  **Settings → HTTPS**.
+- TorrServer itself stays on this computer: other devices and the web
+  version come in only through these ports, with logins of their own.
 - In Lampa, switch on authorization in its TorrServer settings, or it sends
   no login. Lampa opened from an `https://` address cannot reach an
   `http://` one: the browser blocks it. Use the Lampa app, or open Lampa
   from an `http://` address.
 - Removing a login in **Settings → Other apps** signs that app out at once.
-- Port 8090 is the one TorrServer apps suggest. If a TorrServer of its own
-  already uses it, stop that one, or choose another port with
-  `MT_TORRSERVER_LISTEN`. In Docker, publish the port too (`"8090:8090"`, in
+- Ports 8090 (HTTP) and 8091 (HTTPS) are the ones TorrServer apps suggest.
+  If a TorrServer of its own already uses them, stop that one, or choose
+  other ports with `MT_TORRSERVER_LISTEN` and `MT_TORRSERVER_TLS_LISTEN`. In
+  Docker, publish them too (`"8090:8090"` and `"8091:8091"`, in
   `compose.yaml`).
 
 ## Where the data comes from

@@ -37,7 +37,8 @@ Everything is set in the browser under Settings → Sources and kept in the data
 | --- | --- | --- |
 | `MT_LISTEN` | `:8095` | Listen address; the default serves every network interface so TVs and phones can connect |
 | `MT_DATA_DIR` | `moviestracker` in the user config directory | Where accounts, sessions and sources are kept (the Mac app sets `~/Library/Application Support/moviestracker`, the Windows tray app `%LOCALAPPDATA%\Moviestracker`) |
-| `MT_TORRSERVER_LISTEN` | `:8090` | Where TorrServer apps (TorrServe, Lampa) connect once **Settings → Other apps** is on; nothing listens there until then |
+| `MT_TORRSERVER_LISTEN` | `:8090` | Where TorrServer apps (TorrServe, Lampa) connect over HTTP once **Settings → Other apps** is on; nothing listens there until then |
+| `MT_TORRSERVER_TLS_LISTEN` | `:8091` | The same over HTTPS, with TorrServer's certificate (**Settings → HTTPS**); the only way in from the internet |
 | `MT_LAN_ADDRESS` | *(empty: found)* | The address TVs and phones use to reach this machine, put in links made while Moviestracker is opened as `localhost`; `off` keeps `localhost` (the Docker image's default) |
 | `MT_HOSTNAMES` | *(empty)* | Extra hostnames to answer to (comma-separated) besides IP addresses, `localhost` and `<hostname>.local` |
 | `MT_SECURE_COOKIES` | `false` | Secure cookies and HSTS, for HTTPS setups |

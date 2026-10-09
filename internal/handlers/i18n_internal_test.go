@@ -35,7 +35,7 @@ func TestSettingsAndMessagesHaveRussianTranslations(t *testing.T) {
 			}
 		}
 	}
-	texts = append(texts, reconnectCost, startupOnly, engineAsleep, gstCost, httpsCost, reachableNeedsHTTPS, gstNotBuilt, noToneMapper, saveFailed,
+	texts = append(texts, reconnectCost, startupOnly, engineAsleep, gstCost, httpsCost, gstNotBuilt, noToneMapper, saveFailed,
 		"Certificate uploaded. TorrServer serves it now.", "TorrServer serves the certificate from these files now.",
 		"TorrServer serves its self-signed certificate now.", "New self-signed certificate made. Browsers ask to accept it again.",
 		"must be between %d and %d %s", "contains an invalid character", sharedViewer, "A browser")

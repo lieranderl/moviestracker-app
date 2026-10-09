@@ -11,15 +11,10 @@ type Options struct {
 	PublicIPv6  string // --pubipv6
 	MaxSize     int64  // --maxsize: largest file TorrServer streams, in bytes (0: no limit)
 	TorrentsDir string // --torrentsdir: folder whose .torrent files are added automatically
-	HTTPS       bool   // --ssl: also serve HTTPS (port, certificate and key come from TorrServer's settings)
-	// Reachable listens on every interface instead of loopback, so other
-	// devices reach TorrServer (behind its login). It applies with HTTPS only.
-	Reachable bool
-}
-
-// loopbackOnly reports whether the engine listens on 127.0.0.1 only.
-func (o Options) loopbackOnly() bool {
-	return !o.HTTPS || !o.Reachable
+	// HTTPS (--ssl) also serves HTTPS, on a loopback port of the engine's
+	// own (--sslport): other devices reach it through the gateway, which
+	// serves the same certificate on 8091.
+	HTTPS bool
 }
 
 // args turns the options into TorrServer flags.

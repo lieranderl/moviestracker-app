@@ -22,14 +22,13 @@ import (
 )
 
 const (
-	settingsTimeout     = 10 * time.Second
-	reconnectCost       = "Saving makes TorrServer reconnect (about 2 seconds)."
-	startupOnly         = "Only when Moviestracker runs TorrServer (Settings → Sources)."
-	reachableNeedsHTTPS = "Reachable from other devices needs HTTPS."
-	engineAsleep        = "TorrServer is not answering, so its settings cannot be shown. Check Settings → Sources."
-	gstCost             = "Applied at once to new streams."
-	httpsCost           = "TorrServer reads these when it starts with --ssl, so restart it to apply them."
-	gstNotBuilt         = "This TorrServer was built without GStreamer, so MKV files cannot be converted for the browser. " +
+	settingsTimeout = 10 * time.Second
+	reconnectCost   = "Saving makes TorrServer reconnect (about 2 seconds)."
+	startupOnly     = "Only when Moviestracker runs TorrServer (Settings → Sources)."
+	engineAsleep    = "TorrServer is not answering, so its settings cannot be shown. Check Settings → Sources."
+	gstCost         = "Applied at once to new streams."
+	httpsCost       = "TorrServer reads these when it starts with --ssl, so restart it to apply them."
+	gstNotBuilt     = "This TorrServer was built without GStreamer, so MKV files cannot be converted for the browser. " +
 		"The TorrServer Moviestracker runs (make torrserver) is the GStreamer build."
 )
 
@@ -76,6 +75,9 @@ func (s *Server) managed() bool {
 
 // engineSectionView shows a section with TorrServer's current values.
 func (s *Server) engineSectionView(ctx context.Context, r *http.Request, sec settingsSection) views.SettingsSection {
+	if s.managed() {
+		sec.Fields = slices.DeleteFunc(slices.Clone(sec.Fields), func(f settingField) bool { return f.External })
+	}
 	v := sectionView(sec, "/api/settings/engine/"+sec.ID)
 	v.Cost, v.Playing = reconnectCost, int(s.playing.Load())
 	sets, err := s.torrServer.Client().Settings(ctx)
@@ -96,7 +98,7 @@ func (s *Server) engineSectionView(ctx context.Context, r *http.Request, sec set
 	}
 	if sec.ID == "https" {
 		ssl := sslStatus(ctx, s.torrServer.Client())
-		v.Header = views.HTTPSCard(s.httpsView(r, sets, ssl, views.SourceStatus{}))
+		v.Header = views.HTTPSCard(s.httpsView(r, ssl, views.SourceStatus{}))
 		if ssl != nil {
 			// The card sets these, with TorrServer checking the pair first.
 			v.Fields = slices.DeleteFunc(v.Fields, func(f views.SettingField) bool { return f.Key == "SslCert" || f.Key == "SslKey" })
@@ -266,7 +268,7 @@ func (s *Server) handleSaveEngineSettings(w http.ResponseWriter, r *http.Request
 	before := startup
 	for _, f := range sec.Fields {
 		value, present := posted[f.Key]
-		if !present || (f.Startup && !s.managed()) {
+		if !present || (f.Startup && !s.managed()) || (f.External && s.managed()) {
 			continue
 		}
 		stored, err := f.parse(value)
@@ -279,10 +281,6 @@ func (s *Server) handleSaveEngineSettings(w http.ResponseWriter, r *http.Request
 			continue
 		}
 		engineChanges[f.Key] = stored
-	}
-	if startup.Reachable && !startup.HTTPS {
-		status(failed(reachableNeedsHTTPS))
-		return
 	}
 
 	client := s.torrServer.Client()
@@ -364,7 +362,7 @@ func (s *Server) restartWithStartup(ctx context.Context, startup config.EngineSt
 func (s *Server) recoverEngine(ctx context.Context, before config.EngineStartup, previous map[string]any, startErr error) views.SourceStatus {
 	slog.Warn("engine did not restart with new settings; restoring the previous ones", "error", startErr)
 	safe := before
-	safe.HTTPS, safe.Reachable = false, false
+	safe.HTTPS = false
 	err := s.restartWithStartup(ctx, safe)
 	if err == nil && len(previous) > 0 {
 		err = s.torrServer.Client().UpdateSettings(ctx, previous)
@@ -401,8 +399,6 @@ func startupValue(st config.EngineStartup, f settingField) any {
 		return st.TorrentsDir
 	case "HTTPS":
 		return st.HTTPS
-	case "Reachable":
-		return st.Reachable
 	}
 	return nil
 }
@@ -423,8 +419,6 @@ func setStartup(st *config.EngineStartup, key string, v any) {
 		st.TorrentsDir, _ = v.(string)
 	case "HTTPS":
 		st.HTTPS, _ = v.(bool)
-	case "Reachable":
-		st.Reachable, _ = v.(bool)
 	}
 }
 

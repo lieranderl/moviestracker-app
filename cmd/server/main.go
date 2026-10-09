@@ -132,14 +132,18 @@ func main() {
 
 	// Other apps (TorrServe, Lampa) reach TorrServer here once an admin
 	// turns it on in Settings → Other apps; nothing listens until then.
-	appsPort := gateway.NewPort(appsListenAddr(), gateway.New(gateway.Config{
+	// Both ports serve the same gateway: HTTP, and HTTPS with the certificate
+	// TorrServer serves (Settings → HTTPS).
+	apps := gateway.New(gateway.Config{
 		Store: store,
 		Plays: plays,
 		Upstream: func() gateway.Upstream {
 			url, user, password := torrMgr.Endpoint()
 			return gateway.Upstream{URL: url, User: user, Password: password}
 		},
-	}))
+	})
+	appsPort := gateway.NewPort(appsListenAddr(), apps)
+	appsTLSPort := gateway.NewPort(appsTLSListenAddr(), apps).WithTLS(gateway.NewCertificates(torrMgr.CertificateFiles).Get)
 
 	// Once a day, unless an admin turned it off, ask GitHub whether a newer
 	// Moviestracker is out, to tell admins and the menu bar and tray apps.
@@ -175,6 +179,7 @@ func main() {
 		SetupCode:         setupCode,
 		LANAddress:        lanAddressFrom(os.Getenv("MT_LAN_ADDRESS")),
 		AppsPort:          appsPort,
+		AppsTLSPort:       appsTLSPort,
 	})
 	if err != nil {
 		slog.Error("server configuration failed", "error", err)
@@ -241,6 +246,7 @@ func main() {
 
 		stopReleases()
 		_ = appsPort.Close()
+		_ = appsTLSPort.Close()
 		// Close background stores cleanly
 		server.Close()
 		if sup != nil {
@@ -429,6 +435,18 @@ func appsListenAddr() string {
 		return addr
 	}
 	return defaultAppsListen
+}
+
+// defaultAppsTLSListen is where other apps find TorrServer over HTTPS: 8091,
+// TorrServer's own HTTPS port.
+const defaultAppsTLSListen = ":8091"
+
+// appsTLSListenAddr is MT_TORRSERVER_TLS_LISTEN (host:port), else :8091.
+func appsTLSListenAddr() string {
+	if addr := strings.TrimSpace(os.Getenv("MT_TORRSERVER_TLS_LISTEN")); addr != "" {
+		return addr
+	}
+	return defaultAppsTLSListen
 }
 
 // checkWritable makes sure this user can write to dir, and says how to fix
