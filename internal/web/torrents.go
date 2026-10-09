@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/starfederation/datastar-go/datastar"
 
@@ -73,4 +74,26 @@ func (a *app) readTorrents(w http.ResponseWriter, r *http.Request) ([]torrserver
 		return nil, false
 	}
 	return list.Torrents, true
+}
+
+// maxSSLStatus bounds a posted certificate status: a few names and paths.
+const maxSSLStatus = 64 << 10
+
+// handleCertificate renders, read-only, the HTTPS certificate the user's
+// browser read from their TorrServer (tsSSL), into #ts-https-details.
+func (a *app) handleCertificate(w http.ResponseWriter, r *http.Request) {
+	if _, ok := a.currentUser(r); !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var in struct {
+		Status *torrserver.SSLStatus `json:"status"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxSSLStatus)).Decode(&in); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.WebCertificate(in.Status, time.Now())); err != nil {
+		slog.Warn("patching the TorrServer certificate failed", "error", err)
+	}
 }

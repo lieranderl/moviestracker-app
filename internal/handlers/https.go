@@ -2,19 +2,22 @@ package handlers
 
 import (
 	"context"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
+	"errors"
 	"io"
 	"log/slog"
+	"mime"
 	"mime/multipart"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 	"github.com/starfederation/datastar-go/datastar"
@@ -25,18 +28,25 @@ const (
 	maxPEMBytes = 256 << 10
 	// defaultSSLPort is TorrServer's HTTPS port when SslPort is 0.
 	defaultSSLPort = 8091
-	certMismatch   = "The certificate and private key do not match, or are not PEM files."
+	// certificateTimeout bounds one certificate change: TorrServer checks
+	// the pair and serves it without a restart.
+	certificateTimeout = 20 * time.Second
 )
 
-// httpsView describes the managed engine's HTTPS: where other devices reach
-// it, how they sign in and which certificate it serves.
-func (s *Server) httpsView(sets torrserver.Fields, st views.SourceStatus) views.HTTPSView {
+// httpsView describes TorrServer's HTTPS: for the managed engine, where
+// other devices reach it and how they sign in; for any TorrServer, the
+// certificate it serves (ssl is nil when it predates MatriX.146).
+func (s *Server) httpsView(r *http.Request, sets torrserver.Fields, ssl *torrserver.SSLStatus, st views.SourceStatus) views.HTTPSView {
+	v := views.HTTPSView{Managed: s.managed(), SSL: ssl, Now: time.Now(), PlainHTTP: plainHTTPFromElsewhere(r), Status: st}
+	if !v.Managed {
+		return v
+	}
 	startup := s.store.State().TorrServer.Startup
 	port := sets.Int("SslPort")
 	if port == 0 {
 		port = defaultSSLPort
 	}
-	v := views.HTTPSView{Serving: startup.HTTPS, Reachable: startup.HTTPS && startup.Reachable, Status: st}
+	v.Serving, v.Reachable = startup.HTTPS, startup.HTTPS && startup.Reachable
 	hosts := []string{"localhost"}
 	if v.Reachable {
 		hosts = networkAddresses()
@@ -45,12 +55,32 @@ func (s *Server) httpsView(sets torrserver.Fields, st views.SourceStatus) views.
 	for _, h := range hosts {
 		v.Addresses = append(v.Addresses, "https://"+net.JoinHostPort(h, strconv.Itoa(port)))
 	}
-	uploaded, _ := s.engine.CertificateFiles()
-	if path := sets.String("SslCert"); path != "" {
-		v.Certificate = describeCertificate(path)
-		v.Uploaded = filepath.Clean(path) == uploaded
-	}
 	return v
+}
+
+// sslStatus is TorrServer's certificate status, or nil when it has no /ssl
+// API (before MatriX.146) or does not answer.
+func sslStatus(ctx context.Context, client *torrserver.Client) *torrserver.SSLStatus {
+	st, err := client.SSLStatus(ctx)
+	if err != nil {
+		return nil
+	}
+	return &st
+}
+
+// plainHTTPFromElsewhere reports whether r came over the network without
+// TLS, so whatever the page uploads crosses it unencrypted.
+func plainHTTPFromElsewhere(r *http.Request) bool {
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		return false
+	}
+	host, _, err := net.SplitHostPort(r.Host)
+	if err != nil {
+		host = r.Host
+	}
+	name := strings.ToLower(strings.Trim(host, "[]"))
+	ip, ipErr := netip.ParseAddr(name)
+	return name != "localhost" && !strings.HasSuffix(name, ".localhost") && (ipErr != nil || !ip.IsLoopback())
 }
 
 // networkAddresses are this computer's addresses on its networks.
@@ -70,52 +100,46 @@ func networkAddresses() []string {
 	return out
 }
 
-// describeCertificate reads the first certificate of a PEM file.
-func describeCertificate(path string) *views.CertificateInfo {
-	info := &views.CertificateInfo{Path: path}
-	raw, err := os.ReadFile(path) // #nosec G304 -- the engine's own SslCert setting
-	if err != nil {
-		info.Problem = "The certificate file cannot be read."
-		return info
-	}
-	block, _ := pem.Decode(raw)
-	var cert *x509.Certificate
-	if block != nil {
-		cert, err = x509.ParseCertificate(block.Bytes)
-	}
-	if block == nil || err != nil {
-		info.Problem = "The certificate file is not a PEM certificate."
-		return info
-	}
-	info.Names = cert.DNSNames
-	for _, ip := range cert.IPAddresses {
-		info.Names = append(info.Names, ip.String())
-	}
-	if len(info.Names) == 0 && cert.Subject.CommonName != "" {
-		info.Names = []string{cert.Subject.CommonName}
-	}
-	info.Expires = cert.NotAfter.UTC().Format(time.DateOnly)
-	info.Expired = time.Now().After(cert.NotAfter)
-	info.SelfSigned = cert.CheckSignatureFrom(cert) == nil
-	return info
-}
-
-// patchHTTPS replaces the HTTPS card and the settings form, whose
-// certificate paths changed with it.
+// patchHTTPS replaces the HTTPS card.
 func (s *Server) patchHTTPS(w http.ResponseWriter, r *http.Request, ctx context.Context, st views.SourceStatus) {
-	sec, _ := sectionByID("https")
-	v := s.engineSectionView(ctx, sec)
-	sets, err := s.torrServer.Client().Settings(ctx)
-	if err != nil {
+	client := s.torrServer.Client()
+	sets, err := client.Settings(ctx)
+	if err != nil && st.OK {
 		st = failed(engineAsleep)
 	}
-	sse := datastar.NewSSE(w, r)
-	if err := sse.PatchElementTempl(views.HTTPSCard(s.httpsView(sets, st))); err != nil {
+	v := s.httpsView(r, sets, sslStatus(ctx, client), st)
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.HTTPSCard(v)); err != nil {
 		logSSEError(r, "patch HTTPS card", err)
+	}
+}
+
+// changeCertificate makes one certificate change through TorrServer's /ssl
+// API and shows the card with its outcome.
+func (s *Server) changeCertificate(w http.ResponseWriter, r *http.Request, change func(*torrserver.Client, context.Context) (torrserver.SSLStatus, error), done string) {
+	ctx, cancel := context.WithTimeout(r.Context(), certificateTimeout)
+	defer cancel()
+	st, err := change(s.torrServer.Client(), ctx)
+	if err != nil {
+		slog.Warn("TorrServer refused the HTTPS certificate change", "error", err)
+		s.patchHTTPS(w, r, ctx, failed("TorrServer did not accept it: %v", err))
 		return
 	}
-	if err := sse.PatchElementTempl(views.SettingsForm(v, views.SourceStatus{})); err != nil {
-		logSSEError(r, "patch HTTPS settings", err)
+	s.forgetOldUpload(st.Cert.CertFile)
+	s.patchHTTPS(w, r, ctx, succeeded(done))
+}
+
+// forgetOldUpload deletes a certificate and key Moviestracker kept for the
+// engine before MatriX.146, once TorrServer serves another pair.
+func (s *Server) forgetOldUpload(serving string) {
+	if !s.managed() {
+		return
+	}
+	old, _ := s.engine.CertificateFiles()
+	if serving == "" || filepath.Clean(serving) == old {
+		return
+	}
+	if err := s.engine.RemoveCertificate(); err != nil {
+		slog.Warn("removing the old uploaded certificate failed", "error", err)
 	}
 }
 
@@ -129,14 +153,9 @@ func readPEM(r *http.Request, field string) ([]byte, error) {
 	return io.ReadAll(io.LimitReader(f, maxPEMBytes))
 }
 
-// handleUploadCertificate makes the managed engine serve HTTPS with an
-// uploaded certificate and key.
+// handleUploadCertificate has TorrServer serve an uploaded certificate and key.
 func (s *Server) handleUploadCertificate(w http.ResponseWriter, r *http.Request) {
 	if s.adminAPI(w, r) == nil {
-		return
-	}
-	if !s.managed() {
-		http.Error(w, "Only when Moviestracker runs TorrServer.", http.StatusConflict)
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4*maxPEMBytes)
@@ -145,63 +164,76 @@ func (s *Server) handleUploadCertificate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	defer func() { _ = r.MultipartForm.RemoveAll() }()
-	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
-	defer cancel()
-
 	cert, certErr := readPEM(r, "sslCert")
 	key, keyErr := readPEM(r, "sslKey")
 	if certErr != nil || keyErr != nil {
-		s.patchHTTPS(w, r, ctx, failed("Choose both the certificate and its private key."))
+		s.patchHTTPS(w, r, r.Context(), failed("Choose both the certificate and its private key."))
 		return
 	}
-	certFile, keyFile, err := s.engine.SaveCertificate(cert, key)
-	if err != nil {
-		s.patchHTTPS(w, r, ctx, failed(certMismatch))
-		return
-	}
-	s.patchHTTPS(w, r, ctx, s.useCertificate(ctx, certFile, keyFile, "Certificate saved. TorrServer uses it once it serves HTTPS.", "Certificate saved. TorrServer restarted with it."))
+	s.changeCertificate(w, r, func(c *torrserver.Client, ctx context.Context) (torrserver.SSLStatus, error) { //nolint:revive // the method expression's order
+		return c.UploadCertificate(ctx, cert, key)
+	}, "Certificate uploaded. TorrServer serves it now.")
 }
 
-// handleRemoveCertificate goes back to TorrServer's self-signed certificate.
-func (s *Server) handleRemoveCertificate(w http.ResponseWriter, r *http.Request) {
+// handleCertificateFiles has TorrServer serve a certificate and key already
+// on its machine.
+func (s *Server) handleCertificateFiles(w http.ResponseWriter, r *http.Request) {
 	if s.adminAPI(w, r) == nil {
 		return
 	}
-	if !s.managed() {
-		http.Error(w, "Only when Moviestracker runs TorrServer.", http.StatusConflict)
+	var in struct {
+		Cert string `json:"httpsCertFile"`
+		Key  string `json:"httpsKeyFile"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)).Decode(&in); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
-	defer cancel()
-	st := s.useCertificate(ctx, "", "", "Certificate removed. TorrServer makes a self-signed one.", "Certificate removed. TorrServer restarted with a self-signed one.")
-	if st.OK {
-		if err := s.engine.RemoveCertificate(); err != nil {
-			slog.Warn("removing the HTTPS certificate failed", "error", err)
-		}
+	in.Cert, in.Key = strings.TrimSpace(in.Cert), strings.TrimSpace(in.Key)
+	if in.Cert == "" || in.Key == "" {
+		s.patchHTTPS(w, r, r.Context(), failed("Give both the certificate file and the private key file."))
+		return
 	}
-	s.patchHTTPS(w, r, ctx, st)
+	s.changeCertificate(w, r, func(c *torrserver.Client, ctx context.Context) (torrserver.SSLStatus, error) { //nolint:revive // the method expression's order
+		return c.UseCertificateFiles(ctx, in.Cert, in.Key)
+	}, "TorrServer serves the certificate from these files now.")
 }
 
-// useCertificate points TorrServer at a certificate ("" for a self-signed
-// one) and restarts the engine when it serves HTTPS, as TorrServer reads the
-// certificate when it starts. done and restarted report success either way.
-func (s *Server) useCertificate(ctx context.Context, certFile, keyFile, done, restarted string) views.SourceStatus {
-	client := s.torrServer.Client()
-	current, err := client.Settings(ctx)
+// handleSelfSignedCertificate goes back to TorrServer's self-signed certificate.
+func (s *Server) handleSelfSignedCertificate(w http.ResponseWriter, r *http.Request) {
+	if s.adminAPI(w, r) == nil {
+		return
+	}
+	s.changeCertificate(w, r, (*torrserver.Client).UseSelfSignedCertificate, "TorrServer serves its self-signed certificate now.")
+}
+
+// handleRegenerateCertificate has TorrServer make a new self-signed certificate.
+func (s *Server) handleRegenerateCertificate(w http.ResponseWriter, r *http.Request) {
+	if s.adminAPI(w, r) == nil {
+		return
+	}
+	s.changeCertificate(w, r, (*torrserver.Client).RegenerateCertificate, "New self-signed certificate made. Browsers ask to accept it again.")
+}
+
+// handleDownloadCertificate gives the certificate TorrServer serves (never
+// its key), to trust on a device.
+func (s *Server) handleDownloadCertificate(w http.ResponseWriter, r *http.Request) {
+	if s.adminAPI(w, r) == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), certificateTimeout)
+	defer cancel()
+	pem, name, err := s.torrServer.Client().Certificate(ctx)
 	if err != nil {
-		return failed(engineAsleep)
+		status := http.StatusBadGateway
+		if errors.Is(err, torrserver.ErrNoSSLAPI) {
+			status = http.StatusNotFound
+		}
+		http.Error(w, i18n.Tf(r.Context(), "TorrServer has no certificate to give: %v", err), status)
+		return
 	}
-	previous := map[string]any{"SslCert": json.RawMessage(current["SslCert"]), "SslKey": json.RawMessage(current["SslKey"])}
-	if err := client.UpdateSettings(ctx, map[string]any{"SslCert": certFile, "SslKey": keyFile}); err != nil {
-		slog.Warn("saving the HTTPS certificate settings failed", "error", err)
-		return failed("TorrServer did not accept the settings: %v", err)
-	}
-	startup := s.store.State().TorrServer.Startup
-	if !startup.HTTPS {
-		return succeeded(done)
-	}
-	if err := s.restartWithStartup(ctx, startup); err != nil {
-		return s.recoverEngine(ctx, startup, previous, err)
-	}
-	return succeeded(restarted)
+	w.Header().Set("Content-Type", "application/x-x509-ca-cert")
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filepath.Base(name)}))
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(pem)
 }

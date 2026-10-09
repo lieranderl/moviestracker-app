@@ -42,6 +42,8 @@ type systemState struct {
 	CacheSize       int64  // TorrServer's RAM cache, bytes
 	DiskCache       string // the disk cache folder, when disk caching is on
 	SegmentSeconds  int    // GStreamer HLS segment length
+	// HTTPS is TorrServer's certificate status; nil before MatriX.146.
+	HTTPS *torrserver.SSLStatus
 	// The last few minutes, oldest first: CPU and memory in %, network in B/s.
 	CPUHist, MemHist, NetDownHist, NetUpHist []float64
 }
@@ -55,6 +57,7 @@ func (s *Server) systemFetch() func(context.Context) (any, error) {
 		cacheSize int64
 		diskCache string
 		segment   = 6
+		https     *torrserver.SSLStatus
 		folderAt  time.Time
 		folder    int64
 		portAt    time.Time
@@ -77,8 +80,10 @@ func (s *Server) systemFetch() func(context.Context) (any, error) {
 				defer cancel()
 				sets, setsErr := client.Settings(ctx)
 				gst, gstErr := client.GSTSettings(ctx)
+				ssl := sslStatus(ctx, client)
 				mu.Lock()
 				defer mu.Unlock()
+				https = ssl
 				if setsErr == nil {
 					cacheSize, diskCache = sets.Int64("CacheSize"), ""
 					if sets.Bool("UseDisk") {
@@ -132,7 +137,7 @@ func (s *Server) systemFetch() func(context.Context) (any, error) {
 			netUpH.Add(sys.Net.Up)
 		}
 		return systemState{
-			System: sys, EngineElsewhere: elsewhere, DataDir: s.store.Dir(), CacheSize: cacheSize, DiskCache: diskCache, SegmentSeconds: segment,
+			System: sys, EngineElsewhere: elsewhere, DataDir: s.store.Dir(), CacheSize: cacheSize, DiskCache: diskCache, SegmentSeconds: segment, HTTPS: https,
 			CPUHist: cpuH.Values(), MemHist: memH.Values(), NetDownHist: netDownH.Values(), NetUpHist: netUpH.Values(),
 		}, nil
 	}
@@ -192,7 +197,7 @@ func (s *Server) handleDashboardStream(w http.ResponseWriter, r *http.Request) {
 		plays := liveValue[[]playback.Session](sub, topicPlays)
 		people := s.dashPeople(ctx, now)
 		played := s.dashPlayed(ctx, now, torrents.List)
-		problems, engineNote := s.dashProblems(ctx)
+		problems, notes := s.dashProblems(ctx, system, now)
 		for _, card := range []struct {
 			id string
 			c  templ.Component
@@ -205,7 +210,7 @@ func (s *Server) handleDashboardStream(w http.ResponseWriter, r *http.Request) {
 			{"system", views.DashSystemCard(dashMachine(ctx, system))},
 			{"people", views.DashPeopleCard(people)},
 			{"sources", views.DashSourcesCard(dashSources(ctx, liveValue[map[string]sources.ServiceHealth](sub, topicSources)))},
-			{"problems", views.DashProblemsCard(problems, engineNote)},
+			{"problems", views.DashProblemsCard(problems, notes)},
 			{"gstreamer", views.GStreamerCard(s.gstSetup(user, liveValue[gstinstall.Status](sub, topicGStreamer), liveValue[torrserver.EchoInfo](sub, topicEngine)), true)},
 		} {
 			if err := patch(card.id, card.c); err != nil {
@@ -421,9 +426,9 @@ func (s *Server) dashPeople(ctx context.Context, now time.Time) []views.DashPers
 // problemRows is how many recent problems the card lists.
 const problemRows = 6
 
-// dashProblems lists recent warnings and errors, and the managed engine's
-// restarts, if any.
-func (s *Server) dashProblems(ctx context.Context) ([]views.DashProblem, string) {
+// dashProblems lists recent warnings and errors, and what needs attention
+// now: the managed engine's restarts and TorrServer's HTTPS certificate.
+func (s *Server) dashProblems(ctx context.Context, sys systemState, now time.Time) ([]views.DashProblem, []string) {
 	var rows []views.DashProblem
 	if s.events != nil {
 		for _, e := range s.events.Recent() {
@@ -433,17 +438,58 @@ func (s *Server) dashProblems(ctx context.Context) ([]views.DashProblem, string)
 			rows = append(rows, views.DashProblem{Time: e.Time.Format("15:04"), Message: e.Message, Detail: e.Detail, Error: e.Level >= slog.LevelError})
 		}
 	}
-	engineNote := ""
+	var notes []string
 	if s.managed() {
 		st := s.engine.Status()
 		switch {
 		case st.State != engine.Running && st.LastError != "":
-			engineNote = i18n.Tf(ctx, "TorrServer is not running: %s", st.LastError)
+			notes = append(notes, i18n.Tf(ctx, "TorrServer is not running: %s", st.LastError))
 		case st.Restarts > 0:
-			engineNote = i18n.N(ctx, st.Restarts, "TorrServer restarted %d time since Moviestracker started.", "TorrServer restarted %d times since Moviestracker started.")
+			notes = append(notes, i18n.N(ctx, st.Restarts, "TorrServer restarted %d time since Moviestracker started.", "TorrServer restarted %d times since Moviestracker started."))
 		}
 	}
-	return rows, engineNote
+	if h := sys.HTTPS; h != nil && h.Enabled {
+		switch c := h.Cert; {
+		case c.Error != "":
+			notes = append(notes, i18n.Tf(ctx, "TorrServer cannot load its HTTPS certificate: %s", c.Error))
+		case c.Expired(now):
+			notes = append(notes, i18n.Tf(ctx, "TorrServer's HTTPS certificate expired on %s.", c.NotAfter.UTC().Format(time.DateOnly)))
+		case c.ExpiresSoon(now):
+			notes = append(notes, i18n.N(ctx, c.DaysLeft(now), "TorrServer's HTTPS certificate expires in %d day.", "TorrServer's HTTPS certificate expires in %d days."))
+		}
+	}
+	return rows, notes
+}
+
+// dashHTTPS is TorrServer's HTTPS row: its port, certificate and expiry.
+func dashHTTPS(ctx context.Context, h *torrserver.SSLStatus, now time.Time) (views.DashProc, bool) {
+	if h == nil || !h.Enabled {
+		return views.DashProc{}, false
+	}
+	c := h.Cert
+	row := views.DashProc{Name: "HTTPS", Nested: true, Known: true, Online: c.Error == "" && !c.Expired(now) && !c.NotAfter.IsZero()}
+	detail := []string{":" + h.Port}
+	if names := append(append([]string{}, c.DNSNames...), c.IPs...); len(names) > 0 {
+		detail = append(detail, names[0])
+	}
+	if c.Issuer != "" {
+		detail = append(detail, views.IssuerName(c.Issuer))
+	}
+	row.Detail = strings.Join(detail, " · ")
+	switch {
+	case c.Error != "":
+		row.Note = i18n.T(ctx, "the certificate does not load")
+	case c.NotAfter.IsZero():
+		row.Note = i18n.T(ctx, "no certificate yet")
+	default:
+		// Checked against the TorrServer machine's roots, not a browser's.
+		trust := i18n.T(ctx, "trusted by the TorrServer machine")
+		if !c.Trusted {
+			trust = i18n.T(ctx, "not trusted by the TorrServer machine")
+		}
+		row.Note = trust + " · " + i18n.Tf(ctx, "valid until %s", c.NotAfter.UTC().Format(time.DateOnly))
+	}
+	return row, true
 }
 
 // engineLocalPort is the port of a TorrServer address on this machine.
@@ -575,6 +621,9 @@ func (s *Server) dashApp(ctx context.Context, sys systemState, echoSnap live.Sna
 		gst.Note = i18n.T(ctx, "MKV files play in VLC, on TVs and in other players, not in the browser")
 	}
 	v.Procs = []views.DashProc{self, engineRow, gst}
+	if row, ok := dashHTTPS(ctx, sys.HTTPS, time.Now()); ok && engineRow.Online {
+		v.Procs = append(v.Procs, row)
+	}
 	return v
 }
 

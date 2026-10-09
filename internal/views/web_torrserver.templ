@@ -2,9 +2,11 @@ package views
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/store"
+	"github.com/lieranderl/moviestracker-app/internal/torrserver"
 )
 
 // webTorrServerSignals are the TorrServer page's signals: the address picked
@@ -167,8 +169,31 @@ templ webTorrServerStatus() {
 			for _, p := range tsProblems {
 				@tsProblem(p.Problem, p.Message)
 			}
+			<div
+				id="ts-https"
+				data-effect="tsSSL(el, $tsStatus.ok ? $tsSelected : '')"
+				data-on:ts-ssl="@post('/api/ts/https', {payload: {status: evt.detail}})"
+			>
+				<div id="ts-https-details"></div>
+			</div>
 		</div>
 	</section>
+}
+
+// WebCertificate shows, read-only, the HTTPS certificate of the TorrServer
+// the browser checked (tsSSL); nothing when it serves no HTTPS or cannot say.
+templ WebCertificate(st *torrserver.SSLStatus, now time.Time) {
+	<div id="ts-https-details">
+		if st != nil && st.Enabled {
+			<div class="pt-3 border-t border-base-content/10 space-y-3">
+				<h3 class="text-sm font-medium flex items-center gap-2">
+					@Icon("shield-check", "size-4 text-primary")
+					{ tr(ctx, "HTTPS certificate") }
+				</h3>
+				@CertificateDetails(*st, now)
+			</div>
+		}
+	</div>
 }
 
 // tsProblems explain why the browser could not reach a TorrServer, by the

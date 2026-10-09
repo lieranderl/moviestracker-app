@@ -423,3 +423,33 @@ test("a shared form batch adds valid entries and continues after a TorrServer fa
  expect(events.at(-1).failed).toEqual(["https://tracker.example/two.torrent"]);
  expect(events.at(-1).ok).toBe(false);
 });
+
+const certificateEvents = () => {
+  const el = new EventTarget();
+  const events = [];
+  el.addEventListener("ts-ssl", (evt) => events.push(evt.detail));
+  return { el, events };
+};
+
+test("the TorrServer page reads the certificate of a TorrServer serving HTTPS, once", async () => {
+  const status = { enabled: true, port: "8091", cert: { source: "user", issuer: "CN=R11,O=Let's Encrypt,C=US", trusted: true } };
+  globalThis.fetch = requests = mock(async () => new Response(JSON.stringify(status)));
+  client.tsSaveLogin(server, "admin", "secret");
+  const { el, events } = certificateEvents();
+  await client.tsSSL(el, server);
+  await client.tsSSL(el, server); // unchanged: not posted again
+  const [target, init] = requests.mock.calls[0];
+  expect(target.href).toBe("https://nas.example:8091/ssl/status");
+  expect(init.headers.Authorization).toBe(`Basic ${btoa("admin:secret")}`);
+  expect(events).toEqual([status]);
+});
+
+test("a TorrServer without HTTPS or older than MatriX.146 shows no certificate", async () => {
+  const { el, events } = certificateEvents();
+  globalThis.fetch = requests = mock(async () => new Response(JSON.stringify({ enabled: true, cert: {} })));
+  await client.tsSSL(el, server);
+  globalThis.fetch = requests = mock(async () => new Response("404 page not found", { status: 404 }));
+  await client.tsSSL(el, server);
+  await client.tsSSL(el, ""); // none picked, or it does not answer
+  expect(events).toEqual([{ enabled: true, cert: {} }, null]);
+});

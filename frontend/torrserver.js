@@ -144,6 +144,25 @@ window.tsList = async (el, url, force = false) => {
   tell(el, "ts-torrents", list.value);
 };
 
+// tsSSL reads the HTTPS certificate of the TorrServer at url (MatriX.146 or
+// later, started with --ssl) and, when it changed since el last reported it,
+// fires ts-ssl on el with TorrServer's status, or null when there is none to
+// show (no url, no HTTPS, an older TorrServer, no answer); the page posts it
+// to the server, which renders it. Like tsCheck, it fires nothing before its
+// first await.
+window.tsSSL = async (el, url) => {
+  const signal = begin(el);
+  await Promise.resolve();
+  if (signal.aborted) return;
+  const st = url ? await call(url, "ssl/status", { read: (res) => res.json(), signal }) : {};
+  if (signal.aborted) return;
+  const value = st.value?.enabled === true ? st.value : null;
+  const key = JSON.stringify(value); // the same status shows the same, whichever TorrServer
+  if (shown.get(el) === key) return;
+  shown.set(el, key);
+  tell(el, "ts-ssl", value);
+};
+
 // tsTorrentAction asks the TorrServer to drop a torrent's cache ("drop") or
 // remove it ("rem"), then lists its torrents again, unless another
 // TorrServer was picked meanwhile (the page keeps the pick in

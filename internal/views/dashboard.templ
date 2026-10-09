@@ -149,7 +149,7 @@ templ DashboardPage(user *auth.User) {
 					@DashAppCard(DashApp{})
 					@DashPeopleCard(nil)
 					@DashSourcesCard(nil)
-					@DashProblemsCard(nil, "")
+					@DashProblemsCard(nil, nil)
 				</div>
 			</div>
 		</main>
@@ -580,13 +580,14 @@ templ DashSourcesCard(rows []DashService) {
 	}
 }
 
-// DashProblemsCard shows recent warnings and errors, calm when there are none.
-templ DashProblemsCard(rows []DashProblem, engine string) {
+// DashProblemsCard shows what needs attention now (notes) and recent
+// warnings and errors, calm when there are none.
+templ DashProblemsCard(rows []DashProblem, notes []string) {
 	@dashCard("dash-problems", "triangle-alert", tr(ctx, "Problems")) {
-		if engine != "" {
-			<p class="text-sm text-warning">{ engine }</p>
+		for _, n := range notes {
+			<p class="text-sm text-warning">{ n }</p>
 		}
-		if len(rows) == 0 && engine == "" {
+		if len(rows) == 0 && len(notes) == 0 {
 			@dashEmpty("circle-check", tr(ctx, "No problems since Moviestracker started."))
 		} else if len(rows) > 0 {
 			<ul class="space-y-2">

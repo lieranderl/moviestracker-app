@@ -114,6 +114,7 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("DELETE /api/torrservers/{id}", a.handleRemoveTorrServer)
 	mux.HandleFunc("POST /api/ts/torrents", a.handleTorrents)
 	mux.HandleFunc("POST /api/ts/recent", a.handleRecentTorrents)
+	mux.HandleFunc("POST /api/ts/https", a.handleCertificate)
 	mux.HandleFunc("POST /api/ts/player", a.handlePlayer)
 	mux.HandleFunc("POST /api/ts/player-stats", a.handlePlayerStats)
 	mux.HandleFunc("POST /api/ts/files", a.handlePlayerFiles)
