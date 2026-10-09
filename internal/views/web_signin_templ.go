@@ -8,7 +8,11 @@ package views
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "github.com/lieranderl/moviestracker-app/internal/tmdb"
+import (
+	"context"
+
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+)
 
 // signInStep is one step of how the web app works, as the sign-in page tells it.
 type signInStep struct{ Title, Body string }
@@ -17,6 +21,25 @@ var signInSteps = []signInStep{
 	{Title: "Browse what is trending", Body: "Movies and series from TMDB, with IMDb ratings."},
 	{Title: "Get its sources", Body: "Torrent releases from JacRed, with their quality, size and seeders."},
 	{Title: "Add one to your TorrServer", Body: "Then watch it from your TorrServer."},
+}
+
+// homeDescription is the web app's summary in search results.
+const homeDescription = "Browse trending movies and series, find their torrent releases with quality, size and seeders, and watch them on your own TorrServer."
+
+// webAppLD describes the web app to search engines (schema.org).
+func webAppLD(ctx context.Context) map[string]any {
+	return map[string]any{
+		"@context":            "https://schema.org",
+		"@type":               "WebApplication",
+		"name":                "Moviestracker",
+		"url":                 canonicalURL(ctx, "/"),
+		"description":         tr(ctx, homeDescription),
+		"applicationCategory": "EntertainmentApplication",
+		"operatingSystem":     "Any",
+		"inLanguage":          []string{"en", "ru"},
+		"isAccessibleForFree": true,
+		"offers":              map[string]any{"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+	}
 }
 
 // maxSignInPosters fills the poster wall's four columns three rows deep.
@@ -58,7 +81,11 @@ func WebSignIn(posters []tmdb.MediaItem) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<main class=\"grow flex flex-col\">")
+			templ_7745c5c3_Err = templ.JSONScript("app-ld", webAppLD(ctx)).WithType("application/ld+json").Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <main class=\"grow flex flex-col\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -113,7 +140,7 @@ func WebSignIn(posters []tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Welcome to Moviestracker"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_signin.templ`, Line: 27, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_signin.templ`, Line: 51, Col: 89}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -126,7 +153,7 @@ func WebSignIn(posters []tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Find a film and its sources. Watch it on your own TorrServer."))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_signin.templ`, Line: 28, Col: 152}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_signin.templ`, Line: 52, Col: 152}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -144,7 +171,7 @@ func WebSignIn(posters []tmdb.MediaItem) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, s.Title))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_signin.templ`, Line: 34, Col: 61}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_signin.templ`, Line: 58, Col: 61}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -157,7 +184,7 @@ func WebSignIn(posters []tmdb.MediaItem) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, s.Body))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_signin.templ`, Line: 35, Col: 75}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_signin.templ`, Line: 59, Col: 75}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
@@ -179,7 +206,7 @@ func WebSignIn(posters []tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Sign in with Google"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_signin.templ`, Line: 43, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_signin.templ`, Line: 67, Col: 39}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -192,7 +219,7 @@ func WebSignIn(posters []tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Moviestracker does not host, upload, seed, or distribute media."))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_signin.templ`, Line: 45, Col: 122}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_signin.templ`, Line: 69, Col: 122}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -215,7 +242,7 @@ func WebSignIn(posters []tmdb.MediaItem) templ.Component {
 					var templ_7745c5c3_Var13 string
 					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(p.PosterURL())
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_signin.templ`, Line: 52, Col: 32}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_signin.templ`, Line: 76, Col: 32}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 					if templ_7745c5c3_Err != nil {
@@ -245,7 +272,7 @@ func WebSignIn(posters []tmdb.MediaItem) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = Layout(tr(ctx, "Sign in")).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = layoutWithMeta(PageMeta{Title: tr(ctx, "Find movies and series, watch them on your TorrServer"), Description: tr(ctx, homeDescription), Path: "/"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

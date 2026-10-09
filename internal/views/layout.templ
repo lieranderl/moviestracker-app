@@ -12,7 +12,7 @@ localStorage.setItem('theme', $theme || 'system')
 const redirectEffect = `if ($redirectUrl) { window.location.assign($redirectUrl) }`
 
 templ Layout(title string) {
-	@layoutWithScripts(title) {
+	@layoutWithMeta(PageMeta{Title: title}) {
 		{ children... }
 	}
 }
@@ -20,13 +20,22 @@ templ Layout(title string) {
 // layoutWithScripts renders the document shell. Page-specific module scripts
 // are passed explicitly so heavy bundles (hls.js) load only where needed.
 templ layoutWithScripts(title string, scripts ...string) {
+	@layoutWithMeta(PageMeta{Title: title, Scripts: scripts}) {
+		{ children... }
+	}
+}
+
+// layoutWithMeta renders the document shell with what search engines and
+// link previews read of the page.
+templ layoutWithMeta(meta PageMeta) {
 	<!DOCTYPE html>
 	<html lang={ pageLang(ctx) } class="scroll-smooth">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<meta name="color-scheme" content="light dark"/>
-			<title>{ title } · Moviestracker</title>
+			<title>{ meta.Title } · Moviestracker</title>
+			@pageMeta(meta)
 			<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎬</text></svg>"/>
 			<!-- Render-blocking by design: tiny, sets data-theme before first paint -->
 			<script src="/static/theme.js"></script>
@@ -34,7 +43,7 @@ templ layoutWithScripts(title string, scripts ...string) {
 			<!-- Page modules run before Datastar (modules execute in document order):
 			     its first scan calls their window helpers, and one ReferenceError
 			     there would stop the scan and leave the page inert. -->
-			for _, src := range pageScripts(ctx, scripts) {
+			for _, src := range pageScripts(ctx, meta.Scripts) {
 				<script type="module" src={ src }></script>
 			}
 			<!-- Datastar Client (v1.0.4); modules are deferred and never block rendering -->

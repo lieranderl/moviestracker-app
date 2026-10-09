@@ -12,6 +12,9 @@ import (
 // TorrServer from the browser.
 type Site struct {
 	Cloud bool
+	// BaseURL is where visitors reach the web app (https://…, no trailing
+	// slash), for its pages' canonical addresses; empty has none.
+	BaseURL string
 	// TorrServerCheck are the Datastar attributes, from the site's adapter,
 	// by which the navbar's TorrServer status learns whether it answers:
 	// they set $_tsNav to "online", "offline" or "none". Nil shows none.

@@ -100,6 +100,9 @@ func New(cfg Config) http.Handler {
 	})
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(webstatic.Files))))
 	mux.HandleFunc("GET /{$}", a.handleHome)
+	mux.HandleFunc("GET "+views.PrivacyPath, a.handlePrivacy)
+	mux.HandleFunc("GET /robots.txt", a.handleRobots)
+	mux.HandleFunc("GET /sitemap.xml", a.handleSitemap)
 	a.catalog.Register(mux, "")
 	mux.HandleFunc("GET "+signInPath, a.handleSignIn)
 	mux.HandleFunc("GET "+signInPath+"/callback", a.handleSignInCallback)
@@ -124,7 +127,7 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("POST /api/ts/settings", a.handleBrowserSettings)
 	mux.HandleFunc("POST /api/ts/settings/validate", a.handleValidateBrowserSettings)
 	mux.HandleFunc("POST /api/language", handlers.SetLanguage(a.secure(), a.saveLanguage))
-	app := http.NewCrossOriginProtection().Handler(handlers.Language(webSite(mux)))
+	app := http.NewCrossOriginProtection().Handler(handlers.Language(webSite(mux, cfg.BaseURL)))
 	return handlers.RecoveryMiddleware(handlers.SecurityHeadersMiddleware(true, handlers.LoggingMiddleware(app)))
 }
 
@@ -139,6 +142,14 @@ func (a *app) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := views.WebSignIn(a.signInPosters(r.Context())).Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "home", "error", err)
+	}
+}
+
+// handlePrivacy is the privacy policy, for everyone.
+func (a *app) handlePrivacy(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := views.WebPrivacy().Render(r.Context(), w); err != nil {
+		slog.Warn("render failed", "page", "privacy", "error", err)
 	}
 }
 
@@ -209,8 +220,6 @@ func (a *app) catalogUser(r *http.Request) *auth.User {
 	return &auth.User{Username: user.Email, Name: user.Name, Role: config.RoleViewer, Picture: user.Picture}
 }
 
-// webSite marks every page as the web app's, so shared views show its
-// navigation.
 // posterProvider is details' posters by language, when it gives them.
 func posterProvider(details tmdb.DetailsProvider) tmdb.PosterProvider {
 	posters, _ := details.(tmdb.PosterProvider)
@@ -238,8 +247,11 @@ var recentTorrents = templ.OrderedAttributes{
 	{Key: "data-on:ts-torrents", Value: "@post('/api/ts/recent', {payload: {torrents: evt.detail}})"},
 }
 
-func webSite(next http.Handler) http.Handler {
+// webSite marks every page as the web app's, served at baseURL, so shared
+// views show its navigation and canonical addresses.
+func webSite(next http.Handler, baseURL string) http.Handler {
+	site := views.Site{Cloud: true, BaseURL: baseURL, TorrServerCheck: torrServerCheck, RecentTorrents: recentTorrents}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		next.ServeHTTP(w, r.WithContext(views.WithSite(r.Context(), views.Site{Cloud: true, TorrServerCheck: torrServerCheck, RecentTorrents: recentTorrents})))
+		next.ServeHTTP(w, r.WithContext(views.WithSite(r.Context(), site)))
 	})
 }

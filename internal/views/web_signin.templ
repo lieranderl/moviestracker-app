@@ -1,6 +1,10 @@
 package views
 
-import "github.com/lieranderl/moviestracker-app/internal/tmdb"
+import (
+	"context"
+
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+)
 
 // signInStep is one step of how the web app works, as the sign-in page tells it.
 type signInStep struct{ Title, Body string }
@@ -11,6 +15,25 @@ var signInSteps = []signInStep{
 	{Title: "Add one to your TorrServer", Body: "Then watch it from your TorrServer."},
 }
 
+// homeDescription is the web app's summary in search results.
+const homeDescription = "Browse trending movies and series, find their torrent releases with quality, size and seeders, and watch them on your own TorrServer."
+
+// webAppLD describes the web app to search engines (schema.org).
+func webAppLD(ctx context.Context) map[string]any {
+	return map[string]any{
+		"@context":            "https://schema.org",
+		"@type":               "WebApplication",
+		"name":                "Moviestracker",
+		"url":                 canonicalURL(ctx, "/"),
+		"description":         tr(ctx, homeDescription),
+		"applicationCategory": "EntertainmentApplication",
+		"operatingSystem":     "Any",
+		"inLanguage":          []string{"en", "ru"},
+		"isAccessibleForFree": true,
+		"offers":              map[string]any{"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+	}
+}
+
 // maxSignInPosters fills the poster wall's four columns three rows deep.
 const maxSignInPosters = 12
 
@@ -18,7 +41,8 @@ const maxSignInPosters = 12
 // Google account can sign in. Posters are this week's trending titles, shown
 // beside the steps on wide screens; without them the steps stand alone.
 templ WebSignIn(posters []tmdb.MediaItem) {
-	@Layout(tr(ctx, "Sign in")) {
+	@layoutWithMeta(PageMeta{Title: tr(ctx, "Find movies and series, watch them on your TorrServer"), Description: tr(ctx, homeDescription), Path: "/"}) {
+		@templ.JSONScript("app-ld", webAppLD(ctx)).WithType("application/ld+json")
 		<main class="grow flex flex-col">
 			@authTopBar("/")
 			<div class={ "grow w-full max-w-7xl mx-auto px-4 sm:px-8 py-10 lg:py-16 grid gap-12 items-center", templ.KV("lg:grid-cols-2", len(posters) > 0) }>
