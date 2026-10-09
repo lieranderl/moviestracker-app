@@ -80,7 +80,7 @@ func (s *Server) systemFetch() func(context.Context) (any, error) {
 				defer cancel()
 				sets, setsErr := client.Settings(ctx)
 				gst, gstErr := client.GSTSettings(ctx)
-				ssl := sslStatus(ctx, client)
+				ssl := s.shownSSL(sslStatus(ctx, client))
 				mu.Lock()
 				defer mu.Unlock()
 				https = ssl
@@ -468,7 +468,10 @@ func dashHTTPS(ctx context.Context, h *torrserver.SSLStatus, now time.Time) (vie
 	}
 	c := h.Cert
 	row := views.DashProc{Name: "HTTPS", Nested: true, Known: true, Online: c.Error == "" && !c.Expired(now) && !c.NotAfter.IsZero()}
-	detail := []string{":" + h.Port}
+	var detail []string
+	if h.Port != "" {
+		detail = append(detail, ":"+h.Port)
+	}
 	if names := append(append([]string{}, c.DNSNames...), c.IPs...); len(names) > 0 {
 		detail = append(detail, names[0])
 	}

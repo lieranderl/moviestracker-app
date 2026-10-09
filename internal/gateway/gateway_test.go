@@ -191,6 +191,8 @@ func TestAppsPlayAddAndRemoveButCannotStopOrReconfigureTorrServer(t *testing.T) 
 		{http.MethodPost, "/settings", `{"action":"get"}`},
 		{http.MethodGet, "/gst/settings", ""},
 		{http.MethodGet, "/playlistall/all.m3u", ""},
+		{http.MethodGet, "/ssl/status", ""},
+		{http.MethodGet, "/ssl/cert", ""},
 	}
 	for _, tc := range allowed {
 		if rec := s.ask(t, tc.method, tc.target, tc.body, user, password, tv); rec.Code != http.StatusOK {
@@ -208,6 +210,12 @@ func TestAppsPlayAddAndRemoveButCannotStopOrReconfigureTorrServer(t *testing.T) 
 		{http.MethodPost, "/gst/settings", `{}`},
 		{http.MethodPost, "/waf", `{}`},
 		{http.MethodPost, "/torznab/test", `{}`},
+		// MatriX.146's certificate API: the certificate is Moviestracker's too.
+		{http.MethodPost, "/ssl/upload", "cert"},
+		{http.MethodPost, "/ssl/paths", `{"cert":"/etc/ssl/a.pem","key":"/etc/ssl/a.key"}`},
+		{http.MethodPost, "/ssl/selfsigned", ""},
+		{http.MethodPost, "/ssl/regenerate", ""},
+		{http.MethodDelete, "/ssl/anything", ""},
 		{http.MethodPost, "/torrents", `{"action":"list","pad":"` + strings.Repeat("x", 1<<20) + `"}`},
 	}
 	before := len(s.engine.asked())
@@ -299,9 +307,13 @@ func TestOnlyTheHomeNetworkGetsInUnlessTheInternetIsAllowed(t *testing.T) {
 	if err := s.store.Update(func(st *config.State) error { st.Gateway.Internet = true; return nil }); err != nil {
 		t.Fatal(err)
 	}
+	// Logins never cross the internet unencrypted: HTTPS only from there.
 	for _, remote := range internet {
-		if rec := s.ask(t, http.MethodGet, "/echo", "", user, password, remote); rec.Code != http.StatusOK {
-			t.Errorf("from %s with the internet allowed: %d", remote, rec.Code)
+		if rec := s.ask(t, http.MethodGet, "/echo", "", user, password, remote); rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "HTTPS") {
+			t.Errorf("from %s over plain HTTP with the internet allowed: %d %q, want 403 asking for HTTPS", remote, rec.Code, rec.Body.String())
+		}
+		if rec := s.ask(t, http.MethodGet, "https://nas.example:8091/echo", "", user, password, remote); rec.Code != http.StatusOK {
+			t.Errorf("from %s over HTTPS with the internet allowed: %d", remote, rec.Code)
 		}
 	}
 }
@@ -314,11 +326,11 @@ func TestGuessingLoginsIsCutShort(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := range 10 {
-		if rec := s.ask(t, http.MethodGet, "/echo", "", user, fmt.Sprintf("guess-%d", i), guesser); rec.Code != http.StatusUnauthorized {
+		if rec := s.ask(t, http.MethodGet, "https://nas.example:8091/echo", "", user, fmt.Sprintf("guess-%d", i), guesser); rec.Code != http.StatusUnauthorized {
 			t.Fatalf("guess %d: %d, want 401", i, rec.Code)
 		}
 	}
-	if rec := s.ask(t, http.MethodGet, "/echo", "", user, password, guesser); rec.Code != http.StatusTooManyRequests {
+	if rec := s.ask(t, http.MethodGet, "https://nas.example:8091/echo", "", user, password, guesser); rec.Code != http.StatusTooManyRequests {
 		t.Errorf("after 10 wrong logins the right one = %d, want 429 until the minute is over", rec.Code)
 	}
 	if rec := s.ask(t, http.MethodGet, "/echo", "", user, password, tv); rec.Code != http.StatusOK {

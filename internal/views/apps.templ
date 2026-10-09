@@ -14,6 +14,14 @@ type AppsView struct {
 	On, Internet bool
 	// Address is where apps reach TorrServer: this machine on the gateway's port.
 	Address string
+	// HTTPSAddress is the same over HTTPS, with TorrServer's certificate; ""
+	// while TorrServer serves no HTTPS this machine can serve too.
+	HTTPSAddress string
+	// HTTPSProblem says why the gateway's HTTPS port did not open.
+	HTTPSProblem string
+	// CertificateElsewhere: TorrServer serves HTTPS, but its certificate
+	// files are on another machine, so the gateway cannot serve them.
+	CertificateElsewhere bool
 	// Problem says why the gateway is on but its port did not open.
 	Problem string
 	Logins  []AppLogin
@@ -80,15 +88,31 @@ templ AppsSwitch(v AppsView, st SourceStatus) {
 				<span>
 					<span class="block text-sm font-semibold">{ tr(ctx, "Also allow from the internet") }</span>
 					<span class="block text-sm text-base-content/70">
-						{ tr(ctx, "Off, only devices on your home network (and your Tailscale network) get in. On, anyone who reaches this machine can try — logins travel unencrypted, and your internet connection streams to them. For access away from home, a VPN such as Tailscale or WireGuard is the safer way.") }
+						{ tr(ctx, "Off, only devices on your home network (and your Tailscale network) get in. On, anyone who reaches this machine can try, over HTTPS only, so logins never cross the internet unencrypted; your internet connection streams to them. For access away from home, a VPN such as Tailscale or WireGuard is the safer way.") }
 					</span>
 				</span>
 			</label>
 		</form>
 		if v.On {
 			<div class="rounded-box bg-base-100 border border-base-content/10 p-4 space-y-2">
-				<p class="text-sm">{ tr(ctx, "In the app, add this TorrServer address, then sign in with the app's login:") }</p>
-				@copyable(tr(ctx, "Address"), v.Address)
+				<p class="text-sm">{ tr(ctx, "In the app, add one of these TorrServer addresses, then sign in with the app's login:") }</p>
+				@copyable(tr(ctx, "HTTP address"), v.Address)
+				if v.HTTPSAddress != "" {
+					@copyable(tr(ctx, "HTTPS address"), v.HTTPSAddress)
+					<p class="text-xs text-base-content/70">{ tr(ctx, "HTTPS uses TorrServer's certificate. Apps may refuse a self-signed one: use plain HTTP at home for them, or a certificate of your own.") }</p>
+				} else if v.CertificateElsewhere {
+					<p class="text-xs text-base-content/70">{ tr(ctx, "TorrServer's certificate files are on another machine, so apps get HTTP here. Use TorrServer's own HTTPS address, or keep the files where this machine can read them at the same paths.") }</p>
+				} else if v.HTTPSProblem != "" {
+					<div role="alert" class="alert alert-soft alert-warning text-sm py-2.5">
+						@Icon("triangle-alert", "size-4")
+						<span>{ tr(ctx, v.HTTPSProblem) }</span>
+					</div>
+				} else {
+					<p class="text-xs text-base-content/70">
+						{ tr(ctx, "For an HTTPS address too, turn on Serve HTTPS in") }
+						<a href="/settings/https" class="link link-primary">{ tr(ctx, "Settings → HTTPS") }</a>.
+					</p>
+				}
 			</div>
 		}
 		if v.Problem != "" {

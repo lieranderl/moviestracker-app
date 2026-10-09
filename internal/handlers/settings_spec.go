@@ -40,6 +40,9 @@ type settingField struct {
 	Choices []choice
 	// Startup marks a command-line-only option of the managed engine.
 	Startup bool
+	// External marks a setting only a TorrServer Moviestracker does not run
+	// shows: Moviestracker sets it for the engine it runs.
+	External bool
 	// AtStart marks a setting TorrServer reads only when it starts, so the
 	// managed engine restarts when it changes while it serves HTTPS.
 	AtStart bool
@@ -128,11 +131,10 @@ var engineSections = []settingsSection{
 	},
 	{
 		ID: "https", Title: "HTTPS", Icon: "lock",
-		Intro: "HTTPS lets browsers on other devices, and the Moviestracker web app, reach TorrServer. TorrServer serves it only when started with --ssl.",
+		Intro: "TorrServer's HTTPS certificate. Other devices and the Moviestracker web app use it through Other apps, which also serves HTTPS. TorrServer serves it only when started with --ssl.",
 		Fields: []settingField{
 			{Key: "HTTPS", Label: "Serve HTTPS", Kind: kindBool, Startup: true, Help: "Without a certificate of your own, TorrServer makes a self-signed one, which each browser asks you to accept once."},
-			{Key: "Reachable", Label: "Reachable from other devices", Kind: kindBool, Startup: true, Help: "Listens on every network, not only this computer, behind TorrServer's login. Needs HTTPS; other devices should use the HTTPS address, as the plain HTTP port opens too."},
-			{Key: "SslPort", Label: "HTTPS port", Kind: kindInt, Min: 0, Max: 65535, Scale: 1, AtStart: true, Help: "0 uses TorrServer's default, 8091."},
+			{Key: "SslPort", Label: "HTTPS port", Kind: kindInt, Min: 0, Max: 65535, Scale: 1, AtStart: true, External: true, Help: "0 uses TorrServer's default, 8091."},
 			{Key: "SslCert", Label: "Certificate file", Kind: kindText, AtStart: true, Check: optionalAbsolutePath, Help: "Full path, on the TorrServer machine, to a PEM certificate with its chain. Empty: TorrServer makes a self-signed one."},
 			{Key: "SslKey", Label: "Private key file", Kind: kindText, AtStart: true, Check: optionalAbsolutePath, Help: "Full path, on the TorrServer machine, to the certificate's PEM private key."},
 		},

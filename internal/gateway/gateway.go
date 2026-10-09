@@ -120,6 +120,11 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Moviestracker lets apps in from the home network only (Settings → Other apps).", http.StatusForbidden)
 		return
 	}
+	// From the internet, logins and streams cross it encrypted only.
+	if !atHome(addr) && r.TLS == nil {
+		http.Error(w, "From the internet, use TorrServer's HTTPS address (Settings → Other apps).", http.StatusForbidden)
+		return
+	}
 	if isPreflight(r) {
 		allowPreflight(w, r)
 		return
@@ -196,6 +201,10 @@ func refused(r *http.Request) string {
 		return "Moviestracker runs TorrServer: apps cannot stop it."
 	case r.Method == http.MethodGet || r.Method == http.MethodHead:
 		return ""
+	case p == "/ssl" || strings.HasPrefix(p, "/ssl/"):
+		// MatriX.146's certificate API: reading it is fine, changing it is
+		// Settings → HTTPS's.
+		return managedByMoviestracker
 	}
 	switch p {
 	case "/settings":

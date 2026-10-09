@@ -83,8 +83,9 @@ LABEL org.opencontainers.image.title="Moviestracker" \
 # the container's own address is not one TVs can reach (set the host's).
 ENV MT_LISTEN=:8095 MT_DATA_DIR=/data MT_LAN_ADDRESS=off HOME=/data
 VOLUME /data
-# 8090: TorrServer for other apps, when switched on in Settings → Other apps.
-EXPOSE 8095 8090
+# 8090 (HTTP) and 8091 (HTTPS): TorrServer for other apps, when switched on
+# in Settings → Other apps.
+EXPOSE 8095 8090 8091
 USER 1000:1000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --start-interval=2s --retries=3 \
   CMD ["/usr/local/bin/moviestracker", "--health"]

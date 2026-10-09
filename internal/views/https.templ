@@ -7,15 +7,12 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
 )
 
-// HTTPSView is TorrServer's HTTPS: for the engine Moviestracker runs, its
-// addresses and login; for any TorrServer, its certificate.
+// HTTPSView is TorrServer's HTTPS: for the engine Moviestracker runs,
+// whether it serves it; for any TorrServer, its certificate.
 type HTTPSView struct {
-	// Managed: Moviestracker runs TorrServer, so it knows its addresses.
-	Managed            bool
-	Serving, Reachable bool
-	Addresses          []string
-	// User and Password are TorrServer's login, given when other devices reach it.
-	User, Password string
+	// Managed: Moviestracker runs TorrServer, on this computer only.
+	Managed bool
+	Serving bool
 	// SSL is TorrServer's certificate API answer; nil when it predates MatriX.146.
 	SSL *torrserver.SSLStatus
 	Now time.Time
@@ -34,24 +31,12 @@ templ HTTPSCard(v HTTPSView) {
 				{ tr(ctx, "Certificate and addresses") }
 			</h2>
 			if v.Managed {
-				if v.Serving {
-					<div class="space-y-1.5">
-						<p class="text-sm text-base-content/70">{ tr(ctx, "TorrServer's HTTPS address:") }</p>
-						<ul class="flex flex-wrap gap-2">
-							for _, a := range v.Addresses {
-								<li><code class="badge badge-ghost font-mono">{ a }</code></li>
-							}
-						</ul>
-					</div>
-					if v.Reachable && v.User != "" {
-						<p class="text-sm text-base-content/70">
-							{ tr(ctx, "Sign in on other devices, and in the web app's TorrServer login, as") }
-							<code class="badge badge-ghost font-mono">{ v.User }</code>
-							{ tr(ctx, "with the password") }
-							<code class="badge badge-ghost font-mono select-all">{ v.Password }</code>
-						</p>
-					}
-				} else {
+				<p class="text-sm text-base-content/70">
+					{ tr(ctx, "TorrServer listens on this computer only. Other devices and the web app reach it through") }
+					<a href="/settings/apps" class="link link-primary">{ tr(ctx, "Other apps") }</a>
+					{ tr(ctx, "with logins of their own, over HTTP or HTTPS with this certificate.") }
+				</p>
+				if !v.Serving {
 					<p class="text-sm text-base-content/70">{ tr(ctx, "Turn on Serve HTTPS below to use the certificate.") }</p>
 				}
 			}

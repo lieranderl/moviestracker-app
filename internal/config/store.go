@@ -132,7 +132,9 @@ type EngineStartup struct {
 	MaxSize     int64  `json:"maxSize,omitempty"`
 	TorrentsDir string `json:"torrentsDir,omitempty"`
 	HTTPS       bool   `json:"https,omitempty"`
-	Reachable   bool   `json:"reachable,omitempty"`
+	// Reachable is read only to move an install that opened TorrServer to
+	// other devices to Other apps (the gateway), its only way in now.
+	Reachable bool `json:"reachable,omitempty"`
 }
 
 // Store is the state file of one data directory. It is safe for concurrent use.

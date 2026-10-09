@@ -71,7 +71,9 @@ type Server struct {
 	setupCode       string                 // lets another device create the first admin
 	titles          titleLookups           // torrents whose titles were looked up on TMDB
 	appsPort        *gateway.Port          // other apps' door to TorrServer; nil without one
+	appsTLSPort     *gateway.Port          // the same door over HTTPS; nil without one
 	appsProblem     atomic.Pointer[string] // why the apps port did not open at startup
+	appsTLSProblem  atomic.Pointer[string] // why the apps HTTPS port did not open
 }
 
 // NewServer initializes all HTTP routes and returns the configured Server.
@@ -112,7 +114,9 @@ func NewServer(cfg Config) (*Server, error) {
 		updates:         cfg.Updates,
 		setupCode:       normalizeSetupCode(cfg.SetupCode),
 		appsPort:        cfg.AppsPort,
+		appsTLSPort:     cfg.AppsTLSPort,
 	}
+	s.letReachableDevicesInThroughApps()
 	s.openAppsPort()
 	signer, err := linkSigner(cfg.Store)
 	if err != nil {

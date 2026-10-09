@@ -27,7 +27,8 @@ are in scope:
   DNS rebinding, XSS, including through titles or file names from TMDB,
   JacRed or torrents);
 - reaching TorrServer or other machines through Moviestracker in ways the
-  app does not offer, including through the port for other apps (8090):
+  app does not offer, including through the ports for other apps (8090 and
+  8091):
   more than playing, adding and removing torrents, or getting in from outside
   the home network while that is not allowed;
 - stream links that reach more than the one file they were made for;
@@ -49,11 +50,12 @@ TorrServer, GStreamer or JacRed themselves (please report those upstream).
   refused to stop DNS rebinding.
 - A managed TorrServer listens only on `127.0.0.1` behind a generated
   password; pages and playlists never contain its address.
-- The port for other apps (Settings → Other apps) is shut until an
-  administrator opens it. Each app has its own login (a bcrypt hash is kept),
-  apps cannot stop TorrServer or change its settings, only the home network
-  gets in unless the internet is allowed, and ten wrong logins lock an
-  address out for a minute.
+- The ports for other apps (Settings → Other apps, HTTP 8090 and HTTPS
+  8091) are shut until an administrator opens them. Each app has its own
+  login (a bcrypt hash is kept), apps cannot stop TorrServer or change its
+  settings, only the home network gets in unless the internet is allowed,
+  the internet gets in over HTTPS only, and ten wrong logins lock an address
+  out for a minute.
 - Links for external players are signed, expire after 7 days, reach only one
   file, and can all be cancelled at once in Settings → Security.
 - Keys are never sent to the browser; the settings file is readable only by

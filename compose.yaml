@@ -14,8 +14,10 @@ services:
     ports:
       - "8095:8095"
       # TorrServer for TorrServe, Lampa and other TorrServer apps, once it is
-      # switched on in Settings → Other apps.
+      # switched on in Settings → Other apps: HTTP, and HTTPS with
+      # TorrServer's certificate (Settings → HTTPS).
       # - "8090:8090"
+      # - "8091:8091"
     volumes:
       # Accounts, settings, TorrServer's database and settings. A folder of
       # your own works too (./moviestracker:/data): it must belong to uid 1000,

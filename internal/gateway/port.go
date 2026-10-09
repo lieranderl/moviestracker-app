@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -15,6 +16,10 @@ import (
 type Port struct {
 	addr    string
 	handler http.Handler
+	// getCert, when set, makes the port serve HTTPS with its certificates.
+	getCert func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+	// setting is the environment variable that moves the port.
+	setting string
 
 	mu     sync.Mutex
 	server *http.Server
@@ -24,7 +29,14 @@ type Port struct {
 // NewPort returns the shut port addr (host:port) that serves handler once
 // opened.
 func NewPort(addr string, handler http.Handler) *Port {
-	return &Port{addr: addr, handler: handler}
+	return &Port{addr: addr, handler: handler, setting: "MT_TORRSERVER_LISTEN"}
+}
+
+// WithTLS makes the port serve HTTPS only, with the certificates getCert
+// gives (Certificates.Get).
+func (p *Port) WithTLS(getCert func(*tls.ClientHelloInfo) (*tls.Certificate, error)) *Port {
+	p.getCert, p.setting = getCert, "MT_TORRSERVER_TLS_LISTEN"
+	return p
 }
 
 // Open starts listening; an open port stays open.
@@ -37,12 +49,16 @@ func (p *Port) Open() error {
 	ln, err := net.Listen("tcp", p.addr)
 	if err != nil {
 		if inUse(err) {
-			return fmt.Errorf("another program already uses port %s (a TorrServer of its own?): stop it, or set MT_TORRSERVER_LISTEN", portOf(p.addr))
+			return fmt.Errorf("another program already uses port %s (a TorrServer of its own?): stop it, or set %s", portOf(p.addr), p.setting)
 		}
 		return fmt.Errorf("open port %s: %w", portOf(p.addr), err)
 	}
 	// No write timeout: streams last as long as the film.
 	server := &http.Server{Handler: p.handler, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 120 * time.Second, MaxHeaderBytes: 1 << 20}
+	if p.getCert != nil {
+		server.TLSConfig = &tls.Config{GetCertificate: p.getCert, MinVersion: tls.VersionTLS12}
+		ln = tls.NewListener(ln, server.TLSConfig)
+	}
 	p.server, p.ln = server, ln
 	go func() { _ = server.Serve(ln) }()
 	return nil
