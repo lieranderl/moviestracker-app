@@ -1,0 +1,59 @@
+package views
+
+import "context"
+
+// PageMeta is what a page tells search engines and link previews about
+// itself.
+type PageMeta struct {
+	Title string
+	// Description is the page's summary in search results; empty leaves it
+	// to the search engine.
+	Description string
+	// Path is the page's canonical path on the web app ("/privacy"); empty
+	// for pages that only signed-in users see, which search engines do not
+	// index.
+	Path string
+	// Scripts are the page's module scripts.
+	Scripts []string
+}
+
+// canonicalURL is the page's address on the web app, or "" when it has
+// none: a private page, or the local app.
+func canonicalURL(ctx context.Context, path string) string {
+	base := siteOf(ctx).BaseURL
+	if path == "" || base == "" {
+		return ""
+	}
+	return base + path
+}
+
+// ogLocale is the page language as Open Graph names it.
+func ogLocale(ctx context.Context) string {
+	if pageLang(ctx) == "ru" {
+		return "ru_RU"
+	}
+	return "en_US"
+}
+
+// pageMeta are the head's description, canonical address and link preview.
+// Only the web app's public pages are indexed: the others, and the local
+// app's, ask search engines to leave them out.
+templ pageMeta(meta PageMeta) {
+	if meta.Description != "" {
+		<meta name="description" content={ meta.Description }/>
+	}
+	if u := canonicalURL(ctx, meta.Path); u != "" {
+		<link rel="canonical" href={ templ.SafeURL(u) }/>
+		<meta property="og:type" content="website"/>
+		<meta property="og:site_name" content="Moviestracker"/>
+		<meta property="og:title" content={ meta.Title }/>
+		if meta.Description != "" {
+			<meta property="og:description" content={ meta.Description }/>
+		}
+		<meta property="og:url" content={ u }/>
+		<meta property="og:locale" content={ ogLocale(ctx) }/>
+		<meta name="twitter:card" content="summary"/>
+	} else {
+		<meta name="robots" content="noindex, nofollow"/>
+	}
+}

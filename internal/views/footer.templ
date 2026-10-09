@@ -32,6 +32,9 @@ templ footer(showVersion bool) {
 			<p class="text-xs leading-relaxed">
 				{ tr(ctx, "A free, non-commercial personal catalog. Moviestracker does not host, upload, seed or distribute media.") }
 			</p>
+			if IsCloud(ctx) {
+				<a href={ templ.SafeURL(PrivacyPath) } class="link link-hover text-xs">{ tr(ctx, "Privacy policy") }</a>
+			}
 		</aside>
 		<nav aria-label={ tr(ctx, "Data sources") }>
 			<h2 class="footer-title">{ tr(ctx, "Data sources") }</h2>

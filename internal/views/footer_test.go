@@ -43,3 +43,11 @@ func TestEveryPageOffersTheSourceCodeUnderTheAGPL(t *testing.T) {
 		}
 	}
 }
+
+// Only the web app's public pages belong in search results; a signed-in
+// user's pages, and the self-hosted app's, ask search engines to stay away.
+func TestPrivatePagesAreKeptOutOfSearchResults(t *testing.T) {
+	if out := render(t, views.Movies(testUser, nil, nil, nil, true)); !strings.Contains(out, `<meta name="robots" content="noindex, nofollow">`) {
+		t.Error("the catalog page lets search engines index it")
+	}
+}

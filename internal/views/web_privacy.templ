@@ -1,0 +1,108 @@
+package views
+
+// PrivacyPath is where the web app's privacy policy is.
+const PrivacyPath = "/privacy"
+
+// privacyUpdated is when the privacy policy last changed; change it with
+// the policy.
+const privacyUpdated = "9 October 2026"
+
+// issuesURL is where visitors ask about their data.
+const issuesURL = SourceURL + "/issues"
+
+// googleConnectionsURL is where a Google account holder removes an app's
+// access to their account.
+const googleConnectionsURL = "https://myaccount.google.com/connections"
+
+// privacyCookie is one of the web app's cookies, as the policy lists it.
+type privacyCookie struct{ Name, Purpose, Lifetime string }
+
+var privacyCookies = []privacyCookie{
+	{Name: "mt_session", Purpose: "Keeps you signed in. Signed, so it cannot be forged.", Lifetime: "30 days"},
+	{Name: "mt_signin", Purpose: "Protects one sign-in with Google from forgery.", Lifetime: "10 minutes"},
+	{Name: "mt_lang", Purpose: "Remembers the interface language you picked.", Lifetime: "1 year"},
+}
+
+// WebPrivacy is the cloud web app's privacy policy, public to everyone.
+templ WebPrivacy() {
+	@layoutWithMeta(PageMeta{Title: tr(ctx, "Privacy policy"), Description: tr(ctx, "What Moviestracker keeps about you, why, and how to have it removed."), Path: PrivacyPath}) {
+		<main class="grow flex flex-col">
+			@authTopBar("/")
+			<article class="grow w-full max-w-3xl mx-auto px-4 sm:px-8 py-10 space-y-8">
+				<header class="space-y-2">
+					<h1 class="text-4xl font-black tracking-tight">{ tr(ctx, "Privacy policy") }</h1>
+					<p class="text-sm text-base-content/70">{ trf(ctx, "Last updated: %s", tr(ctx, privacyUpdated)) }</p>
+				</header>
+				<p>{ tr(ctx, "Moviestracker is a free, non-commercial and open-source catalog of movies and series. It keeps as little about you as it can, never sells it and shows no ads.") }</p>
+				@privacySection(tr(ctx, "What we keep")) {
+					<p>{ tr(ctx, "When you sign in with Google, Google tells us your Google account ID, email address, name and profile picture. Your name, email address and picture stay in your session cookie; we do not store them.") }</p>
+					<p>{ tr(ctx, "Under your Google account ID we store, in Google Cloud Firestore:") }</p>
+					<ul class="list-disc ps-6 space-y-1">
+						<li>{ tr(ctx, "your favourites: each title, its poster and when you added it;") }</li>
+						<li>{ tr(ctx, "the names and addresses of the TorrServers you add;") }</li>
+						<li>{ tr(ctx, "the interface language you picked.") }</li>
+					</ul>
+				}
+				@privacySection(tr(ctx, "What stays in your browser")) {
+					<p>{ tr(ctx, "Your browser talks to your TorrServer directly; our server never connects to it. TorrServer usernames and passwords stay in your browser and are never sent to us.") }</p>
+					<p>{ tr(ctx, "Your browser also keeps the TorrServer you last picked, your theme and your subtitle and audio languages in its local storage. When a page shows your TorrServer's torrents or settings, your browser sends them to us only to draw that page; we do not keep them.") }</p>
+				}
+				@privacySection(tr(ctx, "Cookies")) {
+					<p>{ tr(ctx, "We use only the cookies the app needs to work. There are no advertising or analytics cookies and no trackers.") }</p>
+					<div class="overflow-x-auto">
+						<table class="table table-sm">
+							<thead>
+								<tr>
+									<th>{ tr(ctx, "Cookie") }</th>
+									<th>{ tr(ctx, "Purpose") }</th>
+									<th>{ tr(ctx, "Lifetime") }</th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, c := range privacyCookies {
+									<tr>
+										<td><code>{ c.Name }</code></td>
+										<td>{ tr(ctx, c.Purpose) }</td>
+										<td class="whitespace-nowrap">{ tr(ctx, c.Lifetime) }</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				}
+				@privacySection(tr(ctx, "Services we rely on")) {
+					<ul class="list-disc ps-6 space-y-1">
+						<li>{ tr(ctx, "Google signs you in, and Google Cloud runs the app and stores your data. Its request logs record your IP address, browser and the pages you open, to keep the app secure and working.") }</li>
+						<li>{ tr(ctx, "TMDB provides the catalog. Your browser loads posters and pictures from TMDB, which sees your IP address.") }</li>
+						<li>{ tr(ctx, "Trailers play from YouTube in its privacy-enhanced mode, only when you start one.") }</li>
+						<li>{ tr(ctx, "Our server searches JacRed for a title's releases; JacRed does not learn who you are.") }</li>
+					</ul>
+				}
+				@privacySection(tr(ctx, "Your choices")) {
+					<p>{ tr(ctx, "You can remove favourites and TorrServers at any time, and signing out deletes your session cookie. You can also remove Moviestracker's access to your Google account:") }</p>
+					<p>
+						<a href={ templ.SafeURL(googleConnectionsURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">{ tr(ctx, "Google account connections") }</a>
+					</p>
+					<p>{ tr(ctx, "To have everything we keep about you deleted, or to ask anything about your data, contact us. We delete it within 30 days.") }</p>
+				}
+				@privacySection(tr(ctx, "Contact")) {
+					<p>
+						{ tr(ctx, "Ask on the project's issue tracker:") }
+						<a href={ templ.SafeURL(issuesURL) } target="_blank" rel="noopener noreferrer" class="link link-primary break-all">{ issuesURL }</a>
+					</p>
+				}
+				@privacySection(tr(ctx, "Changes")) {
+					<p>{ tr(ctx, "When this policy changes, this page shows the new version and its date.") }</p>
+				}
+			</article>
+			@footer(false)
+		</main>
+	}
+}
+
+templ privacySection(title string) {
+	<section class="space-y-3">
+		<h2 class="text-2xl font-bold tracking-tight">{ title }</h2>
+		{ children... }
+	</section>
+}
