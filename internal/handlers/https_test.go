@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"html"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/lieranderl/moviestracker-app/internal/engine"
 	"github.com/lieranderl/moviestracker-app/internal/engine/enginetest"
+	"github.com/lieranderl/moviestracker-app/internal/gateway"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
 )
 
@@ -290,5 +292,27 @@ func TestAnHTTPSSettingTorrServerCannotStartWithIsUndone(t *testing.T) {
 	}
 	if o := sup.Options(); !o.HTTPS || !l.store.State().TorrServer.Startup.HTTPS {
 		t.Errorf("HTTPS was not kept as it was: %+v", o)
+	}
+}
+
+func TestTheHTTPSModeNamesThePortsOtherDevicesUse(t *testing.T) {
+	opt, _ := withEngine(t)
+	var port, tlsPort *gateway.Port
+	l := newLocal(t, withAdmin(t), opt, withAppsPorts(t, "127.0.0.1:0", &port, &tlsPort))
+	admin := l.admin(t)
+	l.action(t, "/api/settings/sources/torrserver", `{"torrserverMode":"managed"}`, admin)
+	l.action(t, "/api/settings/engine/https", `{"https":{"HTTPS":true}}`, admin)
+
+	// Other apps off: nothing but this computer reaches TorrServer.
+	if page := httpsPage(t, l, admin); strings.Contains(page, "HTTPS on port") {
+		t.Errorf("with Other apps off the card names TorrServer's own loopback ports")
+	}
+
+	l.action(t, "/api/settings/apps", `{"appsOn":true,"appsInternet":false}`, admin)
+	_, httpPort, _ := net.SplitHostPort(port.Addr())
+	_, httpsPort, _ := net.SplitHostPort(tlsPort.Addr())
+	want := "HTTPS on port " + httpsPort + ", HTTP on port " + httpPort
+	if page := httpsPage(t, l, admin); !strings.Contains(page, want) {
+		t.Errorf("the card does not say %q", want)
 	}
 }

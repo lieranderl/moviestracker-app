@@ -97,7 +97,7 @@ func (s *Server) engineSectionView(ctx context.Context, r *http.Request, sec set
 		v.Values[f.Key] = shownValue(sets, f)
 	}
 	if sec.ID == "https" {
-		ssl := sslStatus(ctx, s.torrServer.Client())
+		ssl := s.shownSSL(sslStatus(ctx, s.torrServer.Client()))
 		v.Header = views.HTTPSCard(s.httpsView(r, ssl, views.SourceStatus{}))
 		if ssl != nil {
 			// The card sets these, with TorrServer checking the pair first.

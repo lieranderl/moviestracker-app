@@ -50,6 +50,21 @@ func sslStatus(ctx context.Context, client *torrserver.Client) *torrserver.SSLSt
 	return &st
 }
 
+// shownSSL is TorrServer's certificate status as other devices see it: the
+// TorrServer Moviestracker runs listens on this computer only, so its
+// ports are Other apps' (none while Other apps is off).
+func (s *Server) shownSSL(st *torrserver.SSLStatus) *torrserver.SSLStatus {
+	if st == nil || !s.managed() {
+		return st
+	}
+	shown := *st
+	shown.Port, shown.HTTPPort, shown.HTTPEnabled = "", "", false
+	if s.appsPort != nil && s.appsPort.Addr() != "" {
+		shown.Port, shown.HTTPPort, shown.HTTPEnabled = s.appsHTTPSPort(), s.appsPort.Number(), true
+	}
+	return &shown
+}
+
 // plainHTTPFromElsewhere reports whether r came over the network without
 // TLS, so whatever the page uploads crosses it unencrypted.
 func plainHTTPFromElsewhere(r *http.Request) bool {
@@ -71,7 +86,7 @@ func (s *Server) patchHTTPS(w http.ResponseWriter, r *http.Request, ctx context.
 	if _, err := client.Settings(ctx); err != nil && st.OK {
 		st = failed(engineAsleep)
 	}
-	v := s.httpsView(r, sslStatus(ctx, client), st)
+	v := s.httpsView(r, s.shownSSL(sslStatus(ctx, client)), st)
 	if err := datastar.NewSSE(w, r).PatchElementTempl(views.HTTPSCard(v)); err != nil {
 		logSSEError(r, "patch HTTPS card", err)
 	}
