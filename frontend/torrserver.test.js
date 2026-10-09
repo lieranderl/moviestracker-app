@@ -453,3 +453,88 @@ test("a TorrServer without HTTPS or older than MatriX.146 shows no certificate",
   await client.tsSSL(el, ""); // none picked, or it does not answer
   expect(events).toEqual([{ enabled: true, cert: {} }, null]);
 });
+
+const certificateChanges = () => {
+  const el = new EventTarget();
+  const events = [];
+  for (const name of ["ts-ssl", "ts-ssl-change"]) el.addEventListener(name, (evt) => events.push([name, evt.detail]));
+  return { el, events };
+};
+const sslStatus = (source) => ({ enabled: true, port: "8091", cert: { source, issuer: "CN=R11,O=Let's Encrypt,C=US" } });
+const change = (fields) => ({ busy: "", ok: false, problem: "", status: 0, error: "", url: server, ...fields });
+
+test("a user uploads a certificate and key straight from their browser to TorrServer", async () => {
+  globalThis.fetch = requests = mock(async () => new Response(JSON.stringify(sslStatus("user"))));
+  client.tsSaveLogin(server, "admin", "secret");
+  const { el, events } = certificateChanges();
+  await client.tsSSLChange(el, server, "upload", {
+    cert: new File(["-----BEGIN CERTIFICATE-----"], "fullchain.pem"),
+    key: new File(["-----BEGIN PRIVATE KEY-----"], "privkey.pem"),
+  });
+  const [target, init] = requests.mock.calls[0];
+  expect(target.href).toBe("https://nas.example:8091/ssl/upload");
+  expect(init.method).toBe("POST");
+  expect(init.headers.Authorization).toBe(`Basic ${btoa("admin:secret")}`);
+  expect(await init.body.get("cert").text()).toBe("-----BEGIN CERTIFICATE-----");
+  expect(await init.body.get("key").text()).toBe("-----BEGIN PRIVATE KEY-----");
+  expect(events).toEqual([
+    ["ts-ssl-change", change({ busy: "upload" })],
+    ["ts-ssl", sslStatus("user")],
+    ["ts-ssl-change", change({ ok: true })],
+  ]);
+});
+
+test("a user points TorrServer at certificate files on its machine", async () => {
+  globalThis.fetch = requests = mock(async () => new Response(JSON.stringify(sslStatus("user"))));
+  const { el } = certificateChanges();
+  await client.tsSSLChange(el, server, "paths", { cert: " /etc/ssl/fullchain.pem ", key: "/etc/ssl/privkey.pem" });
+  const [target, init] = requests.mock.calls[0];
+  expect(target.href).toBe("https://nas.example:8091/ssl/paths");
+  expect(init.headers["Content-Type"]).toBe("application/json");
+  expect(JSON.parse(init.body)).toEqual({ cert: "/etc/ssl/fullchain.pem", key: "/etc/ssl/privkey.pem" });
+});
+
+test("a user goes back to a self-signed certificate or makes a new one", async () => {
+  globalThis.fetch = requests = mock(async () => new Response(JSON.stringify(sslStatus("self-signed"))));
+  const { el } = certificateChanges();
+  await client.tsSSLChange(el, server, "selfsigned");
+  await client.tsSSLChange(el, server, "regenerate");
+  expect(requests.mock.calls.map(([target, init]) => [target.href, init.method])).toEqual([
+    ["https://nas.example:8091/ssl/selfsigned", "POST"],
+    ["https://nas.example:8091/ssl/regenerate", "POST"],
+  ]);
+});
+
+test("TorrServer's reason for refusing a certificate is shown to the user", async () => {
+  globalThis.fetch = requests = mock(async () => new Response(JSON.stringify({ error: "private key does not match certificate" }), { status: 400 }));
+  const { el, events } = certificateChanges();
+  await client.tsSSLChange(el, server, "upload", { cert: new File(["a"], "a.pem"), key: new File(["b"], "b.pem") });
+  expect(events.at(-1)).toEqual(["ts-ssl-change", change({ problem: "status", status: 400, error: "private key does not match certificate" })]);
+});
+
+test("a certificate change without both files or paths never reaches TorrServer", async () => {
+  const { el, events } = certificateChanges();
+  await client.tsSSLChange(el, server, "upload", { cert: new File(["a"], "a.pem") });
+  await client.tsSSLChange(el, server, "paths", { cert: "/etc/ssl/fullchain.pem", key: " " });
+  await client.tsSSLChange(el, server, "delete");
+  expect(requests).not.toHaveBeenCalled();
+  expect(events).toEqual([["ts-ssl-change", change({ problem: "input" })], ["ts-ssl-change", change({ problem: "input" })]]);
+});
+
+test("a user downloads TorrServer's certificate with their browser-only login", async () => {
+  globalThis.fetch = requests = mock(async () => new Response("-----BEGIN CERTIFICATE-----"));
+  client.tsSaveLogin(server, "admin", "secret");
+  const anchor = { click: mock(() => {}) };
+  const originalDocument = globalThis.document;
+  globalThis.document = { createElement: () => anchor };
+  try {
+    await client.tsSSLDownload(server);
+  } finally {
+    globalThis.document = originalDocument;
+  }
+  const [target, init] = requests.mock.calls[0];
+  expect(target.href).toBe("https://nas.example:8091/ssl/cert");
+  expect(init.headers.Authorization).toBe(`Basic ${btoa("admin:secret")}`);
+  expect(anchor.download).toBe("nas.example.crt");
+  expect(anchor.click).toHaveBeenCalledTimes(1);
+});

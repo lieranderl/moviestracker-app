@@ -171,18 +171,23 @@ templ webTorrServerStatus() {
 			}
 			<div
 				id="ts-https"
+				class="space-y-3"
+				data-signals="{_tsSSL: {busy: '', ok: false, problem: '', status: 0, error: '', url: ''}}"
 				data-effect="tsSSL(el, $tsStatus.ok ? $tsSelected : '')"
-				data-on:ts-ssl="@post('/api/ts/https', {payload: {status: evt.detail}})"
+				data-on:ts-ssl="@post('/api/ts/https', {payload: {status: evt.detail, url: $tsSelected}})"
+				data-on:ts-ssl-change="$_tsSSL = evt.detail"
 			>
 				<div id="ts-https-details"></div>
+				@webCertificateOutcome()
 			</div>
 		</div>
 	</section>
 }
 
-// WebCertificate shows, read-only, the HTTPS certificate of the TorrServer
-// the browser checked (tsSSL); nothing when it serves no HTTPS or cannot say.
-templ WebCertificate(st *torrserver.SSLStatus, now time.Time) {
+// WebCertificate shows the HTTPS certificate of the TorrServer the browser
+// checked (tsSSL), and changes it from the browser; nothing when it serves no
+// HTTPS or cannot say. plainHTTP: the browser reaches it unencrypted.
+templ WebCertificate(st *torrserver.SSLStatus, plainHTTP bool, now time.Time) {
 	<div id="ts-https-details">
 		if st != nil && st.Enabled {
 			<div class="pt-3 border-t border-base-content/10 space-y-3">
@@ -191,8 +196,43 @@ templ WebCertificate(st *torrserver.SSLStatus, now time.Time) {
 					{ tr(ctx, "HTTPS certificate") }
 				</h3>
 				@CertificateDetails(*st, now)
+				@CertificateActions(*st, plainHTTP, browserCertificateTransport())
 			</div>
 		}
+	</div>
+}
+
+// browserCertificateTransport changes the certificate from the visitor's
+// browser, with the login it keeps (tsSSLChange); #ts-https shows the outcome.
+func browserCertificateTransport() CertificateTransport {
+	change := func(action, fields string) string {
+		return "tsSSLChange(el.closest('#ts-https'), $tsSelected, '" + action + "'" + fields + ")"
+	}
+	busy := func(action string) string { return "$_tsSSL.busy === '" + action + "'" }
+	return CertificateTransport{
+		Upload:     templ.Attributes{"data-on:submit": change("upload", ", {cert: el.elements.sslCert.files[0], key: el.elements.sslKey.files[0]}")},
+		Files:      templ.Attributes{"data-on:submit": change("paths", ", {cert: $httpsCertFile, key: $httpsKeyFile}")},
+		UploadBusy: busy("upload"),
+		FilesBusy:  busy("paths"),
+		SelfSigned: change("selfsigned", ""),
+		Regenerate: change("regenerate", ""),
+		Download:   templ.Attributes{"href": "#", "data-on:click__prevent": "tsSSLDownload($tsSelected)"},
+	}
+}
+
+// webCertificateOutcome tells how the last certificate change went, for the
+// TorrServer it was made on.
+templ webCertificateOutcome() {
+	<div role="status" class="alert alert-success alert-soft text-sm" data-show="$_tsSSL.ok && $_tsSSL.url === $tsSelected">
+		@Icon("circle-check", "size-4")
+		<span>{ tr(ctx, "TorrServer serves the new certificate.") }</span>
+	</div>
+	<div role="alert" class="alert alert-error alert-soft text-sm" data-show="$_tsSSL.problem && $_tsSSL.url === $tsSelected">
+		@Icon("circle-alert", "size-4")
+		<span data-show="$_tsSSL.problem === 'input'">{ tr(ctx, "Choose both the certificate and its private key.") }</span>
+		<span data-show="$_tsSSL.problem === 'login'">{ tr(ctx, "TorrServer asks for a login. Remove it and add it again with its username and password.") }</span>
+		<span data-show="$_tsSSL.problem === 'status'" data-text={ trJS(ctx, "TorrServer refused the certificate:") + " + ' ' + ($_tsSSL.error || $_tsSSL.status)" }></span>
+		<span data-show="!['input', 'login', 'status'].includes($_tsSSL.problem)">{ tr(ctx, "TorrServer did not answer. If it now serves a certificate this browser does not trust, open its address once and accept it.") }</span>
 	</div>
 }
 

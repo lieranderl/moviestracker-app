@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	neturl "net/url"
 	"slices"
 	"time"
 
@@ -79,8 +80,9 @@ func (a *app) readTorrents(w http.ResponseWriter, r *http.Request) ([]torrserver
 // maxSSLStatus bounds a posted certificate status: a few names and paths.
 const maxSSLStatus = 64 << 10
 
-// handleCertificate renders, read-only, the HTTPS certificate the user's
-// browser read from their TorrServer (tsSSL), into #ts-https-details.
+// handleCertificate renders the HTTPS certificate the user's browser read
+// from their TorrServer at url (tsSSL), into #ts-https-details; the browser
+// changes it itself.
 func (a *app) handleCertificate(w http.ResponseWriter, r *http.Request) {
 	if _, ok := a.currentUser(r); !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -88,12 +90,27 @@ func (a *app) handleCertificate(w http.ResponseWriter, r *http.Request) {
 	}
 	var in struct {
 		Status *torrserver.SSLStatus `json:"status"`
+		URL    string                `json:"url"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxSSLStatus)).Decode(&in); err != nil {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.WebCertificate(in.Status, time.Now())); err != nil {
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.WebCertificate(in.Status, plainHTTP(in.URL), time.Now())); err != nil {
 		slog.Warn("patching the TorrServer certificate failed", "error", err)
 	}
+}
+
+// plainHTTP says whether the browser reaches the TorrServer at url over the
+// network unencrypted, so an uploaded key would cross it in the clear.
+func plainHTTP(url string) bool {
+	u, err := neturl.Parse(url)
+	if err != nil || u.Scheme != "http" {
+		return false
+	}
+	switch u.Hostname() {
+	case "localhost", "127.0.0.1", "::1":
+		return false
+	}
+	return true
 }
