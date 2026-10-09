@@ -1095,7 +1095,7 @@ var ru = map[string]string{
 	"no certificate yet":                     "сертификата пока нет",
 	"the certificate does not load":          "сертификат не загружается",
 	"trusted":                                "доверенный",
-	"self-signed: browsers ask to accept it": "самоподписанный: браузеры просят его принять",
+	"not trusted: browsers ask to accept it": "недоверенный: браузеры просят его принять",
 	"valid until %s":                         "действует до %s",
 	"HTTPS certificate":                      "HTTPS-сертификат",
 }

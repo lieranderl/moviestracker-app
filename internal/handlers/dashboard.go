@@ -484,7 +484,7 @@ func dashHTTPS(ctx context.Context, h *torrserver.SSLStatus, now time.Time) (vie
 	default:
 		trust := i18n.T(ctx, "trusted")
 		if !c.Trusted {
-			trust = i18n.T(ctx, "self-signed: browsers ask to accept it")
+			trust = i18n.T(ctx, "not trusted: browsers ask to accept it")
 		}
 		row.Note = trust + " · " + i18n.Tf(ctx, "valid until %s", c.NotAfter.UTC().Format(time.DateOnly))
 	}
