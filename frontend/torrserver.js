@@ -45,8 +45,9 @@ const headers = (url) => {
 // an https page, not this computer), "unreachable" (not running, blocked, or
 // its certificate not trusted), "login" (it wants a login), "timeout",
 // "status", or "aborted" (signal: a newer request replaced this one). The
-// timeout covers reading the body too.
-const call = async (url, path, { init = {}, read = (res) => res.text(), signal, timeout = timeoutMs } = {}) => {
+// timeout covers reading the body too. With refusal, a "status" problem
+// carries TorrServer's reason ({"error": "…"}) as error.
+const call = async (url, path, { init = {}, read = (res) => res.text(), signal, timeout = timeoutMs, refusal = false } = {}) => {
   const target = new URL(path, `${url}/`);
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(target.hostname);
   if (window.location.protocol === "https:" && target.protocol === "http:" && !local) {
@@ -59,6 +60,7 @@ const call = async (url, path, { init = {}, read = (res) => res.text(), signal, 
   try {
     const res = await fetch(target, { ...init, headers: { ...headers(url), ...init.headers }, signal: ctl.signal });
     if (res.status === 401) return { problem: "login", status: 401 };
+    if (!res.ok && refusal) return { problem: "status", status: res.status, error: await reason(res) };
     if (!res.ok) return { problem: "status", status: res.status };
     return { value: await read(res) };
   } catch (err) {
@@ -67,6 +69,16 @@ const call = async (url, path, { init = {}, read = (res) => res.text(), signal, 
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener("abort", abort);
+  }
+};
+
+// reason is why TorrServer refused a request, from its {"error": "…"} body.
+const reason = async (res) => {
+  try {
+    const { error } = await res.json();
+    return typeof error === "string" ? error.slice(0, 500) : "";
+  } catch {
+    return "";
   }
 };
 
@@ -146,9 +158,9 @@ window.tsList = async (el, url, force = false) => {
 
 // tsSSL reads the HTTPS certificate of the TorrServer at url (MatriX.146 or
 // later, started with --ssl) and, when it changed since el last reported it,
-// fires ts-ssl on el with TorrServer's status, or null when there is none to
-// show (no url, no HTTPS, an older TorrServer, no answer); the page posts it
-// to the server, which renders it. Like tsCheck, it fires nothing before its
+// fires ts-ssl on el with { url, status }: TorrServer's status, or null when
+// there is none to show (no url, no HTTPS, an older TorrServer, no answer);
+// the page posts it to the server, which renders it. Like tsCheck, it fires nothing before its
 // first await.
 window.tsSSL = async (el, url) => {
   const signal = begin(el);
@@ -156,11 +168,74 @@ window.tsSSL = async (el, url) => {
   if (signal.aborted) return;
   const st = url ? await call(url, "ssl/status", { read: (res) => res.json(), signal }) : {};
   if (signal.aborted) return;
-  const value = st.value?.enabled === true ? st.value : null;
-  const key = JSON.stringify(value); // the same status shows the same, whichever TorrServer
+  showSSL(el, url, st.value?.enabled === true ? st.value : null);
+};
+
+// showSSL fires ts-ssl on el with the certificate status of the TorrServer
+// at url, unless el already showed it: the page shows it only while url is
+// still the one picked.
+const showSSL = (el, url, status) => {
+  const key = `${url} ${JSON.stringify(status)}`;
   if (shown.get(el) === key) return;
   shown.set(el, key);
-  tell(el, "ts-ssl", value);
+  tell(el, "ts-ssl", { url, status });
+};
+
+// sslChanges are TorrServer's certificate changes (MatriX.146), by action.
+const sslChanges = {
+  upload: ({ cert, key }) => {
+    if (!(cert instanceof Blob) || !(key instanceof Blob) || !cert.size || !key.size) return null;
+    const body = new FormData();
+    body.append("cert", cert, cert.name || "cert.pem");
+    body.append("key", key, key.name || "key.pem");
+    return { path: "ssl/upload", init: { method: "POST", body } };
+  },
+  paths: ({ cert = "", key = "" }) => {
+    if (!cert.trim() || !key.trim()) return null;
+    const body = JSON.stringify({ cert: cert.trim(), key: key.trim() });
+    return { path: "ssl/paths", init: { method: "POST", headers: { "Content-Type": "application/json" }, body } };
+  },
+  selfsigned: () => ({ path: "ssl/selfsigned", init: { method: "POST" } }),
+  regenerate: () => ({ path: "ssl/regenerate", init: { method: "POST" } }),
+};
+
+// tsSSLChange changes the certificate of the TorrServer at url from this
+// browser, so a private key never passes through Moviestracker: "upload"
+// sends files ({cert, key}), "paths" names files on its machine ({cert,
+// key}), "selfsigned" and "regenerate" go back to a self-signed one. It fires
+// ts-ssl-change on el with { busy, ok, problem, status, error, url }, and
+// ts-ssl with the certificate TorrServer serves afterwards (see showSSL).
+window.tsSSLChange = async (el, url, action, fields = {}) => {
+  const change = Object.hasOwn(sslChanges, action) && url ? sslChanges[action](fields) : undefined;
+  if (change === undefined) return;
+  const report = (detail) => tell(el, "ts-ssl-change", { busy: "", ok: false, problem: "", status: 0, error: "", url, ...detail });
+  if (change === null) {
+    report({ problem: "input" });
+    return;
+  }
+  report({ busy: action });
+  const res = await call(url, change.path, { init: change.init, read: (r) => r.json(), timeout: 30000, refusal: true });
+  if (res.problem) {
+    report({ problem: res.problem, status: res.status || 0, error: res.error || "" });
+    return;
+  }
+  showSSL(el, url, res.value?.enabled === true ? res.value : null);
+  report({ ok: true });
+};
+
+// tsSSLDownload saves the certificate (never the key) of the TorrServer at
+// url, to trust it on a device; it needs this browser's login, so a plain
+// link cannot fetch it.
+window.tsSSLDownload = async (url) => {
+  if (!webAddress(url)) return;
+  const res = await call(url, "ssl/cert", { read: (r) => r.blob() });
+  if (!res.value) return;
+  const href = URL.createObjectURL(res.value);
+  const anchor = document.createElement("a");
+  anchor.href = href;
+  anchor.download = `${new URL(url).hostname}.crt`;
+  anchor.click();
+  URL.revokeObjectURL(href);
 };
 
 // tsTorrentAction asks the TorrServer to drop a torrent's cache ("drop") or

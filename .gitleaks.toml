@@ -19,3 +19,6 @@ regexes = [
   '''23456789abcdefghjkmnpqrstuvwxyz''',
 ]
 paths = ['''^\.agents/skills/golang-security/references/secrets\.md$''']
+# A test of the web app's certificate upload sent a made-up PEM header, not a
+# key; the tests no longer use one, but the PR's history keeps that commit.
+commits = ['''7c66069900055443ff39ed1133b65074455748b8''']
