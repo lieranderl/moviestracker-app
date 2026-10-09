@@ -306,7 +306,7 @@ func TestTheDashboardShowsTorrServersHTTPSCertificate(t *testing.T) {
 	body := openStreams(t, l, l.admin(t), 400*time.Millisecond, "/api/dashboard?stream=true")[0]
 
 	app := section(t, body, "dash-app")
-	for _, want := range []string{"HTTPS", ":8091", "ts.example", "Let&#39;s Encrypt (R11)", "trusted", time.Now().AddDate(0, 2, 0).UTC().Format(time.DateOnly)} {
+	for _, want := range []string{"HTTPS", ":8091", "ts.example", "Let&#39;s Encrypt (R11)", "trusted by the TorrServer machine", time.Now().AddDate(0, 2, 0).UTC().Format(time.DateOnly)} {
 		if !strings.Contains(app, want) {
 			t.Errorf("app card lacks %q", want)
 		}

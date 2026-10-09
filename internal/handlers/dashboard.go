@@ -482,9 +482,10 @@ func dashHTTPS(ctx context.Context, h *torrserver.SSLStatus, now time.Time) (vie
 	case c.NotAfter.IsZero():
 		row.Note = i18n.T(ctx, "no certificate yet")
 	default:
-		trust := i18n.T(ctx, "trusted")
+		// Checked against the TorrServer machine's roots, not a browser's.
+		trust := i18n.T(ctx, "trusted by the TorrServer machine")
 		if !c.Trusted {
-			trust = i18n.T(ctx, "not trusted: browsers ask to accept it")
+			trust = i18n.T(ctx, "not trusted by the TorrServer machine")
 		}
 		row.Note = trust + " · " + i18n.Tf(ctx, "valid until %s", c.NotAfter.UTC().Format(time.DateOnly))
 	}

@@ -86,10 +86,12 @@ templ CertificateDetails(st torrserver.SSLStatus, now time.Time) {
 			@Icon("file-badge", "size-4 text-primary")
 			<span class="badge badge-neutral badge-soft">{ tr(ctx, certSourceLabel(c.Source)) }</span>
 			if !c.NotAfter.IsZero() {
+				// TorrServer checks the chain against its own machine's roots, not
+				// the browser's: a CA installed only there counts as trusted.
 				if c.Trusted {
-					<span class="badge badge-success badge-soft">{ tr(ctx, "Trusted") }</span>
+					<span class="badge badge-success badge-soft">{ tr(ctx, "Trusted by the TorrServer machine") }</span>
 				} else {
-					<span class="badge badge-warning badge-soft">{ tr(ctx, "Browsers ask to accept it") }</span>
+					<span class="badge badge-warning badge-soft">{ tr(ctx, "Not trusted by the TorrServer machine") }</span>
 				}
 				switch {
 					case c.Expired(now):

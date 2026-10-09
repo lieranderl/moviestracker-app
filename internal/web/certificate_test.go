@@ -27,7 +27,7 @@ func TestTheWebAppShowsTheTorrServersCertificateReadOnly(t *testing.T) {
 "not_before":"2026-09-01T00:00:00Z","not_after":"2099-11-30T00:00:00Z"}}}`
 	res := sendSignals(t, h, http.MethodPost, "/api/ts/https", status, session)
 	body := html.UnescapeString(res.Body.String())
-	for _, want := range []string{`id="ts-https-details"`, "ts.example", "Let's Encrypt (R11)", "Trusted", "2099-11-30", "Files on the TorrServer machine"} {
+	for _, want := range []string{`id="ts-https-details"`, "ts.example", "Let's Encrypt (R11)", "Trusted by the TorrServer machine", "2099-11-30", "Files on the TorrServer machine"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("POST /api/ts/https = %d lacks %q:\n%s", res.Code, want, body)
 		}

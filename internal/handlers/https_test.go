@@ -106,7 +106,7 @@ func httpsPage(t *testing.T, l *local, admin *http.Cookie) string {
 func TestAnUploadedCertificateIsServedWithoutRestartingTorrServer(t *testing.T) {
 	l, sup, admin := managedLocal(t)
 	l.action(t, "/api/settings/engine/https", `{"https":{"HTTPS":true}}`, admin)
-	if page := httpsPage(t, l, admin); !strings.Contains(page, "Self-signed") || !strings.Contains(page, "Browsers ask to accept it") {
+	if page := httpsPage(t, l, admin); !strings.Contains(page, "Self-signed") || !strings.Contains(page, "Not trusted by the TorrServer machine") {
 		t.Fatalf("page does not describe TorrServer's self-signed certificate")
 	}
 	cert, key := enginetest.Certificate(t, "torrserver.example", time.Date(2027, 3, 1, 0, 0, 0, 0, time.UTC))
@@ -243,7 +243,7 @@ func TestAnExternalTorrServersCertificateIsManagedFromTheCard(t *testing.T) {
 	admin := l.admin(t)
 
 	page := httpsPage(t, l, admin)
-	for _, want := range []string{"ts.example", "Let's Encrypt", "Trusted", "/etc/letsencrypt/live/ts.example/fullchain.pem", "Upload certificate"} {
+	for _, want := range []string{"ts.example", "Let's Encrypt", "Trusted by the TorrServer machine", "/etc/letsencrypt/live/ts.example/fullchain.pem", "Upload certificate"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the card lacks %q", want)
 		}
