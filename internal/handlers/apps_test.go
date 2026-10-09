@@ -285,3 +285,16 @@ func TestAnInstallReachableFromOtherDevicesNowLetsThemInThroughOtherApps(t *test
 		t.Error("the gateway did not open for the devices that reached TorrServer before")
 	}
 }
+
+func TestAnExternalTorrServersCertificateOnAnotherMachineIsExplained(t *testing.T) {
+	var port, tlsPort *gateway.Port
+	engine := newSettingsEngine(t, false)
+	// Paths on the TorrServer machine, which this one cannot read.
+	engine.ssl = `{"enabled":true,"port":"8091","http_port":"8090","http_enabled":true,"cert":{"source":"user",
+"cert_file":"/nas/ssl/fullchain.pem","key_file":"/nas/ssl/privkey.pem","dns_names":["nas.example"]}}`
+	l := newLocal(t, withAdmin(t), withEngineAt(engine.URL), withAppsPorts(t, "127.0.0.1:0", &port, &tlsPort))
+	body := html.UnescapeString(l.action(t, "/api/settings/apps", `{"appsOn":true,"appsInternet":false}`, l.admin(t)).Body.String())
+	if strings.Contains(body, "https://example.com") || strings.Contains(body, "turn on Serve HTTPS") || !strings.Contains(body, "another machine") {
+		t.Errorf("an external TorrServer's unreadable certificate is not explained:\n%s", body)
+	}
+}

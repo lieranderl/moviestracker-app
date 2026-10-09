@@ -99,8 +99,13 @@ func (s *Server) appsView(r *http.Request) views.AppsView {
 	if v.On {
 		if p := s.appsTLSProblem.Load(); p != nil {
 			v.HTTPSProblem = *p
-		} else if port := s.appsHTTPSPort(); port != "" && s.torrServerCertificateHere(r.Context()) {
-			v.HTTPSAddress = s.appsAddress(r, "https", port)
+		} else if port := s.appsHTTPSPort(); port != "" {
+			switch s.torrServerCertificate(r.Context()) {
+			case certificateHere:
+				v.HTTPSAddress = s.appsAddress(r, "https", port)
+			case certificateElsewhere:
+				v.CertificateElsewhere = true
+			}
 		}
 	}
 	for _, l := range st.Logins {
@@ -119,17 +124,30 @@ func (s *Server) appsAddress(r *http.Request, scheme, port string) string {
 	return scheme + "://" + net.JoinHostPort(origin.Hostname(), port)
 }
 
-// torrServerCertificateHere reports whether TorrServer serves HTTPS with a
-// certificate this machine can read, which the gateway's HTTPS port serves.
-func (s *Server) torrServerCertificateHere(ctx context.Context) bool {
+// certificatePlace is where TorrServer's HTTPS certificate is, for the
+// gateway's HTTPS port to serve it too.
+type certificatePlace int
+
+const (
+	certificateNone      certificatePlace = iota // TorrServer serves no HTTPS
+	certificateHere                              // its files load on this machine
+	certificateElsewhere                         // its files are on another machine (an external TorrServer)
+)
+
+// torrServerCertificate says where TorrServer's certificate is: the gateway
+// serves it only from files this machine reads, since TorrServer never
+// hands out the key.
+func (s *Server) torrServerCertificate(ctx context.Context) certificatePlace {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	cert, key, err := s.torrServer.CertificateFiles(ctx)
 	if err != nil {
-		return false
+		return certificateNone
 	}
-	_, err = tls.LoadX509KeyPair(cert, key)
-	return err == nil
+	if _, err := tls.LoadX509KeyPair(cert, key); err != nil {
+		return certificateElsewhere
+	}
+	return certificateHere
 }
 
 // appsAction reads an Other apps action's signals: nil when the request was
