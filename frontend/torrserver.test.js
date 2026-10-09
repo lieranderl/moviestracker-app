@@ -441,7 +441,7 @@ test("the TorrServer page reads the certificate of a TorrServer serving HTTPS, o
   const [target, init] = requests.mock.calls[0];
   expect(target.href).toBe("https://nas.example:8091/ssl/status");
   expect(init.headers.Authorization).toBe(`Basic ${btoa("admin:secret")}`);
-  expect(events).toEqual([status]);
+  expect(events).toEqual([{ url: server, status }]);
 });
 
 test("a TorrServer without HTTPS or older than MatriX.146 shows no certificate", async () => {
@@ -451,7 +451,7 @@ test("a TorrServer without HTTPS or older than MatriX.146 shows no certificate",
   globalThis.fetch = requests = mock(async () => new Response("404 page not found", { status: 404 }));
   await client.tsSSL(el, server);
   await client.tsSSL(el, ""); // none picked, or it does not answer
-  expect(events).toEqual([{ enabled: true, cert: {} }, null]);
+  expect(events).toEqual([{ url: server, status: { enabled: true, cert: {} } }, { url: server, status: null }, { url: "", status: null }]);
 });
 
 const certificateChanges = () => {
@@ -468,18 +468,18 @@ test("a user uploads a certificate and key straight from their browser to TorrSe
   client.tsSaveLogin(server, "admin", "secret");
   const { el, events } = certificateChanges();
   await client.tsSSLChange(el, server, "upload", {
-    cert: new File(["-----BEGIN CERTIFICATE-----"], "fullchain.pem"),
-    key: new File(["-----BEGIN PRIVATE KEY-----"], "privkey.pem"),
+    cert: new File(["made-up certificate"], "fullchain.pem"),
+    key: new File(["made-up key"], "privkey.pem"),
   });
   const [target, init] = requests.mock.calls[0];
   expect(target.href).toBe("https://nas.example:8091/ssl/upload");
   expect(init.method).toBe("POST");
   expect(init.headers.Authorization).toBe(`Basic ${btoa("admin:secret")}`);
-  expect(await init.body.get("cert").text()).toBe("-----BEGIN CERTIFICATE-----");
-  expect(await init.body.get("key").text()).toBe("-----BEGIN PRIVATE KEY-----");
+  expect(await init.body.get("cert").text()).toBe("made-up certificate");
+  expect(await init.body.get("key").text()).toBe("made-up key");
   expect(events).toEqual([
     ["ts-ssl-change", change({ busy: "upload" })],
-    ["ts-ssl", sslStatus("user")],
+    ["ts-ssl", { url: server, status: sslStatus("user") }],
     ["ts-ssl-change", change({ ok: true })],
   ]);
 });
@@ -522,7 +522,7 @@ test("a certificate change without both files or paths never reaches TorrServer"
 });
 
 test("a user downloads TorrServer's certificate with their browser-only login", async () => {
-  globalThis.fetch = requests = mock(async () => new Response("-----BEGIN CERTIFICATE-----"));
+  globalThis.fetch = requests = mock(async () => new Response("made-up certificate"));
   client.tsSaveLogin(server, "admin", "secret");
   const anchor = { click: mock(() => {}) };
   const originalDocument = globalThis.document;
@@ -537,4 +537,26 @@ test("a user downloads TorrServer's certificate with their browser-only login", 
   expect(init.headers.Authorization).toBe(`Basic ${btoa("admin:secret")}`);
   expect(anchor.download).toBe("nas.example.crt");
   expect(anchor.click).toHaveBeenCalledTimes(1);
+});
+
+test("another address of the same TorrServer shows its certificate again", async () => {
+  const status = { enabled: true, port: "8091", cert: { source: "self-signed" } };
+  globalThis.fetch = requests = mock(async () => new Response(JSON.stringify(status)));
+  const { el, events } = certificateEvents();
+  await client.tsSSL(el, server);
+  await client.tsSSL(el, "http://localhost:8090");
+  expect(events).toEqual([{ url: server, status }, { url: "http://localhost:8090", status }]);
+});
+
+test("a certificate change names its TorrServer, so a late one is not shown for another", async () => {
+  let finish;
+  const other = { enabled: true, port: "8091", cert: { source: "user" } };
+  globalThis.fetch = requests = mock((target) =>
+    target.href.endsWith("/ssl/selfsigned") ? new Promise((resolve) => { finish = resolve; }) : Promise.resolve(new Response(JSON.stringify(other))));
+  const { el, events } = certificateChanges();
+  const pending = client.tsSSLChange(el, server, "selfsigned");
+  await client.tsSSL(el, "http://localhost:8090"); // picked meanwhile
+  finish(new Response(JSON.stringify(sslStatus("self-signed"))));
+  await pending;
+  expect(events.filter(([name]) => name === "ts-ssl").at(-1)).toEqual(["ts-ssl", { url: server, status: sslStatus("self-signed") }]);
 });

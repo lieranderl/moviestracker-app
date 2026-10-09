@@ -694,7 +694,7 @@ func webTorrServerStatus() templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "<div id=\"ts-https\" class=\"space-y-3\" data-signals=\"{_tsSSL: {busy: '', ok: false, problem: '', status: 0, error: '', url: ''}}\" data-effect=\"tsSSL(el, $tsStatus.ok ? $tsSelected : '')\" data-on:ts-ssl=\"@post('/api/ts/https', {payload: {status: evt.detail, url: $tsSelected}})\" data-on:ts-ssl-change=\"$_tsSSL = evt.detail\"><div id=\"ts-https-details\"></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "<div id=\"ts-https\" class=\"space-y-3\" data-signals=\"{_tsSSL: {busy: '', ok: false, problem: '', status: 0, error: '', url: ''}}\" data-effect=\"tsSSL(el, $tsStatus.ok ? $tsSelected : '')\" data-on:ts-ssl=\"evt.detail.url === $tsSelected && @post('/api/ts/https', {payload: evt.detail})\" data-on:ts-ssl-change=\"$_tsSSL = evt.detail\"><div id=\"ts-https-details\"></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

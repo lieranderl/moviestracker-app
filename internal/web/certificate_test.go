@@ -11,7 +11,7 @@ import (
 func TestTheTorrServerPageAsksTheBrowserForTheCertificate(t *testing.T) {
 	h, session, _ := torrServers(t)
 	body := html.UnescapeString(getWith(t, h, "/torrserver", session).Body.String())
-	for _, want := range []string{`id="ts-https"`, "tsSSL(el, $tsStatus.ok ? $tsSelected : '')", "@post('/api/ts/https', {payload: {status: evt.detail, url: $tsSelected}})", "data-on:ts-ssl-change"} {
+	for _, want := range []string{`id="ts-https"`, "tsSSL(el, $tsStatus.ok ? $tsSelected : '')", "evt.detail.url === $tsSelected && @post('/api/ts/https', {payload: evt.detail})", "data-on:ts-ssl-change"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the TorrServer page lacks %q", want)
 		}
