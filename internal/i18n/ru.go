@@ -981,6 +981,7 @@ var ru = map[string]string{
 	"Up to 20":                                                                             "До 20",
 	"Up":                                                                                   "Отдача",
 	"Upload":                                                                               "Отдача",
+	"Upload files":                                                                         "Загрузка файлов",
 	"Uploaded":                                                                             "Отдано",
 	"Video":                                                                                "Видео",
 	"Volume":                                                                               "Громкость",
