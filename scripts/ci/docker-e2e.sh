@@ -55,12 +55,14 @@ wait_healthy() {
   fail "the container did not become healthy (health: $(health))"
 }
 location() { curl -sS -o /dev/null -w '%{redirect_url}' "$base$1"; }
-# engine_get asks the bundled TorrServer, which only the container reaches.
+# engine_get asks the bundled TorrServer, which only the container reaches,
+# with curl's own image from quay.io: Docker Hub's anonymous pull limit, which
+# GitHub's runners exhaust, does not apply there.
 engine_get() {
   local password port
   password="$(in_container cat /data/engine/accs.db | sed -E 's/.*"moviestracker":"([0-9a-f]+)".*/\1/')"
   port="$(engine_port "$project")"
-  docker run --rm --network "container:$project" curlimages/curl:8.22.0 -fsS -u "moviestracker:$password" "http://127.0.0.1:$port$1"
+  docker run --rm --network "container:$project" quay.io/curl/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777 -fsS -u "moviestracker:$password" "http://127.0.0.1:$port$1"
 }
 # commands lists the command lines of the processes in container $1.
 commands() {
