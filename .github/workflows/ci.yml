@@ -135,6 +135,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Pull Docker Hub images through Google's mirror
+        run: scripts/ci/docker-hub-mirror.sh
       - name: Build and test the image end to end with compose.yaml
         run: scripts/ci/docker-e2e.sh
 
@@ -146,6 +148,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Pull Docker Hub images through Google's mirror
+        run: scripts/ci/docker-hub-mirror.sh
       # web.yml deploys this image from main: it must build, start and answer
       # Cloud Run's probe.
       - name: Build the image and check that it serves
