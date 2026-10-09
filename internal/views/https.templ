@@ -63,7 +63,7 @@ templ CertificateDetails(st torrserver.SSLStatus, now time.Time) {
 	<div class="space-y-3">
 		<div class="flex flex-wrap items-center gap-2 text-sm">
 			@Icon("file-badge", "size-4 text-primary")
-			<span class="badge badge-neutral badge-soft">{ tr(ctx, certSourceLabel(c.Source)) }</span>
+			<span class="badge badge-ghost">{ tr(ctx, certSourceLabel(c.Source)) }</span>
 			if !c.NotAfter.IsZero() {
 				// TorrServer checks the chain against its own machine's roots, not
 				// the browser's: a CA installed only there counts as trusted.
@@ -171,7 +171,7 @@ templ CertificateActions(st torrserver.SSLStatus, plainHTTP bool, t CertificateT
 		</div>
 	}
 	<div class="tabs tabs-box tabs-sm">
-		<input type="radio" name="https-certificate-source" class="tab" aria-label={ tr(ctx, "Upload") } checked/>
+		<input type="radio" name="https-certificate-source" class="tab" aria-label={ tr(ctx, "Upload files") } checked/>
 		<div class="tab-content bg-base-100 border-base-content/10 rounded-box p-4">
 			<form { t.Upload... }>
 				<fieldset disabled?={ locked } class="grid gap-3 sm:grid-cols-2">
