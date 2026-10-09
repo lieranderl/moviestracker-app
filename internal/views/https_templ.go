@@ -528,7 +528,7 @@ func CertificateDetails(st torrserver.SSLStatus, now time.Time) templ.Component 
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var25 string
-			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(issuerName(c.Issuer))
+			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(IssuerName(c.Issuer))
 			if templ_7745c5c3_Err != nil {
 				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/https.templ`, Line: 115, Col: 30}
 			}
@@ -979,9 +979,9 @@ func certSourceLabel(source string) string {
 	}
 }
 
-// issuerName is who issued a certificate, from its issuer's distinguished
+// IssuerName is who issued a certificate, from its issuer's distinguished
 // name: "CN=R11,O=Let's Encrypt,C=US" is "Let's Encrypt (R11)".
-func issuerName(dn string) string {
+func IssuerName(dn string) string {
 	var cn, org string
 	for _, part := range strings.Split(dn, ",") {
 		k, v, _ := strings.Cut(strings.TrimSpace(part), "=")

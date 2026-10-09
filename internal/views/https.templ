@@ -112,7 +112,7 @@ templ CertificateDetails(st torrserver.SSLStatus, now time.Time) {
 			}
 			if c.Issuer != "" {
 				<dt class="text-base-content/70">{ tr(ctx, "Issued by") }</dt>
-				<dd>{ issuerName(c.Issuer) }</dd>
+				<dd>{ IssuerName(c.Issuer) }</dd>
 			}
 			if !c.NotAfter.IsZero() {
 				<dt class="text-base-content/70">{ tr(ctx, "Valid") }</dt>
@@ -230,9 +230,9 @@ func certSourceLabel(source string) string {
 	}
 }
 
-// issuerName is who issued a certificate, from its issuer's distinguished
+// IssuerName is who issued a certificate, from its issuer's distinguished
 // name: "CN=R11,O=Let's Encrypt,C=US" is "Let's Encrypt (R11)".
-func issuerName(dn string) string {
+func IssuerName(dn string) string {
 	var cn, org string
 	for _, part := range strings.Split(dn, ",") {
 		k, v, _ := strings.Cut(strings.TrimSpace(part), "=")

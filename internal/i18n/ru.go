@@ -1090,10 +1090,18 @@ var ru = map[string]string{
 	"Give both the certificate file and the private key file.":                       "Укажите и файл сертификата, и файл закрытого ключа.",
 	"TorrServer did not accept it: %v":                                               "TorrServer не принял его: %v",
 	"TorrServer has no certificate to give: %v":                                      "У TorrServer нет сертификата для скачивания: %v",
+	"TorrServer cannot load its HTTPS certificate: %s":                               "TorrServer не может загрузить свой HTTPS-сертификат: %s",
+	"TorrServer's HTTPS certificate expired on %s.":                                  "HTTPS-сертификат TorrServer истёк %s.",
+	"no certificate yet":                     "сертификата пока нет",
+	"the certificate does not load":          "сертификат не загружается",
+	"trusted":                                "доверенный",
+	"self-signed: browsers ask to accept it": "самоподписанный: браузеры просят его принять",
+	"valid until %s":                         "действует до %s",
 }
 
 // ruPlural holds the one, few and many forms of counts, by English one form.
 var ruPlural = map[string][3]string{
+	"TorrServer's HTTPS certificate expires in %d day.": {"HTTPS-сертификат TorrServer истекает через %d день.", "HTTPS-сертификат TorrServer истекает через %d дня.", "HTTPS-сертификат TorrServer истекает через %d дней."},
 	"Expires in %d day": {"Истекает через %d день", "Истекает через %d дня", "Истекает через %d дней"},
 	"%d season":         {"%d сезон", "%d сезона", "%d сезонов"},
 	"%d restart":        {"%d перезапуск", "%d перезапуска", "%d перезапусков"},

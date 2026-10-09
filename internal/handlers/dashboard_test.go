@@ -287,3 +287,49 @@ func TestTheProblemsCardShowsRecentWarningsAndErrors(t *testing.T) {
 		}
 	}
 }
+
+// httpsEngine is a MatriX.146 TorrServer serving HTTPS on 8091 with a Let's
+// Encrypt certificate for ts.example valid until notAfter, or one it cannot load.
+func httpsEngine(t *testing.T, notAfter time.Time, loadError string) *settingsEngine {
+	t.Helper()
+	eng := newSettingsEngine(t, false)
+	eng.ssl = `{"enabled":true,"port":"8091","http_port":"8090","http_enabled":true,"cert":{"source":"user",
+"cert_file":"/etc/letsencrypt/live/ts.example/fullchain.pem","key_file":"/etc/letsencrypt/live/ts.example/privkey.pem",
+"issuer":"CN=R11,O=Let's Encrypt,C=US","dns_names":["ts.example"],"trusted":true,
+"not_before":"2026-01-01T00:00:00Z","not_after":"` + notAfter.UTC().Format(time.RFC3339) + `","error":"` + loadError + `"}}`
+	return eng
+}
+
+func TestTheDashboardShowsTorrServersHTTPSCertificate(t *testing.T) {
+	eng := httpsEngine(t, time.Now().AddDate(0, 2, 0), "")
+	l := newLocal(t, withAdmin(t), withEngineAt(eng.URL), quickDashboard)
+	body := openStreams(t, l, l.admin(t), 400*time.Millisecond, "/api/dashboard?stream=true")[0]
+
+	app := section(t, body, "dash-app")
+	for _, want := range []string{"HTTPS", ":8091", "ts.example", "Let&#39;s Encrypt (R11)", "trusted", time.Now().AddDate(0, 2, 0).UTC().Format(time.DateOnly)} {
+		if !strings.Contains(app, want) {
+			t.Errorf("app card lacks %q", want)
+		}
+	}
+	if problems := section(t, body, "dash-problems"); !strings.Contains(problems, "No problems") {
+		t.Errorf("a certificate valid for two months is flagged:\n%s", problems)
+	}
+}
+
+func TestTheDashboardWarnsTwoWeeksBeforeTheHTTPSCertificateExpires(t *testing.T) {
+	eng := httpsEngine(t, time.Now().Add(5*24*time.Hour+time.Hour), "")
+	l := newLocal(t, withAdmin(t), withEngineAt(eng.URL), quickDashboard)
+	body := openStreams(t, l, l.admin(t), 400*time.Millisecond, "/api/dashboard?stream=true")[0]
+	if problems := section(t, body, "dash-problems"); !strings.Contains(problems, "HTTPS certificate expires in 5 days") {
+		t.Errorf("Problems card does not warn about the certificate:\n%s", problems)
+	}
+}
+
+func TestTheDashboardSaysWhenTorrServerCannotLoadItsCertificate(t *testing.T) {
+	eng := httpsEngine(t, time.Now().AddDate(1, 0, 0), "open /etc/letsencrypt/live/ts.example/privkey.pem: permission denied")
+	l := newLocal(t, withAdmin(t), withEngineAt(eng.URL), quickDashboard)
+	body := openStreams(t, l, l.admin(t), 400*time.Millisecond, "/api/dashboard?stream=true")[0]
+	if problems := section(t, body, "dash-problems"); !strings.Contains(problems, "cannot load its HTTPS certificate") || !strings.Contains(problems, "permission denied") {
+		t.Errorf("Problems card does not say the certificate fails to load:\n%s", problems)
+	}
+}
