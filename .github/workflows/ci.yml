@@ -82,7 +82,7 @@ jobs:
         run: go test -count=1 ./...
       - name: Build the DMG as a release would (no shared TMDB key)
         run: scripts/macapp.sh v0.0.0-ci
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Moviestracker-dmg-${{ github.sha }}
           path: dist/*.dmg
@@ -110,7 +110,7 @@ jobs:
         run: scripts/winapp.sh v0.0.0-ci
       - name: Install, set up, upgrade, quit, uninstall and purge it
         run: scripts/ci/windows-install-e2e.ps1 dist/Moviestracker-Setup-v0.0.0-ci-x64.exe
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Moviestracker-windows-${{ github.sha }}
           path: dist/*.exe
