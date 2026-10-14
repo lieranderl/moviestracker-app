@@ -52,7 +52,7 @@ RUN TS_TARGET="$TARGETOS/$TARGETARCH" scripts/fetch-torrserver.sh /out/bin/torrs
       > /out/doc/TorrServer-SOURCE.txt && \
     install -m 0644 LICENSE NOTICE packaging/docker/GSTREAMER.txt /out/doc/
 
-FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
+FROM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
 # GStreamer as TorrServer's README lists it (Debian 13: GStreamer 1.26), for
 # MKV, AC3/DTS and HEVC in the browser; tini forwards signals and reaps.
 # Each package keeps its licence in /usr/share/doc/<package>/copyright.
