@@ -48,12 +48,12 @@ func fakeGStreamerPkg(t *testing.T) (pkg, sum string) {
 				t.Fatal(err)
 			}
 		}
-		comp := filepath.Join(work, part+"-1.28.7-universal.pkg")
+		comp := filepath.Join(work, part+"-1.28.8-universal.pkg")
 		run(t, work, nil, "pkgbuild", "--quiet", "--root", root, "--identifier", "org.freedesktop.gstreamer.test."+part,
-			"--version", "1.28.7", "--install-location", "/Library/Frameworks/GStreamer.framework/Versions/1.0", comp)
+			"--version", "1.28.8", "--install-location", "/Library/Frameworks/GStreamer.framework/Versions/1.0", comp)
 		args = append(args, "--package", comp)
 	}
-	pkg = filepath.Join(work, "gstreamer-1.0-1.28.7-universal.pkg")
+	pkg = filepath.Join(work, "gstreamer-1.0-1.28.8-universal.pkg")
 	run(t, work, nil, "productbuild", append(append([]string{"--quiet"}, args...), pkg)...)
 	data, err := os.ReadFile(pkg) // #nosec G304 -- the test's own fixture
 	if err != nil {
@@ -80,7 +80,7 @@ func TestTheMacAppDownloadsOnlyTheGStreamerPartsTorrServerUses(t *testing.T) {
 	if out, err := installGStreamer(root, pkg, sum); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
-	dir := filepath.Join(root, "1.28.7")
+	dir := filepath.Join(root, "1.28.8")
 	for _, want := range []string{
 		"lib/libgstreamer-1.0.0.dylib", "lib/libglib-2.0.0.dylib", "libexec/gstreamer-1.0/gst-plugin-scanner",
 		"lib/gstreamer-1.0/libgstmatroska.dylib", "lib/gstreamer-1.0/libgstx264.dylib", "lib/gstreamer-1.0/libgstlibav.dylib",
@@ -100,7 +100,7 @@ func TestTheMacAppDownloadsOnlyTheGStreamerPartsTorrServerUses(t *testing.T) {
 	for _, e := range entries {
 		names = append(names, e.Name())
 	}
-	if strings.Join(names, ",") != "1.28.7" {
+	if strings.Join(names, ",") != "1.28.8" {
 		t.Errorf("GStreamer folder holds %v, want only the new version (no older one, download or leftovers)", names)
 	}
 }
@@ -120,10 +120,10 @@ func TestAGStreamerDownloadWithTheWrongChecksumInstallsNothing(t *testing.T) {
 
 func TestTheAppKnowsThePinnedGStreamerAndItsDownloadSize(t *testing.T) {
 	script := filepath.Join("macos", "install-gstreamer.sh")
-	if out := run(t, "..", nil, script, "--size"); strings.TrimSpace(out) != "153594157" {
+	if out := run(t, "..", nil, script, "--size"); strings.TrimSpace(out) != "156581817" {
 		t.Errorf("--size = %q, want the pinned installer's size, for progress", out)
 	}
-	if out := run(t, "..", nil, script, "--version"); strings.TrimSpace(out) != "1.28.7" {
+	if out := run(t, "..", nil, script, "--version"); strings.TrimSpace(out) != "1.28.8" {
 		t.Errorf("--version = %q, want the pinned GStreamer", out)
 	}
 }
