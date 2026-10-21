@@ -34,7 +34,7 @@ type upstream struct {
 }
 
 // current is upstream as scripts/torrserver.lock and install-gstreamer.sh
-// pin it: MatriX.146 and GStreamer 1.28.7.
+// pin it: MatriX.146 and GStreamer 1.28.8.
 func current() upstream {
 	return upstream{
 		tsTag:       "MatriX.146",
@@ -46,7 +46,7 @@ func current() upstream {
 			"TorrServer-gst-linux-arm64":       "sha256:66569ed8fb469ec8fd82d63331c90f4bbe7a15ab5626ff9349658ae13ce23f9d",
 			"TorrServer-gst-windows-amd64.exe": "sha256:4f867732f56bfeff532e6fd9ef9562c42cf0761be109bd340d9602ce0390df74",
 		},
-		gstVersions:  []string{"1.26.9", "1.28.6", "1.28.7"},
+		gstVersions:  []string{"1.26.9", "1.28.7", "1.28.8"},
 		gstPublished: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC),
 	}
 }
@@ -268,7 +268,7 @@ func TestTheNewestStableGStreamerIsPinnedAndDevelopmentVersionsSkipped(t *testin
 			t.Errorf("install-gstreamer.sh lacks %s", want)
 		}
 	}
-	if !strings.Contains(out, "GStreamer 1.28.7 → 1.28.10") {
+	if !strings.Contains(out, "GStreamer 1.28.8 → 1.28.10") {
 		t.Errorf("the summary does not name the GStreamer update:\n%s", out)
 	}
 }
