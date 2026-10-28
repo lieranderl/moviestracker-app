@@ -216,6 +216,7 @@ type Client struct {
 	// searchAPI is the search API's protocol (jacred.su); otherwise the
 	// jacred-fdb one, which self-hosted instances run.
 	searchAPI  bool
+	jackettAPI bool
 	httpClient *http.Client
 	cacheTTL   time.Duration
 	now        func() time.Time
@@ -256,6 +257,10 @@ func WithAPIKey(key string) Option { return func(c *Client) { c.apiKey = key } }
 // WithSearchAPI speaks the search API's protocol (api.jacred.su's) to the
 // base URL, whatever its host.
 func WithSearchAPI() Option { return func(c *Client) { c.searchAPI = true } }
+
+// WithJackettAPI uses the keyless JacRed v2 API, with its required user-agent.
+// Credentials are never sent in this mode.
+func WithJackettAPI() Option { return func(c *Client) { c.jackettAPI = true } }
 
 // WithCacheTTL overrides how long results are reused.
 func WithCacheTTL(ttl time.Duration) Option {
@@ -380,6 +385,13 @@ func (c *Client) Search(ctx context.Context, q Query) ([]Result, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decode jacred response: %w", err)
 	}
+	if c.jackettAPI && q.Season > 0 {
+		// Jackett searches by title across seasons. Unknown season metadata
+		// cannot vouch for a release, unlike the season-scoped native APIs.
+		raw = slices.DeleteFunc(raw, func(r rawResult) bool {
+			return !slices.Contains(r.Seasons, q.Season)
+		})
+	}
 
 	results := normalize(raw, q)
 	c.store(key, results)
@@ -389,7 +401,10 @@ func (c *Client) Search(ctx context.Context, q Query) ([]Result, error) {
 // request asks for term in the instance's protocol.
 func (c *Client) request(ctx context.Context, term string, q Query) (*http.Request, error) {
 	var target string
-	if c.searchAPI {
+	if c.jackettAPI {
+		params := url.Values{"Query": {term}}
+		target = c.baseURL + "/api/v2.0/indexers/all/results?" + params.Encode()
+	} else if c.searchAPI {
 		params := url.Values{"query": {term}, "limit": {strconv.Itoa(apiPageSize)}}
 		if q.Season > 0 {
 			params.Set("season", strconv.Itoa(q.Season))
@@ -420,7 +435,9 @@ func (c *Client) request(ctx context.Context, term string, q Query) (*http.Reque
 		return nil, fmt.Errorf("create jacred request: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
-	if c.searchAPI && c.apiKey != "" {
+	if c.jackettAPI {
+		req.Header.Set("User-Agent", "Mozilla/5.0")
+	} else if c.searchAPI && c.apiKey != "" {
 		req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	}
 	return req, nil
@@ -428,6 +445,9 @@ func (c *Client) request(ctx context.Context, term string, q Query) (*http.Reque
 
 // decode reads either protocol's results.
 func (c *Client) decode(body io.Reader) ([]rawResult, error) {
+	if c.jackettAPI {
+		return decodeJackett(body)
+	}
 	if !c.searchAPI {
 		var raw []rawResult
 		err := json.NewDecoder(body).Decode(&raw)

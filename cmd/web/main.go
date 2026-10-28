@@ -90,7 +90,7 @@ func configFromEnv() web.Config {
 		jacredURL = config.DefaultJacRedURL
 	}
 	cfg := web.Config{
-		Sources: sources.Connector{}.Connect(config.Sources{
+		Sources: sources.Connector{JacRedFallbackURL: "https://jac.red"}.Connect(config.Sources{ // #nosec G101 -- a public service URL, not a credential
 			TMDBKey:      os.Getenv("MT_WEB_TMDB_KEY"),
 			JacRedURL:    jacredURL,
 			JacRedAPIKey: jacredKey,
