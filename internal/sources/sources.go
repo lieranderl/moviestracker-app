@@ -31,7 +31,8 @@ type Connector struct {
 	TMDBBaseURL string
 	// JacRedHTTP, when set, carries JacRed's requests (tests record them).
 	JacRedHTTP *http.Client
-	// JacRedFallbackURL opts into a keyless v2 backup. Empty keeps one source.
+	// JacRedFallbackURL opts public jacred.su into a keyless v2 backup.
+	// Empty and custom/private sources keep a single source.
 	JacRedFallbackURL string
 	// Health, when set, records the outcome of every call the clients make.
 	Health *Health
@@ -46,7 +47,7 @@ func (c Connector) Connect(src config.Sources) Clients {
 	}
 	if src.JacRedURL != "" {
 		var searcher jacred.Searcher = c.jacred(src.JacRedURL, src.JacRedAPIKey)
-		if c.JacRedFallbackURL != "" {
+		if c.JacRedFallbackURL != "" && config.IsJacredSu(src.JacRedURL) {
 			backup := jacred.NewClient(c.JacRedFallbackURL, jacred.WithJackettAPI(), jacred.WithHTTPClient(c.JacRedHTTP))
 			searcher = jacred.NewFallback(searcher, backup, 5*time.Second)
 		}
