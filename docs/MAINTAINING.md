@@ -118,8 +118,11 @@ and serves, and that the user store works with Firestore's emulator.
   the primary search fails, including a five-second primary timeout. It
   never forwards the primary API key. Empty successful searches and
   cancelled requests do not trigger fallback. Both sources use the same
-  result filters and per-client cache. Successful fallback searches emit
-  `JacRed fallback served search` in Cloud Run logs. The self-hosted app
+  result filters and per-client cache.
+  Season-specific backup searches require matching season metadata;
+  releases without it are excluded to avoid showing another season.
+  Successful fallback searches emit `JacRed fallback served search` in
+  Cloud Run logs. The self-hosted app
   continues to use only its configured source.
 - **Shared UI:** title pages, season tabs, torrent cards, the add-torrent
   form, settings fields and player controls are the existing components in

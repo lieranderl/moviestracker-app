@@ -38,3 +38,20 @@ func TestUserCanSearchJackettWithoutSendingACredential(t *testing.T) {
 		t.Errorf("published = %v", r.CreatedAt)
 	}
 }
+
+func TestJackettSeasonSearchExcludesReleasesWithoutMatchingSeasonMetadata(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"Results":[
+			{"Tracker":"rutor","Details":"https://rutor.info/1","Title":"Severance S01E01","MagnetUri":"magnet:?xt=urn:btih:AAAA","info":{}},
+			{"Tracker":"rutor","Details":"https://rutor.info/2","Title":"Severance S01E02 2022","MagnetUri":"magnet:?xt=urn:btih:BBBB","info":{"relased":2022}},
+			{"Tracker":"rutor","Details":"https://rutor.info/3","Title":"Severance S02E01","MagnetUri":"magnet:?xt=urn:btih:CCCC","info":{"seasons":[2]}},
+			{"Tracker":"rutor","Details":"https://rutor.info/4","Title":"Severance S01E03","MagnetUri":"magnet:?xt=urn:btih:DDDD","info":{"seasons":[1]}}
+		]}`))
+	}))
+	defer server.Close()
+	client := jacred.NewClient(server.URL, jacred.WithJackettAPI())
+	results, err := client.Search(t.Context(), jacred.Query{OriginalTitle: "Severance", Year: 2022, SeasonYear: 2025, Season: 2})
+	if err != nil || len(results) != 1 || results[0].Title != "Severance S02E01" {
+		t.Fatalf("season-two results = %+v, err = %v", results, err)
+	}
+}

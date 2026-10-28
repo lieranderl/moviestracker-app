@@ -385,6 +385,13 @@ func (c *Client) Search(ctx context.Context, q Query) ([]Result, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decode jacred response: %w", err)
 	}
+	if c.jackettAPI && q.Season > 0 {
+		// Jackett searches by title across seasons. Unknown season metadata
+		// cannot vouch for a release, unlike the season-scoped native APIs.
+		raw = slices.DeleteFunc(raw, func(r rawResult) bool {
+			return !slices.Contains(r.Seasons, q.Season)
+		})
+	}
 
 	results := normalize(raw, q)
 	c.store(key, results)
