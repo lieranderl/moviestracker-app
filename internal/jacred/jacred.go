@@ -400,9 +400,10 @@ func (c *Client) Search(ctx context.Context, q Query) ([]Result, error) {
 
 	var results []Result
 	if c.searchAPI && !c.jackettAPI {
+		var complete bool
 		var err error
-		if results, err = c.searchByNames(ctx, q); err != nil {
-			return nil, err
+		if results, complete, err = c.searchByNames(ctx, q); err != nil || !complete {
+			return results, err
 		}
 	} else {
 		raw, err := c.search(ctx, q.primary(), q)
@@ -419,8 +420,9 @@ func (c *Client) Search(ctx context.Context, q Query) ([]Result, error) {
 // up with the IMDb id's, and when neither finds the title, tries its other
 // names in turn. Releases not named after the title are left out: the id
 // and a common-word name find others too. A name the API fails on is
-// passed over; a refusal ends the search.
-func (c *Client) searchByNames(ctx context.Context, q Query) ([]Result, error) {
+// passed over; a refusal ends the search, keeping what was found before it,
+// which is then not complete.
+func (c *Client) searchByNames(ctx context.Context, q Query) (results []Result, complete bool, err error) {
 	names := q.names()
 	var failed error
 	ask := func(term string) ([]rawResult, error) {
@@ -436,18 +438,25 @@ func (c *Client) searchByNames(ctx context.Context, q Query) ([]Result, error) {
 	}
 
 	var raw []rawResult
+	// stop ends the search at a refusal, with the releases found before it.
+	stop := func(err error) ([]Result, bool, error) {
+		if found := normalize(raw, q); len(found) > 0 {
+			return found, false, nil
+		}
+		return nil, false, err
+	}
 	others := names
 	if len(names) > 0 {
 		found, err := ask(names[0])
 		if err != nil {
-			return nil, err
+			return stop(err)
 		}
 		raw, others = found, names[1:]
 	}
 	if id := q.imdb(); id != "" && len(normalize(raw, q)) < enoughReleases {
 		found, err := ask(id)
 		if err != nil {
-			return nil, err
+			return stop(err)
 		}
 		raw = append(raw, found...)
 	}
@@ -457,15 +466,15 @@ func (c *Client) searchByNames(ctx context.Context, q Query) ([]Result, error) {
 		}
 		found, err := ask(name)
 		if err != nil {
-			return nil, err
+			return stop(err)
 		}
 		raw = append(raw, found...)
 	}
-	results := normalize(raw, q)
+	results = normalize(raw, q)
 	if len(results) == 0 && failed != nil {
-		return nil, failed
+		return nil, true, failed
 	}
-	return results, nil
+	return results, true, nil
 }
 
 // refused reports whether JacRed refused the key, which every other search
@@ -477,12 +486,14 @@ func refused(err error) bool {
 
 // namedAfter reports whether a release title, or one of its "/" or "|"
 // parts, starts with one of names, as in "Медведь / The Bear (2022)" or
-// "The.Bear.S03". Without names every release is.
+// "The.Bear.S03"; the whole title is tried too, for names with a slash in
+// them ("Face/Off"). Without names every release is.
 func namedAfter(title string, names []string) bool {
 	if len(names) == 0 {
 		return true
 	}
-	for part := range strings.FieldsFuncSeq(title, func(r rune) bool { return r == '/' || r == '|' }) {
+	parts := strings.FieldsFunc(title, func(r rune) bool { return r == '/' || r == '|' })
+	for _, part := range append(parts, title) {
 		part = plain(part)
 		for _, name := range names {
 			if name = plain(name); name != "" && (part == name || strings.HasPrefix(part, name+" ")) {

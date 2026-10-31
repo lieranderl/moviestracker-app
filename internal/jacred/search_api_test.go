@@ -367,3 +367,33 @@ func TestOnlyTheSearchAPIIsAskedByIMDbID(t *testing.T) {
 		}
 	}
 }
+
+// A name with a slash in it is a name, not two alternatives.
+func TestANameWithASlashFindsItsReleases(t *testing.T) {
+	var asked []string
+	client := fakeSearchAPI(t, map[string]string{
+		"Face/Off": apiReleases(1997, "Face/Off (1997) 1080p BluRay", "Без лица / Face/Off (1997) BDRip"),
+	}, &asked)
+	results, err := client.Search(context.Background(), Query{EnglishTitle: "Face/Off", Title: "Без лица", Year: 1997})
+	if err != nil || len(results) != 2 {
+		t.Errorf("kept %q (err %v), want both releases", titles(results), err)
+	}
+}
+
+// Releases already found are kept when JacRed refuses the next search, and
+// are not remembered as the whole answer.
+func TestReleasesFoundBeforeARefusalAreKept(t *testing.T) {
+	var asked []string
+	pages := map[string]string{"The Bear": apiReleases(2024, "Медведь / The Bear (2024) WEBRip"), "tt14452776": "status 429"}
+	client := fakeSearchAPI(t, pages, &asked)
+	q := Query{IMDbID: "tt14452776", EnglishTitle: "The Bear", Title: "Медведь", Year: 2022, Season: 3, SeasonYear: 2024}
+
+	results, err := client.Search(context.Background(), q)
+	if err != nil || len(results) != 1 {
+		t.Fatalf("kept %q (err %v), want the English name's release", titles(results), err)
+	}
+	pages["tt14452776"] = apiReleases(2024, "Медведь / The Bear [3 сезон] (2024) LostFilm")
+	if results, _ = client.Search(context.Background(), q); len(results) != 2 {
+		t.Errorf("searching again kept %q, want both releases", titles(results))
+	}
+}
