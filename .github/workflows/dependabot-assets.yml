@@ -1,0 +1,120 @@
+name: Dependabot assets
+
+# Dependabot's Bun updates change the tools that build the committed assets
+# (static/*.css, static/*.js, icons_gen.go) but not the assets, so CI's
+# "generated files" check fails on them. This rebuilds the assets from the
+# pull request merged into main, as CI checks them, and commits any change to
+# the pull request's branch.
+#
+# pull_request_target, so the commit can come from the pins app (its key is in
+# the `pins` environment, which only main can use): a push with GITHUB_TOKEN
+# would not start CI. The build job runs the pull request's code with a
+# read-only token, no secrets and no caches; the commit job gets the key but
+# runs nothing from the pull request, and takes only the asset files from the
+# build. Dependabot stops rebasing a branch someone else committed to;
+# `@dependabot rebase` starts it over, and this runs again.
+on:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] the pull request's code runs only in the build job, without secrets
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: dependabot-assets-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Rebuild the assets
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'dependabot/bun/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Build the assets
+        run: |
+          bun install --frozen-lockfile --ignore-scripts
+          bun run assets
+      - name: Did they change?
+        id: diff
+        run: |
+          if git diff --quiet -- static/app.css static/player.js static/theme.js static/torrserver.js internal/views/icons_gen.go; then
+            echo "changed=false" >>"$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >>"$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.diff.outputs.changed == 'true'
+        with:
+          name: assets
+          path: |
+            static/app.css
+            static/player.js
+            static/theme.js
+            static/torrserver.js
+            internal/views/icons_gen.go
+          retention-days: 1
+          if-no-files-found: error
+
+  commit:
+    name: Commit the rebuilt assets
+    needs: build
+    if: needs.build.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: pins
+    steps:
+      - name: Get a token for the pins app
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.PINS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PINS_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          token: ${{ steps.app.outputs.token }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: assets
+          path: ${{ runner.temp }}/assets
+
+      - name: Commit and push
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          for f in static/app.css static/player.js static/theme.js static/torrserver.js internal/views/icons_gen.go; do
+            cp "$RUNNER_TEMP/assets/$f" "$f"
+          done
+          if git diff --quiet; then
+            echo "The branch already has these assets."
+            exit 0
+          fi
+          user_id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
+          git commit -qam "build(assets): rebuild for the dependency update"
+          # Not forced: if the branch moved meanwhile, its own run rebuilds.
+          git push -q "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}"
