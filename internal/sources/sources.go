@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/config"
 	"github.com/lieranderl/moviestracker-app/internal/imdb"
@@ -30,6 +31,9 @@ type Connector struct {
 	TMDBBaseURL string
 	// JacRedHTTP, when set, carries JacRed's requests (tests record them).
 	JacRedHTTP *http.Client
+	// JacRedFallbackURL opts public jacred.su into a keyless v2 backup.
+	// Empty and custom/private sources keep a single source.
+	JacRedFallbackURL string
 	// Health, when set, records the outcome of every call the clients make.
 	Health *Health
 }
@@ -42,7 +46,12 @@ func (c Connector) Connect(src config.Sources) Clients {
 		out.Catalog, out.Details = client, client
 	}
 	if src.JacRedURL != "" {
-		out.Torrents = watchedJacRed{c: c.jacred(src.JacRedURL, src.JacRedAPIKey), h: c.Health}
+		var searcher jacred.Searcher = c.jacred(src.JacRedURL, src.JacRedAPIKey)
+		if c.JacRedFallbackURL != "" && config.IsJacredSu(src.JacRedURL) {
+			backup := jacred.NewClient(c.JacRedFallbackURL, jacred.WithJackettAPI(), jacred.WithHTTPClient(c.JacRedHTTP))
+			searcher = jacred.NewFallback(searcher, backup, 5*time.Second)
+		}
+		out.Torrents = watchedJacRed{c: searcher, h: c.Health}
 	}
 	if src.IMDbURL != "" && !src.IMDbOff {
 		out.IMDb = watchedIMDb{c: imdb.NewClient(src.IMDbURL), h: c.Health}

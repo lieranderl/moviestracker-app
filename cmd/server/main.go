@@ -95,7 +95,7 @@ func main() {
 	env.SharedTMDBKey = sharedTMDBKey
 	env.SharedJacRedKey = sharedJacRedKey
 	effective := env.Apply(store.State())
-	connector := sources.Connector{Health: sources.NewHealth()}
+	connector := sources.Connector{Health: sources.NewHealth(), JacRedFallbackURL: "https://jac.red"} // #nosec G101 -- a public service URL, not a credential
 	clients := connector.Connect(effective.Sources)
 	if clients.Catalog == nil {
 		slog.Warn("no TMDB key yet; add one in Settings → Sources")

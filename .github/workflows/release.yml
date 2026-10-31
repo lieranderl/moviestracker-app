@@ -112,7 +112,8 @@ jobs:
   macos:
     name: Mac app (DMG)
     needs: ci
-    runs-on: macos-latest
+    # Match CI: avoid the ARM64 hosted capacity shortage; build both CPU slices.
+    runs-on: macos-26-intel
     timeout-minutes: 30
     environment: release
     steps:
