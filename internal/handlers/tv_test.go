@@ -12,9 +12,9 @@ import (
 var breakingBad = &tmdb.TVDetails{
 	MediaItem: tmdb.MediaItem{
 		ID: 1396, Title: "Breaking Bad", MediaType: "tv", ReleaseDate: "2008-01-20",
-		Overview: "A chemistry teacher turns to crime.", VoteAverage: 8.9,
+		Overview: "A chemistry teacher turns to crime.", VoteAverage: 8.9, ImdbID: "tt0903747",
 	},
-	OriginalTitle: "Breaking Bad", Status: "Ended", LastAirDate: "2013-09-29", ContentRating: "TV-MA",
+	OriginalTitle: "Breaking Bad", EnglishTitle: "Breaking Bad", Status: "Ended", LastAirDate: "2013-09-29", ContentRating: "TV-MA",
 	NumberOfSeasons: 2, NumberOfEpisodes: 20,
 	Creators: []tmdb.CrewMember{{ID: 66633, Name: "Vince Gilligan"}},
 	Networks: []string{"AMC"},
@@ -117,7 +117,7 @@ func TestSeriesSourcesAreSearchedPerSeasonWithShowAndSeasonYears(t *testing.T) {
 		t.Fatalf("JacRed queries = %d, want 1", len(jr.queries))
 	}
 	q := jr.queries[0]
-	if q.OriginalTitle != "Breaking Bad" || q.Season != 2 || q.Year != 2008 || q.SeasonYear != 2009 {
+	if q.OriginalTitle != "Breaking Bad" || q.EnglishTitle != "Breaking Bad" || q.IMDbID != "tt0903747" || q.Season != 2 || q.Year != 2008 || q.SeasonYear != 2009 {
 		t.Errorf("query = %+v, want season 2 with years 2008/2009", q)
 	}
 	if !strings.Contains(body, "Season 2") {

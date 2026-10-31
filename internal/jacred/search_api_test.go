@@ -201,3 +201,117 @@ func TestQualityIsPartOfTheCachedSearch(t *testing.T) {
 		t.Errorf("%d searches, want 3", calls)
 	}
 }
+
+// The search API finds a title by its IMDb id, which names it exactly, and
+// keeps the season filter.
+func TestTheSearchAPIIsAskedByIMDbIDWhenKnown(t *testing.T) {
+	var asked []url.Values
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		asked = append(asked, r.URL.Query())
+		_, _ = w.Write([]byte(searchAPIJSON))
+	}, WithSearchAPI())
+
+	results, err := client.Search(context.Background(), Query{OriginalTitle: "Inception", Year: 2010, IMDbID: "tt1375666", Season: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(asked) != 1 || asked[0].Get("query") != "tt1375666" || asked[0].Get("season") != "2" {
+		t.Errorf("asked %v, want one search for query=tt1375666&season=2", asked)
+	}
+	if len(results) == 0 {
+		t.Error("no results")
+	}
+}
+
+// A title JacRed has not linked to its IMDb id is still found by name.
+func TestTheSearchAPIFallsBackToTheTitleWhenTheIMDbIDFindsNothing(t *testing.T) {
+	var asked []string
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		asked = append(asked, r.URL.Query().Get("query"))
+		if strings.HasPrefix(r.URL.Query().Get("query"), "tt") {
+			_, _ = w.Write([]byte(`{"results":[]}`))
+			return
+		}
+		_, _ = w.Write([]byte(searchAPIJSON))
+	}, WithSearchAPI())
+
+	results, err := client.Search(context.Background(), Query{OriginalTitle: "Inception", Year: 2010, IMDbID: "tt1375666"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(asked, ",") != "tt1375666,Inception" || len(results) != 2 {
+		t.Errorf("asked %v and kept %d results, want the id then the title's 2 releases", asked, len(results))
+	}
+}
+
+// Other JacRed protocols search by name only: they do not resolve IMDb ids
+// reliably, and a malformed id is never sent.
+func TestOnlyTheSearchAPIIsAskedByIMDbID(t *testing.T) {
+	for name, tc := range map[string]struct {
+		opts []Option
+		q    Query
+		path string
+		key  string
+	}{
+		"jacred-fdb":        {nil, Query{OriginalTitle: "Inception", IMDbID: "tt1375666"}, "/api/v1.0/torrents", "search"},
+		"jackett":           {[]Option{WithJackettAPI()}, Query{OriginalTitle: "Inception", IMDbID: "tt1375666"}, "/api/v2.0/indexers/all/results", "Query"},
+		"search API bad id": {[]Option{WithSearchAPI()}, Query{OriginalTitle: "Inception", IMDbID: "1375666"}, "/api/search", "query"},
+	} {
+		var got string
+		client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			got = r.URL.Query().Get(tc.key)
+			_, _ = w.Write([]byte(`[]`))
+		}, tc.opts...)
+		_, _ = client.Search(context.Background(), tc.q)
+		if got != "Inception" {
+			t.Errorf("%s asked %s=%q, want the title", name, tc.key, got)
+		}
+	}
+}
+
+// When a name finds nothing the next is tried: the IMDb id, the English
+// name torrents are mostly filed under, the original, then the local one,
+// each name once.
+func TestTheSearchAPITriesEachNameInTurnUntilOneFindsReleases(t *testing.T) {
+	var asked []string
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query().Get("query")
+		asked = append(asked, q)
+		if q != "Паразиты" {
+			_, _ = w.Write([]byte(`{"results":[]}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"results":[{"title":"Паразиты (2019) BDRip","tracker":"rutor","seeders":5,"year":2019,
+			"magnet":"magnet:?xt=urn:btih:AAAA","source_url":"https://rutor.info/1"}]}`))
+	}, WithSearchAPI())
+
+	results, err := client.Search(context.Background(), Query{
+		IMDbID: "tt6751668", EnglishTitle: "Parasite", OriginalTitle: "기생충", Title: "Паразиты", Year: 2019,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(asked, ",") != "tt6751668,Parasite,기생충,Паразиты" || len(results) != 1 {
+		t.Errorf("asked %v and kept %d results", asked, len(results))
+	}
+
+	asked = nil
+	_, _ = client.Search(context.Background(), Query{EnglishTitle: "Verity", OriginalTitle: "verity", Title: "Верити", Year: 2026})
+	if strings.Join(asked, ",") != "Verity,Верити" {
+		t.Errorf("asked %v, want each name once", asked)
+	}
+}
+
+// A refusal ends the search: the next name would be refused too, and would
+// spend a search of the key's daily allowance.
+func TestTheSearchAPIStopsAtARefusal(t *testing.T) {
+	calls := 0
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusTooManyRequests)
+	}, WithSearchAPI())
+	_, err := client.Search(context.Background(), Query{IMDbID: "tt1375666", OriginalTitle: "Inception"})
+	if _, ok := errors.AsType[*LimitError](err); !ok || calls != 1 {
+		t.Errorf("err = %v after %d calls, want the limit after one", err, calls)
+	}
+}

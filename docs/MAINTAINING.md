@@ -115,6 +115,10 @@ and serves, and that the user store works with Firestore's emulator.
   the TMDB title, poster, category and `data` metadata:
   `{"tmdb":{"id":438631,"type":"movie"}}`. No key or TorrServer login
   is included in the rendered source results.
+  On jacred.su's search API a title is asked by its IMDb id first (with
+  `season=N` for series), then by its English, original and local names in
+  turn until one finds releases; a refusal (key, limit) ends the search.
+  Other JacRed protocols search by name only.
   App and web searches on jacred.su fall back to `https://jac.red`'s keyless
   Jackett v2 API when
   the primary search fails, including a five-second primary timeout. It

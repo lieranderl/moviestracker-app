@@ -44,7 +44,9 @@ func (s SeasonSummary) PosterURL() string { return MediaItem{PosterPath: s.Poste
 // TVDetails is the full series page model.
 type TVDetails struct {
 	MediaItem
-	OriginalTitle    string
+	OriginalTitle string
+	// EnglishTitle is the series' English name, empty when TMDB has none.
+	EnglishTitle     string
 	Tagline          string
 	Status           string
 	LastAirDate      string
@@ -237,6 +239,7 @@ func (c *Client) TV(ctx context.Context, id int) (*TVDetails, error) {
 		}
 		t.LastEpisode, t.NextEpisode = raw.LastEpisode.airing(), raw.NextEpisode.airing()
 		t.ImdbID = raw.ExternalIDs.IMDb
+		t.EnglishTitle = englishTitle(ctx, t.Title, raw.OriginalName, raw.Language, english.Title)
 		t.LogoPath = selectLogo(raw.Images.Logos, lang)
 		t.TrailerKey = selectTrailer(raw.Videos.Results, lang)
 		// episode_run_time is often empty for newer shows; fall back to the

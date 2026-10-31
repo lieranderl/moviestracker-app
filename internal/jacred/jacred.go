@@ -68,6 +68,11 @@ type Query struct {
 	Title string
 	// OriginalTitle is the primary search term.
 	OriginalTitle string
+	// IMDbID ("tt…") and EnglishTitle, when set, are what the search API is
+	// asked first: the id names the title exactly, and torrents are mostly
+	// filed under the English name.
+	IMDbID       string
+	EnglishTitle string
 	// Year, when set, drops releases of other titles with the same name. For
 	// a series it is the first-air year.
 	Year int
@@ -96,6 +101,25 @@ func qualityOf(q int) int {
 	default:
 		return 480
 	}
+}
+
+var imdbID = regexp.MustCompile(`^tt\d{5,10}$`)
+
+// searchTerms are what the search API is asked, in turn until one finds
+// releases: the IMDb id, then the English, original and local names, each
+// once.
+func (q Query) searchTerms() []string {
+	var terms []string
+	if id := strings.TrimSpace(q.IMDbID); imdbID.MatchString(id) {
+		terms = append(terms, id)
+	}
+	for _, name := range []string{q.EnglishTitle, q.OriginalTitle, q.Title} {
+		name = strings.TrimSpace(name)
+		if name != "" && !slices.ContainsFunc(terms, func(t string) bool { return strings.EqualFold(t, name) }) {
+			terms = append(terms, name)
+		}
+	}
+	return terms
 }
 
 func (q Query) primary() string {
@@ -355,15 +379,34 @@ func (a apiResult) raw() rawResult {
 // Search returns playable releases, most seeded first. Results are cached
 // briefly and must be treated as read-only.
 func (c *Client) Search(ctx context.Context, q Query) ([]Result, error) {
-	term := q.primary()
-	if term == "" {
+	terms := []string{q.primary()}
+	if c.searchAPI && !c.jackettAPI {
+		terms = q.searchTerms()
+	}
+	if len(terms) == 0 || terms[0] == "" {
 		return nil, nil
 	}
-	key := strings.ToLower(fmt.Sprintf("%s\x00%s\x00%d\x00%d\x00%d\x00%v\x00%t", term, strings.TrimSpace(q.Title), q.Year, q.Season, q.SeasonYear, q.Qualities, q.HDR))
+	key := strings.ToLower(fmt.Sprintf("%q\x00%s\x00%d\x00%d\x00%d\x00%v\x00%t", terms, strings.TrimSpace(q.Title), q.Year, q.Season, q.SeasonYear, q.Qualities, q.HDR))
 	if results, ok := c.cached(key); ok {
 		return results, nil
 	}
 
+	var results []Result
+	for _, term := range terms {
+		found, err := c.search(ctx, term, q)
+		if err != nil {
+			return nil, err
+		}
+		if results = found; len(results) > 0 {
+			break
+		}
+	}
+	c.store(key, results)
+	return results, nil
+}
+
+// search asks for one term.
+func (c *Client) search(ctx context.Context, term string, q Query) ([]Result, error) {
 	req, err := c.request(ctx, term, q)
 	if err != nil {
 		return nil, err
@@ -393,9 +436,7 @@ func (c *Client) Search(ctx context.Context, q Query) ([]Result, error) {
 		})
 	}
 
-	results := normalize(raw, q)
-	c.store(key, results)
-	return results, nil
+	return normalize(raw, q), nil
 }
 
 // request asks for term in the instance's protocol.

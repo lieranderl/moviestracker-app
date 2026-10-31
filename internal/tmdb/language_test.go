@@ -155,3 +155,44 @@ func TestEachLanguageHasItsOwnHomeCatalog(t *testing.T) {
 		t.Errorf("requests = %d, want 3 per language", hits.Load())
 	}
 }
+
+// Torrents are named in English as well as the local language, so a page in
+// any language knows the title's English name.
+func TestTitlesKnowTheirEnglishNameInEveryLanguage(t *testing.T) {
+	client, _ := multilingualTMDB(t, map[string]map[string]string{
+		"/3/movie/27205": {
+			"en-US": `{"id":27205,"title":"Inception","original_title":"Inception","original_language":"en"}`,
+			"ru-RU": `{"id":27205,"title":"Начало","original_title":"Inception","original_language":"en",
+				"translations":{"translations":[{"iso_639_1":"en","data":{"title":""}}]}}`,
+		},
+		"/3/movie/496243": {"ru-RU": `{"id":496243,"title":"Паразиты","original_title":"기생충","original_language":"ko",
+			"translations":{"translations":[{"iso_639_1":"en","data":{"title":"Parasite"}}]}}`},
+		"/3/tv/1396": {"ru-RU": `{"id":1396,"name":"Во все тяжкие","original_name":"Breaking Bad","original_language":"en",
+			"translations":{"translations":[{"iso_639_1":"en","data":{"name":"Breaking Bad"}}]}}`},
+		"/3/tv/93405": {"ru-RU": `{"id":93405,"name":"Игра в кальмара","original_name":"오징어 게임","original_language":"ko",
+			"translations":{"translations":[{"iso_639_1":"en","data":{"name":"Squid Game"}}]}}`},
+	})
+	ru := i18n.WithLang(context.Background(), i18n.Russian)
+	for _, tc := range []struct {
+		ctx  context.Context
+		id   int
+		want string
+	}{{context.Background(), 27205, "Inception"}, {ru, 27205, "Inception"}, {ru, 496243, "Parasite"}} {
+		m, err := client.Movie(tc.ctx, tc.id)
+		if err != nil {
+			t.Fatalf("Movie(%d): %v", tc.id, err)
+		}
+		if m.EnglishTitle != tc.want {
+			t.Errorf("movie %d English title = %q, want %q", tc.id, m.EnglishTitle, tc.want)
+		}
+	}
+	for id, want := range map[int]string{1396: "Breaking Bad", 93405: "Squid Game"} {
+		show, err := client.TV(ru, id)
+		if err != nil {
+			t.Fatalf("TV(%d): %v", id, err)
+		}
+		if show.EnglishTitle != want {
+			t.Errorf("show %d English title = %q, want %q", id, show.EnglishTitle, want)
+		}
+	}
+}
