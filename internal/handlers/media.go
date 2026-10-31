@@ -164,7 +164,7 @@ func (c *Catalog) lookupTitle(ctx context.Context, r *http.Request) (titleInfo, 
 		year, _ := strconv.Atoi(tv.ReleaseYear())
 		return titleInfo{
 			id:     id,
-			query:  jacred.Query{Title: tv.Title, OriginalTitle: tv.OriginalTitle, Year: year},
+			query:  jacred.Query{Title: tv.Title, OriginalTitle: tv.OriginalTitle, EnglishTitle: tv.EnglishTitle, IMDbID: tv.ImdbID, Year: year},
 			label:  views.PageTitle(tv.MediaItem),
 			poster: tv.PosterURL(),
 			tv:     tv,
@@ -177,7 +177,7 @@ func (c *Catalog) lookupTitle(ctx context.Context, r *http.Request) (titleInfo, 
 	year, _ := strconv.Atoi(movie.ReleaseYear())
 	return titleInfo{
 		id:      id,
-		query:   jacred.Query{Title: movie.Title, OriginalTitle: movie.OriginalTitle, Year: year},
+		query:   jacred.Query{Title: movie.Title, OriginalTitle: movie.OriginalTitle, EnglishTitle: movie.EnglishTitle, IMDbID: movie.ImdbID, Year: year},
 		label:   views.PageTitle(movie.MediaItem),
 		poster:  movie.PosterURL(),
 		minutes: movie.Runtime,

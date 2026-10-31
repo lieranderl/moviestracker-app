@@ -96,7 +96,9 @@ func (v Video) WatchURL() string { return "https://www.youtube.com/watch?v=" + v
 // MovieDetails is the full movie page model.
 type MovieDetails struct {
 	MediaItem
-	OriginalTitle   string
+	OriginalTitle string
+	// EnglishTitle is the title's English name, empty when TMDB has none.
+	EnglishTitle    string
 	Tagline         string
 	Runtime         int
 	Budget          int64
@@ -239,6 +241,7 @@ func (c *Client) movie(ctx context.Context, id int) (*MovieDetails, error) {
 			Similar:         relatedTitles(raw.Similar.Results, "movie"),
 		}
 		m.ImdbID = raw.ImdbID
+		m.EnglishTitle = englishTitle(ctx, m.Title, raw.OriginalTitle, raw.Language, english.Title)
 		if raw.Collection != nil {
 			m.collectionID = raw.Collection.ID
 		}
@@ -380,6 +383,8 @@ type translations struct {
 	Translations []struct {
 		Language string `json:"iso_639_1"`
 		Data     struct {
+			Title     string `json:"title"`
+			Name      string `json:"name"`
 			Overview  string `json:"overview"`
 			Tagline   string `json:"tagline"`
 			Biography string `json:"biography"`
@@ -388,13 +393,27 @@ type translations struct {
 }
 
 // english is the English translation, empty when TMDB has none.
-func (t translations) english() (out struct{ Overview, Tagline, Biography string }) {
+func (t translations) english() (out struct{ Title, Overview, Tagline, Biography string }) {
 	for _, tr := range t.Translations {
 		if tr.Language == "en" {
-			return struct{ Overview, Tagline, Biography string }{tr.Data.Overview, tr.Data.Tagline, tr.Data.Biography}
+			d := tr.Data
+			return struct{ Title, Overview, Tagline, Biography string }{cmp.Or(d.Title, d.Name), d.Overview, d.Tagline, d.Biography}
 		}
 	}
 	return out
+}
+
+// englishTitle is a title's English name: the page's own title on an
+// English page, else the English translation's, which TMDB leaves blank
+// when it is the original English one.
+func englishTitle(ctx context.Context, title, original, originalLanguage, translated string) string {
+	if i18n.FromContext(ctx) == i18n.English {
+		return title
+	}
+	if translated == "" && originalLanguage == "en" {
+		return original
+	}
+	return translated
 }
 
 // getJSON performs an authenticated GET and decodes a bounded JSON body.

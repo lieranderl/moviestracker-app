@@ -3,9 +3,12 @@ package jacred
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -199,5 +202,198 @@ func TestQualityIsPartOfTheCachedSearch(t *testing.T) {
 	}
 	if calls != 3 {
 		t.Errorf("%d searches, want 3", calls)
+	}
+}
+
+// apiReleases is a search API page of releases with these titles, from
+// year, with distinct hashes.
+func apiReleases(year int, titles ...string) string {
+	var b strings.Builder
+	b.WriteString(`{"results":[`)
+	for i, title := range titles {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		fmt.Fprintf(&b, `{"title":%q,"tracker":"rutor","seeders":%d,"year":%d,"magnet":"magnet:?xt=urn:btih:%x","source_url":"https://rutor.info/%d"}`,
+			title, 100-i, year, []byte(title), i)
+	}
+	b.WriteString("]}")
+	return b.String()
+}
+
+// fakeSearchAPI answers each query from pages; others find nothing.
+func fakeSearchAPI(t *testing.T, pages map[string]string, asked *[]string) *Client {
+	t.Helper()
+	return newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		*asked = append(*asked, q.Get("query")+"@"+q.Get("season"))
+		page, ok := pages[q.Get("query")]
+		switch {
+		case !ok:
+			_, _ = w.Write([]byte(`{"results":[]}`))
+		case strings.HasPrefix(page, "status "):
+			code, _ := strconv.Atoi(strings.TrimPrefix(page, "status "))
+			w.WriteHeader(code)
+		default:
+			_, _ = w.Write([]byte(page))
+		}
+	}, WithSearchAPI())
+}
+
+func titles(results []Result) []string {
+	var out []string
+	for _, r := range results {
+		out = append(out, r.Title)
+	}
+	slices.Sort(out)
+	return out
+}
+
+// The English name finds most titles in one search: torrents are filed
+// under it, beside the Russian one.
+func TestTheSearchAPIAsksTheEnglishNameFirst(t *testing.T) {
+	many := make([]string, 60)
+	for i := range many {
+		many[i] = fmt.Sprintf("Начало / Inception (2010) part %d", i)
+	}
+	var asked []string
+	client := fakeSearchAPI(t, map[string]string{"Inception": apiReleases(2010, many...)}, &asked)
+
+	results, err := client.Search(context.Background(), Query{
+		IMDbID: "tt1375666", EnglishTitle: "Inception", OriginalTitle: "Inception", Title: "Начало", Year: 2010,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(asked, ",") != "Inception@" || len(results) != 60 {
+		t.Errorf("asked %v and kept %d results, want the English name only and its 60 releases", asked, len(results))
+	}
+}
+
+// When the English name finds few releases the IMDb id is asked too, for
+// the season, and both are kept; releases not named after the title, which
+// the id or a common word also finds, are left out.
+func TestFewReleasesByTheEnglishNameAreToppedUpByTheIMDbID(t *testing.T) {
+	var asked []string
+	client := fakeSearchAPI(t, map[string]string{
+		"The Bear":   apiReleases(2024, "Медведь 3 сезон (1-10 из 10) / The Bear (2024) WEBRip", "The.Bear.S03.1080p.WEB"),
+		"tt14452776": apiReleases(2024, "Медведь 3 сезон (1-10 из 10) / The Bear (2024) WEBRip", "Медведь / The Bear [3 сезон] (2024) LostFilm", "Маша и Медведь / Сезон: 1-7 (2024)"),
+	}, &asked)
+
+	results, err := client.Search(context.Background(), Query{
+		IMDbID: "tt14452776", EnglishTitle: "The Bear", OriginalTitle: "The Bear", Title: "Медведь", Year: 2022, Season: 3, SeasonYear: 2024,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(asked, ",") != "The Bear@3,tt14452776@3" {
+		t.Errorf("asked %v, want the English name, then the IMDb id, for season 3", asked)
+	}
+	want := []string{"The.Bear.S03.1080p.WEB", "Медведь / The Bear [3 сезон] (2024) LostFilm", "Медведь 3 сезон (1-10 из 10) / The Bear (2024) WEBRip"}
+	if got := titles(results); !slices.Equal(got, want) {
+		t.Errorf("kept %q, want %q", got, want)
+	}
+}
+
+// When neither finds the title, its original and local names are tried in
+// turn; a name the API fails on is passed over.
+func TestTheOriginalAndLocalNamesAreTriedWhenNothingElseFindsTheTitle(t *testing.T) {
+	var asked []string
+	client := fakeSearchAPI(t, map[string]string{
+		"기생충":      "status 502",
+		"Паразиты": apiReleases(2019, "Паразиты / Gisaengchung (2019) BDRip"),
+	}, &asked)
+
+	results, err := client.Search(context.Background(), Query{
+		IMDbID: "tt6751668", EnglishTitle: "Parasite", OriginalTitle: "기생충", Title: "Паразиты", Year: 2019,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(asked, ",") != "Parasite@,tt6751668@,기생충@,Паразиты@" || len(results) != 1 {
+		t.Errorf("asked %v and kept %d results", asked, len(results))
+	}
+}
+
+// Each name is asked once, and a malformed IMDb id never.
+func TestEachNameIsAskedOnce(t *testing.T) {
+	var asked []string
+	client := fakeSearchAPI(t, nil, &asked)
+	_, _ = client.Search(context.Background(), Query{IMDbID: "1375666", EnglishTitle: "Verity", OriginalTitle: "verity", Title: "Верити", Year: 2026})
+	if strings.Join(asked, ",") != "Verity@,Верити@" {
+		t.Errorf("asked %v", asked)
+	}
+}
+
+// A refusal ends the search: the next name would be refused too.
+func TestTheSearchAPIStopsAtARefusal(t *testing.T) {
+	var asked []string
+	client := fakeSearchAPI(t, map[string]string{"Inception": "status 429"}, &asked)
+	_, err := client.Search(context.Background(), Query{IMDbID: "tt1375666", EnglishTitle: "Inception", Title: "Начало"})
+	if _, ok := errors.AsType[*LimitError](err); !ok || len(asked) != 1 {
+		t.Errorf("err = %v after %v, want the limit after one search", err, asked)
+	}
+}
+
+// A search the API failed throughout is an error, so the backup JacRed
+// can answer it, not an empty result.
+func TestASearchThatFailedEverywhereIsAnError(t *testing.T) {
+	var asked []string
+	client := fakeSearchAPI(t, map[string]string{"Inception": "status 502", "tt1375666": "status 502"}, &asked)
+	if _, err := client.Search(context.Background(), Query{IMDbID: "tt1375666", EnglishTitle: "Inception"}); err == nil {
+		t.Errorf("no error after %v", asked)
+	}
+}
+
+// Other JacRed protocols search by name only: they do not resolve IMDb ids
+// reliably.
+func TestOnlyTheSearchAPIIsAskedByIMDbID(t *testing.T) {
+	for name, tc := range map[string]struct {
+		opts []Option
+		path string
+		key  string
+	}{
+		"jacred-fdb": {nil, "/api/v1.0/torrents", "search"},
+		"jackett":    {[]Option{WithJackettAPI()}, "/api/v2.0/indexers/all/results", "Query"},
+	} {
+		var got string
+		client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			got = r.URL.Query().Get(tc.key)
+			_, _ = w.Write([]byte(`[]`))
+		}, tc.opts...)
+		_, _ = client.Search(context.Background(), Query{OriginalTitle: "Inception", IMDbID: "tt1375666"})
+		if got != "Inception" {
+			t.Errorf("%s asked %s=%q, want the title", name, tc.key, got)
+		}
+	}
+}
+
+// A name with a slash in it is a name, not two alternatives.
+func TestANameWithASlashFindsItsReleases(t *testing.T) {
+	var asked []string
+	client := fakeSearchAPI(t, map[string]string{
+		"Face/Off": apiReleases(1997, "Face/Off (1997) 1080p BluRay", "Без лица / Face/Off (1997) BDRip"),
+	}, &asked)
+	results, err := client.Search(context.Background(), Query{EnglishTitle: "Face/Off", Title: "Без лица", Year: 1997})
+	if err != nil || len(results) != 2 {
+		t.Errorf("kept %q (err %v), want both releases", titles(results), err)
+	}
+}
+
+// Releases already found are kept when JacRed refuses the next search, and
+// are not remembered as the whole answer.
+func TestReleasesFoundBeforeARefusalAreKept(t *testing.T) {
+	var asked []string
+	pages := map[string]string{"The Bear": apiReleases(2024, "Медведь / The Bear (2024) WEBRip"), "tt14452776": "status 429"}
+	client := fakeSearchAPI(t, pages, &asked)
+	q := Query{IMDbID: "tt14452776", EnglishTitle: "The Bear", Title: "Медведь", Year: 2022, Season: 3, SeasonYear: 2024}
+
+	results, err := client.Search(context.Background(), q)
+	if err != nil || len(results) != 1 {
+		t.Fatalf("kept %q (err %v), want the English name's release", titles(results), err)
+	}
+	pages["tt14452776"] = apiReleases(2024, "Медведь / The Bear [3 сезон] (2024) LostFilm")
+	if results, _ = client.Search(context.Background(), q); len(results) != 2 {
+		t.Errorf("searching again kept %q, want both releases", titles(results))
 	}
 }

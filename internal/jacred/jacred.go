@@ -16,6 +16,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -68,6 +71,11 @@ type Query struct {
 	Title string
 	// OriginalTitle is the primary search term.
 	OriginalTitle string
+	// EnglishTitle and IMDbID ("tt…"), when set, are what the search API is
+	// asked first: torrents are mostly filed under the English name, and
+	// the id finds those JacRed filed under its own (Russian) name for it.
+	IMDbID       string
+	EnglishTitle string
 	// Year, when set, drops releases of other titles with the same name. For
 	// a series it is the first-air year.
 	Year int
@@ -96,6 +104,32 @@ func qualityOf(q int) int {
 	default:
 		return 480
 	}
+}
+
+var imdbID = regexp.MustCompile(`^tt\d{5,10}$`)
+
+// enoughReleases is how many releases the English name must find for the
+// IMDb id not to be asked as well.
+const enoughReleases = 50
+
+// imdb is the query's IMDb id, empty unless well formed.
+func (q Query) imdb() string {
+	if id := strings.TrimSpace(q.IMDbID); imdbID.MatchString(id) {
+		return id
+	}
+	return ""
+}
+
+// names are the title's English, original and local names, each once.
+func (q Query) names() []string {
+	var names []string
+	for _, name := range []string{q.EnglishTitle, q.OriginalTitle, q.Title} {
+		name = strings.TrimSpace(name)
+		if name != "" && !slices.ContainsFunc(names, func(n string) bool { return strings.EqualFold(n, name) }) {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 func (q Query) primary() string {
@@ -355,15 +389,140 @@ func (a apiResult) raw() rawResult {
 // Search returns playable releases, most seeded first. Results are cached
 // briefly and must be treated as read-only.
 func (c *Client) Search(ctx context.Context, q Query) ([]Result, error) {
-	term := q.primary()
-	if term == "" {
+	names := q.names()
+	if len(names) == 0 && q.imdb() == "" {
 		return nil, nil
 	}
-	key := strings.ToLower(fmt.Sprintf("%s\x00%s\x00%d\x00%d\x00%d\x00%v\x00%t", term, strings.TrimSpace(q.Title), q.Year, q.Season, q.SeasonYear, q.Qualities, q.HDR))
+	key := strings.ToLower(fmt.Sprintf("%q\x00%s\x00%s\x00%d\x00%d\x00%d\x00%v\x00%t", names, q.imdb(), q.primary(), q.Year, q.Season, q.SeasonYear, q.Qualities, q.HDR))
 	if results, ok := c.cached(key); ok {
 		return results, nil
 	}
 
+	var results []Result
+	if c.searchAPI && !c.jackettAPI {
+		var complete bool
+		var err error
+		if results, complete, err = c.searchByNames(ctx, q); err != nil || !complete {
+			return results, err
+		}
+	} else {
+		raw, err := c.search(ctx, q.primary(), q)
+		if err != nil {
+			return nil, err
+		}
+		results = normalize(raw, q)
+	}
+	c.store(key, results)
+	return results, nil
+}
+
+// searchByNames asks the search API by the English name, tops few releases
+// up with the IMDb id's, and when neither finds the title, tries its other
+// names in turn. Releases not named after the title are left out: the id
+// and a common-word name find others too. A name the API fails on is
+// passed over; a refusal ends the search, keeping what was found before it,
+// which is then not complete.
+func (c *Client) searchByNames(ctx context.Context, q Query) (results []Result, complete bool, err error) {
+	names := q.names()
+	var failed error
+	ask := func(term string) ([]rawResult, error) {
+		raw, err := c.search(ctx, term, q)
+		if err != nil {
+			if refused(err) || ctx.Err() != nil {
+				return nil, err
+			}
+			failed = cmp.Or(failed, err)
+			return nil, nil
+		}
+		return slices.DeleteFunc(raw, func(r rawResult) bool { return !namedAfter(r.Title, names) }), nil
+	}
+
+	var raw []rawResult
+	// stop ends the search at a refusal, with the releases found before it.
+	stop := func(err error) ([]Result, bool, error) {
+		if found := normalize(raw, q); len(found) > 0 {
+			return found, false, nil
+		}
+		return nil, false, err
+	}
+	others := names
+	if len(names) > 0 {
+		found, err := ask(names[0])
+		if err != nil {
+			return stop(err)
+		}
+		raw, others = found, names[1:]
+	}
+	if id := q.imdb(); id != "" && len(normalize(raw, q)) < enoughReleases {
+		found, err := ask(id)
+		if err != nil {
+			return stop(err)
+		}
+		raw = append(raw, found...)
+	}
+	for _, name := range others {
+		if len(normalize(raw, q)) > 0 {
+			break
+		}
+		found, err := ask(name)
+		if err != nil {
+			return stop(err)
+		}
+		raw = append(raw, found...)
+	}
+	results = normalize(raw, q)
+	if len(results) == 0 && failed != nil {
+		return nil, true, failed
+	}
+	return results, true, nil
+}
+
+// refused reports whether JacRed refused the key, which every other search
+// would be refused too.
+func refused(err error) bool {
+	_, limited := errors.AsType[*LimitError](err)
+	return limited || errors.Is(err, ErrKeyNeeded) || errors.Is(err, ErrBlocked)
+}
+
+// namedAfter reports whether a release title, or one of its "/" or "|"
+// parts, starts with one of names, as in "Медведь / The Bear (2022)" or
+// "The.Bear.S03"; the whole title is tried too, for names with a slash in
+// them ("Face/Off"). Without names every release is.
+func namedAfter(title string, names []string) bool {
+	if len(names) == 0 {
+		return true
+	}
+	parts := strings.FieldsFunc(title, func(r rune) bool { return r == '/' || r == '|' })
+	for _, part := range append(parts, title) {
+		part = plain(part)
+		for _, name := range names {
+			if name = plain(name); name != "" && (part == name || strings.HasPrefix(part, name+" ")) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// plain is s in lower case without accents or punctuation: "Shōgun" and
+// "Shogun", "Dead-End Job" and "Dead.End.Job" match.
+func plain(s string) string {
+	s = strings.ReplaceAll(strings.ToLower(norm.NFKD.String(s)), "ё", "е")
+	s = strings.Map(func(r rune) rune {
+		switch {
+		case unicode.Is(unicode.Mn, r):
+			return -1
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			return r
+		default:
+			return ' '
+		}
+	}, s)
+	return strings.Join(strings.Fields(s), " ")
+}
+
+// search asks for one term.
+func (c *Client) search(ctx context.Context, term string, q Query) ([]rawResult, error) {
 	req, err := c.request(ctx, term, q)
 	if err != nil {
 		return nil, err
@@ -393,9 +552,7 @@ func (c *Client) Search(ctx context.Context, q Query) ([]Result, error) {
 		})
 	}
 
-	results := normalize(raw, q)
-	c.store(key, results)
-	return results, nil
+	return raw, nil
 }
 
 // request asks for term in the instance's protocol.

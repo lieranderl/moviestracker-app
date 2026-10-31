@@ -172,7 +172,7 @@ var inception = &tmdb.MovieDetails{
 		Overview: "Cobb steals secrets from dreams.", PosterPath: "/poster.jpg", BackdropPath: "/backdrop.jpg",
 		VoteAverage: 8.4, VoteCount: 37000, ImdbID: "tt1375666", TrailerKey: "YoHD9XEInc0",
 	},
-	OriginalTitle: "Inception", Tagline: "Your mind is the scene of the crime.", Runtime: 148, Certification: "PG-13",
+	OriginalTitle: "Inception", EnglishTitle: "Inception", Tagline: "Your mind is the scene of the crime.", Runtime: 148, Certification: "PG-13",
 	Homepage:        "https://www.warnerbros.com/movies/inception",
 	Links:           tmdb.ExternalIDs{IMDb: "tt1375666", Instagram: "inceptionmovie", Twitter: "Bad handle/../x", Wikidata: "Q25188"},
 	Genres:          []tmdb.Genre{{ID: 28, Name: "Action"}},
@@ -347,7 +347,8 @@ func TestTorrentSearchStreamsProgressThenResults(t *testing.T) {
 			t.Errorf("results missing %q", want)
 		}
 	}
-	if len(jr.queries) != 1 || jr.queries[0].OriginalTitle != "Inception" || jr.queries[0].Year != 2010 {
+	if len(jr.queries) != 1 || jr.queries[0].OriginalTitle != "Inception" || jr.queries[0].Year != 2010 ||
+		jr.queries[0].EnglishTitle != "Inception" || jr.queries[0].IMDbID != "tt1375666" {
 		t.Errorf("JacRed queries = %+v", jr.queries)
 	}
 }
