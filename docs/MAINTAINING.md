@@ -52,6 +52,7 @@ changing it (it updates what exists).
 | --- | --- | --- |
 | `ci.yml` | pull requests, pushes to `main`, called by releases | `make ci` (generated files, lint, race tests, govulncheck, gosec, build) and the TorrServer API contract; gitleaks over the whole history; macOS tests and a real DMG build; Windows tests, a real installer build, and its install, upgrade, quit, uninstall and purge; the Docker image end to end with `compose.yaml` (`scripts/ci/docker-e2e.sh`: TorrServer and GStreamer, setup, persistence, shutdown, licences) on amd64 and on native arm64 runners; zizmor over the workflows; **CI passed** when all of them are green |
 | `pr.yml` | pull requests | Conventional Commit titles; dependency review (vulnerable or AGPL-incompatible dependencies); labels from the title; auto-merge for Dependabot's minor and patch updates |
+| `dependabot-assets.yml` | Dependabot's Bun pull requests | Rebuilds the committed assets from the pull request merged into `main` and, when they changed, commits them to its branch as the pins app, so CI's generated-files check passes; the build runs with a read-only token and no secrets, the commit job runs nothing from the pull request |
 | `codeql.yml` | pull requests, `main`, weekly | CodeQL for Go, JavaScript and the workflows; results in templ's generated `*_templ.go` are dropped before upload |
 | `release.yml` | `v*` tags | Checks the tag is on `main`, runs CI, then in parallel the Docker image for linux/amd64 and linux/arm64 (pushed to `ghcr.io/lieranderl/moviestracker:<version>` with SBOM and signed provenance), the DMG and the Windows installer; checksums, signed build provenance, and a **draft** release |
 | `pins.yml` | Mondays, or by hand | `scripts/update-pins.sh` moves the TorrServer and GStreamer pins to upstream's latest stable releases once they are a week old, and opens (or refreshes) a pull request from the branch `deps/pins` as the pins app; it waits for a person (see [Dependencies](#dependencies)) |
@@ -205,10 +206,11 @@ create a new read-only token for the Moviestracker TMDB account, update the
 secret, release, then revoke the old token.
 
 The `pins` environment, which only `main` can use, holds the pins app that
-opens the weekly pin updates: the variable `PINS_APP_CLIENT_ID` and the secret
+opens the weekly pin updates and commits rebuilt assets to Dependabot's Bun
+updates: the variable `PINS_APP_CLIENT_ID` and the secret
 `PINS_APP_PRIVATE_KEY`. Actions may not open pull requests in this
-repository, and pull requests opened with `GITHUB_TOKEN` would not start CI,
-so the app does it. To create it (once):
+repository, and pull requests opened or pushed with `GITHUB_TOKEN` would not
+start CI, so the app does it. To create it (once):
 
 1. GitHub → Settings → Developer settings → GitHub Apps → **New GitHub App**:
    any unique name (for example `moviestracker-pins`), this repository as the
