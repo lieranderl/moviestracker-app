@@ -472,3 +472,231 @@ func notFound(err error) bool {
 	var se interface{ GRPCStatus() *status.Status }
 	return errors.As(err, &se) && se.GRPCStatus().Code() == codes.NotFound
 }
+
+// customListRecord is a users/{uid}/lists/{id} document. Its titles are in
+// it, newest first: a list holds few enough for one document.
+type customListRecord struct {
+	Name      string            `firestore:"name"`
+	Titles    []listTitleRecord `firestore:"titles"`
+	ShareID   string            `firestore:"shareId,omitempty"`
+	UpdatedAt time.Time         `firestore:"updatedAt"`
+}
+
+// sharedListRecord is a sharedLists/{shareId} document: whose list its
+// link opens.
+type sharedListRecord struct {
+	UID  string `firestore:"uid"`
+	List string `firestore:"list"`
+}
+
+type listTitleRecord struct {
+	Kind    string    `firestore:"kind"`
+	TMDBID  int       `firestore:"tmdbId"`
+	Title   string    `firestore:"title"`
+	Poster  string    `firestore:"poster,omitempty"`
+	AddedAt time.Time `firestore:"addedAt"`
+}
+
+func (f *Firestore) lists(uid string) *firestore.CollectionRef {
+	return f.userDoc(uid).Collection("lists")
+}
+
+// list is list id's document; ok is false when id, as a URL gives it, is
+// no document ID.
+func (f *Firestore) list(uid, id string) (doc *firestore.DocumentRef, ok bool) {
+	if id == "" || strings.ContainsAny(id, "/.") {
+		return nil, false
+	}
+	return f.lists(uid).Doc(id), true
+}
+
+func toListRecord(l CustomList) customListRecord {
+	rec := customListRecord{Name: l.Name, Titles: make([]listTitleRecord, len(l.Titles)), ShareID: l.ShareID, UpdatedAt: l.UpdatedAt}
+	for i, t := range l.Titles {
+		rec.Titles[i] = listTitleRecord(t)
+	}
+	return rec
+}
+
+func readCustomList(snap *firestore.DocumentSnapshot) (CustomList, error) {
+	var rec customListRecord
+	if err := snap.DataTo(&rec); err != nil {
+		return CustomList{}, fmt.Errorf("read list %s: %w", snap.Ref.ID, err)
+	}
+	l := CustomList{ID: snap.Ref.ID, Name: rec.Name, Titles: make([]ListTitle, len(rec.Titles)), ShareID: rec.ShareID, UpdatedAt: rec.UpdatedAt}
+	for i, t := range rec.Titles {
+		l.Titles[i] = ListTitle(t)
+	}
+	return l, nil
+}
+
+// CreateCustomList implements Store.
+func (f *Firestore) CreateCustomList(ctx context.Context, uid, name string) (CustomList, error) {
+	name, err := checkListName(name)
+	if err != nil {
+		return CustomList{}, err
+	}
+	kept, err := f.lists(uid).Select().Documents(ctx).GetAll()
+	if err != nil {
+		return CustomList{}, fmt.Errorf("count lists: %w", err)
+	}
+	if len(kept) >= maxLists {
+		return CustomList{}, ErrTooManyLists
+	}
+	l := CustomList{ID: newID(), Name: name, Titles: []ListTitle{}, UpdatedAt: f.opts.now().UTC()}
+	if _, err := f.lists(uid).Doc(l.ID).Create(ctx, toListRecord(l)); err != nil {
+		return CustomList{}, fmt.Errorf("make list: %w", err)
+	}
+	return l, nil
+}
+
+// CustomLists implements Store. They are sorted here, like watch states.
+func (f *Firestore) CustomLists(ctx context.Context, uid string) ([]CustomList, error) {
+	docs, err := f.lists(uid).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("read lists: %w", err)
+	}
+	out := make([]CustomList, 0, len(docs))
+	for _, doc := range docs {
+		l, err := readCustomList(doc)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, l)
+	}
+	slices.SortFunc(out, recentlyChanged)
+	return out, nil
+}
+
+// RemoveCustomList implements Store. Its link goes with it.
+func (f *Firestore) RemoveCustomList(ctx context.Context, uid, id string) error {
+	return f.changeList(ctx, uid, id, func(tx *firestore.Transaction, doc *firestore.DocumentRef, l CustomList) error {
+		if l.ShareID != "" {
+			if err := tx.Delete(f.sharedLists().Doc(l.ShareID)); err != nil {
+				return err
+			}
+		}
+		return tx.Delete(doc)
+	})
+}
+
+func (f *Firestore) sharedLists() *firestore.CollectionRef { return f.client.Collection("sharedLists") }
+
+// ShareList implements Store.
+func (f *Firestore) ShareList(ctx context.Context, uid, id string, on bool) (CustomList, error) {
+	var out CustomList
+	err := f.changeList(ctx, uid, id, func(tx *firestore.Transaction, doc *firestore.DocumentRef, l CustomList) error {
+		out = l
+		switch {
+		case on && l.ShareID == "":
+			out.ShareID = newShareID()
+			if err := tx.Create(f.sharedLists().Doc(out.ShareID), sharedListRecord{UID: uid, List: id}); err != nil {
+				return err
+			}
+		case !on && l.ShareID != "":
+			out.ShareID = ""
+			if err := tx.Delete(f.sharedLists().Doc(l.ShareID)); err != nil {
+				return err
+			}
+		default:
+			return nil
+		}
+		return tx.Set(doc, toListRecord(out))
+	})
+	return out, err
+}
+
+// SharedList implements Store.
+func (f *Firestore) SharedList(ctx context.Context, shareID string) (CustomList, bool, error) {
+	if shareID == "" || strings.ContainsAny(shareID, "/.") {
+		return CustomList{}, false, nil
+	}
+	snap, err := f.sharedLists().Doc(shareID).Get(ctx)
+	if notFound(err) {
+		return CustomList{}, false, nil
+	}
+	if err != nil {
+		return CustomList{}, false, fmt.Errorf("read shared list: %w", err)
+	}
+	var ref sharedListRecord
+	if err := snap.DataTo(&ref); err != nil {
+		return CustomList{}, false, fmt.Errorf("read shared list: %w", err)
+	}
+	l, ok, err := f.CustomList(ctx, ref.UID, ref.List)
+	if err != nil || !ok || l.ShareID != shareID {
+		return CustomList{}, false, err
+	}
+	return l, true, nil
+}
+
+// CustomList implements Store.
+func (f *Firestore) CustomList(ctx context.Context, uid, id string) (CustomList, bool, error) {
+	doc, ok := f.list(uid, id)
+	if !ok {
+		return CustomList{}, false, nil
+	}
+	snap, err := doc.Get(ctx)
+	if notFound(err) {
+		return CustomList{}, false, nil
+	}
+	if err != nil {
+		return CustomList{}, false, fmt.Errorf("read list: %w", err)
+	}
+	l, err := readCustomList(snap)
+	return l, err == nil, err
+}
+
+// changeList changes list id in a transaction, in which change writes.
+func (f *Firestore) changeList(ctx context.Context, uid, id string, change func(*firestore.Transaction, *firestore.DocumentRef, CustomList) error) error {
+	doc, ok := f.list(uid, id)
+	if !ok {
+		return ErrNoList
+	}
+	err := f.client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		snap, err := tx.Get(doc)
+		if notFound(err) {
+			return ErrNoList
+		}
+		if err != nil {
+			return err
+		}
+		l, err := readCustomList(snap)
+		if err != nil {
+			return err
+		}
+		return change(tx, doc, l)
+	})
+	if err != nil && !errors.Is(err, ErrNoList) && !errors.Is(err, ErrListFull) {
+		return fmt.Errorf("change list: %w", err)
+	}
+	return err
+}
+
+// changeTitles changes list id's titles: change says whether it did.
+func (f *Firestore) changeTitles(ctx context.Context, uid, id string, change func(CustomList) (CustomList, bool, error)) error {
+	return f.changeList(ctx, uid, id, func(tx *firestore.Transaction, doc *firestore.DocumentRef, l CustomList) error {
+		l, changed, err := change(l)
+		if err != nil || !changed {
+			return err
+		}
+		return tx.Set(doc, toListRecord(l))
+	})
+}
+
+// AddToList implements Store.
+func (f *Firestore) AddToList(ctx context.Context, uid, id string, t ListTitle) error {
+	if _, err := titleID(t.Kind, t.TMDBID); err != nil {
+		return err
+	}
+	at := f.opts.now().UTC()
+	return f.changeTitles(ctx, uid, id, func(l CustomList) (CustomList, bool, error) { return withTitle(l, t, at) })
+}
+
+// RemoveFromList implements Store.
+func (f *Firestore) RemoveFromList(ctx context.Context, uid, id, kind string, tmdbID int) error {
+	at := f.opts.now().UTC()
+	return f.changeTitles(ctx, uid, id, func(l CustomList) (CustomList, bool, error) {
+		l, changed := withoutTitle(l, kind, tmdbID, at)
+		return l, changed, nil
+	})
+}
