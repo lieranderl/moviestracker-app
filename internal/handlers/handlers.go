@@ -37,47 +37,48 @@ import (
 
 // Server holds application state and dependencies for HTTP handling.
 type Server struct {
-	*Catalog        // the catalog's pages, for this server's accounts
-	mux             *http.ServeMux
-	handler         http.Handler // mux behind the setup gate and cross-origin (CSRF) protection
-	sessions        *auth.SessionManager
-	lanAddress      func() string
-	presence        *presence
-	events          *events.Recorder
-	accounts        *auth.Accounts
-	store           *config.Store
-	env             config.Env
-	connector       sources.Connector
-	current         atomic.Pointer[sources.Clients] // replaced when Sources are saved
-	secureCookies   bool
-	loginLimiter    *loginLimiter
-	loginRetryAfter string
-	trustedProxies  []netip.Prefix
-	sseSlots        chan struct{}
-	streams         context.Context // canceled by Close to end every SSE stream
-	stopStreams     context.CancelFunc
-	closeOnce       sync.Once
-	catalogTimeout  time.Duration
-	torrServer      *torrserver.Manager
-	engine          *engine.Supervisor                // nil without a TorrServer program
-	gst             *gstinstall.Installer             // downloads GStreamer in the macOS app; nil elsewhere
-	updates         *update.Checker                   // new releases; nil never tells
-	links           atomic.Pointer[streamlink.Signer] // signs the links external players open
-	playing         atomic.Int64                      // media responses streaming through the proxy
-	live            *live.Hub                         // shared pollers behind every live view
-	progress        *Progress                         // where each account stopped watching
-	titleStates     *TitleStates                      // what each account wants to watch or watched
-	plays           *playback.Tracker                 // what plays through the proxy
-	sampler         *stats.Sampler                    // this machine, for the dashboard
-	startedAt       time.Time
-	version         string
-	hlsOutputs      hlsOutputCache         // what GStreamer serves, as seen by the stream proxy
-	setupCode       string                 // lets another device create the first admin
-	titles          titleLookups           // torrents whose titles were looked up on TMDB
-	appsPort        *gateway.Port          // other apps' door to TorrServer; nil without one
-	appsTLSPort     *gateway.Port          // the same door over HTTPS; nil without one
-	appsProblem     atomic.Pointer[string] // why the apps port did not open at startup
-	appsTLSProblem  atomic.Pointer[string] // why the apps HTTPS port did not open
+	*Catalog           // the catalog's pages, for this server's accounts
+	mux                *http.ServeMux
+	handler            http.Handler // mux behind the setup gate and cross-origin (CSRF) protection
+	sessions           *auth.SessionManager
+	lanAddress         func() string
+	presence           *presence
+	events             *events.Recorder
+	accounts           *auth.Accounts
+	store              *config.Store
+	env                config.Env
+	connector          sources.Connector
+	current            atomic.Pointer[sources.Clients] // replaced when Sources are saved
+	secureCookies      bool
+	loginLimiter       *loginLimiter
+	loginRetryAfter    string
+	trustedProxies     []netip.Prefix
+	sseSlots           chan struct{}
+	streams            context.Context // canceled by Close to end every SSE stream
+	stopStreams        context.CancelFunc
+	closeOnce          sync.Once
+	catalogTimeout     time.Duration
+	torrServer         *torrserver.Manager
+	engine             *engine.Supervisor                // nil without a TorrServer program
+	gst                *gstinstall.Installer             // downloads GStreamer in the macOS app; nil elsewhere
+	updates            *update.Checker                   // new releases; nil never tells
+	links              atomic.Pointer[streamlink.Signer] // signs the links external players open
+	playing            atomic.Int64                      // media responses streaming through the proxy
+	live               *live.Hub                         // shared pollers behind every live view
+	progress           *Progress                         // where each account stopped watching
+	titleStates        *TitleStates                      // what each account wants to watch or watched
+	releaseFilterPrefs *ReleaseFilterPrefs               // how each account last searched releases
+	plays              *playback.Tracker                 // what plays through the proxy
+	sampler            *stats.Sampler                    // this machine, for the dashboard
+	startedAt          time.Time
+	version            string
+	hlsOutputs         hlsOutputCache         // what GStreamer serves, as seen by the stream proxy
+	setupCode          string                 // lets another device create the first admin
+	titles             titleLookups           // torrents whose titles were looked up on TMDB
+	appsPort           *gateway.Port          // other apps' door to TorrServer; nil without one
+	appsTLSPort        *gateway.Port          // the same door over HTTPS; nil without one
+	appsProblem        atomic.Pointer[string] // why the apps port did not open at startup
+	appsTLSProblem     atomic.Pointer[string] // why the apps HTTPS port did not open
 }
 
 // NewServer initializes all HTTP routes and returns the configured Server.
@@ -146,6 +147,12 @@ func NewServer(cfg Config) (*Server, error) {
 		return nil, err
 	}
 	s.titleStates = NewTitleStates(titles, s.username, s.Catalog)
+	filters, err := store.OpenFilterFile(filepath.Join(cfg.Store.Dir(), "filters.json"))
+	if err != nil {
+		return nil, err
+	}
+	s.releaseFilterPrefs = NewReleaseFilterPrefs(filters, s.username)
+	s.RememberReleaseFilters(s.releaseFilterPrefs)
 	s.progress = NewProgress(progress, s.username, s.progressTorrent)
 	s.ShowProgress(s.progress)
 	s.progress.MarkFinishedMoviesIn(s.titleStates)
@@ -290,6 +297,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/torrserver/torrent-stats", s.handleTorrentStats)
 	s.progress.Register(s.mux)
 	s.titleStates.Register(s.mux)
+	s.releaseFilterPrefs.Register(s.mux)
 	s.mux.HandleFunc("GET /api/torrserver/stream/", s.handleTorrServerStreamProxy)
 
 	// Signed links for external players (VLC, TVs, playlists): no session.

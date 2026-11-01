@@ -54,7 +54,7 @@ func originalTitle(original, title string) string {
 templ MoviePage(user *auth.User, m *tmdb.MovieDetails) {
 	@layoutWithScripts(PageTitle(m.MediaItem), titleScripts(ctx)...) {
 		@Navbar(user)
-		<main class="grow pb-16" data-signals={ mediaPageSignals } data-on:click={ videoClick(ctx) }>
+		<main class="grow pb-16" data-signals={ mediaPageSignals(ctx) } data-on:click={ videoClick(ctx) }>
 			@detailHero(m.MediaItem, movieFacts(ctx, m), m.Certification, genreNames(m.Genres)) {
 				@trailerButton(m.TrailerKey, trf(ctx, "%s trailer", m.Title))
 				@progressSlot("movie", m.ID)
