@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/store"
@@ -41,10 +42,82 @@ func NewProgress(s store.ProgressStore, user func(*http.Request) (string, bool),
 	return &Progress{store: s, user: user, torrent: torrent}
 }
 
+// continueLimit is how many unfinished files the home page lists.
+const continueLimit = 12
+
+// titleWindow is how many unfinished files a title page looks through.
+const titleWindow = 50
+
+// recent is what the signed-in user has not finished, newest first, for
+// the home page.
+func (p *Progress) recent(r *http.Request) []store.Progress { return p.recentOf(r, continueLimit) }
+
+// recentOf is up to limit files the signed-in user has not finished, newest
+// first; none for a nil p, a signed-out visitor or a store that does not
+// answer.
+func (p *Progress) recentOf(r *http.Request, limit int) []store.Progress {
+	if p == nil {
+		return nil
+	}
+	uid, ok := p.user(r)
+	if !ok {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
+	defer cancel()
+	watching, err := p.store.RecentProgress(ctx, uid, limit)
+	if err != nil {
+		slog.Warn("reading recent progress failed", "error", logError(err))
+	}
+	return watching
+}
+
+// PlayRequest is the file a TorrServer page's link asks to play
+// (?play=<hash>&file=<id>), titled as the user last watched it.
+func (p *Progress) PlayRequest(r *http.Request) (views.PlayRequest, bool) {
+	hash := r.URL.Query().Get("play")
+	index, err := strconv.Atoi(r.URL.Query().Get("file"))
+	if !infoHash.MatchString(hash) || err != nil || index < 1 {
+		return views.PlayRequest{}, false
+	}
+	req := views.PlayRequest{Hash: strings.ToLower(hash), Index: index}
+	if uid, ok := p.user(r); ok {
+		ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
+		defer cancel()
+		if kept, found, err := p.store.Progress(ctx, uid, hash, index); err == nil && found {
+			req.Title = kept.Title
+		}
+	}
+	return req, true
+}
+
 // Register adds the progress routes to mux.
 func (p *Progress) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/progress", p.handleSave)
 	mux.HandleFunc("GET /api/progress/resume", p.handleResume)
+	mux.HandleFunc("GET /api/progress/title", p.handleTitle)
+}
+
+// handleTitle patches a title page's button to continue the file of it the
+// user last left unfinished, or an empty slot.
+func (p *Progress) handleTitle(w http.ResponseWriter, r *http.Request) {
+	kind := r.URL.Query().Get("type")
+	id, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if (kind != "movie" && kind != "tv") || err != nil || id <= 0 {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	var last *store.Progress
+	for _, kept := range p.recentOf(r, titleWindow) {
+		if kept.Kind == kind && kept.TMDBID == id {
+			last = &kept
+			break
+		}
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.ProgressButton(last)); err != nil {
+		slog.Warn("patching the title progress failed", "error", err)
+	}
 }
 
 // handleResume patches the player's offer to resume a file where the user

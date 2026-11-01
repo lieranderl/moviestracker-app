@@ -42,6 +42,6 @@ func (c *Catalog) handleMoviesPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	component := views.Movies(user, catalog.Hero, catalog.Movies, catalog.Series, c.clients().Details != nil)
+	component := views.Movies(user, catalog.Hero, catalog.Movies, catalog.Series, c.clients().Details != nil, c.progress.recent(r))
 	templ.Handler(component).ServeHTTP(w, r)
 }

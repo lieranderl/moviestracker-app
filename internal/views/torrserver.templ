@@ -734,6 +734,7 @@ templ torrPlayerModalFor(browser bool) {
 			<div class="hidden" data-effect={ torrQueueFetch }></div>
 		}
 		<div class="hidden" data-effect={ progressResumeFetch }></div>
+		@torrAutoplay(browser)
 		<header class="flex items-center justify-between gap-4 pb-3 border-b border-base-content/10">
 			<div class="flex items-center gap-2 min-w-0">
 				@playKindSwitch(browser)
@@ -1435,10 +1436,12 @@ func trackDetails(ctx context.Context, trk torrserver.ProbeTrack) string {
 // TorrServerAlertFragment replaces the alert region. A fresh element id per
 // render makes Datastar re-initialise the alert (and its $torrAlert signal).
 templ TorrServerAlertFragment(msg, alertType string, container ...string) {
-	{{ id := "torr-alert-container"
-if len(container) > 0 {
-	id = container[0]
-} }}
+	{{
+		id := "torr-alert-container"
+		if len(container) > 0 {
+			id = container[0]
+		}
+	}}
 	<div id={ id }>
 		if msg != "" {
 			<div

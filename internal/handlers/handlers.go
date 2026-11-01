@@ -141,6 +141,7 @@ func NewServer(cfg Config) (*Server, error) {
 		return nil, err
 	}
 	s.progress = NewProgress(progress, s.username, s.progressTorrent)
+	s.ShowProgress(s.progress)
 	s.routes()
 	// Rejects cross-origin POSTs (Sec-Fetch-Site / Origin), so no other site
 	// can submit forms or Datastar actions with a visitor's cookies.

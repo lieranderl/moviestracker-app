@@ -57,6 +57,7 @@ templ MoviePage(user *auth.User, m *tmdb.MovieDetails) {
 		<main class="grow pb-16" data-signals={ mediaPageSignals } data-on:click={ videoClick(ctx) }>
 			@detailHero(m.MediaItem, movieFacts(ctx, m), m.Certification, genreNames(m.Genres)) {
 				@trailerButton(m.TrailerKey, trf(ctx, "%s trailer", m.Title))
+				@progressSlot("movie", m.ID)
 				if siteOf(ctx).Cloud {
 					@favoriteSlot("movie", m.ID)
 				}

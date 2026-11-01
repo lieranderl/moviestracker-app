@@ -60,3 +60,40 @@ func TestTheWebPlayerReportsProgressWithTheRelayedTorrentAndOffersToResume(t *te
 		t.Errorf("resume = %d, want an offer to resume from 42:10:\n%s", res.Code, res.Body)
 	}
 }
+
+func TestTheHomePageListsWhatAUserIsWatching(t *testing.T) {
+	h, session, _ := favorites(t)
+	if page := getWith(t, h, "/", session).Body.String(); strings.Contains(page, `id="continue-watching"`) {
+		t.Error("a user who never played anything sees Continue watching")
+	}
+	postPlayer(t, h, "/api/progress", duneProgress, session)
+	page := html.UnescapeString(getWith(t, h, "/", session).Body.String())
+	for _, want := range []string{`id="continue-watching"`, "Continue watching", `href="/torrserver?play=aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111&file=2"`, `value="27"`, "Dune", "1:53:50 left"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("home page lacks %q", want)
+		}
+	}
+}
+
+func TestContinueWatchingOpensTheWebPlayerOnceTheTorrServerAnswers(t *testing.T) {
+	h, session, _ := torrServers(t)
+	postPlayer(t, h, "/api/progress", duneProgress, session)
+	page := html.UnescapeString(getWith(t, h, "/torrserver?play=aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111&file=2", session).Body.String())
+	for _, want := range []string{`id="torr-autoplay"`, "$tsSelected && $tsStatus.ok", "$activeHash = 'aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111'", "$activeFileIndex = 2", `$streamTitle = "Dune"`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("player lacks %q", want)
+		}
+	}
+}
+
+func TestAWebTitlePageAsksWhereTheUserStopped(t *testing.T) {
+	h, session, _ := favorites(t)
+	page := html.UnescapeString(getWith(t, h, "/movie/438631", session).Body.String())
+	if !strings.Contains(page, "@get('/api/progress/title?type=movie&id=438631')") {
+		t.Error("the movie page does not ask where the user stopped")
+	}
+	postPlayer(t, h, "/api/progress", duneProgress, session)
+	if body := send(t, h, http.MethodGet, "/api/progress/title?type=movie&id=438631", session).Body.String(); !strings.Contains(body, "42:10 of 2:36:00") {
+		t.Errorf("title progress = %s, want Continue at 42:10", body)
+	}
+}

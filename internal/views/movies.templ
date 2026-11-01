@@ -2,9 +2,10 @@ package views
 
 import (
 	"context"
-	"github.com/lieranderl/moviestracker-app/internal/auth"
-	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"fmt"
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/store"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"net/url"
 )
 
@@ -33,7 +34,8 @@ document.querySelectorAll('iframe[data-trailer-iframe]').forEach(f => f.contentW
 `
 
 // Movies is the authenticated home; discover adds the lazily loaded rails.
-templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, series []tmdb.MediaItem, discover bool) {
+// Movies is the home page; watching is what the user has not finished.
+templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, series []tmdb.MediaItem, discover bool, watching []store.Progress) {
 	@Layout(tr(ctx, "Trending Movies & Series")) {
 		@Navbar(user)
 		<main class="grow pb-20">
@@ -45,6 +47,9 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 			}
 			@categoryBar(homeLists(ctx, discover), "")
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 space-y-10 mt-10">
+				if len(watching) > 0 {
+					@continueWatching(watching)
+				}
 				if load := siteOf(ctx).RecentTorrents; load != nil {
 					@RecentTorrentsSlot(load)
 				}

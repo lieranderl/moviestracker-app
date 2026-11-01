@@ -44,8 +44,12 @@ func (s *Server) handleTorrServerPage(w http.ResponseWriter, r *http.Request) {
 	torrents, _ := client.ListTorrents(ctx)
 	s.matchTitles(torrents)
 
+	page := r.Context()
+	if play, ok := s.progress.PlayRequest(r); ok {
+		page = views.WithPlayRequest(page, play)
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := views.TorrServer(user, s.engineLabel(), s.linkOrigin(r), s.streamLinks(), echo, torrents, s.gstSetup(user, s.gstStatus(), echo)).Render(r.Context(), w); err != nil {
+	if err := views.TorrServer(user, s.engineLabel(), s.linkOrigin(r), s.streamLinks(), echo, torrents, s.gstSetup(user, s.gstStatus(), echo)).Render(page, w); err != nil {
 		slog.Error("failed to render TorrServer view", "error", err)
 	}
 }

@@ -25,7 +25,7 @@ type ProgressFile struct {
 // OpenProgressFile reads the progress kept at path; a missing file is none.
 func OpenProgressFile(path string, opts ...Option) (*ProgressFile, error) {
 	f := &ProgressFile{opts: newOptions(opts), path: path, users: map[string]map[string]Progress{}}
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(filepath.Clean(path)) // the data directory's file, not user input
 	if errors.Is(err, fs.ErrNotExist) {
 		return f, nil
 	}

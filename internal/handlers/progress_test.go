@@ -110,3 +110,42 @@ func TestTheLocalPlayerReportsProgressAndAsksWhereToResume(t *testing.T) {
 		}
 	}
 }
+
+func TestTheLocalHomePageListsWhatAnAccountIsWatching(t *testing.T) {
+	s := progressServer(t)
+	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":2530.4,"duration":9360.2}`, true)
+	page := html.UnescapeString(get(t, s, homePath, true).Body.String())
+	for _, want := range []string{`id="continue-watching"`, `href="/torrserver?play=` + duneHash + `&file=2"`, `value="27"`, "1:53:50 left"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("home page lacks %q", want)
+		}
+	}
+}
+
+func TestContinueWatchingOpensTheLocalPlayerOnTheFile(t *testing.T) {
+	s := progressServer(t)
+	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":2530.4,"duration":9360.2}`, true)
+	page := html.UnescapeString(get(t, s, "/torrserver?play="+duneHash+"&file=2", true).Body.String())
+	for _, want := range []string{`id="torr-autoplay"`, "$activeHash = '" + duneHash + "'", "$activeFileIndex = 2", `$streamTitle = "Dune"`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("player lacks %q", want)
+		}
+	}
+	if page := get(t, s, "/torrserver?play=dune&file=2", true).Body.String(); strings.Contains(page, `id="torr-autoplay"`) {
+		t.Error("a link without a torrent hash opens the player")
+	}
+}
+
+func TestATitlePageOffersToContinueWhereTheAccountStopped(t *testing.T) {
+	s := progressServer(t)
+	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":2530.4,"duration":9360.2}`, true)
+	body := html.UnescapeString(get(t, s, "/api/progress/title?type=movie&id=438631", true).Body.String())
+	for _, want := range []string{`id="progress-button"`, `href="/torrserver?play=` + duneHash + `&file=2"`, "Continue · 42:10 of 2:36:00"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("title progress lacks %q:\n%s", want, body)
+		}
+	}
+	if body := get(t, s, "/api/progress/title?type=movie&id=1", true).Body.String(); strings.Contains(body, "Continue") {
+		t.Error("a title never played offers to continue")
+	}
+}
