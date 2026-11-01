@@ -162,3 +162,23 @@ func TestAUserSharesAListByALinkAnyoneCanOpenUntilTheyStop(t *testing.T) {
 		t.Errorf("after sharing stopped the link = %d, want 404", res.Code)
 	}
 }
+
+func TestMyListsTellsAUserWithoutListsTheyCanMakeAndShareThem(t *testing.T) {
+	h, session, users := favorites(t)
+	if page := html.UnescapeString(getWith(t, h, "/lists/want", session).Body.String()); !strings.Contains(page, `id="lists-hint"`) {
+		t.Error("My lists has no place for the hint")
+	}
+	tabs := html.UnescapeString(send(t, h, http.MethodGet, "/api/lists/tabs?active=want", session).Body.String())
+	for _, want := range []string{`id="lists-hint"`, "Make your own lists", "share one by link", "$_newListOpen = true"} {
+		if !strings.Contains(tabs, want) {
+			t.Errorf("a user without lists is not told %q:\n%s", want, tabs)
+		}
+	}
+	if _, err := users.CreateCustomList(context.Background(), "1098765", "Mine"); err != nil {
+		t.Fatal(err)
+	}
+	tabs = html.UnescapeString(send(t, h, http.MethodGet, "/api/lists/tabs?active=want", session).Body.String())
+	if !strings.Contains(tabs, `id="lists-hint"`) || strings.Contains(tabs, "Make your own lists") {
+		t.Errorf("a user with a list is still given the hint:\n%s", tabs)
+	}
+}

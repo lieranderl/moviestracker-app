@@ -144,17 +144,24 @@ func (cl *CustomLists) handleTabs(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
 	defer cancel()
-	lists, err := cl.store.CustomLists(ctx, uid)
-	if err != nil {
-		slog.Warn("reading lists failed", "error", logError(err))
+	lists, readErr := cl.store.CustomLists(ctx, uid)
+	if readErr != nil {
+		slog.Warn("reading lists failed", "error", logError(readErr))
 	}
 	links := make([]views.ListLink, 0, len(lists))
 	for _, l := range lists {
 		links = append(links, views.ListLink{ID: l.ID, Name: l.Name})
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.ListTabs(r.URL.Query().Get("active"), links, false)); err != nil {
+	sse := datastar.NewSSE(w, r)
+	if err := sse.PatchElementTempl(views.ListTabs(r.URL.Query().Get("active"), links, false)); err != nil {
 		slog.Warn("patching list tabs failed", "error", err)
+		return
+	}
+	// The hint is for users who have made no list, not for a store that
+	// did not answer.
+	if err := sse.PatchElementTempl(views.ListsHint(readErr == nil && len(lists) == 0, cl.sharing != nil)); err != nil {
+		slog.Warn("patching the lists hint failed", "error", err)
 	}
 }
 
