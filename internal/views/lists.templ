@@ -78,6 +78,7 @@ templ listsLayout(user *auth.User, active string) {
 					</h1>
 					@ListTabs(active, nil, true)
 				</header>
+				<div id="lists-hint"></div>
 				{ children... }
 			</div>
 			@newListDialog()

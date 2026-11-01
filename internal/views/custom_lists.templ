@@ -117,6 +117,32 @@ templ ListTabs(active string, lists []ListLink, load bool) {
 	</nav>
 }
 
+// ListsHint tells a user with no lists of their own (show) that they can
+// make them and, where the site shares lists, share one by link.
+templ ListsHint(show, sharing bool) {
+	<div id="lists-hint">
+		if show {
+			<div role="note" class="alert alert-info alert-soft items-start sm:items-center">
+				@Icon("list-plus", "size-5 shrink-0")
+				<div class="space-y-1">
+					<p class="font-semibold">{ tr(ctx, "Make your own lists") }</p>
+					<p class="text-sm">
+						if sharing {
+							{ tr(ctx, "A movie night, picks for a friend: press New list, or Add to list on any movie or series. Then share one by link: anyone with it can see the list, without signing in.") }
+						} else {
+							{ tr(ctx, "A movie night, picks for a friend: press New list, or Add to list on any movie or series.") }
+						}
+					</p>
+				</div>
+				<button type="button" class="btn btn-sm btn-info gap-2" data-on:click="$_newListOpen = true">
+					@Icon("plus", "size-4")
+					{ tr(ctx, "New list") }
+				</button>
+			</div>
+		}
+	</div>
+}
+
 // newListDialog names a new list and makes it; the server opens it.
 templ newListDialog() {
 	@modalDialog("new-list", "_newListOpen", "", "", "max-w-md", templ.Attributes{"data-signals": "{ _newListOpen: false, listName: '' }"}) {
