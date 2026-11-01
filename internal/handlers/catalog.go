@@ -51,6 +51,7 @@ func (c *Catalog) Register(mux *http.ServeMux, home string) {
 	mux.HandleFunc("GET /api/movies/imdb-rating", c.handleMovieIMDbRating)
 	mux.HandleFunc("GET /api/tv/{id}/season/{season}", c.handleSeason)
 	mux.HandleFunc("GET /api/search", c.handleSearchAPI)
+	mux.HandleFunc("GET /api/search/suggest", c.handleSuggest)
 	mux.HandleFunc("GET /api/discover", c.handleDiscover)
 	mux.HandleFunc("GET /api/torrents", c.handleTorrentSearch)
 	mux.HandleFunc("GET /api/browse/{slug}", c.handleBrowseMore)

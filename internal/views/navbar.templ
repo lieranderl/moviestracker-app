@@ -66,12 +66,23 @@ templ Navbar(user *auth.User) {
 			</div>
 			<div class="navbar-end gap-2">
 				if user != nil {
-					<form action="/search" method="GET" role="search" class="hidden xl:block">
+					<form action="/search" method="GET" role="search" class="hidden xl:block relative" data-signals="{navQ: '', _suggestOpen: false}" data-on:click__outside="$_suggestOpen = false">
 						<label class="input input-sm w-64">
 							@Icon("search", "size-4 opacity-60")
 							<span class="sr-only">{ tr(ctx, "Search") }</span>
-							<input type="search" name="q" maxlength="100" placeholder={ tr(ctx, "Search movies, TV, people") } class="grow"/>
+							<input
+								type="search"
+								name="q"
+								maxlength="100"
+								autocomplete="off"
+								placeholder={ tr(ctx, "Search movies, TV, people") }
+								class="grow"
+								data-bind="navQ"
+								data-on:input__debounce.250ms={ "$_suggestOpen = true; " + suggestSearch }
+								data-on:keydown="evt.key === 'Escape' && ($_suggestOpen = false)"
+							/>
 						</label>
+						@SearchSuggestions("", nil)
 					</form>
 				}
 				if user != nil && siteOf(ctx).Cloud {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/lieranderl/moviestracker-app/internal/i18n"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 
 	"github.com/a-h/templ"
@@ -54,6 +55,34 @@ func (c *Catalog) handleSearchAPI(w http.ResponseWriter, r *http.Request) {
 	sse := datastar.NewSSE(w, r)
 	if err := sse.PatchElementTempl(views.SearchResults(view)); err != nil {
 		logSSEError(r, "patch search results", err)
+	}
+}
+
+// handleSuggest patches the navbar's suggestions for the $navQ signal; a
+// blank query, or a search that fails, suggests nothing.
+func (c *Catalog) handleSuggest(w http.ResponseWriter, r *http.Request) {
+	if c.apiUser(w, r) == nil {
+		return
+	}
+	var signals struct {
+		NavQ string `json:"navQ"`
+	}
+	if err := datastar.ReadSignals(r, &signals); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	q := normalizeQuery(signals.NavQ)
+	var results *tmdb.SearchResults
+	if q != "" && c.clients().Details != nil {
+		ctx, cancel := c.detailsContext(r)
+		defer cancel()
+		var err error
+		if results, err = c.clients().Details.Search(ctx, q); err != nil {
+			slog.Warn("tmdb suggestions failed", "error", err)
+		}
+	}
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.SearchSuggestions(q, results)); err != nil {
+		logSSEError(r, "patch search suggestions", err)
 	}
 }
 
