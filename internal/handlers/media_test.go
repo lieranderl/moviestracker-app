@@ -509,3 +509,18 @@ func TestSourcesOfferQualityAndHDRBeforeSearching(t *testing.T) {
 		}
 	}
 }
+
+func TestASearchItsFiltersEmptySaysSoAndOffersAllQualities(t *testing.T) {
+	server := newMediaServer(t, &fakeTMDBDetails{movies: map[int]*tmdb.MovieDetails{27205: inception}}, &fakeJacRed{}, "")
+	filtered := html.UnescapeString(get(t, server, "/api/torrents?type=movie&id=27205&quality=2160,1080", true).Body.String())
+	if !strings.Contains(filtered, "No releases match your filters.") || !strings.Contains(filtered, "$qual = $qual.map(() => '')") {
+		t.Errorf("a filtered search with no releases does not say the filters hid them, with a way to clear them:\n%s", filtered)
+	}
+	if hdr := html.UnescapeString(get(t, server, "/api/torrents?type=movie&id=27205&hdr=1", true).Body.String()); !strings.Contains(hdr, "No releases match your filters.") {
+		t.Error("an HDR search with no releases blames JacRed, not the filter")
+	}
+	plain := html.UnescapeString(get(t, server, "/api/torrents?type=movie&id=27205", true).Body.String())
+	if !strings.Contains(plain, "No releases found on JacRed for this title.") || strings.Contains(plain, "match your filters") {
+		t.Errorf("an unfiltered search with no releases says:\n%s", plain)
+	}
+}

@@ -267,7 +267,7 @@ func (c *Catalog) handleTorrentSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	sort := sortParam(r)
 	search := views.SourcesSearch(mediaType, title.id)
-	if err := sse.PatchElementTempl(views.TorrentResults(jacred.Sort(title.withRuntimes(results), sort), sort, search)); err != nil {
+	if err := sse.PatchElementTempl(views.TorrentResults(jacred.Sort(title.withRuntimes(results), sort), sort, search, len(title.query.Qualities) > 0 || title.query.HDR)); err != nil {
 		logSSEError(r, "patch torrent results", err)
 	}
 }

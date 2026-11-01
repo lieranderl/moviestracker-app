@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -399,7 +400,13 @@ func (c *Client) Search(ctx context.Context, q Query) ([]Result, error) {
 	}
 
 	var results []Result
-	if c.searchAPI && !c.jackettAPI {
+	if c.searchAPI && !c.jackettAPI && len(q.Qualities) > 1 {
+		var complete bool
+		var err error
+		if results, complete, err = c.searchEachQuality(ctx, q); err != nil || !complete {
+			return results, err
+		}
+	} else if c.searchAPI && !c.jackettAPI {
 		var complete bool
 		var err error
 		if results, complete, err = c.searchByNames(ctx, q); err != nil || !complete {
@@ -414,6 +421,68 @@ func (c *Client) Search(ctx context.Context, q Query) ([]Result, error) {
 	}
 	c.store(key, results)
 	return results, nil
+}
+
+// searchEachQuality searches each of q's qualities on its own, at once,
+// and merges what they find: the API filters one quality, and one search
+// for several would get its best-seeded page of everything, where releases
+// of the qualities picked can be crowded out. A search that fails leaves
+// the others' releases, which are then not complete; when all fail, the
+// first failure is the error.
+func (c *Client) searchEachQuality(ctx context.Context, q Query) (results []Result, complete bool, err error) {
+	type found struct {
+		results []Result
+		err     error
+	}
+	each := make([]found, len(q.Qualities))
+	var wg sync.WaitGroup
+	for i, quality := range q.Qualities {
+		one := q
+		one.Qualities = []int{quality}
+		wg.Go(func() {
+			r, err := c.Search(ctx, one)
+			each[i] = found{r, err}
+		})
+	}
+	wg.Wait()
+	complete = true
+	var all []Result
+	for _, f := range each {
+		if f.err != nil {
+			complete, err = false, cmp.Or(err, f.err)
+			continue
+		}
+		all = append(all, f.results...)
+	}
+	results = merged(all)
+	if len(results) > 0 {
+		err = nil
+	}
+	return results, complete, err
+}
+
+// merged is results without repeats of a release, most seeded first, as
+// normalize leaves them.
+func merged(results []Result) []Result {
+	best := make(map[string]Result)
+	for _, r := range results {
+		hash := infoHash(r.Magnet)
+		if prev, ok := best[hash]; !ok || r.Seeders > prev.Seeders {
+			best[hash] = r
+		}
+	}
+	return ranked(slices.Collect(maps.Values(best)))
+}
+
+// ranked orders results most seeded first and keeps maxResults of them.
+func ranked(results []Result) []Result {
+	slices.SortFunc(results, func(a, b Result) int {
+		return cmp.Or(cmp.Compare(b.Seeders, a.Seeders), cmp.Compare(b.Quality, a.Quality), strings.Compare(a.Title, b.Title))
+	})
+	if len(results) > maxResults {
+		results = results[:maxResults]
+	}
+	return results
 }
 
 // searchByNames asks the search API by the English name, tops few releases
@@ -696,17 +765,7 @@ func normalize(raw []rawResult, q Query) []Result {
 			best[hash] = res
 		}
 	}
-	results := make([]Result, 0, len(best))
-	for _, r := range best {
-		results = append(results, r)
-	}
-	slices.SortFunc(results, func(a, b Result) int {
-		return cmp.Or(cmp.Compare(b.Seeders, a.Seeders), cmp.Compare(b.Quality, a.Quality), strings.Compare(a.Title, b.Title))
-	})
-	if len(results) > maxResults {
-		results = results[:maxResults]
-	}
-	return results
+	return ranked(slices.Collect(maps.Values(best)))
 }
 
 func infoHash(magnet string) string {

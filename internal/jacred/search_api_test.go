@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -153,8 +154,7 @@ func TestRefusedSearchesAreNotCached(t *testing.T) {
 }
 
 // One quality, or HDR, is filtered by JacRed, which then returns all of them
-// instead of the best-seeded 120 of everything. Several qualities are one
-// search (the API takes one), filtered here.
+// instead of the best-seeded 120 of everything.
 func TestQualityAndHDRNarrowTheSearch(t *testing.T) {
 	for _, tc := range []struct {
 		q         Query
@@ -163,7 +163,6 @@ func TestQualityAndHDRNarrowTheSearch(t *testing.T) {
 		want      []string
 	}{
 		{Query{Qualities: []int{2160}}, "2160", "", []string{"kinozal"}},
-		{Query{Qualities: []int{480, 2160}}, "", "", []string{"rutracker", "kinozal"}},
 		{Query{HDR: true}, "", "hdr", []string{"kinozal"}},
 		{Query{Qualities: []int{480}, HDR: true}, "480", "hdr", nil},
 	} {
@@ -187,6 +186,41 @@ func TestQualityAndHDRNarrowTheSearch(t *testing.T) {
 		if strings.Join(trackers, ",") != strings.Join(tc.want, ",") {
 			t.Errorf("%+v kept %v, want %v", tc.q, trackers, tc.want)
 		}
+	}
+}
+
+// The API filters one quality, so several are a search each, merged: one
+// search for all of them would get JacRed's best-seeded page of everything,
+// where releases of the qualities picked can be crowded out by others.
+func TestSeveralQualitiesAreASearchEachMerged(t *testing.T) {
+	var mu sync.Mutex
+	var asked []string
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		quality := r.URL.Query().Get("quality")
+		mu.Lock()
+		asked = append(asked, quality)
+		mu.Unlock()
+		page := map[string]string{
+			"480":  `{"results":[{"title":"Inception 2010 SD","tracker":"rutracker","seeders":289,"year":2010,"quality":480,"magnet":"magnet:?xt=urn:btih:AAAA","source_url":"https://rutracker.org/AAAA"}]}`,
+			"2160": `{"results":[{"title":"Inception 2010 2160p","tracker":"kinozal","seeders":40,"year":2010,"quality":2160,"magnet":"magnet:?xt=urn:btih:BBBB","source_url":"https://rutracker.org/BBBB"},{"title":"Inception 2010 2160p copy","tracker":"nnmclub","seeders":3,"year":2010,"quality":2160,"magnet":"magnet:?xt=urn:btih:bbbb","source_url":"https://rutracker.org/bbbb"}]}`,
+			"":     `{"results":[{"title":"Inception 2010 720p","tracker":"bitru","seeders":900,"year":2010,"quality":720,"magnet":"magnet:?xt=urn:btih:CCCC","source_url":"https://rutracker.org/CCCC"}]}`,
+		}[quality]
+		_, _ = w.Write([]byte(page))
+	}, WithSearchAPI())
+	results, err := client.Search(context.Background(), Query{OriginalTitle: "Inception", Year: 2010, Qualities: []int{480, 2160}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(asked)
+	if strings.Join(asked, ",") != "2160,480" {
+		t.Errorf("asked qualities %q, want a search for 480 and one for 2160", asked)
+	}
+	var trackers []string
+	for _, r := range results {
+		trackers = append(trackers, r.Tracker)
+	}
+	if strings.Join(trackers, ",") != "rutracker,kinozal" {
+		t.Errorf("kept %v, want both qualities' releases, most seeded first, the same release once", trackers)
 	}
 }
 
