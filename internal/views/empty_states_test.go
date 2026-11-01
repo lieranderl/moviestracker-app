@@ -79,3 +79,14 @@ func TestASearchWithNoMatchesLeadsBackToTrending(t *testing.T) {
 		t.Error("an empty search does not suggest what to do instead")
 	}
 }
+
+func TestOpeningTheAddTorrServerFormScrollsToIt(t *testing.T) {
+	out := renderIn(t, context.Background(), views.WebTorrServerPage(&auth.User{Name: "Ann"}, nil, nil))
+	form := regexp.MustCompile(`<form[^>]*data-show="\$tsAddOpen"[^>]*>`).FindString(out)
+	if form == "" {
+		t.Fatal("no add TorrServer form")
+	}
+	if !strings.Contains(form, `data-effect="$tsAddOpen && el.scrollIntoView({behavior: 'smooth', block: 'center'})"`) {
+		t.Errorf("opening the add TorrServer form does not scroll to it: %s", form)
+	}
+}

@@ -68,8 +68,10 @@ templ WebTorrServerPage(user *auth.User, servers []store.TorrServer, settings []
 	}
 }
 
+// webTorrServerForm scrolls into view as it opens: its buttons sit above it,
+// or far above it under the TorrServer explanation.
 templ webTorrServerForm() {
-	<form class="card bg-base-200/60 border border-base-content/10" data-show="$tsAddOpen" data-on:submit={ webTorrServerAdd }>
+	<form class="card bg-base-200/60 border border-base-content/10" data-show="$tsAddOpen" data-effect="$tsAddOpen && el.scrollIntoView({behavior: 'smooth', block: 'center'})" data-on:submit={ webTorrServerAdd }>
 		<div class="card-body gap-4">
 			<h2 class="card-title text-base">{ tr(ctx, "Add TorrServer") }</h2>
 			<div class="grid sm:grid-cols-2 gap-3">
