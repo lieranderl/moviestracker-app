@@ -440,9 +440,10 @@ func TestSeveralQualitiesCutShortByARefusalAreSearchedAgain(t *testing.T) {
 	refuse := true
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
+		quality, _ := strconv.Atoi(q.Get("quality"))
 		release := func(title, hash string) {
-			_, _ = fmt.Fprintf(w, `{"results":[{"title":%q,"tracker":"rutor","seeders":10,"year":2024,"quality":%s,"magnet":"magnet:?xt=urn:btih:%s%s","source_url":"https://rutor.info/%s"}]}`,
-				title, q.Get("quality"), hash, q.Get("quality"), hash)
+			_, _ = fmt.Fprintf(w, `{"results":[{"title":%q,"tracker":"rutor","seeders":10,"year":2024,"quality":%d,"magnet":"magnet:?xt=urn:btih:%s%d","source_url":"https://rutor.info/%s"}]}`,
+				title, quality, hash, quality, hash)
 		}
 		mu.Lock()
 		defer mu.Unlock()
