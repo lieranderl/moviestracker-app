@@ -41,13 +41,13 @@ func postPlayer(t *testing.T, h http.Handler, endpoint, body string, session *ht
 
 func TestBrowserRelayedPlayerDataRendersTracksAndStatsWithoutReachingTorrServer(t *testing.T) {
 	h, session, _ := torrServers(t)
-	body := `{"hash":"aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111","index":1,"kind":"hls","nonce":1,"torrent":{"hash":"aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111","active_peers":12,"total_peers":40,"file_stats":[{"id":1,"path":"Sintel.mp4"},{"id":2,"path":"Next.mp4"}]},"probe":{"Tracks":[{"Index":0,"Type":"audio","Language":"en"},{"Index":1,"Type":"audio","Language":"ru"},{"Index":0,"Type":"sub","Language":"en"}]}}`
+	body := `{"hash":"aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111","index":1,"kind":"hls","nonce":1,"torrent":{"hash":"aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111","active_peers":12,"total_peers":40,"file_stats":[{"id":1,"path":"Show/Season 1/01.mp4"},{"id":2,"path":"Show/Season 1/02.mp4"}]},"probe":{"Tracks":[{"Index":0,"Type":"audio","Language":"en"},{"Index":1,"Type":"audio","Language":"ru"},{"Index":0,"Type":"sub","Language":"en"}]}}`
 	res := postPlayer(t, h, "/api/ts/player", body, session)
 	if res.Code != 200 {
 		t.Fatalf("relay = %d %s", res.Code, res.Body)
 	}
-	for _, want := range []string{`id="torr-audio-picker"`, `id="torr-subtitle-menu"`, `id="torr-player-stats"`, "Peers 12/40", `data-track="1"`, "Next.mp4"} {
-		if !strings.Contains(res.Body.String(), want) {
+	for _, want := range []string{`id="torr-audio-picker"`, `id="torr-subtitle-menu"`, `id="torr-player-stats"`, "Peers 12/40", `data-track="1"`, `"title":"S01E02 · 02.mp4"`, ">S01E02</span>"} {
+		if !strings.Contains(html.UnescapeString(res.Body.String()), want) {
 			t.Errorf("relay lacks %q", want)
 		}
 	}

@@ -3,7 +3,6 @@ package views
 import (
 	"encoding/json"
 	"fmt"
-	"path"
 	"strings"
 
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
@@ -98,7 +97,7 @@ templ WebPlayerControls(hash string, index, nonce int, files []torrserver.FileSt
 	{{
 		queue := make([]QueuedFile, len(files))
 		for i, f := range files {
-			queue[i] = QueuedFile{Index: f.ID, Title: path.Base(f.Path)}
+			queue[i] = QueuedFile{Index: f.ID, Title: fileLabel(f)}
 		}
 		data, _ := json.Marshal(queue)
 	}}

@@ -23,7 +23,7 @@ func TestThePlayerGetsTheTorrentsVideosAsItsPlaylist(t *testing.T) {
 	rr := httptest.NewRecorder()
 	srv.ServeHTTP(rr, signedIn(t, sessions, httptest.NewRequest(http.MethodGet, "/api/torrserver/queue?hash=56f590f136968628d49fe8047c9664f01296eeb1", nil)))
 	body := rr.Body.String()
-	for _, want := range []string{`"_queueHash":"56f590f136968628d49fe8047c9664f01296eeb1"`, `"index":1`, `"index":3`, `"title":"Show/e02.mkv"`, `id="torr-playlist"`, `data-at="1"`} {
+	for _, want := range []string{`"_queueHash":"56f590f136968628d49fe8047c9664f01296eeb1"`, `"index":1`, `"index":3`, `"title":"E02 · e02.mkv"`, `id="torr-playlist"`, `data-at="1"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("playlist lacks %s:\n%s", want, body)
 		}
