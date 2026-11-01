@@ -309,6 +309,20 @@ in focused PRs before the larger episode/discovery and collaboration work.
   cover the categories and the contact route; a local browser check of
   `/privacy` confirmed the list, the mailto link and no horizontal overflow.
   This is not a legal compliance assessment.
+- **R09 — declined (2 November 2026):** moving Continue watching above the
+  billboard was built and checked in the browser, then rejected on review as
+  visually worse; it was not merged and the home page stays billboard-first.
+  Any later attempt should keep the billboard first and be shown before
+  merging.
+- **R11 — implemented, deployment unverified (2 November 2026):** on the
+  web app each release's send button reads "Add to <server name>" for the
+  TorrServer picked in the selector (truncated, with the full name in its
+  tooltip and accessible name); with no server it stays "TorrServer". The
+  label and the destination both follow `$tsSelected`, so switching servers
+  changes them together. The local app, with one TorrServer, keeps its label
+  and gains an accessible name. View tests cover the label, the selector's
+  names and the local button; no browser check, as web title pages need a
+  Google sign-in.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding
