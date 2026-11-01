@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sync"
 )
 
@@ -34,8 +35,17 @@ func (f *ListFile) shelf(uid string) shelf {
 	return s
 }
 
-func (f *ListFile) save() error {
+// change applies change to uid's lists and saves them when it says it
+// changed them. A save that fails puts them back as they were, so trying
+// again changes and saves them anew. f.mu must be held.
+func (f *ListFile) change(uid string, change func(shelf) (bool, error)) error {
+	before := maps.Clone(f.users[uid]) // changes replace a list's titles, never edit them
+	changed, err := change(f.shelf(uid))
+	if err != nil || !changed {
+		return err
+	}
 	if err := writeJSONFile(f.path, f.users); err != nil {
+		f.users[uid] = before
 		return fmt.Errorf("save lists: %w", err)
 	}
 	return nil
@@ -45,11 +55,16 @@ func (f *ListFile) save() error {
 func (f *ListFile) CreateCustomList(_ context.Context, uid, name string) (CustomList, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	l, err := f.shelf(uid).create(name, f.opts.now().UTC())
+	var l CustomList
+	err := f.change(uid, func(s shelf) (bool, error) {
+		var err error
+		l, err = s.create(name, f.opts.now().UTC())
+		return err == nil, err
+	})
 	if err != nil {
 		return CustomList{}, err
 	}
-	return l, f.save()
+	return l, nil
 }
 
 // CustomLists implements CustomListStore.
@@ -63,10 +78,7 @@ func (f *ListFile) CustomLists(_ context.Context, uid string) ([]CustomList, err
 func (f *ListFile) RemoveCustomList(_ context.Context, uid, id string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if err := f.users[uid].delete(id); err != nil {
-		return err
-	}
-	return f.save()
+	return f.change(uid, func(s shelf) (bool, error) { return true, s.delete(id) })
 }
 
 // CustomList implements CustomListStore.
@@ -81,20 +93,12 @@ func (f *ListFile) CustomList(_ context.Context, uid, id string) (CustomList, bo
 func (f *ListFile) AddToList(_ context.Context, uid, id string, t ListTitle) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	changed, err := f.shelf(uid).add(id, t, f.opts.now().UTC())
-	if err != nil || !changed {
-		return err
-	}
-	return f.save()
+	return f.change(uid, func(s shelf) (bool, error) { return s.add(id, t, f.opts.now().UTC()) })
 }
 
 // RemoveFromList implements CustomListStore.
 func (f *ListFile) RemoveFromList(_ context.Context, uid, id, kind string, tmdbID int) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	changed, err := f.shelf(uid).remove(id, kind, tmdbID, f.opts.now().UTC())
-	if err != nil || !changed {
-		return err
-	}
-	return f.save()
+	return f.change(uid, func(s shelf) (bool, error) { return s.remove(id, kind, tmdbID, f.opts.now().UTC()) })
 }

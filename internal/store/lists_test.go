@@ -5,8 +5,11 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -239,4 +242,63 @@ func TestASharedListIsReadByItsLinkUntilSharingStops(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestListsMadeAtOnceStillStopAtFifty(t *testing.T) {
+	eachListStore(t, func(t *testing.T, s store.CustomListStore, uid string, _ *time.Time) {
+		ctx := context.Background()
+		for i := range 48 {
+			if _, err := s.CreateCustomList(ctx, uid, fmt.Sprint("List ", i)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		var wg sync.WaitGroup
+		for i := range 6 {
+			wg.Go(func() { _, _ = s.CreateCustomList(ctx, uid, fmt.Sprint("Racing ", i)) })
+		}
+		wg.Wait()
+		if lists, _ := s.CustomLists(ctx, uid); len(lists) != 50 {
+			t.Errorf("after six lists made at once from 48 there are %d, want 50", len(lists))
+		}
+	})
+}
+
+func TestAChangeTheListFileCouldNotSaveIsSavedWhenTriedAgain(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a read-only directory still takes new files on Windows")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "lists.json")
+	s, err := store.OpenListFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	l, err := s.CreateCustomList(ctx, "anna", "Weekend")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	failed := s.AddToList(ctx, "anna", l.ID, duneTitle)
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if failed == nil {
+		t.Fatal("adding to a list in a read-only directory succeeded")
+	}
+	if got, _, _ := s.CustomList(ctx, "anna", l.ID); len(got.Titles) != 0 {
+		t.Errorf("after the failed save the list shows %q, want nothing", listTitles(got))
+	}
+	if err := s.AddToList(ctx, "anna", l.ID, duneTitle); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := store.OpenListFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _, _ := reopened.CustomList(ctx, "anna", l.ID); len(got.Titles) != 1 {
+		t.Errorf("after trying again the file keeps %q, want [Dune]", listTitles(got))
+	}
 }

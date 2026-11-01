@@ -530,24 +530,55 @@ func readCustomList(snap *firestore.DocumentSnapshot) (CustomList, error) {
 	return l, nil
 }
 
+// listCount is the users/{uid} field that counts the user's lists: the
+// transactions that make and delete lists keep it, so lists made at once
+// still stop at maxLists.
+const listCount = "listCount"
+
 // CreateCustomList implements Store.
 func (f *Firestore) CreateCustomList(ctx context.Context, uid, name string) (CustomList, error) {
 	name, err := checkListName(name)
 	if err != nil {
 		return CustomList{}, err
 	}
-	kept, err := f.lists(uid).Select().Documents(ctx).GetAll()
-	if err != nil {
-		return CustomList{}, fmt.Errorf("count lists: %w", err)
-	}
-	if len(kept) >= maxLists {
-		return CustomList{}, ErrTooManyLists
-	}
 	l := CustomList{ID: newID(), Name: name, Titles: []ListTitle{}, UpdatedAt: f.opts.now().UTC()}
-	if _, err := f.lists(uid).Doc(l.ID).Create(ctx, toListRecord(l)); err != nil {
+	err = f.client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		n, err := f.listCount(tx, uid)
+		if err != nil {
+			return err
+		}
+		if n >= maxLists {
+			return ErrTooManyLists
+		}
+		if err := tx.Create(f.lists(uid).Doc(l.ID), toListRecord(l)); err != nil {
+			return err
+		}
+		return tx.Set(f.userDoc(uid), map[string]any{listCount: n + 1}, firestore.Merge([]string{listCount}))
+	})
+	if errors.Is(err, ErrTooManyLists) {
+		return CustomList{}, err
+	}
+	if err != nil {
 		return CustomList{}, fmt.Errorf("make list: %w", err)
 	}
 	return l, nil
+}
+
+// listCount is how many lists the user has, read in tx.
+func (f *Firestore) listCount(tx *firestore.Transaction, uid string) (int64, error) {
+	snap, err := tx.Get(f.userDoc(uid))
+	if notFound(err) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	n, err := snap.DataAt(listCount)
+	if err != nil {
+		return 0, nil // no list made yet
+	}
+	count, _ := n.(int64)
+	return count, nil
 }
 
 // CustomLists implements Store. They are sorted here, like watch states.
@@ -571,12 +602,19 @@ func (f *Firestore) CustomLists(ctx context.Context, uid string) ([]CustomList, 
 // RemoveCustomList implements Store. Its link goes with it.
 func (f *Firestore) RemoveCustomList(ctx context.Context, uid, id string) error {
 	return f.changeList(ctx, uid, id, func(tx *firestore.Transaction, doc *firestore.DocumentRef, l CustomList) error {
+		n, err := f.listCount(tx, uid)
+		if err != nil {
+			return err
+		}
 		if l.ShareID != "" {
 			if err := tx.Delete(f.sharedLists().Doc(l.ShareID)); err != nil {
 				return err
 			}
 		}
-		return tx.Delete(doc)
+		if err := tx.Delete(doc); err != nil {
+			return err
+		}
+		return tx.Set(f.userDoc(uid), map[string]any{listCount: max(n-1, 0)}, firestore.Merge([]string{listCount}))
 	})
 }
 
