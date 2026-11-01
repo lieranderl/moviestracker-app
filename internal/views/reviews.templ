@@ -12,9 +12,10 @@ func reviewPost(kind string, id int) string {
 }
 
 // reviewSlot is a title page's section for the user's rating and note: it
-// asks for them when the page loads.
+// asks for them when the page loads, and the note can be edited only once
+// they arrive ($_reviewReady), so a save cannot overwrite them.
 templ reviewSlot(kind string, id int) {
-	<section class="max-w-7xl mx-auto px-4 sm:px-8 pt-10" aria-labelledby="title-review-heading" data-signals="{ reviewRating: 0, reviewNote: '' }">
+	<section class="max-w-7xl mx-auto px-4 sm:px-8 pt-10" aria-labelledby="title-review-heading" data-signals="{ reviewRating: 0, reviewNote: '', _reviewReady: false }">
 		<div class="card bg-base-200/60 border border-base-content/10">
 			<div class="card-body gap-4">
 				<h2 id="title-review-heading" class="card-title text-lg gap-2">
@@ -26,10 +27,10 @@ templ reviewSlot(kind string, id int) {
 				</div>
 				<fieldset class="fieldset">
 					<legend class="fieldset-legend">{ tr(ctx, "Note, just for you") }</legend>
-					<textarea class="textarea w-full h-24" maxlength="2000" placeholder={ tr(ctx, "What did you think? Who recommended it?") } data-bind:review-note></textarea>
+					<textarea class="textarea w-full h-24" maxlength="2000" placeholder={ tr(ctx, "What did you think? Who recommended it?") } data-bind:review-note data-attr:disabled="!$_reviewReady"></textarea>
 				</fieldset>
 				<div class="card-actions items-center">
-					<button type="button" class="btn btn-sm btn-primary gap-2" data-on:click={ reviewPost(kind, id) }>
+					<button type="button" class="btn btn-sm btn-primary gap-2" data-attr:disabled="!$_reviewReady" data-on:click={ reviewPost(kind, id) }>
 						@Icon("save", "size-4")
 						{ tr(ctx, "Save note") }
 					</button>
@@ -65,5 +66,15 @@ templ TitleReview(kind string, id int, rating int, saved bool) {
 				{ tr(ctx, "Saved") }
 			</span>
 		}
+	</div>
+}
+
+// TitleReviewFailed says the user's rating and note could not be loaded,
+// with a way to ask again; until they load nothing can be changed.
+templ TitleReviewFailed(kind string, id int) {
+	<div id="title-review" role="alert" class="alert alert-warning alert-soft">
+		@Icon("triangle-alert", "size-5")
+		<span>{ tr(ctx, "Your rating and note could not be loaded right now.") }</span>
+		<button type="button" class="btn btn-sm" data-on:click={ fmt.Sprintf("@get('%s')", reviewURL(kind, id)) }>{ tr(ctx, "Try again") }</button>
 	</div>
 }

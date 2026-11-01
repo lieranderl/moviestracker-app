@@ -2,6 +2,7 @@ package web_test
 
 import (
 	"context"
+	"errors"
 	"html"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/lieranderl/moviestracker-app/internal/store"
+	"github.com/lieranderl/moviestracker-app/internal/web"
 )
 
 func TestAUserRatesAMovieWhichMarksItWatched(t *testing.T) {
@@ -59,5 +61,39 @@ func TestARatingMustBeOneToTen(t *testing.T) {
 	}
 	if res := send(t, h, http.MethodPost, "/api/titles/review?type=movie&id=438631", httptest.NewRecorder()); res.Code != http.StatusUnauthorized {
 		t.Errorf("signed out = %d, want 401", res.Code)
+	}
+}
+
+func TestTheNoteCannotBeEditedUntilTheSavedReviewArrives(t *testing.T) {
+	h, session, _ := favorites(t)
+	page := html.UnescapeString(getWith(t, h, "/movie/438631", session).Body.String())
+	if !strings.Contains(page, `data-attr:disabled="!$_reviewReady"`) || !strings.Contains(page, "_reviewReady: false") {
+		t.Error("the note and its Save button work before the saved review arrives")
+	}
+	body := send(t, h, http.MethodGet, "/api/titles/review?type=movie&id=438631", session).Body.String()
+	if !strings.Contains(body, `"_reviewReady":true`) {
+		t.Errorf("the saved review did not turn editing on:\n%s", body)
+	}
+}
+
+// failingReviews is a store that cannot read reviews right now.
+type failingReviews struct{ *store.Memory }
+
+func (failingReviews) Review(context.Context, string, string, int) (store.Review, error) {
+	return store.Review{}, errors.New("firestore is unavailable")
+}
+
+func TestAReviewThatCannotBeLoadedIsNotShownAsNone(t *testing.T) {
+	g := newGoogle(t)
+	cfg := withTMDB(t, g.config())
+	cfg.Store = failingReviews{store.NewMemory()}
+	h := web.New(cfg)
+	session := signIn(t, h)
+	body := html.UnescapeString(send(t, h, http.MethodGet, "/api/titles/review?type=movie&id=438631", session).Body.String())
+	if !strings.Contains(body, "could not be loaded") || !strings.Contains(body, "@get('/api/titles/review?type=movie&id=438631')") {
+		t.Errorf("a failed load does not say so with a way to try again:\n%s", body)
+	}
+	if strings.Contains(body, "_reviewReady") || strings.Contains(body, `of 10"`) {
+		t.Errorf("a failed load still lets the user rate or edit:\n%s", body)
 	}
 }

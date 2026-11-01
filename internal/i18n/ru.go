@@ -83,6 +83,7 @@ var ru = map[string]string{
 	"Save note":                                              "Сохранить заметку",
 	"Saved":                                                  "Сохранено",
 	"A note has at most 2000 characters.":                    "Заметка — не длиннее 2000 символов.",
+	"Your rating and note could not be loaded right now.":    "Не удалось загрузить вашу оценку и заметку.",
 	"Start over":                                             "Сначала",
 	"Retry":                                                  "Повторить",
 	"See all results":                                        "Все результаты",

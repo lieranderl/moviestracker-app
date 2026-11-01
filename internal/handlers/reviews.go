@@ -45,10 +45,17 @@ func (rv *Reviews) handleReview(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	kept, err := rv.store.Review(ctx, uid, kind, id)
 	if err != nil {
+		// Shown as none, a rating or note saved then would replace the
+		// one kept: editing stays off until it loads.
 		slog.Warn("reading a review failed", "error", logError(err))
+		w.Header().Set("Cache-Control", "no-store")
+		if err := datastar.NewSSE(w, r).PatchElementTempl(views.TitleReviewFailed(kind, id)); err != nil {
+			slog.Warn("patching a review error failed", "error", err)
+		}
+		return
 	}
 	sse := patchReview(w, r, kind, id, kept, false)
-	if err := sse.MarshalAndPatchSignals(map[string]any{"reviewRating": kept.Rating, "reviewNote": kept.Note}); err != nil {
+	if err := sse.MarshalAndPatchSignals(map[string]any{"reviewRating": kept.Rating, "reviewNote": kept.Note, "_reviewReady": true}); err != nil {
 		slog.Warn("patching review signals failed", "error", err)
 	}
 }
