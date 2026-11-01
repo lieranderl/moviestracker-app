@@ -2,7 +2,6 @@ package views
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
@@ -62,14 +61,8 @@ func torrentAddTransport(browser bool) templ.Attributes {
 func webStreamLinks(torrents []torrserver.Torrent) StreamLinks {
 	pages := map[string]string{}
 	for _, t := range torrents {
-		var data struct {
-			TMDB struct {
-				ID   int    `json:"id"`
-				Type string `json:"type"`
-			} `json:"tmdb"`
-		}
-		if json.Unmarshal([]byte(t.Data), &data) == nil && data.TMDB.ID > 0 && (data.TMDB.Type == "movie" || data.TMDB.Type == "tv") {
-			pages[t.Hash] = fmt.Sprintf("/%s/%d", data.TMDB.Type, data.TMDB.ID)
+		if kind, id := t.TMDB(); kind != "" {
+			pages[t.Hash] = fmt.Sprintf("/%s/%d", kind, id)
 		}
 	}
 	return StreamLinks{Browser: true,

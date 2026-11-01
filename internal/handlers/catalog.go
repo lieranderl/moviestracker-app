@@ -16,7 +16,11 @@ type Catalog struct {
 	userFromRequest func(*http.Request) *auth.User // the signed-in user; nil when signed out
 	signIn          string                         // where signed-out visitors are sent
 	catalogTimeout  time.Duration                  // bounds each TMDB lookup of a request
+	progress        *Progress                      // where users stopped watching; nil keeps none
 }
+
+// ShowProgress lets the catalog's pages show where users stopped watching.
+func (c *Catalog) ShowProgress(p *Progress) { c.progress = p }
 
 // NewCatalog serves the catalog with clients, to the users user names;
 // signed-out visitors are sent to signIn.

@@ -11,7 +11,7 @@ import (
 func TestTheFooterCreditsTheStreamingEngineAndShowsTheVersion(t *testing.T) {
 	views.SetVersion("v0.1.30")
 	defer views.SetVersion("")
-	out := html.UnescapeString(render(t, views.Movies(testUser, nil, nil, nil, true)))
+	out := html.UnescapeString(render(t, views.Movies(testUser, nil, nil, nil, true, nil)))
 	footer := out[strings.Index(out, "<footer"):]
 	for _, want := range []string{
 		`href="https://github.com/YouROK/TorrServer"`, ">TorrServer",
@@ -31,7 +31,7 @@ func TestTheFooterCreditsTheStreamingEngineAndShowsTheVersion(t *testing.T) {
 // in or not, is offered its source code.
 func TestEveryPageOffersTheSourceCodeUnderTheAGPL(t *testing.T) {
 	pages := map[string]string{
-		"catalog": render(t, views.Movies(testUser, nil, nil, nil, true)),
+		"catalog": render(t, views.Movies(testUser, nil, nil, nil, true, nil)),
 		"sign-in": render(t, views.Login(true, "")),
 	}
 	for name, out := range pages {
@@ -47,7 +47,7 @@ func TestEveryPageOffersTheSourceCodeUnderTheAGPL(t *testing.T) {
 // Only the web app's public pages belong in search results; a signed-in
 // user's pages, and the self-hosted app's, ask search engines to stay away.
 func TestPrivatePagesAreKeptOutOfSearchResults(t *testing.T) {
-	if out := render(t, views.Movies(testUser, nil, nil, nil, true)); !strings.Contains(out, `<meta name="robots" content="noindex, nofollow">`) {
+	if out := render(t, views.Movies(testUser, nil, nil, nil, true, nil)); !strings.Contains(out, `<meta name="robots" content="noindex, nofollow">`) {
 		t.Error("the catalog page lets search engines index it")
 	}
 }

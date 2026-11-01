@@ -61,6 +61,7 @@ templ TVPage(user *auth.User, t *tmdb.TVDetails, season *tmdb.Season, selected i
 			@detailHero(t.MediaItem, tvFacts(ctx, t), t.ContentRating, genreNames(t.Genres)) {
 				@trailerButton(t.TrailerKey, trf(ctx, "%s trailer", t.Title))
 				@heroLink("#seasons", "list-video", tr(ctx, "Episodes"))
+				@progressSlot("tv", t.ID)
 				if siteOf(ctx).Cloud {
 					@favoriteSlot("tv", t.ID)
 				}

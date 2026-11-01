@@ -173,3 +173,10 @@ func audienceHas(aud json.RawMessage, clientID string) bool {
 	}
 	return false
 }
+
+// userID is the signed-in user's Google account ID, by which their data is
+// kept.
+func (a *app) userID(r *http.Request) (string, bool) {
+	user, ok := a.currentUser(r)
+	return user.ID, ok
+}

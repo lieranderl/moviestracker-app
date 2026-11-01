@@ -48,9 +48,10 @@ type Config struct {
 
 // app is the web app's state behind its routes.
 type app struct {
-	cfg     Config
-	signer  signer
-	catalog *handlers.Catalog
+	cfg      Config
+	signer   signer
+	catalog  *handlers.Catalog
+	progress *handlers.Progress
 }
 
 func (a *app) now() time.Time {
@@ -126,6 +127,9 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("POST /api/ts/add-result", a.handleBrowserAddResult)
 	mux.HandleFunc("POST /api/ts/settings", a.handleBrowserSettings)
 	mux.HandleFunc("POST /api/ts/settings/validate", a.handleValidateBrowserSettings)
+	a.progress = handlers.NewProgress(a.cfg.Store, a.userID, nil)
+	a.progress.Register(mux)
+	a.catalog.ShowProgress(a.progress)
 	mux.HandleFunc("POST /api/language", handlers.SetLanguage(a.secure(), a.saveLanguage))
 	app := http.NewCrossOriginProtection().Handler(handlers.Language(webSite(mux, cfg.BaseURL)))
 	return handlers.RecoveryMiddleware(handlers.SecurityHeadersMiddleware(true, handlers.LoggingMiddleware(app)))

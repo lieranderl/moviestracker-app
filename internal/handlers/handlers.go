@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/netip"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -25,6 +26,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/live"
 	"github.com/lieranderl/moviestracker-app/internal/sources"
 	"github.com/lieranderl/moviestracker-app/internal/stats"
+	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/streamlink"
 	playback "github.com/lieranderl/moviestracker-app/internal/streams"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
@@ -63,6 +65,7 @@ type Server struct {
 	links           atomic.Pointer[streamlink.Signer] // signs the links external players open
 	playing         atomic.Int64                      // media responses streaming through the proxy
 	live            *live.Hub                         // shared pollers behind every live view
+	progress        *Progress                         // where each account stopped watching
 	plays           *playback.Tracker                 // what plays through the proxy
 	sampler         *stats.Sampler                    // this machine, for the dashboard
 	startedAt       time.Time
@@ -133,6 +136,13 @@ func NewServer(cfg Config) (*Server, error) {
 	s.live = live.New(s.liveTopic(cfg.LivePolling.withDefaults()))
 	s.current.Store(&sources.Clients{Catalog: cfg.TMDB, Details: cfg.Details, Torrents: cfg.Torrents, IMDb: cfg.IMDb})
 	s.Catalog = NewCatalog(s.clients, s.userFromRequest, "/login", s.catalogTimeout)
+	progress, err := store.OpenProgressFile(filepath.Join(cfg.Store.Dir(), "progress.json"))
+	if err != nil {
+		return nil, err
+	}
+	s.progress = NewProgress(progress, s.username, s.progressTorrent)
+	s.ShowProgress(s.progress)
+	s.progress.MirrorTo(func() Timecodes { return s.torrServer.Client() })
 	s.routes()
 	// Rejects cross-origin POSTs (Sec-Fetch-Site / Origin), so no other site
 	// can submit forms or Datastar actions with a visitor's cookies.
@@ -271,6 +281,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/torrserver/state", s.handleTorrServerState)
 	s.mux.HandleFunc("GET /api/torrserver/recent", s.handleRecentTorrents)
 	s.mux.HandleFunc("GET /api/torrserver/torrent-stats", s.handleTorrentStats)
+	s.progress.Register(s.mux)
 	s.mux.HandleFunc("GET /api/torrserver/stream/", s.handleTorrServerStreamProxy)
 
 	// Signed links for external players (VLC, TVs, playlists): no session.

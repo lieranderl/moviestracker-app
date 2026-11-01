@@ -101,7 +101,7 @@ func allPages() map[string]templ.Component {
 	return map[string]templ.Component{
 		"consent": views.Login(false, ""),
 		"login":   views.Login(true, "Invalid username or password"),
-		"movies":  views.Movies(testUser, media, media, media, true),
+		"movies":  views.Movies(testUser, media, media, media, true, nil),
 		"movie": views.MoviePage(testUser, &tmdb.MovieDetails{
 			MediaItem: tmdb.MediaItem{ID: 27205, Title: hostileName, MediaType: "movie", ReleaseDate: "2010-07-15", ImdbID: "tt1375666", TrailerKey: "YoHD9XEInc0"},
 			Homepage:  "https://example.com",

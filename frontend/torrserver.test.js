@@ -560,3 +560,22 @@ test("a certificate change names its TorrServer, so a late one is not shown for 
   await pending;
   expect(events.filter(([name]) => name === "ts-ssl").at(-1)).toEqual(["ts-ssl", { url: server, status: sslStatus("self-signed") }]);
 });
+
+test("the player tells the user's TorrServer where a file was left, for its other players", async () => {
+  const hash = "08ada5a7a6183aae1e09d831df6748d566095a10";
+  await client.tsViewedSet(server, hash, 2, 2530.7);
+  const [target, init] = requests.mock.calls[0];
+  expect(target.href).toBe("https://nas.example:8091/viewed");
+  expect(JSON.parse(init.body)).toEqual({ action: "set", hash, file_index: 2, timecode: 2530 });
+  await client.tsViewedSet(server, "not-a-hash", 2, 10);
+  expect(requests).toHaveBeenCalledTimes(1);
+});
+
+test("the player reads where TorrServer's other players left a file", async () => {
+  const hash = "08ada5a7a6183aae1e09d831df6748d566095a10";
+  globalThis.fetch = async () => Response.json([{ hash, file_index: 1, timecode: 0 }, { hash, file_index: 2, timecode: 600.5 }]);
+  expect(await client.tsTimecode(server, hash, 2)).toBe(600);
+  expect(await client.tsTimecode(server, hash, 1)).toBe(0);
+  globalThis.fetch = async () => new Response("", { status: 404 });
+  expect(await client.tsTimecode(server, hash, 2)).toBe(0);
+});

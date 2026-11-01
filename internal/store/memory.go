@@ -3,6 +3,7 @@ package store
 import (
 	"cmp"
 	"context"
+	"maps"
 	"slices"
 	"sync"
 )
@@ -18,6 +19,7 @@ type memoryUser struct {
 	prefs       Preferences
 	favorites   map[string]Favorite
 	torrServers []TorrServer // in the order added
+	progress    map[string]Progress
 }
 
 // NewMemory returns an empty in-memory store.
@@ -29,7 +31,7 @@ func NewMemory(opts ...Option) *Memory {
 func (m *Memory) user(uid string) *memoryUser {
 	u, ok := m.users[uid]
 	if !ok {
-		u = &memoryUser{favorites: map[string]Favorite{}}
+		u = &memoryUser{favorites: map[string]Favorite{}, progress: map[string]Progress{}}
 		m.users[uid] = u
 	}
 	return u
@@ -134,4 +136,38 @@ func (m *Memory) RemoveTorrServer(_ context.Context, uid, id string) error {
 	u := m.user(uid)
 	u.torrServers = slices.DeleteFunc(u.torrServers, func(s TorrServer) bool { return s.ID == id })
 	return nil
+}
+
+// SaveProgress implements Store.
+func (m *Memory) SaveProgress(_ context.Context, uid string, p Progress) error {
+	id, err := progressID(p.Hash, p.Index)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p.UpdatedAt = m.opts.now().UTC()
+	m.user(uid).progress[id] = p
+	return nil
+}
+
+// Progress implements Store.
+func (m *Memory) Progress(_ context.Context, uid, hash string, index int) (Progress, bool, error) {
+	id, err := progressID(hash, index)
+	if err != nil {
+		return Progress{}, false, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p, ok := m.user(uid).progress[id]
+	return p, ok, nil
+}
+
+// RecentProgress implements Store.
+func (m *Memory) RecentProgress(_ context.Context, uid string, limit int) ([]Progress, error) {
+	m.mu.Lock()
+	all := slices.Collect(maps.Values(m.user(uid).progress))
+	m.mu.Unlock()
+	slices.SortFunc(all, func(a, b Progress) int { return b.UpdatedAt.Compare(a.UpdatedAt) })
+	return unfinished(all[:min(len(all), recentWindow)], limit), nil
 }

@@ -303,3 +303,17 @@ func TestCancellingSharedLinksStopsTheOldOnes(t *testing.T) {
 		t.Errorf("a new link after cancelling: %d, want 200", rr.Code)
 	}
 }
+
+func TestAnAdminCanLetTorrServerRememberWhereFilesWereLeft(t *testing.T) {
+	eng := newSettingsEngine(t, false)
+	l := newLocal(t, withAdmin(t), withEngineAt(eng.URL))
+	admin := l.admin(t)
+	page := html.UnescapeString(l.do(t, httptest.NewRequest(http.MethodGet, "/settings/sharing", nil), admin).Body.String())
+	if !strings.Contains(page, "Remember where files were left") {
+		t.Fatal("the Other devices settings do not offer TorrServer's timecodes")
+	}
+	l.action(t, "/api/settings/engine/sharing", `{"sharing":{"EnableDLNA":false,"EnableBonjour":true,"FriendlyName":"","TrackTimecode":true}}`, admin)
+	if got := eng.lastSet(); got == nil || got["TrackTimecode"] != true {
+		t.Errorf("saved %v, want TrackTimecode on", got)
+	}
+}

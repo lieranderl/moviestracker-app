@@ -1,0 +1,199 @@
+package handlers
+
+import (
+	"context"
+	"encoding/json"
+	"html"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/lieranderl/moviestracker-app/internal/store"
+	"github.com/lieranderl/moviestracker-app/internal/torrserver"
+)
+
+const duneHash = "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"
+
+// progressServer is a local app whose TorrServer lists Dune, added from
+// its title page; another player left Dune's sample at 10:00 there.
+func progressServer(t *testing.T) *Server {
+	s, _ := progressServerViewed(t)
+	return s
+}
+
+// progressServerViewed is progressServer and the timecodes its TorrServer
+// was told, by file.
+func progressServerViewed(t *testing.T) (*Server, *sync.Map) {
+	t.Helper()
+	var viewed sync.Map
+	viewed.Store(1, 600.0)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/viewed" {
+			var req struct {
+				Action    string  `json:"action"`
+				FileIndex int     `json:"file_index"`
+				TimeCode  float64 `json:"timecode"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&req)
+			if req.Action == "set" {
+				viewed.Store(req.FileIndex, req.TimeCode)
+				return
+			}
+			list := []map[string]any{}
+			viewed.Range(func(k, v any) bool {
+				list = append(list, map[string]any{"hash": duneHash, "file_index": k, "timecode": v})
+				return true
+			})
+			_ = json.NewEncoder(w).Encode(list)
+			return
+		}
+		if r.URL.Path == "/echo" {
+			_, _ = w.Write([]byte("MatriX.146"))
+			return
+		}
+		if r.URL.Path == "/torrents" {
+			_, _ = w.Write([]byte(`[{"hash":"` + duneHash + `","title":"Dune","poster":"https://image.tmdb.org/t/p/w300/d.jpg",` +
+				`"file_stats":[{"id":1,"path":"Sample.mkv"},{"id":2,"path":"Dune.2021.2160p.mkv"}]}]`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(ts.Close)
+	cfg := validTestConfig(t)
+	cfg.TorrServer = torrserver.NewManager(ts.URL)
+	s := newTestServerWithConfig(t, cfg)
+	s.rememberTitle(duneHash, "movie", 438631)
+	return s, &viewed
+}
+
+func postProgress(t *testing.T, s *Server, body string, signedInUser bool) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/progress", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	if signedInUser {
+		req.AddCookie(signedIn(t, s))
+	}
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestTheLocalPlayerSavesWhereAnAccountStoppedWatching(t *testing.T) {
+	s := progressServer(t)
+	res := postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":2530.4,"duration":9360.2}`, true)
+	if res.Code != http.StatusNoContent {
+		t.Fatalf("saving progress = %d %s, want 204", res.Code, res.Body)
+	}
+	kept, err := store.OpenProgressFile(filepath.Join(s.store.Dir(), "progress.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ok, err := kept.Progress(context.Background(), testUsername, duneHash, 2)
+	if err != nil || !ok {
+		t.Fatalf("progress = %v, %v; want kept in the data directory", ok, err)
+	}
+	if got.Position != 2530*time.Second || got.File != "Dune.2021.2160p.mkv" || got.Title != "Dune" || got.Kind != "movie" || got.TMDBID != 438631 {
+		t.Errorf("progress = %+v, want Dune's file at 42:10, linked to TMDB movie 438631", got)
+	}
+	if res := postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":10,"duration":60}`, false); res.Code != http.StatusUnauthorized {
+		t.Errorf("signed out = %d, want 401", res.Code)
+	}
+}
+
+func getResume(t *testing.T, s *Server, index int) string {
+	t.Helper()
+	res := get(t, s, "/api/progress/resume?hash="+duneHash+"&index="+strconv.Itoa(index), true)
+	if res.Code != http.StatusOK {
+		t.Fatalf("resume = %d %s", res.Code, res.Body)
+	}
+	return res.Body.String()
+}
+
+func TestTheLocalPlayerOffersToResumeWhereTheAccountStopped(t *testing.T) {
+	s := progressServer(t)
+	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":2530.4,"duration":9360.2}`, true)
+	body := getResume(t, s, 2)
+	// The offer's state is patched with every answer, so reopening a file
+	// after dismissing its offer shows it again.
+	for _, want := range []string{`id="torr-resume"`, "Resume from 42:10", `$_video.currentTime = 2530`, `"_resume":"` + duneHash + `-2"`, `"_resumeAt":2530`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("resume patch lacks %q:\n%s", want, body)
+		}
+	}
+	if body := getResume(t, s, 3); strings.Contains(body, "Resume from") {
+		t.Error("a file never played offers to resume")
+	}
+	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":9300,"duration":9360.2}`, true)
+	if body := getResume(t, s, 2); strings.Contains(body, "Resume from") {
+		t.Error("a finished file offers to resume")
+	}
+}
+
+func TestTheLocalPlayerReportsProgressAndAsksWhereToResume(t *testing.T) {
+	page := html.UnescapeString(get(t, progressServer(t), "/torrserver", true).Body.String())
+	// Saving waits while the resume offer is unanswered, so playing the
+	// start of a file never overwrites where the account stopped.
+	for _, want := range []string{"@post('/api/progress'", "!($_resume && $_time < $_resumeAt)", "/api/progress/resume?hash=", `id="torr-resume"`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("player lacks %q", want)
+		}
+	}
+}
+
+func TestTheLocalHomePageListsWhatAnAccountIsWatching(t *testing.T) {
+	s := progressServer(t)
+	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":2530.4,"duration":9360.2}`, true)
+	page := html.UnescapeString(get(t, s, homePath, true).Body.String())
+	for _, want := range []string{`id="continue-watching"`, `href="/torrserver?play=` + duneHash + `&file=2"`, `value="27"`, "1:53:50 left"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("home page lacks %q", want)
+		}
+	}
+}
+
+func TestContinueWatchingOpensTheLocalPlayerOnTheFile(t *testing.T) {
+	s := progressServer(t)
+	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":2530.4,"duration":9360.2}`, true)
+	page := html.UnescapeString(get(t, s, "/torrserver?play="+duneHash+"&file=2", true).Body.String())
+	for _, want := range []string{`id="torr-autoplay"`, "$activeHash = '" + duneHash + "'", "$activeFileIndex = 2", `$streamTitle = "Dune"`, `$streamCleanUrl = "/s/`, `$streamHlsUrl = "/s/`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("player lacks %q", want)
+		}
+	}
+	if page := get(t, s, "/torrserver?play=dune&file=2", true).Body.String(); strings.Contains(page, `id="torr-autoplay"`) {
+		t.Error("a link without a torrent hash opens the player")
+	}
+}
+
+func TestATitlePageOffersToContinueWhereTheAccountStopped(t *testing.T) {
+	s := progressServer(t)
+	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":2530.4,"duration":9360.2}`, true)
+	body := html.UnescapeString(get(t, s, "/api/progress/title?type=movie&id=438631", true).Body.String())
+	for _, want := range []string{`id="progress-button"`, `href="/torrserver?play=` + duneHash + `&file=2"`, "Continue · 42:10 of 2:36:00"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("title progress lacks %q:\n%s", want, body)
+		}
+	}
+	if body := get(t, s, "/api/progress/title?type=movie&id=1", true).Body.String(); strings.Contains(body, "Continue") {
+		t.Error("a title never played offers to continue")
+	}
+}
+
+func TestTheLocalPlayerTellsTorrServerWhereTheFileWasLeft(t *testing.T) {
+	s, viewed := progressServerViewed(t)
+	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":2530.4,"duration":9360.2}`, true)
+	if got, _ := viewed.Load(2); got != 2530.0 {
+		t.Errorf("TorrServer's timecode = %v, want 2530 for its other players", got)
+	}
+}
+
+func TestTheLocalPlayerResumesWhereAnotherTorrServerPlayerStopped(t *testing.T) {
+	if body := getResume(t, progressServer(t), 1); !strings.Contains(body, "Resume from 10:00") {
+		t.Errorf("resume = %s, want TorrServer's 10:00", body)
+	}
+}
