@@ -79,7 +79,7 @@ func TestGStreamerSupportIsPushedAsSignal(t *testing.T) {
 	for _, tc := range []struct {
 		gst  bool
 		want string
-	}{{true, `"gst":true`}, {false, `"gst":false`}} {
+	}{{true, `"gst":true,"gstKnown":true`}, {false, `"gst":false,"gstKnown":true`}} {
 		srv, sessions, ts := setupTestServerWithTorrServer(t, fakeTorrServer(tc.gst))
 		rr := httptest.NewRecorder()
 		srv.ServeHTTP(rr, signedIn(t, sessions, httptest.NewRequest(http.MethodGet, "/api/torrserver/torrents", nil)))

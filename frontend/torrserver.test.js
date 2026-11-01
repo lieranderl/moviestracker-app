@@ -579,3 +579,28 @@ test("the player reads where TorrServer's other players left a file", async () =
   globalThis.fetch = async () => new Response("", { status: 404 });
   expect(await client.tsTimecode(server, hash, 2)).toBe(0);
 });
+
+test("the TorrServer check tells HLS it could not check from HLS the TorrServer cannot do", async () => {
+  const cases = [
+    [new Response("404 page not found", { status: 404 }), { hls: false, hlsKnown: true }],
+    [Response.json({ gstreamer: { works: false } }), { hls: false, hlsKnown: true }],
+    [Response.json({ gstreamer: { works: true } }), { hls: true, hlsKnown: true }],
+    [new Response("boom", { status: 500 }), { hls: false, hlsKnown: false }],
+    [new Response("<html>"), { hls: false, hlsKnown: false }],
+    [new TypeError("Failed to fetch"), { hls: false, hlsKnown: false }],
+  ];
+  for (const [gst, want] of cases) {
+    globalThis.fetch = mock(async (url) => {
+      if (String(url).endsWith("/gst/echo")) {
+        if (gst instanceof Error) throw gst;
+        return gst.clone();
+      }
+      return new Response("MatriX.146");
+    });
+    const el = new EventTarget();
+    const statuses = [];
+    el.addEventListener("ts-status", (evt) => statuses.push(evt.detail));
+    await client.tsCheck(el, server);
+    expect(statuses.at(-1)).toMatchObject({ ok: true, version: "MatriX.146", ...want });
+  }
+});

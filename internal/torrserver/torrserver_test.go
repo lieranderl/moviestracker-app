@@ -615,3 +615,52 @@ func TestFetchingFilesOnlyPutsBackATorrentItWokeFromTheDatabase(t *testing.T) {
 		})
 	}
 }
+
+// Whether TorrServer can convert to HLS is known only from an answer: a
+// build without /gst/echo or with broken GStreamer cannot, while a failed
+// or erroring check leaves it unknown.
+func TestEchoTellsAnHLSCheckThatFailedFromATorrServerThatCannotConvert(t *testing.T) {
+	cases := []struct {
+		name             string
+		gst              http.HandlerFunc
+		available, known bool
+	}{
+		{"no GStreamer build", http.NotFound, false, true},
+		{"GStreamer broken", func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`{"gstreamer":{"found":true,"available":true,"works":false}}`))
+		}, false, true},
+		{"GStreamer works", func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`{"gstreamer":{"found":true,"available":true,"works":true}}`))
+		}, true, true},
+		{"check errors", func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "boom", http.StatusInternalServerError)
+		}, false, false},
+		{"check answers garbage", func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`<html>`))
+		}, false, false},
+		{"check never answers", func(w http.ResponseWriter, r *http.Request) {
+			<-r.Context().Done()
+		}, false, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/gst/echo" {
+					c.gst(w, r)
+					return
+				}
+				_, _ = w.Write([]byte("MatriX.145"))
+			}))
+			defer ts.Close()
+			client := ts.Client()
+			client.Timeout = 200 * time.Millisecond
+			info, err := torrserver.NewClient(ts.URL, client).Echo(context.Background())
+			if err != nil {
+				t.Fatalf("echo: %v", err)
+			}
+			if info.GSTAvailable != c.available || info.GSTKnown != c.known {
+				t.Errorf("available=%v known=%v, want %v %v", info.GSTAvailable, info.GSTKnown, c.available, c.known)
+			}
+		})
+	}
+}

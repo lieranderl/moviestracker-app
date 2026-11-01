@@ -602,3 +602,69 @@ func TestFilesOfOneFolderShowNoFolder(t *testing.T) {
 		t.Error("the shared release folder is repeated on each row")
 	}
 }
+
+func torrPageEcho(t *testing.T, echo torrserver.EchoInfo) string {
+	t.Helper()
+	torrents := []torrserver.Torrent{{Hash: "hash1", Title: "Movie", FileStats: []torrserver.FileStat{{ID: 1, Path: "dir/movie.mkv", Length: 1 << 30}}}}
+	return html.UnescapeString(render(t, views.TorrServer(testUser, "http://nas:8090", "http://192.168.1.20:8095", testLinks, echo, torrents, views.GStreamerSetup{})))
+}
+
+// Without HLS, Direct's help never sends people to HLS: it names VLC instead.
+// HLS is suggested only while TorrServer can convert ($gst).
+func TestDirectPlayHelpSuggestsHLSOnlyWhenTorrServerConverts(t *testing.T) {
+	out := torrPageEcho(t, torrserver.EchoInfo{Version: "1.0", GSTKnown: true})
+	direct := regexp.MustCompile(`<button[^>]*data-kind="direct"[^>]*>`).FindString(out)
+	title := regexp.MustCompile(`\stitle="([^"]*)"`).FindStringSubmatch(direct)
+	if title == nil || strings.Contains(title[1], "HLS") || !strings.Contains(title[1], "VLC") {
+		t.Errorf("Direct's help without HLS should name VLC, not HLS: %s", direct)
+	}
+	if !strings.Contains(direct, `data-attr:title="$gst ?`) {
+		t.Errorf("Direct's help should follow TorrServer's HLS support: %s", direct)
+	}
+}
+
+// Whether TorrServer converts is shown as known yes, known no, or unknown.
+func TestTheStatusLineTellsAFailedGStreamerCheckFromNoGStreamer(t *testing.T) {
+	for _, c := range []struct {
+		echo      torrserver.EchoInfo
+		want, not string
+		signals   string
+	}{
+		{torrserver.EchoInfo{Version: "1.0", GSTKnown: true, GSTAvailable: true, GSTVersion: "1.28"}, "GStreamer v1.28 Active", "Couldn't check GStreamer", "gst: true, gstKnown: true"},
+		{torrserver.EchoInfo{Version: "1.0", GSTKnown: true}, "GStreamer Inactive", "Couldn't check GStreamer", "gst: false, gstKnown: true"},
+		{torrserver.EchoInfo{Version: "1.0"}, "Couldn't check GStreamer", "GStreamer Inactive", "gst: false, gstKnown: false"},
+	} {
+		out := torrPageEcho(t, c.echo)
+		status := regexp.MustCompile(`(?s)<div id="torr-status".*?</div>`).FindString(out)
+		if !strings.Contains(status, c.want) || strings.Contains(status, c.not) {
+			t.Errorf("%+v: status should say %q, not %q:\n%s", c.echo, c.want, c.not, status)
+		}
+		if !strings.Contains(out, c.signals) {
+			t.Errorf("%+v: page signals lack %q", c.echo, c.signals)
+		}
+	}
+}
+
+// A file this browser cannot play offers what can play it: HLS when
+// TorrServer converts, otherwise VLC, saying whether conversion is missing
+// or could not be checked.
+func TestAnUnplayableFileOffersTheAlternativeThatApplies(t *testing.T) {
+	out := torrPageEcho(t, torrserver.EchoInfo{Version: "1.0", GSTKnown: true})
+	notice := regexp.MustCompile(`(?s)<div[^>]*data-show="\$_unplayable" role="alert">.*?</div>\s*</div>`).FindString(out)
+	if notice == "" {
+		t.Fatal("no unplayable notice")
+	}
+	hls := regexp.MustCompile(`(?s)<div data-show="\$gst">.*?</div>`).FindString(notice)
+	if hls == "" || !strings.Contains(notice, "Play HLS") || !strings.Contains(hls, "$playKind = 'hls'") {
+		t.Errorf("with HLS the notice should switch to it:\n%s", notice)
+	}
+	for _, want := range []string{
+		`data-show="$gstKnown && !$gst"`, "This TorrServer cannot convert it to HLS",
+		`data-show="!$gstKnown"`, "Couldn't check whether this TorrServer can convert it to HLS",
+		"for VLC, another player or your TV",
+	} {
+		if !strings.Contains(notice, want) {
+			t.Errorf("notice lacks %q:\n%s", want, notice)
+		}
+	}
+}

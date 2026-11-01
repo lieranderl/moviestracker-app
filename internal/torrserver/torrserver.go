@@ -65,9 +65,12 @@ var ErrUnauthorized = errors.New("TorrServer refused the login")
 type EchoInfo struct {
 	Version      string `json:"version"`
 	GSTAvailable bool   `json:"gst_available"`
-	GSTVersion   string `json:"gst_version"`
-	Discoverer   bool   `json:"discoverer"`
-	HDRTonemap   bool   `json:"hdr_tonemap"`
+	// GSTKnown is whether TorrServer answered the GStreamer check: when
+	// false, GSTAvailable is unknown rather than a confirmed "cannot".
+	GSTKnown   bool   `json:"gst_known"`
+	GSTVersion string `json:"gst_version"`
+	Discoverer bool   `json:"discoverer"`
+	HDRTonemap bool   `json:"hdr_tonemap"`
 }
 
 // Torrent represents a summarized torrent item in the TorrServer database.
@@ -514,6 +517,8 @@ func (c *Client) Echo(ctx context.Context) (EchoInfo, error) {
 		gstResp, gstErr := c.httpClient.Do(gstReq)
 		if gstErr == nil {
 			defer func() { _ = gstResp.Body.Close() }()
+			// Builds without GStreamer have no /gst/echo.
+			info.GSTKnown = gstResp.StatusCode == http.StatusNotFound
 			if gstResp.StatusCode == http.StatusOK {
 				var gstData struct {
 					GStreamer     gstComponent `json:"gstreamer"`
@@ -521,6 +526,7 @@ func (c *Client) Echo(ctx context.Context) (EchoInfo, error) {
 					HDRToneMapper gstComponent `json:"hdr_tone_mapping"`
 				}
 				if decodeJSON(gstResp.Body, &gstData) == nil {
+					info.GSTKnown = true
 					info.GSTAvailable = gstData.GStreamer.Available && gstData.GStreamer.Works
 					info.GSTVersion = gstData.GStreamer.Version
 					info.Discoverer = gstData.Discoverer.Works
