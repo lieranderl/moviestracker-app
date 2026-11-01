@@ -33,7 +33,10 @@ func progressSave(browser bool) string {
 	if browser {
 		report = "(tsViewedSet($tsSelected, $activeHash, +$activeFileIndex, $_time), @post('/api/progress', {payload: {hash: $activeHash, index: +$activeFileIndex, position: $_time, duration: $_dur, torrent: $_progressTorrent}}))"
 	}
-	return "$playerOpen && $_dur > 0 && " + report
+	// Nothing is saved in a file's first minute, nor while its resume offer
+	// is unanswered: playing its start must not overwrite where the user
+	// stopped.
+	return "$playerOpen && $_dur > 0 && $_time >= 60 && !($_resume && $_time < $_resumeAt) && " + report
 }
 
 // progressResumeFetch asks where the user stopped whenever a file opens. The
@@ -48,17 +51,17 @@ func progressResumeFetch(browser bool) string {
 }
 
 // TorrResume offers to jump to where the user stopped in a file; at 0 it
-// offers nothing. It hides once the video passes that point or another
-// file opens.
+// offers nothing. Its state ($_resume, $_resumeAt) is patched with it; it
+// hides once answered, once the video passes that point or another file
+// opens.
 templ TorrResume(hash string, index int, at time.Duration) {
 	<div id="torr-resume" class="absolute left-3 bottom-20 z-30">
 		if at > 0 {
-			{{ key := fmt.Sprintf("%s-%d", hash, index) }}
+			{{ key := fmt.Sprintf("%s-%d", strings.ToLower(hash), index) }}
 			<div
 				role="status"
 				class="alert alert-soft shadow-xl py-2 text-sm"
-				data-signals:_resume={ "'" + key + "'" }
-				data-show={ fmt.Sprintf("$_resume === '%s' && $activeHash === '%s' && +$activeFileIndex === %d && $_time < %d", key, hash, index, int(at/time.Second)) }
+				data-show={ fmt.Sprintf("$_resume === '%s' && $activeHash.toLowerCase() === '%s' && +$activeFileIndex === %d && $_time < $_resumeAt", key, strings.ToLower(hash), index) }
 			>
 				@Icon("history", "size-4")
 				<span>{ trf(ctx, "Resume from %s", clockTime(at)) }</span>
@@ -134,6 +137,9 @@ type PlayRequest struct {
 	Hash  string
 	Index int
 	Title string
+	// Clean and HLS are the file's links for external players, which the
+	// local app signs; the web app's browser makes its own.
+	Clean, HLS string
 }
 
 type playRequestKey struct{}
@@ -151,7 +157,9 @@ func autoplayScript(p PlayRequest, browser bool) string {
 	if browser {
 		return "if ($_autoplay && $tsSelected && $tsStatus.ok) { $_autoplay = false; " + start + webStartPlay() + " }"
 	}
-	return start + torrStartPlay
+	clean, _ := json.Marshal(p.Clean)
+	hls, _ := json.Marshal(p.HLS)
+	return start + fmt.Sprintf("$streamCleanUrl = %s; $streamHlsUrl = %s; ", clean, hls) + torrStartPlay
 }
 
 // torrAutoplay opens the player on the file the page's link asks for.

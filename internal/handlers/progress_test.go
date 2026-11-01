@@ -118,7 +118,9 @@ func TestTheLocalPlayerOffersToResumeWhereTheAccountStopped(t *testing.T) {
 	s := progressServer(t)
 	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":2530.4,"duration":9360.2}`, true)
 	body := getResume(t, s, 2)
-	for _, want := range []string{`id="torr-resume"`, "Resume from 42:10", `$_video.currentTime = 2530`} {
+	// The offer's state is patched with every answer, so reopening a file
+	// after dismissing its offer shows it again.
+	for _, want := range []string{`id="torr-resume"`, "Resume from 42:10", `$_video.currentTime = 2530`, `"_resume":"` + duneHash + `-2"`, `"_resumeAt":2530`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("resume patch lacks %q:\n%s", want, body)
 		}
@@ -134,7 +136,9 @@ func TestTheLocalPlayerOffersToResumeWhereTheAccountStopped(t *testing.T) {
 
 func TestTheLocalPlayerReportsProgressAndAsksWhereToResume(t *testing.T) {
 	page := html.UnescapeString(get(t, progressServer(t), "/torrserver", true).Body.String())
-	for _, want := range []string{"@post('/api/progress'", "/api/progress/resume?hash=", `id="torr-resume"`} {
+	// Saving waits while the resume offer is unanswered, so playing the
+	// start of a file never overwrites where the account stopped.
+	for _, want := range []string{"@post('/api/progress'", "!($_resume && $_time < $_resumeAt)", "/api/progress/resume?hash=", `id="torr-resume"`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("player lacks %q", want)
 		}
@@ -156,7 +160,7 @@ func TestContinueWatchingOpensTheLocalPlayerOnTheFile(t *testing.T) {
 	s := progressServer(t)
 	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":2530.4,"duration":9360.2}`, true)
 	page := html.UnescapeString(get(t, s, "/torrserver?play="+duneHash+"&file=2", true).Body.String())
-	for _, want := range []string{`id="torr-autoplay"`, "$activeHash = '" + duneHash + "'", "$activeFileIndex = 2", `$streamTitle = "Dune"`} {
+	for _, want := range []string{`id="torr-autoplay"`, "$activeHash = '" + duneHash + "'", "$activeFileIndex = 2", `$streamTitle = "Dune"`, `$streamCleanUrl = "/s/`, `$streamHlsUrl = "/s/`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("player lacks %q", want)
 		}

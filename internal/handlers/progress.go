@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math"
 	"net/http"
@@ -178,7 +179,18 @@ func (p *Progress) handleResume(w http.ResponseWriter, r *http.Request) {
 		at = 0
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.TorrResume(hash, index, at)); err != nil {
+	sse := datastar.NewSSE(w, r)
+	// The offer's state goes with every answer: a dismissed offer comes
+	// back when its file opens again, and saving waits while it is pending.
+	offer := ""
+	if at > 0 {
+		offer = fmt.Sprintf("%s-%d", strings.ToLower(hash), index)
+	}
+	if err := sse.MarshalAndPatchSignals(map[string]any{"_resume": offer, "_resumeAt": int(at / time.Second)}); err != nil {
+		slog.Warn("patching the resume offer failed", "error", err)
+		return
+	}
+	if err := sse.PatchElementTempl(views.TorrResume(hash, index, at)); err != nil {
 		slog.Warn("patching the resume offer failed", "error", err)
 	}
 }

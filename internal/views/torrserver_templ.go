@@ -29,7 +29,7 @@ func torrPageSignals(gst, canRemove bool, linkOrigin string) string {
 	gst: %t, canRemove: %t, linkOrigin: %s,
 	playerOpen: false, streamUrl: '', streamCleanUrl: '', streamHlsUrl: '', streamTitle: '', activeHash: '', activeFileIndex: 1,
 	streamBase: '', playKind: 'direct', playNonce: 0, audioTrack: -1, mediaInfoOpen: false, subTrack: -1,
-	_resume: '', _seekHint: '', _seekSum: 0, _seekAt: 0, _zone: '',
+	_resume: '', _resumeAt: 0, _seekHint: '', _seekSum: 0, _seekAt: 0, _zone: '',
 	_paused: true, _time: 0, _dur: 0, _vol: 1, _muted: false, _fs: false, _idle: false, _waiting: false, _seeking: false, _unplayable: '',
 	_queue: [], _queueHash: '', _listMenu: false,
 	_audioMenu: false, _subMenu: false, audioLang: localStorage.getItem('torrAudioLang') || '',

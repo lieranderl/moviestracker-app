@@ -3,6 +3,7 @@ package handlers
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"compress/gzip"
 	"context"
 	"errors"
@@ -46,6 +47,14 @@ func (s *Server) handleTorrServerPage(w http.ResponseWriter, r *http.Request) {
 
 	page := r.Context()
 	if play, ok := s.progress.PlayRequest(r); ok {
+		for _, t := range torrents {
+			for _, f := range t.FileStats {
+				if strings.EqualFold(t.Hash, play.Hash) && f.ID == play.Index {
+					play.Clean, play.HLS = s.shareLink(t.Hash, f), s.hlsShareLink(t.Hash, f)
+					play.Title = cmp.Or(play.Title, t.DisplayName())
+				}
+			}
+		}
 		page = views.WithPlayRequest(page, play)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
