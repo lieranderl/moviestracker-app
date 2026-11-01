@@ -151,7 +151,7 @@ func openPlayer(ctx context.Context, player, name, link string) string {
 // openFileMenu opens a file row's menu from its button's dataset d; clean and
 // hls are expressions for the file's links as players open them.
 func openFileMenu(clean, hls string) string {
-	return `$_file = {hash: d.hash, index: +d.index, title: d.title, clean: ` + clean + `, hls: ` + hls + `, video: d.video === 'true'}; $fileMenuOpen = true`
+	return `$_file = {hash: d.hash, index: +d.index, title: d.path, clean: ` + clean + `, hls: ` + hls + `, video: d.video === 'true'}; $fileMenuOpen = true`
 }
 
 // torrPlayback (re)starts the stream once the audio track is known: right
@@ -238,11 +238,47 @@ $_idle = false
 const toastAutoHide = `$toast && ($toast = '', $toastError = false)`
 
 // playAttrs carries what the player needs to play one file.
-func playAttrs(hash string, index int, title, clean, hls string) templ.Attributes {
+func playAttrs(hash string, f torrserver.FileStat, clean, hls string) templ.Attributes {
 	return templ.Attributes{
-		"data-hash": hash, "data-index": fmt.Sprint(index), "data-title": title,
+		"data-hash": hash, "data-index": fmt.Sprint(f.ID), "data-title": fileLabel(f), "data-path": f.Path,
 		"data-clean": clean, "data-hls": hls,
 	}
+}
+
+// fileLabel names a file to people: its episode, when its path tells one,
+// then its file name. Release folders are left to the file's menu.
+func fileLabel(f torrserver.FileStat) string {
+	if code := torrserver.EpisodeCode(f.Path); code != "" {
+		return code + " · " + path.Base(f.Path)
+	}
+	return path.Base(f.Path)
+}
+
+// filesFolder is the folder all of a torrent's files share ("" for none),
+// ending in "/".
+func filesFolder(files []torrserver.FileStat) string {
+	if len(files) == 0 {
+		return ""
+	}
+	shared := path.Dir(files[0].Path) + "/"
+	for _, f := range files[1:] {
+		for shared != "./" && !strings.HasPrefix(f.Path, shared) {
+			shared = path.Dir(strings.TrimSuffix(shared, "/")) + "/"
+		}
+	}
+	if shared == "./" {
+		return ""
+	}
+	return shared
+}
+
+// fileFolder is the folder of f below the folder its torrent's files share.
+func fileFolder(f torrserver.FileStat, shared string) string {
+	dir := path.Dir(strings.TrimPrefix(f.Path, shared))
+	if dir == "." {
+		return ""
+	}
+	return dir
 }
 
 // QueuedFile is one file of the player's playlist ($_queue).
@@ -257,7 +293,7 @@ type QueuedFile struct {
 func PlayQueue(links StreamLinks, hash string, files []torrserver.FileStat) []QueuedFile {
 	q := make([]QueuedFile, len(files))
 	for i, f := range files {
-		q[i] = QueuedFile{Index: f.ID, Title: f.Path, Clean: links.Direct(hash, f), HLS: links.HLS(hash, f)}
+		q[i] = QueuedFile{Index: f.ID, Title: fileLabel(f), Clean: links.Direct(hash, f), HLS: links.HLS(hash, f)}
 	}
 	return q
 }
@@ -556,8 +592,9 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 					</summary>
 					<div class="collapse-content text-sm">
 						<ul class="divide-y divide-base-content/10">
+							{{ shared := filesFolder(t.FileStats) }}
 							for _, f := range t.FileStats {
-								@torrentFileRow(links, t.Hash, f)
+								@torrentFileRow(links, t.Hash, f, fileFolder(f, shared))
 							}
 						</ul>
 						<div class="mt-3 pt-3 border-t border-base-content/10 flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -570,7 +607,7 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 										type="button"
 										data-action="play"
 										data-kind="hls"
-										{ playAttrs(t.Hash, videos[0].ID, videos[0].Path, links.Direct(t.Hash, videos[0]), links.HLS(t.Hash, videos[0]))... }
+										{ playAttrs(t.Hash, videos[0], links.Direct(t.Hash, videos[0]), links.HLS(t.Hash, videos[0]))... }
 										class="btn btn-xs btn-primary gap-1.5"
 										title={ tr(ctx, "Play every video here, one after the other") }
 									>
@@ -622,9 +659,10 @@ templ torrStat(title, value, tone string) {
 	</div>
 }
 
-templ torrentFileRow(links StreamLinks, hash string, f torrserver.FileStat) {
+templ torrentFileRow(links StreamLinks, hash string, f torrserver.FileStat, folder string) {
 	{{
 		isVideo := torrserver.IsVideoFile(f.Path)
+		code := torrserver.EpisodeCode(f.Path)
 		clean := links.Direct(hash, f)
 		hls := links.HLS(hash, f)
 	}}
@@ -632,9 +670,20 @@ templ torrentFileRow(links StreamLinks, hash string, f torrserver.FileStat) {
 		<div class="min-w-0 flex items-center gap-2.5 grow">
 			<span class="font-mono text-xs text-base-content/40 w-6 shrink-0 text-right">{ fmt.Sprint(f.ID) }.</span>
 			<div class="min-w-0 grow">
-				<div class="text-xs sm:text-sm font-medium truncate" title={ f.Path }>{ f.Path }</div>
-				<div class="flex items-center gap-2 text-[11px] font-mono text-base-content/70">
-					{ f.FormattedLength() }
+				<div class="flex items-center gap-1.5 min-w-0 text-xs sm:text-sm font-medium truncate" title={ f.Path }>
+					if code != "" {
+						<span class="badge badge-xs badge-primary font-mono shrink-0">{ code }</span>
+					}
+					<span class="truncate">{ path.Base(f.Path) }</span>
+				</div>
+				<div class="flex items-center gap-2 min-w-0 text-[11px] font-mono text-base-content/70">
+					if folder != "" {
+						<span class="flex items-center gap-1 min-w-0" title={ folder }>
+							@Icon("folder", "size-3 shrink-0 opacity-60")
+							<span class="truncate">{ folder }</span>
+						</span>
+					}
+					<span class="shrink-0">{ f.FormattedLength() }</span>
 					if isVideo {
 						<span class="badge badge-xs badge-soft badge-primary">{ tr(ctx, "Video") }</span>
 					}
@@ -643,14 +692,14 @@ templ torrentFileRow(links StreamLinks, hash string, f torrserver.FileStat) {
 		</div>
 		<div class="flex items-center gap-1.5 shrink-0 self-end @md:self-center">
 			if isVideo {
-				{{ play := playAttrs(hash, f.ID, f.Path, clean, hls) }}
+				{{ play := playAttrs(hash, f, clean, hls) }}
 				@streamGroup("direct", play)
 				@streamGroup("hls", play)
 			}
 			<button
 				type="button"
 				data-action="more"
-				{ playAttrs(hash, f.ID, f.Path, clean, hls)... }
+				{ playAttrs(hash, f, clean, hls)... }
 				data-video={ fmt.Sprint(isVideo) }
 				class="btn btn-xs btn-ghost btn-square"
 				aria-label={ tr(ctx, "More for this file") }
@@ -1382,7 +1431,11 @@ templ TorrPlaylist(videos []torrserver.FileStat, browser ...bool) {
 				for i, f := range videos {
 					<li>
 						<button type="button" data-at={ fmt.Sprint(i) } data-class:menu-active={ fmt.Sprintf("$activeFileIndex === %d", f.ID) } title={ f.Path }>
-							<span class="truncate">{ fmt.Sprintf("%d. %s", i+1, path.Base(f.Path)) }</span>
+							<span class="shrink-0">{ fmt.Sprintf("%d.", i+1) }</span>
+							if code := torrserver.EpisodeCode(f.Path); code != "" {
+								<span class="badge badge-xs badge-primary font-mono shrink-0">{ code }</span>
+							}
+							<span class="truncate">{ path.Base(f.Path) }</span>
 						</button>
 					</li>
 				}

@@ -438,7 +438,7 @@ func TestSeveralVideosCanBePlayedInARowOrAsAPlaylist(t *testing.T) {
 // The playlist menu lists the torrent's videos, marking the one playing.
 func TestThePlaylistMenuListsTheVideos(t *testing.T) {
 	out := html.UnescapeString(render(t, views.TorrPlaylist([]torrserver.FileStat{{ID: 1, Path: "Show/e01.mkv"}, {ID: 3, Path: "Show/e02.mkv"}})))
-	for _, want := range []string{`aria-label="Playlist"`, `data-at="0"`, `data-at="1"`, "$activeFileIndex === 3", "2. e02.mkv"} {
+	for _, want := range []string{`aria-label="Playlist"`, `data-at="0"`, `data-at="1"`, "$activeFileIndex === 3", "2.", ">E02</span>", ">e02.mkv</span>"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("playlist menu lacks %q:\n%s", want, out)
 		}
@@ -506,7 +506,7 @@ func TestScrollingOverTheVideoChangesTheVolume(t *testing.T) {
 func TestAFileRowOpensAMenuWithTheFilesLinks(t *testing.T) {
 	out := torrPage(t, true)
 	more := regexp.MustCompile(`<button[^>]*data-action="more"[^>]*>`).FindString(out)
-	for _, want := range []string{`data-hash="hash1"`, `data-index="1"`, `data-title="dir/movie.mkv"`, `data-clean="/s/hash1.1/movie.mkv"`, `data-hls="/s/hash1.1/hls/master.m3u8"`, `data-video="true"`, `aria-label="More for this file"`} {
+	for _, want := range []string{`data-hash="hash1"`, `data-index="1"`, `data-title="movie.mkv"`, `data-path="dir/movie.mkv"`, `data-clean="/s/hash1.1/movie.mkv"`, `data-hls="/s/hash1.1/hls/master.m3u8"`, `data-video="true"`, `aria-label="More for this file"`} {
 		if !strings.Contains(more, want) {
 			t.Errorf("the file's menu button lacks %s: %s", want, more)
 		}
@@ -547,5 +547,58 @@ func TestTheFileMenuOpensExternalPlayersAndCopiesLinks(t *testing.T) {
 	}
 	if !regexp.MustCompile(`<button[^>]*data-show="\$gst && \$_file\.video"[^>]*copyLink\(\$_file\.hls`).MatchString(menu) {
 		t.Error("copying the HLS link needs GStreamer")
+	}
+}
+
+// A file row leads with what tells files apart: the episode and the file's
+// name, with its folder inside the release when the release has several.
+// The full release path stays in the tooltip and the file's menu.
+func TestFileRowsShowTheEpisodeAndFileNameBeforeTheReleasePath(t *testing.T) {
+	const root = "Breaking.Bad.S01-S02.2160p.WEB-DL.DDP5.1.Atmos.HDR.HEVC-GROUP/"
+	out := torrPageWith(t,
+		torrserver.FileStat{ID: 1, Path: root + "Season 1/Breaking.Bad.S01E02.Cats.in.the.Bag.2160p.mkv", Length: 1 << 30},
+		torrserver.FileStat{ID: 2, Path: root + "Season 2/Серия 07.mkv", Length: 1 << 30},
+		torrserver.FileStat{ID: 3, Path: root + "Season 2/Breaking.Bad.S02.Extras.txt", Length: 1 << 10},
+	)
+	rows := regexp.MustCompile(`(?s)<li class="py-2.5.*?</li>`).FindAllString(out, -1)
+	if len(rows) != 3 {
+		t.Fatalf("want 3 file rows, got %d", len(rows))
+	}
+	for i, want := range []struct{ code, name, folder, path string }{
+		{"S01E02", "Breaking.Bad.S01E02.Cats.in.the.Bag.2160p.mkv", "Season 1", root + "Season 1/Breaking.Bad.S01E02.Cats.in.the.Bag.2160p.mkv"},
+		{"S02E07", "Серия 07.mkv", "Season 2", root + "Season 2/Серия 07.mkv"},
+		{"", "Breaking.Bad.S02.Extras.txt", "Season 2", root + "Season 2/Breaking.Bad.S02.Extras.txt"},
+	} {
+		row := rows[i]
+		name := regexp.MustCompile(`<div class="[^"]*truncate"[^>]*title="([^"]*)"[^>]*>(?:\s*<span class="badge[^"]*">([^<]*)</span>)?\s*<span[^>]*>([^<]*)</span>`).FindStringSubmatch(row)
+		if name == nil {
+			t.Fatalf("row %d has no file name line:\n%s", i+1, row)
+		}
+		if name[1] != want.path || name[2] != want.code || name[3] != want.name {
+			t.Errorf("row %d shows title=%q code=%q name=%q, want %q %q %q", i+1, name[1], name[2], name[3], want.path, want.code, want.name)
+		}
+		if !strings.Contains(row, want.folder) || strings.Contains(row, ">"+root) {
+			t.Errorf("row %d should show its folder %q, not the release path:\n%s", i+1, want.folder, row)
+		}
+		if !strings.Contains(row, `data-path="`+want.path+`"`) {
+			t.Errorf("row %d should keep the full path for the file's menu", i+1)
+		}
+	}
+	if !strings.Contains(rows[0], `data-title="S01E02 · Breaking.Bad.S01E02.Cats.in.the.Bag.2160p.mkv"`) {
+		t.Error("the player should be titled with the episode and file name")
+	}
+	if !strings.Contains(rows[0], `data-clean="/s/hash1.1/Breaking.Bad.S01E02.Cats.in.the.Bag.2160p.mkv"`) {
+		t.Error("the file's stream link changed")
+	}
+}
+
+// A release whose files share one folder needs no folder on each row.
+func TestFilesOfOneFolderShowNoFolder(t *testing.T) {
+	out := torrPageWith(t,
+		torrserver.FileStat{ID: 1, Path: "Show.S01/Show.S01E01.mkv", Length: 1 << 30},
+		torrserver.FileStat{ID: 2, Path: "Show.S01/Show.S01E02.mkv", Length: 1 << 30},
+	)
+	if strings.Contains(out, "Show.S01 ·") || regexp.MustCompile(`>\s*Show\.S01\s*<`).MatchString(out) {
+		t.Error("the shared release folder is repeated on each row")
 	}
 }

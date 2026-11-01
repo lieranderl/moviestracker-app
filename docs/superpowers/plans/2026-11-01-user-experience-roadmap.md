@@ -212,7 +212,7 @@ pending, implemented, and deployed status separate in future updates here.
 
 ## Next implementation slice
 
-Continue with **R10**, then **R12**. They address directly observed
+Continue with **R12**, then **R03**. They address directly observed
 friction without introducing new persistent product concepts. Continue Phase 1
 in focused PRs before the larger episode/discovery and collaboration work.
 
@@ -242,6 +242,20 @@ in focused PRs before the larger episode/discovery and collaboration work.
   590 px scroll position. Handler tests cover the rendered URL effect and focus
   behaviour; WebKit, the web app surface and Russian rendering were not checked
   in the browser.
+- **R10 — implemented, deployment unverified (1 November 2026):** torrent
+  file rows lead with an episode badge (`S01E02`, ranges, `1x02`, and
+  episode-only names such as `Серия 07` with the season from a `Season 2`
+  folder) and the file name; the file's folder inside the release shows only
+  when the release has several. The full path stays in the row tooltip and
+  the file menu. The player title, both play queues and the playlist menu use
+  the same label; file IDs, stream links, playlists and saved progress are
+  unchanged. Episode titles from TMDB were left to R18. Unit tests cover
+  episode recognition, including resolution/codec false positives; view,
+  handler and web relay tests cover rows, queues and the playlist. A local
+  browser check (self-hosted app, fake TorrServer listing a two-season
+  release) confirmed rows at 1280 and 320 px (badge visible, no horizontal
+  overflow), the file menu's full path, and Russian rendering. The web app
+  surface was covered by tests only.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding
