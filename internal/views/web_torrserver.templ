@@ -159,31 +159,37 @@ templ webTorrServerStatus() {
 				<span class="loading loading-spinner loading-xs"></span>
 				{ tr(ctx, "Checking…") }
 			</p>
-			<div class="flex flex-wrap gap-2" data-show="$tsStatus.ok">
-				<span class="badge badge-success badge-soft gap-1.5">
-					@Icon("circle-check", "size-3.5")
-					<span data-text={ trJS(ctx, "Connected") + " + ' · ' + $tsStatus.version" }></span>
-				</span>
-				<span class="badge badge-info badge-soft gap-1.5" data-show="$tsStatus.hls">
-					@Icon("wand-sparkles", "size-3.5")
-					{ tr(ctx, "HLS conversion available") }
-				</span>
-			</div>
-			<p class="text-sm text-base-content/70" data-show="$tsStatus.ok && !$tsStatus.hls">{ tr(ctx, "This TorrServer has no GStreamer, so videos play only in formats the browser supports. Its -gst build converts the others to HLS.") }</p>
 			for _, p := range tsProblems {
 				@tsProblem(p.Problem, p.Message)
 			}
-			<div
-				id="ts-https"
-				class="space-y-3"
-				data-signals="{_tsSSL: {busy: '', ok: false, problem: '', status: 0, error: '', url: ''}}"
-				data-effect="tsSSL(el, $tsStatus.ok ? $tsSelected : '')"
-				data-on:ts-ssl="evt.detail.url === $tsSelected && @post('/api/ts/https', {payload: evt.detail})"
-				data-on:ts-ssl-change="$_tsSSL = evt.detail"
-			>
-				<div id="ts-https-details"></div>
-				@webCertificateOutcome()
-			</div>
+			// Folded to the connected badge; opening it shows GStreamer and the
+			// HTTPS certificate.
+			<details class="collapse collapse-arrow rounded-none overflow-visible" data-show="$tsStatus.ok">
+				<summary class="collapse-title min-h-0 p-0 pe-8 flex flex-wrap items-center gap-2">
+					<span class="badge badge-success badge-soft gap-1.5">
+						@Icon("circle-check", "size-3.5")
+						<span data-text={ trJS(ctx, "Connected") + " + ' · ' + $tsStatus.version" }></span>
+					</span>
+					<span class="badge badge-info badge-soft gap-1.5" data-show="$tsStatus.hls">
+						@Icon("wand-sparkles", "size-3.5")
+						{ tr(ctx, "HLS conversion available") }
+					</span>
+				</summary>
+				<div class="collapse-content p-0 space-y-3">
+					<p class="pt-3 text-sm text-base-content/70" data-show="!$tsStatus.hls">{ tr(ctx, "This TorrServer has no GStreamer, so videos play only in formats the browser supports. Its -gst build converts the others to HLS.") }</p>
+					<div
+						id="ts-https"
+						class="pt-3 space-y-3"
+						data-signals="{_tsSSL: {busy: '', ok: false, problem: '', status: 0, error: '', url: ''}}"
+						data-effect="tsSSL(el, $tsStatus.ok ? $tsSelected : '')"
+						data-on:ts-ssl="evt.detail.url === $tsSelected && @post('/api/ts/https', {payload: evt.detail})"
+						data-on:ts-ssl-change="$_tsSSL = evt.detail"
+					>
+						<div id="ts-https-details"></div>
+						@webCertificateOutcome()
+					</div>
+				</div>
+			</details>
 		</div>
 	</section>
 }

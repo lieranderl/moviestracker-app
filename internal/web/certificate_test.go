@@ -119,3 +119,20 @@ func TestTheCertificateIsShownOnlyToTheSignedIn(t *testing.T) {
 		t.Errorf("signed out = %d, want 401", res.Code)
 	}
 }
+
+func TestTheTorrServerConnectionFoldsItsDetailsUnderTheConnectedBadge(t *testing.T) {
+	h, session, _ := torrServers(t)
+	body := html.UnescapeString(getWith(t, h, "/torrserver", session).Body.String())
+	fold := body[strings.Index(body, `id="ts-status"`):]
+	open, summary, details := strings.Index(fold, "<details"), strings.Index(fold, "Connected"), strings.Index(fold, `id="ts-https"`)
+	end := strings.Index(fold, "</details>")
+	if open < 0 || strings.Contains(fold[open:strings.Index(fold[open:], ">")+open], " open") {
+		t.Fatal("the connection is not folded by default")
+	}
+	if summary < open || summary > strings.Index(fold, "</summary>") {
+		t.Errorf("the folded connection does not show Connected in its summary")
+	}
+	if details < strings.Index(fold, "</summary>") || details > end {
+		t.Errorf("the certificate is not inside the fold")
+	}
+}
