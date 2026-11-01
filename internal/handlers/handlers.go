@@ -148,6 +148,7 @@ func NewServer(cfg Config) (*Server, error) {
 	s.titleStates = NewTitleStates(titles, s.username, s.Catalog)
 	s.progress = NewProgress(progress, s.username, s.progressTorrent)
 	s.ShowProgress(s.progress)
+	s.progress.MarkFinishedMoviesIn(s.titleStates)
 	s.progress.MirrorTo(func() Timecodes { return s.torrServer.Client() })
 	s.routes()
 	// Rejects cross-origin POSTs (Sec-Fetch-Site / Origin), so no other site

@@ -51,3 +51,42 @@ func TestAnAccountMarksAMovieWatchedInTheLocalApp(t *testing.T) {
 		t.Errorf("kept in the data directory: %+v, want Dune watched", got)
 	}
 }
+
+func TestTheLocalAppListsWhatAnAccountWantsToWatch(t *testing.T) {
+	s := titlesServer(t)
+	sendAs(t, s, http.MethodPost, "/api/titles/state?type=movie&id=438631&state=want")
+	page := sendAs(t, s, http.MethodGet, "/lists/want")
+	for _, want := range []string{`href="/lists/want" role="tab" aria-selected="true"`, `href="/lists/watched"`, `href="/movie/438631"`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("local Want to watch tab lacks %q", want)
+		}
+	}
+	if strings.Contains(page, `href="/favorites"`) {
+		t.Error("the local app offers favourites, which only the web app keeps")
+	}
+}
+
+func TestFinishingAMovieInTheLocalPlayerMarksItWatched(t *testing.T) {
+	s := progressServer(t)
+	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":9300,"duration":9360.2}`, true)
+	kept, err := store.OpenTitleFile(filepath.Join(s.store.Dir(), "titles.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := kept.TitleState(context.Background(), testUsername, "movie", 438631); got.State != store.Watched || got.Title != "Dune" {
+		t.Errorf("after finishing Dune its state is %+v, want watched", got)
+	}
+}
+
+func TestFinishingAnEpisodeDoesNotMarkTheSeriesWatched(t *testing.T) {
+	s := progressServer(t)
+	s.rememberTitle(duneHash, "tv", 95396)
+	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":3200,"duration":3300}`, true)
+	kept, err := store.OpenTitleFile(filepath.Join(s.store.Dir(), "titles.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := kept.TitleState(context.Background(), testUsername, "tv", 95396); got.State != "" {
+		t.Errorf("after one episode the series is %q, want unmarked", got.State)
+	}
+}

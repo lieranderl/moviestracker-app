@@ -55,3 +55,36 @@ func TestATitlePageAsksForItsWatchState(t *testing.T) {
 		t.Errorf("an unmarked title's buttons are:\n%s", body)
 	}
 }
+
+func TestMyListsShowFavouritesWantToWatchAndWatchedAsTabs(t *testing.T) {
+	h, session, _ := favorites(t)
+	send(t, h, http.MethodPost, "/api/titles/state?type=movie&id=438631&state=want", session)
+	page := html.UnescapeString(getWith(t, h, "/lists/want", session).Body.String())
+	for _, want := range []string{`role="tablist"`, `href="/favorites"`, `href="/lists/want" role="tab" aria-selected="true"`, `href="/lists/watched"`, `href="/movie/438631"`, "My lists"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("Want to watch tab lacks %q", want)
+		}
+	}
+	if page := getWith(t, h, "/lists/watched", session).Body.String(); !strings.Contains(page, "Nothing watched yet") {
+		t.Error("an empty Watched tab does not say so")
+	}
+	if page := html.UnescapeString(getWith(t, h, "/favorites", session).Body.String()); !strings.Contains(page, `href="/favorites" role="tab" aria-selected="true"`) {
+		t.Error("the favourites page is not the lists' first tab")
+	}
+	if res := getWith(t, h, "/lists/loved", session); res.Code != http.StatusNotFound {
+		t.Errorf("/lists/loved = %d, want 404", res.Code)
+	}
+}
+
+func TestFinishingAMovieInThePlayerMarksItWatched(t *testing.T) {
+	h, session, users := favorites(t)
+	send(t, h, http.MethodPost, "/api/titles/state?type=movie&id=438631&state=want", session)
+	finished := strings.Replace(duneProgress, `"position":2530.4`, `"position":9300`, 1)
+	if res := postPlayer(t, h, "/api/progress", finished, session); res.Code != http.StatusNoContent {
+		t.Fatalf("saving the end of Dune = %d %s", res.Code, res.Body)
+	}
+	got, _ := users.TitleState(context.Background(), "1098765", "movie", 438631)
+	if got.State != store.Watched || got.Title != "Dune" || got.Poster != "/d.jpg" {
+		t.Errorf("after finishing Dune its state is %+v, want watched, as TMDB names it", got)
+	}
+}

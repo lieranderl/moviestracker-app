@@ -34,6 +34,39 @@ func (ts *TitleStates) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/titles/state", ts.handleState)
 	mux.HandleFunc("POST /api/titles/state", ts.handleSet)
 	mux.HandleFunc("DELETE /api/titles/state", ts.handleSet)
+	mux.HandleFunc("GET /lists/{list}", ts.handleList)
+}
+
+// handleList is My lists' Want to watch or Watched tab.
+func (ts *TitleStates) handleList(w http.ResponseWriter, r *http.Request) {
+	list := r.PathValue("list")
+	if list != views.ListWant && list != views.ListWatched {
+		http.NotFound(w, r)
+		return
+	}
+	uid, ok := ts.user(r)
+	if !ok {
+		http.Redirect(w, r, ts.catalog.signIn, http.StatusSeeOther)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
+	defer cancel()
+	kept, err := ts.store.TitleStates(ctx, uid, list)
+	if err != nil {
+		slog.Warn("reading watch states failed", "error", logError(err))
+	}
+	items := make([]tmdb.MediaItem, 0, len(kept))
+	for _, t := range kept {
+		items = append(items, tmdb.MediaItem{ID: t.TMDBID, Title: t.Title, PosterPath: t.Poster, MediaType: t.Kind})
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	if err := views.ListsPage(ts.catalog.userFromRequest(r), list, items, err != nil).Render(r.Context(), w); err != nil {
+		slog.Warn("render failed", "page", "lists", "error", err)
+	}
 }
 
 // target is the signed-in user and the title (?type=movie|tv&id=N) of a
@@ -111,4 +144,20 @@ func (ts *TitleStates) handleSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	patchWatchState(w, r, kind, id, rec.State)
+}
+
+// markWatched marks a movie the user finished watched, named as TMDB names
+// it (as the torrent was titled when TMDB does not answer). One already
+// watched stays as it was.
+func (ts *TitleStates) markWatched(ctx context.Context, r *http.Request, uid string, id int, title string) {
+	if kept, err := ts.store.TitleState(ctx, uid, "movie", id); err == nil && kept.State == store.Watched {
+		return
+	}
+	rec := store.TitleState{Kind: "movie", TMDBID: id, Title: title, State: store.Watched}
+	if item, err := ts.catalog.Title(r.Context(), "movie", id); err == nil {
+		rec.Title, rec.Poster = item.Title, item.PosterPath
+	}
+	if err := ts.store.SetTitleState(ctx, uid, rec); err != nil {
+		slog.Warn("marking a finished movie watched failed", "error", logError(err))
+	}
 }
