@@ -212,7 +212,7 @@ pending, implemented, and deployed status separate in future updates here.
 
 ## Next implementation slice
 
-Continue with **R04**, then **R06**. They address observed and
+Continue with **R06**, then **R05**. They address observed and
 source-derived Phase 1 risks without introducing new product concepts. Continue Phase 1
 in focused PRs before the larger episode/discovery and collaboration work.
 
@@ -284,6 +284,17 @@ in focused PRs before the larger episode/discovery and collaboration work.
   store and the Firestore emulator; web handler tests cover 130 unread
   alerts, older pages, a later arrival, malformed cursors and a failed read.
   No browser check: the web app signs in only through Google.
+- **R04 — implemented, deployment unverified (1 November 2026):**
+  recommendation rows look up at most three titles at once, all within one
+  deadline (the catalog timeout), each lookup taking at most half of it so a
+  title TMDB is slow on gives its turn to the next. Lookups stop once the
+  titles answered in order fill three rows; at the deadline the rows are made
+  of what was answered. Rows keep seed order and deduplication whichever
+  lookup answers first, and failed or unanswered titles are skipped. Handler
+  tests with a slow/failing TMDB fake cover three never-answering titles
+  (response within twice the deadline, answered rows kept, at most three
+  lookups at once) and out-of-order answers; they pass repeatedly under the
+  race detector. No production latency was measured.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding
