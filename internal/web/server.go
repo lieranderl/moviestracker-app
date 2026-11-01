@@ -52,6 +52,7 @@ type app struct {
 	signer   signer
 	catalog  *handlers.Catalog
 	progress *handlers.Progress
+	feeds    *cachedFeeds // the backend's release feeds, as the home rows read them
 }
 
 func (a *app) now() time.Time {
@@ -80,14 +81,19 @@ func New(cfg Config) http.Handler {
 	if cfg.Releases == nil {
 		cfg.Releases = releases.NewMemory(nil)
 	}
-	if cfg.Sources.Details != nil {
-		clock := cfg.Now
-		if clock == nil {
-			clock = time.Now
-		}
-		cfg.Sources.Details = releaseLists{DetailsProvider: cfg.Sources.Details, feeds: newCachedFeeds(cfg.Releases, posterProvider(cfg.Sources.Details), clock)}
+	clock := cfg.Now
+	if clock == nil {
+		clock = time.Now
 	}
-	a := &app{cfg: cfg, signer: signer{key: cfg.SessionKey}}
+	var posters tmdb.PosterProvider
+	if cfg.Sources.Details != nil {
+		posters = posterProvider(cfg.Sources.Details)
+	}
+	feeds := newCachedFeeds(cfg.Releases, posters, clock)
+	if cfg.Sources.Details != nil {
+		cfg.Sources.Details = releaseLists{DetailsProvider: cfg.Sources.Details, feeds: feeds}
+	}
+	a := &app{cfg: cfg, signer: signer{key: cfg.SessionKey}, feeds: feeds}
 	a.catalog = handlers.NewCatalog(func() *sources.Clients { return &a.cfg.Sources }, a.catalogUser, "/", catalogTimeout)
 
 	mux := http.NewServeMux()
@@ -109,6 +115,8 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("GET "+signInPath+"/callback", a.handleSignInCallback)
 	mux.HandleFunc("POST /api/logout", a.handleSignOut)
 	mux.HandleFunc("GET /favorites", a.handleFavoritesPage)
+	mux.HandleFunc("GET /alerts", a.handleAlertsPage)
+	mux.HandleFunc("GET /api/alerts/count", a.handleAlertsCount)
 	mux.HandleFunc("GET /api/favorites/state", a.handleFavoriteState)
 	mux.HandleFunc("POST /api/favorites", a.handleAddFavorite)
 	mux.HandleFunc("DELETE /api/favorites", a.handleRemoveFavorite)

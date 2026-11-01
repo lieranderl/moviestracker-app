@@ -10,6 +10,7 @@
 //	users/{uid}/torrservers/{id}       one of the user's TorrServers
 //	users/{uid}/progress/{hash}-{file} where they stopped in one file
 //	users/{uid}/titles/{kind}-{id}     a title they want to watch or watched
+//	users/{uid}/updates/{feed}-{id}    a release they were told about
 package store
 
 import (
@@ -18,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 )
@@ -59,7 +61,50 @@ type Store interface {
 
 	ProgressStore
 	TitleStateStore
+	UpdateStore
 }
+
+// Update tells a user a movie they follow turned up in one of the
+// backend's release feeds (internal/releases). They are told once per feed.
+type Update struct {
+	Feed    string // the feed's Firestore collection
+	TMDBID  int
+	Title   string
+	Poster  string    // TMDB image path
+	FoundAt time.Time // when the backend found it, as the feed said then
+	Seen    bool
+}
+
+// updateFeeds are the release feeds updates come from.
+var updateFeeds = []string{"latesttorrentsmovies", "hdr10movies", "dvmovies"}
+
+// updateLimit is how many updates Updates returns.
+const updateLimit = 100
+
+// UpdateStore keeps what users were told about new releases.
+type UpdateStore interface {
+	// AddUpdates keeps updates the user was not told about yet; one already
+	// kept stays as it was, seen or not.
+	AddUpdates(ctx context.Context, uid string, updates []Update) error
+	// Updates are the user's latest updates, most recently found first.
+	Updates(ctx context.Context, uid string) ([]Update, error)
+	// MarkUpdatesSeen marks all the user's updates seen.
+	MarkUpdatesSeen(ctx context.Context, uid string) error
+}
+
+// updateID is an update's key: its feed and TMDB ID ("dvmovies-438631").
+func updateID(u Update) (string, error) {
+	if !slices.Contains(updateFeeds, u.Feed) {
+		return "", fmt.Errorf("release feed %q is unknown", u.Feed)
+	}
+	if u.TMDBID <= 0 {
+		return "", fmt.Errorf("update TMDB ID %d is not positive", u.TMDBID)
+	}
+	return fmt.Sprintf("%s-%d", u.Feed, u.TMDBID), nil
+}
+
+// newestFound orders updates most recently found first.
+func newestFound(a, b Update) int { return b.FoundAt.Compare(a.FoundAt) }
 
 // Watch states a user gives a title.
 const (
