@@ -55,6 +55,10 @@ type Store interface {
 	// RemoveFavorite forgets a favourite; one not kept is no error.
 	RemoveFavorite(ctx context.Context, uid, kind string, tmdbID int) error
 
+	// LibraryStamp changes whenever the user's favourites or watch states
+	// change, so what is worked out from them can be kept until then.
+	LibraryStamp(ctx context.Context, uid string) (string, error)
+
 	// TorrServers are the user's TorrServers, in the order added.
 	TorrServers(ctx context.Context, uid string) ([]TorrServer, error)
 	// SaveTorrServer keeps t: a new one (no ID) gets an ID, one with an ID

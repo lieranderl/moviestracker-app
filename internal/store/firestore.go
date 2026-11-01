@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"slices"
@@ -125,10 +126,36 @@ func (f *Firestore) AddFavorite(ctx context.Context, uid string, fav Favorite) e
 	}
 	fav.AddedAt = fav.AddedAt.UTC()
 	_, err = f.favorites(uid).Doc(id).Create(ctx, favoriteRecord(fav))
-	if err != nil && status.Code(err) != codes.AlreadyExists {
+	if status.Code(err) == codes.AlreadyExists {
+		return nil
+	}
+	if err != nil {
 		return fmt.Errorf("add favourite: %w", err)
 	}
+	return f.libraryChanged(ctx, uid)
+}
+
+// libraryChanged gives the user's library a new stamp, after the change:
+// one read between the two sees the change under the old stamp, and the
+// new stamp then makes it be read again.
+func (f *Firestore) libraryChanged(ctx context.Context, uid string) error {
+	if _, err := f.userDoc(uid).Set(ctx, map[string]any{"libraryStamp": rand.Text()}, firestore.MergeAll); err != nil {
+		return fmt.Errorf("stamp the library: %w", err)
+	}
 	return nil
+}
+
+// LibraryStamp implements Store.
+func (f *Firestore) LibraryStamp(ctx context.Context, uid string) (string, error) {
+	snap, err := f.userDoc(uid).Get(ctx)
+	if notFound(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("read the library stamp: %w", err)
+	}
+	stamp, _ := snap.Data()["libraryStamp"].(string)
+	return stamp, nil
 }
 
 // RemoveFavorite implements Store.
@@ -140,7 +167,7 @@ func (f *Firestore) RemoveFavorite(ctx context.Context, uid, kind string, tmdbID
 	if _, err := f.favorites(uid).Doc(id).Delete(ctx); err != nil {
 		return fmt.Errorf("remove favourite: %w", err)
 	}
-	return nil
+	return f.libraryChanged(ctx, uid)
 }
 
 // torrServerRecord is a users/{uid}/torrservers/{id} document.
@@ -320,13 +347,13 @@ func (f *Firestore) SetTitleState(ctx context.Context, uid string, ts TitleState
 		if _, err := f.titles(uid).Doc(id).Delete(ctx); err != nil {
 			return fmt.Errorf("clear watch state: %w", err)
 		}
-		return nil
+		return f.libraryChanged(ctx, uid)
 	}
 	ts.UpdatedAt = f.opts.now().UTC()
 	if _, err := f.titles(uid).Doc(id).Set(ctx, titleStateRecord(ts)); err != nil {
 		return fmt.Errorf("save watch state: %w", err)
 	}
-	return nil
+	return f.libraryChanged(ctx, uid)
 }
 
 // TitleState implements Store.
