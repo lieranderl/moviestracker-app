@@ -475,7 +475,9 @@ func (f *Firestore) keyWatchLists(ctx context.Context, uid string) error {
 			return fmt.Errorf("read watch state %s: %w", doc.Ref.ID, err)
 		}
 		if key := listKey(rec.State, rec.UpdatedAt); rec.ListKey != key {
-			job, err := bw.Update(doc.Ref, []firestore.Update{{Path: "listKey", Value: key}})
+			// Only if unchanged since read: a state saved meanwhile wrote its
+			// own key, which this one must not overwrite.
+			job, err := bw.Update(doc.Ref, []firestore.Update{{Path: "listKey", Value: key}}, firestore.LastUpdateTime(doc.UpdateTime))
 			if err != nil {
 				bw.End()
 				return fmt.Errorf("key watch state %s: %w", doc.Ref.ID, err)
@@ -485,7 +487,7 @@ func (f *Firestore) keyWatchLists(ctx context.Context, uid string) error {
 	}
 	bw.End()
 	for _, job := range jobs {
-		if _, err := job.Results(); err != nil && status.Code(err) != codes.NotFound {
+		if _, err := job.Results(); err != nil && status.Code(err) != codes.NotFound && status.Code(err) != codes.FailedPrecondition {
 			return fmt.Errorf("key watch state: %w", err)
 		}
 	}
