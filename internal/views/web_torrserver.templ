@@ -10,14 +10,15 @@ import (
 )
 
 // webTorrServerSignals are the TorrServer page's signals: the address picked
-// in this browser (else the first), what it answered, and the add form. The
+// in this browser (else the first), what it answered, and the add form
+// (closed: with no TorrServer, the explanation above it comes first). The
 // form's login never leaves the browser (filterSignals below).
 func webTorrServerSignals(servers []store.TorrServer) string {
 	first := ""
 	if len(servers) > 0 {
 		first = servers[0].URL
 	}
-	return fmt.Sprintf(`{ tsSelected: localStorage.getItem('mt-ts-selected') || %q, tsStatus: {checking: false, ok: false, version: '', hls: false, problem: '', status: 0}, tsAddOpen: %t, tsName: '', tsUrl: '', tsUser: '', tsPass: '', tsFormError: '', tsForget: '' }`, first, len(servers) == 0)
+	return fmt.Sprintf(`{ tsSelected: localStorage.getItem('mt-ts-selected') || %q, tsStatus: {checking: false, ok: false, version: '', hls: false, problem: '', status: 0}, tsAddOpen: false, tsName: '', tsUrl: '', tsUser: '', tsPass: '', tsFormError: '', tsForget: '' }`, first)
 }
 
 // webTorrServerAdd saves the form's login in this browser, then sends only
@@ -44,7 +45,7 @@ templ WebTorrServerPage(user *auth.User, servers []store.TorrServer, settings []
 						</h1>
 						<p class="text-sm text-base-content/70 max-w-2xl">{ tr(ctx, "Your own TorrServer streams to this browser directly: Moviestracker only keeps its address, and its login stays in this browser.") }</p>
 					</div>
-					<button type="button" class="btn btn-primary btn-sm gap-2" data-on:click="$addModalOpen = true">
+					<button type="button" class="btn btn-primary btn-sm gap-2" data-show="$tsSelected" data-on:click="$addModalOpen = true">
  @Icon("plus", "size-4")
  {tr(ctx,"Add Torrents")}
  </button>
@@ -53,8 +54,8 @@ templ WebTorrServerPage(user *auth.User, servers []store.TorrServer, settings []
 						{ tr(ctx, "Add TorrServer") }
 					</button>
 				</header>
-				@webTorrServerForm()
 				@WebTorrServers(servers)
+				@webTorrServerForm()
 				@webTorrServerStatus()
                 @webSettings(settings)
 				<div data-signals={ webPlayerSignals() }>
@@ -106,7 +107,8 @@ templ webTorrServerForm() {
 templ WebTorrServers(servers []store.TorrServer) {
 	<section id="ts-servers" class="space-y-2" aria-label={ tr(ctx, "Your TorrServers") }>
 		if len(servers) == 0 {
-			@emptyState("server", tr(ctx, "No TorrServer yet"), tr(ctx, "Add the address of yours to list and play its torrents here.")) {
+			@webTorrServerIntro()
+			@emptyState("server", tr(ctx, "No TorrServer yet"), tr(ctx, "Once TorrServer runs, add its address here to list and play its torrents. On this computer it is usually http://localhost:8090.")) {
 				<button type="button" class="btn btn-primary btn-sm gap-2" data-on:click="$tsAddOpen = true">
 					@Icon("plus", "size-4")
 					{ tr(ctx, "Add TorrServer") }

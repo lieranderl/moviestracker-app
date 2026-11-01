@@ -9,6 +9,7 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 )
@@ -49,6 +50,25 @@ func TestNoTorrServerYetOffersToAddOne(t *testing.T) {
 	}
 	if !strings.Contains(card, `role="status"`) {
 		t.Error("removing the last TorrServer is not announced: the empty list is no live status")
+	}
+}
+
+func TestANewcomerWithoutATorrServerLearnsWhatItIsAndHowToInstallIt(t *testing.T) {
+	out := renderIn(t, context.Background(), views.WebTorrServers(nil))
+	for _, want := range []string{
+		"What is TorrServer?",
+		`href="https://github.com/YouROK/TorrServer"`,
+		"Moviestracker never downloads, stores or relays any video",
+		"TorrServer-gst-windows-amd64.exe",
+		"Why GStreamer?",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the empty TorrServer list does not explain TorrServer: no %q", want)
+		}
+	}
+	saved := renderIn(t, context.Background(), views.WebTorrServers([]store.TorrServer{{ID: "1", Name: "Home", URL: "http://localhost:8090"}}))
+	if strings.Contains(saved, "What is TorrServer?") {
+		t.Error("the explanation stays once the user has a TorrServer")
 	}
 }
 
