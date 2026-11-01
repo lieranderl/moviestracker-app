@@ -438,3 +438,36 @@ func (m *Memory) Review(_ context.Context, uid, kind string, tmdbID int) (Review
 	defer m.mu.Unlock()
 	return m.user(uid).reviews[id], nil
 }
+
+// ExportAccount implements Store.
+func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error) {
+	favs, _ := m.Favorites(ctx, uid)
+	servers, _ := m.TorrServers(ctx, uid)
+	watched, _ := m.TitleStates(ctx, uid, Watched)
+	want, _ := m.TitleStates(ctx, uid, WantToWatch)
+	filters, _ := m.ReleaseFilters(ctx, uid)
+	lists, _ := m.CustomLists(ctx, uid)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u := m.user(uid)
+	updates := slices.SortedFunc(maps.Values(u.updates), newestFound)
+	return Account{
+		Preferences: u.prefs, Favorites: favs, TorrServers: servers,
+		Progress:    slices.SortedFunc(maps.Values(u.progress), func(a, b Progress) int { return b.UpdatedAt.Compare(a.UpdatedAt) }),
+		TitleStates: append(watched, want...), Updates: updates, ReleaseFilters: filters, Lists: lists,
+		Reviews: slices.Collect(maps.Values(u.reviews)),
+	}, nil
+}
+
+// DeleteAccount implements Store.
+func (m *Memory) DeleteAccount(_ context.Context, uid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for id, s := range m.shared {
+		if s.uid == uid {
+			delete(m.shared, id)
+		}
+	}
+	delete(m.users, uid)
+	return nil
+}

@@ -857,3 +857,123 @@ func (f *Firestore) Review(ctx context.Context, uid, kind string, tmdbID int) (R
 	}
 	return Review(rec), nil
 }
+
+// userCollections are the collections under users/{uid}.
+var userCollections = []string{"favorites", "torrservers", "progress", "titles", "updates", "lists", "reviews"}
+
+// ExportAccount implements Store.
+func (f *Firestore) ExportAccount(ctx context.Context, uid string) (Account, error) {
+	var a Account
+	var err error
+	if a.Preferences, err = f.Preferences(ctx, uid); err != nil {
+		return Account{}, err
+	}
+	if a.Favorites, err = f.Favorites(ctx, uid); err != nil {
+		return Account{}, err
+	}
+	if a.TorrServers, err = f.TorrServers(ctx, uid); err != nil {
+		return Account{}, err
+	}
+	if a.ReleaseFilters, err = f.ReleaseFilters(ctx, uid); err != nil {
+		return Account{}, err
+	}
+	if a.Lists, err = f.CustomLists(ctx, uid); err != nil {
+		return Account{}, err
+	}
+	for _, state := range []string{Watched, WantToWatch} {
+		list, err := f.TitleStates(ctx, uid, state)
+		if err != nil {
+			return Account{}, err
+		}
+		a.TitleStates = append(a.TitleStates, list...)
+	}
+	progress, err := f.progress(uid).OrderBy("updatedAt", firestore.Desc).Documents(ctx).GetAll()
+	if err != nil {
+		return Account{}, fmt.Errorf("read progress: %w", err)
+	}
+	for _, doc := range progress {
+		p, err := readProgress(doc)
+		if err != nil {
+			return Account{}, err
+		}
+		a.Progress = append(a.Progress, p)
+	}
+	updates, err := f.updates(uid).OrderBy("foundAt", firestore.Desc).Documents(ctx).GetAll()
+	if err != nil {
+		return Account{}, fmt.Errorf("read updates: %w", err)
+	}
+	for _, doc := range updates {
+		var rec updateRecord
+		if err := doc.DataTo(&rec); err != nil {
+			return Account{}, fmt.Errorf("read update %s: %w", doc.Ref.ID, err)
+		}
+		a.Updates = append(a.Updates, Update(rec))
+	}
+	reviews, err := f.reviews(uid).Documents(ctx).GetAll()
+	if err != nil {
+		return Account{}, fmt.Errorf("read reviews: %w", err)
+	}
+	for _, doc := range reviews {
+		var rec reviewRecord
+		if err := doc.DataTo(&rec); err != nil {
+			return Account{}, fmt.Errorf("read review %s: %w", doc.Ref.ID, err)
+		}
+		a.Reviews = append(a.Reviews, Review(rec))
+	}
+	return a, nil
+}
+
+// DeleteAccount implements Store. Shared links go first, so none is left
+// pointing at a deleted list; the user's document goes last, so a retry
+// after a failure still finds what is left.
+func (f *Firestore) DeleteAccount(ctx context.Context, uid string) error {
+	links, err := f.sharedLists().Where("uid", "==", uid).Documents(ctx).GetAll()
+	if err != nil {
+		return fmt.Errorf("read shared links: %w", err)
+	}
+	refs := make([]*firestore.DocumentRef, 0, len(links))
+	for _, doc := range links {
+		refs = append(refs, doc.Ref)
+	}
+	if err := f.deleteDocs(ctx, refs); err != nil {
+		return err
+	}
+	for _, name := range userCollections {
+		docs, err := f.userDoc(uid).Collection(name).DocumentRefs(ctx).GetAll()
+		if err != nil {
+			return fmt.Errorf("read %s: %w", name, err)
+		}
+		if err := f.deleteDocs(ctx, docs); err != nil {
+			return err
+		}
+	}
+	if _, err := f.userDoc(uid).Delete(ctx); err != nil {
+		return fmt.Errorf("delete the user: %w", err)
+	}
+	return nil
+}
+
+// deleteDocs deletes these documents; deleting one gone already is no
+// error.
+func (f *Firestore) deleteDocs(ctx context.Context, refs []*firestore.DocumentRef) error {
+	if len(refs) == 0 {
+		return nil
+	}
+	bw := f.client.BulkWriter(ctx)
+	jobs := make([]*firestore.BulkWriterJob, 0, len(refs))
+	for _, ref := range refs {
+		job, err := bw.Delete(ref)
+		if err != nil {
+			bw.End()
+			return fmt.Errorf("delete %s: %w", ref.Path, err)
+		}
+		jobs = append(jobs, job)
+	}
+	bw.End()
+	for _, job := range jobs {
+		if _, err := job.Results(); err != nil && status.Code(err) != codes.NotFound {
+			return fmt.Errorf("delete: %w", err)
+		}
+	}
+	return nil
+}

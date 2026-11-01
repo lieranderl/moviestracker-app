@@ -70,6 +70,7 @@ type Store interface {
 	CustomListStore
 	ListSharing
 	ReviewStore
+	AccountStore
 }
 
 // ReleaseFilters are how a user last searched a title's releases.

@@ -5,7 +5,7 @@ const PrivacyPath = "/privacy"
 
 // privacyUpdated is when the privacy policy last changed; change it with
 // the policy.
-const privacyUpdated = "1 November 2026"
+const privacyUpdated = "2 November 2026"
 
 // privacyEmail is the private address for questions about one's data and
 // requests to delete it.
@@ -87,12 +87,15 @@ templ WebPrivacy() {
 				}
 				@privacySection(tr(ctx, "Your choices")) {
 					<p>{ tr(ctx, "You can remove favourites, watch marks, lists, ratings, notes and TorrServers and change your release filters and language in the app at any time, and stop sharing a list. Signing out deletes your session cookie.") }</p>
-					<p>{ tr(ctx, "Where you stopped watching and your release alerts cannot be removed in the app yet: write to us to have them deleted.") }</p>
+					<p>
+						{ tr(ctx, "On the Your data page you can download everything we keep for your account, or delete your account with all of it at once.") }
+						<a href={ templ.SafeURL(AccountPath) } class="link link-primary">{ tr(ctx, "Your data") }</a>
+					</p>
 					<p>{ tr(ctx, "You can also remove Moviestracker's access to your Google account:") }</p>
 					<p>
 						<a href={ templ.SafeURL(googleConnectionsURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">{ tr(ctx, "Google account connections") }</a>
 					</p>
-					<p>{ tr(ctx, "To have everything we keep about you deleted, or to ask anything about your data, write to us from the email address of your Google account. We delete it within 30 days.") }</p>
+					<p>{ tr(ctx, "To ask anything about your data, or if you cannot delete your account yourself, write to us from the email address of your Google account. We answer deletion requests within 30 days.") }</p>
 				}
 				@privacySection(tr(ctx, "Contact")) {
 					<p>
