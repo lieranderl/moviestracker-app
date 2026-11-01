@@ -212,7 +212,7 @@ pending, implemented, and deployed status separate in future updates here.
 
 ## Next implementation slice
 
-Continue with **R02**, then **R10**. They address directly observed
+Continue with **R10**, then **R12**. They address directly observed
 friction without introducing new persistent product concepts. Continue Phase 1
 in focused PRs before the larger episode/discovery and collaboration work.
 
@@ -231,6 +231,17 @@ in focused PRs before the larger episode/discovery and collaboration work.
   Existing view/translation/handler race tests and the full `make ci` gate
   passed. Real-device and additional browser-engine checks remain outside this
   slice's recorded verification.
+- **R02 — implemented, deployment unverified (1 November 2026):** live search
+  now replaces the current history entry with the typed query (`?q=`), keeping
+  other parameters, the fragment and browser history state; clearing the box
+  removes `q`. Initial focus no longer uses native autofocus, so it cannot
+  scroll a restored page back to the input. Returning from a result relies on
+  the server-rendered direct search URL. A local browser check (self-hosted
+  app, Chromium pane) confirmed typing kept the history length unchanged, and
+  opening a result then Back restored the query, six movie results and the
+  590 px scroll position. Handler tests cover the rendered URL effect and focus
+  behaviour; WebKit, the web app surface and Russian rendering were not checked
+  in the browser.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding

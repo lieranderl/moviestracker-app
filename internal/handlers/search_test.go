@@ -43,6 +43,33 @@ func TestSearchPageGroupsMoviesSeriesAndPeople(t *testing.T) {
 	}
 }
 
+// The rendered effect is the browser boundary: it must synchronize live input
+// without growing history or discarding browser-owned state. Back/Forward and
+// scroll restoration are also exercised in the browser.
+func TestLiveSearchKeepsAShareableURLWithoutExtraHistoryEntries(t *testing.T) {
+	server := newMediaServer(t, searchDetails(), &fakeJacRed{}, "")
+	body := html.UnescapeString(get(t, server, "/search?q=nolan", true).Body.String())
+	for _, want := range []string{`data-effect=`, `history.replaceState(history.state,`, `url.searchParams.set('q', $q)`, `url.searchParams.delete('q')`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("live search URL synchronization missing %q", want)
+		}
+	}
+	if strings.Contains(body, "history.pushState") {
+		t.Error("typing must replace the current history entry")
+	}
+}
+
+func TestReturningToSearchDoesNotScrollBackToTheInput(t *testing.T) {
+	server := newMediaServer(t, searchDetails(), &fakeJacRed{}, "")
+	body := html.UnescapeString(get(t, server, "/search?q=nolan", true).Body.String())
+	if strings.Contains(body, " autofocus") {
+		t.Error("native autofocus overrides restored search scroll")
+	}
+	if !strings.Contains(body, "el.focus({preventScroll: true})") {
+		t.Error("initial search focus must preserve the browser scroll position")
+	}
+}
+
 func TestLiveSearchPatchesResults(t *testing.T) {
 	server := newMediaServer(t, searchDetails(), &fakeJacRed{}, "")
 
