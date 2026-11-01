@@ -1,0 +1,99 @@
+package views
+
+import (
+	"context"
+	"net/url"
+
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+)
+
+// maxSuggestions is how many matches the navbar search suggests.
+const maxSuggestions = 6
+
+// suggestion is one match the navbar search suggests.
+type suggestion struct {
+	Href     templ.SafeURL
+	Title    string
+	Subtitle string
+	Image    string
+	Icon     string // shown without an image
+}
+
+// suggestions pick a few of each kind (three movies, two series, a
+// person), then fill up to maxSuggestions with the rest, in that order.
+func suggestions(ctx context.Context, r *tmdb.SearchResults) []suggestion {
+	if r == nil {
+		return nil
+	}
+	title := func(it tmdb.MediaItem) suggestion {
+		sub := mediaTypeLabel(ctx, it.MediaType, tr(ctx, "TV series"))
+		if y := it.ReleaseYear(); y != "" {
+			sub = y + " · " + sub
+		}
+		return suggestion{Href: mediaHref(it), Title: it.Title, Subtitle: sub, Image: it.PosterURL(), Icon: "film"}
+	}
+	person := func(p tmdb.PersonSummary) suggestion {
+		return suggestion{Href: personHref(p.ID), Title: p.Name, Subtitle: tr(ctx, p.KnownForDepartment), Image: p.ProfileURL(), Icon: "user"}
+	}
+	var first, rest []suggestion
+	for i, it := range r.Movies {
+		if i < 3 {
+			first = append(first, title(it))
+		} else {
+			rest = append(rest, title(it))
+		}
+	}
+	for i, it := range r.Series {
+		if i < 2 {
+			first = append(first, title(it))
+		} else {
+			rest = append(rest, title(it))
+		}
+	}
+	for i, p := range r.People {
+		if i < 1 {
+			first = append(first, person(p))
+		} else {
+			rest = append(rest, person(p))
+		}
+	}
+	out := append(first, rest...)
+	return out[:min(len(out), maxSuggestions)]
+}
+
+// suggestSearch asks for suggestions for the navbar's query.
+const suggestSearch = `@get('/api/search/suggest', {filterSignals: {include: /^navQ$/}})`
+
+// SearchSuggestions drop down under the navbar search: the best matches
+// for q and a link to all of them. With none it is empty.
+templ SearchSuggestions(q string, results *tmdb.SearchResults) {
+	<div id="search-suggest" class="absolute top-full right-0 mt-2 w-80 z-50" data-show="$_suggestOpen && $navQ.trim()">
+		if list := suggestions(ctx, results); len(list) > 0 {
+			<ul class="menu bg-base-200 rounded-box shadow-xl border border-base-content/10 w-full" role="listbox" aria-label={ tr(ctx, "Suggestions") }>
+				for _, s := range list {
+					<li role="option">
+						<a href={ s.Href } class="suggestion flex items-center gap-3">
+							if s.Image != "" {
+								<img src={ s.Image } alt="" class="w-8 h-12 rounded-field object-cover shrink-0" loading="lazy" width="32" height="48"/>
+							} else {
+								<span class="w-8 h-12 rounded-field bg-base-300 grid place-items-center shrink-0">
+									@Icon(s.Icon, "size-4 opacity-50")
+								</span>
+							}
+							<span class="min-w-0">
+								<span class="block font-medium line-clamp-1">{ s.Title }</span>
+								<span class="block text-xs text-base-content/60 line-clamp-1">{ s.Subtitle }</span>
+							</span>
+						</a>
+					</li>
+				}
+				<li>
+					<a href={ templ.SafeURL("/search?q=" + url.QueryEscape(q)) } class="justify-center text-primary">
+						@Icon("search", "size-4")
+						{ tr(ctx, "See all results") }
+					</a>
+				</li>
+			</ul>
+		}
+	</div>
+}
