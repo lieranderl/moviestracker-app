@@ -21,11 +21,43 @@ func TestAnyoneCanReadThePrivacyPolicy(t *testing.T) {
 		"Google account", "favourites", "TorrServer",
 		"usernames and passwords stay in your browser",
 		"mt_session", "mt_lang",
-		"https://github.com/lieranderl/moviestracker-app/issues",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("privacy policy lacks %q", want)
 		}
+	}
+}
+
+// The policy names every kind of data the app keeps for a user.
+func TestThePrivacyPolicyListsEverythingKeptAboutAUser(t *testing.T) {
+	body := html.UnescapeString(get(t, web.New(web.Config{}), "/privacy").Body.String())
+	for _, want := range []string{
+		"favourites",
+		"Watched and Want to watch",
+		"where you stopped watching",
+		"release alerts",
+		"your lists",
+		"anyone with its link",
+		"ratings and private notes",
+		"release filters",
+		"interface language",
+		"TorrServers you add",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("privacy policy does not mention %q", want)
+		}
+	}
+}
+
+// Deletion and data requests go to a private address, never a public
+// issue tracker.
+func TestDataRequestsGoToAPrivateAddress(t *testing.T) {
+	body := html.UnescapeString(get(t, web.New(web.Config{}), "/privacy").Body.String())
+	if !strings.Contains(body, `href="mailto:moviestracker.scoured892@passinbox.com"`) {
+		t.Error("privacy policy lacks the private contact address")
+	}
+	if strings.Contains(body, "/issues") {
+		t.Error("privacy policy still sends data requests to the public issue tracker")
 	}
 }
 

@@ -212,7 +212,7 @@ pending, implemented, and deployed status separate in future updates here.
 
 ## Next implementation slice
 
-Continue with **R06**, then **R05**. They address observed and
+Continue with **R05**, then **R07** (which builds on R06). They address observed and
 source-derived Phase 1 risks without introducing new product concepts. Continue Phase 1
 in focused PRs before the larger episode/discovery and collaboration work.
 
@@ -295,6 +295,18 @@ in focused PRs before the larger episode/discovery and collaboration work.
   (response within twice the deadline, answered rows kept, at most three
   lookups at once) and out-of-order answers; they pass repeatedly under the
   race detector. No production latency was measured.
+- **R06 — implemented, deployment unverified (1 November 2026):** the web
+  privacy policy now lists every category the store keeps per user:
+  favourites, Watched/Want to watch, playback progress (torrent hash, file
+  name, title, position), release alerts, lists and their public sharing,
+  ratings and private notes, release filters, TorrServers and language.
+  Data and deletion requests go to the private address the user confirmed
+  (`mailto:`), asked from the Google account's email address; the public
+  issue tracker is no longer offered and the page asks people not to post
+  personal details there. Policy date updated; Russian translated. Web tests
+  cover the categories and the contact route; a local browser check of
+  `/privacy` confirmed the list, the mailto link and no horizontal overflow.
+  This is not a legal compliance assessment.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding
