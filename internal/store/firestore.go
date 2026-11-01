@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -856,4 +857,63 @@ func (f *Firestore) Review(ctx context.Context, uid, kind string, tmdbID int) (R
 		return Review{}, fmt.Errorf("read review: %w", err)
 	}
 	return Review(rec), nil
+}
+
+// episodesRecord is a users/{uid}/episodes/{tvID} document: the series'
+// watched episodes by season.
+type episodesRecord struct {
+	Seasons seriesEpisodes `firestore:"seasons"`
+}
+
+func (f *Firestore) episodes(uid string) *firestore.CollectionRef {
+	return f.userDoc(uid).Collection("episodes")
+}
+
+// WatchedEpisodes implements Store.
+func (f *Firestore) WatchedEpisodes(ctx context.Context, uid string, tvID int) (map[int][]int, error) {
+	snap, err := f.episodes(uid).Doc(strconv.Itoa(tvID)).Get(ctx)
+	if notFound(err) {
+		return map[int][]int{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read watched episodes: %w", err)
+	}
+	var rec episodesRecord
+	if err := snap.DataTo(&rec); err != nil {
+		return nil, fmt.Errorf("read watched episodes: %w", err)
+	}
+	return rec.Seasons.bySeason(), nil
+}
+
+// MarkEpisodes implements Store, in a transaction so marks made at once
+// are all kept.
+func (f *Firestore) MarkEpisodes(ctx context.Context, uid string, tvID, season int, episodes []int, watched bool) error {
+	if err := checkEpisodes(tvID, season, episodes); err != nil {
+		return err
+	}
+	doc := f.episodes(uid).Doc(strconv.Itoa(tvID))
+	err := f.client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		rec := episodesRecord{Seasons: seriesEpisodes{}}
+		snap, err := tx.Get(doc)
+		switch {
+		case err == nil:
+			if err := snap.DataTo(&rec); err != nil {
+				return err
+			}
+			if rec.Seasons == nil {
+				rec.Seasons = seriesEpisodes{}
+			}
+		case !notFound(err):
+			return err
+		}
+		rec.Seasons.mark(season, episodes, watched)
+		if len(rec.Seasons) == 0 {
+			return tx.Delete(doc)
+		}
+		return tx.Set(doc, rec)
+	})
+	if err != nil {
+		return fmt.Errorf("mark episodes: %w", err)
+	}
+	return nil
 }

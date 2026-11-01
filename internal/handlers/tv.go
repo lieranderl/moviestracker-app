@@ -37,7 +37,9 @@ func (c *Catalog) handleTVPage(w http.ResponseWriter, r *http.Request) {
 			slog.Warn("tmdb season lookup failed", "tv", id, "season", selected, "error", err)
 		}
 	}
-	templ.Handler(views.TVPage(user, tv, season, selected)).ServeHTTP(w, c.releaseFilters.withFilters(r))
+	r = c.releaseFilters.withFilters(r)
+	r = r.WithContext(views.WithEpisodeMarks(r.Context(), c.episodes.Marks(r, id)))
+	templ.Handler(views.TVPage(user, tv, season, selected)).ServeHTTP(w, r)
 }
 
 func hasSeason(tv *tmdb.TVDetails, n int) bool {
@@ -69,7 +71,7 @@ func (c *Catalog) handleSeason(w http.ResponseWriter, r *http.Request) {
 		patchSeasonError(r, sse)
 		return
 	}
-	if err := sse.PatchElementTempl(views.SeasonEpisodes(season)); err != nil {
+	if err := sse.PatchElementTempl(views.SeasonEpisodes(season, c.episodes.Marks(r, id))); err != nil {
 		logSSEError(r, "patch season episodes", err)
 		return
 	}
