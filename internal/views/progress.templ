@@ -26,16 +26,26 @@ func clockTime(d time.Duration) string {
 // the video plays (on its timeupdate events: no timer asks the server).
 // The web app relays the torrent from the user's TorrServer; the local app
 // looks it up itself.
+// In the web app the browser also tells the user's TorrServer, for its
+// other players (the local app's server does).
 func progressSave(browser bool) string {
-	torrent := ""
+	report := "@post('/api/progress', {payload: {hash: $activeHash, index: +$activeFileIndex, position: $_time, duration: $_dur}})"
 	if browser {
-		torrent = ", torrent: $_progressTorrent"
+		report = "(tsViewedSet($tsSelected, $activeHash, +$activeFileIndex, $_time), @post('/api/progress', {payload: {hash: $activeHash, index: +$activeFileIndex, position: $_time, duration: $_dur, torrent: $_progressTorrent}}))"
 	}
-	return `$playerOpen && $_dur > 0 && @post('/api/progress', {payload: {hash: $activeHash, index: +$activeFileIndex, position: $_time, duration: $_dur` + torrent + `}})`
+	return "$playerOpen && $_dur > 0 && " + report
 }
 
-// progressResumeFetch asks where the user stopped whenever a file opens.
-const progressResumeFetch = `$playerOpen && $activeHash && @get('/api/progress/resume?hash=' + $activeHash + '&index=' + $activeFileIndex, {filterSignals: {include: /^$/}})`
+// progressResumeFetch asks where the user stopped whenever a file opens. The
+// web app's browser first asks the user's TorrServer where its other players
+// left the file, for when Moviestracker has no record of it.
+func progressResumeFetch(browser bool) string {
+	resume := "'/api/progress/resume?hash=' + $activeHash + '&index=' + $activeFileIndex"
+	if browser {
+		return "$playerOpen && $activeHash && tsTimecode($tsSelected, $activeHash, +$activeFileIndex).then(at => @get(" + resume + " + '&at=' + at, {filterSignals: {include: /^$/}}))"
+	}
+	return "$playerOpen && $activeHash && @get(" + resume + ", {filterSignals: {include: /^$/}})"
+}
 
 // TorrResume offers to jump to where the user stopped in a file; at 0 it
 // offers nothing. It hides once the video passes that point or another

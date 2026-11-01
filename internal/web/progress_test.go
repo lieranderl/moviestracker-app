@@ -97,3 +97,17 @@ func TestAWebTitlePageAsksWhereTheUserStopped(t *testing.T) {
 		t.Errorf("title progress = %s, want Continue at 42:10", body)
 	}
 }
+
+func TestTheWebPlayerSharesTimecodesWithTheUsersTorrServer(t *testing.T) {
+	h, session, _ := torrServers(t)
+	page := html.UnescapeString(getWith(t, h, "/torrserver", session).Body.String())
+	for _, want := range []string{"tsViewedSet($tsSelected, $activeHash, +$activeFileIndex, $_time)", "tsTimecode($tsSelected, $activeHash, +$activeFileIndex).then(at =>", "&at=' + at"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("player lacks %q", want)
+		}
+	}
+	res := send(t, h, http.MethodGet, "/api/progress/resume?hash=aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111&index=1&at=600", session)
+	if !strings.Contains(res.Body.String(), "Resume from 10:00") {
+		t.Errorf("resume = %s, want TorrServer's 10:00 when Moviestracker has none", res.Body)
+	}
+}

@@ -404,6 +404,24 @@ window.tsPlayerLoad = async (el, url, hash, index, kind, nonce) => {
   tell(el,"ts-player",{hash,index,kind,nonce,torrent:result.value || null,probe:probe.value || null,...playerProblem(result),probeProblem:probe.problem || ""});
 };
 
+// TorrServer (MatriX.142+) keeps where each file was left for its other
+// players, when its TrackTimecode setting is on. Both calls are best effort.
+const viewedCall = (url, body, read) => call(url, "viewed", {
+  init: { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, read,
+});
+
+window.tsViewedSet = (url, hash, index, seconds) => {
+  if (!webAddress(url) || !hashOK(hash) || !Number.isSafeInteger(index) || index < 1 || !(seconds >= 0)) return Promise.resolve();
+  return viewedCall(url, { action: "set", hash, file_index: index, timecode: Math.floor(seconds) }, (res) => res.text());
+};
+
+window.tsTimecode = async (url, hash, index) => {
+  if (!webAddress(url) || !hashOK(hash)) return 0;
+  const list = await viewedCall(url, { action: "list", hash }, (res) => res.json());
+  const at = Array.isArray(list.value) ? list.value.find((v) => v?.file_index === index)?.timecode : 0;
+  return Number.isFinite(at) && at > 0 ? Math.floor(at) : 0;
+};
+
 const playerSessions = new WeakMap();
 const playerLeases = new WeakMap();
 

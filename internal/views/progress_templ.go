@@ -34,16 +34,26 @@ func clockTime(d time.Duration) string {
 // the video plays (on its timeupdate events: no timer asks the server).
 // The web app relays the torrent from the user's TorrServer; the local app
 // looks it up itself.
+// In the web app the browser also tells the user's TorrServer, for its
+// other players (the local app's server does).
 func progressSave(browser bool) string {
-	torrent := ""
+	report := "@post('/api/progress', {payload: {hash: $activeHash, index: +$activeFileIndex, position: $_time, duration: $_dur}})"
 	if browser {
-		torrent = ", torrent: $_progressTorrent"
+		report = "(tsViewedSet($tsSelected, $activeHash, +$activeFileIndex, $_time), @post('/api/progress', {payload: {hash: $activeHash, index: +$activeFileIndex, position: $_time, duration: $_dur, torrent: $_progressTorrent}}))"
 	}
-	return `$playerOpen && $_dur > 0 && @post('/api/progress', {payload: {hash: $activeHash, index: +$activeFileIndex, position: $_time, duration: $_dur` + torrent + `}})`
+	return "$playerOpen && $_dur > 0 && " + report
 }
 
-// progressResumeFetch asks where the user stopped whenever a file opens.
-const progressResumeFetch = `$playerOpen && $activeHash && @get('/api/progress/resume?hash=' + $activeHash + '&index=' + $activeFileIndex, {filterSignals: {include: /^$/}})`
+// progressResumeFetch asks where the user stopped whenever a file opens. The
+// web app's browser first asks the user's TorrServer where its other players
+// left the file, for when Moviestracker has no record of it.
+func progressResumeFetch(browser bool) string {
+	resume := "'/api/progress/resume?hash=' + $activeHash + '&index=' + $activeFileIndex"
+	if browser {
+		return "$playerOpen && $activeHash && tsTimecode($tsSelected, $activeHash, +$activeFileIndex).then(at => @get(" + resume + " + '&at=' + at, {filterSignals: {include: /^$/}}))"
+	}
+	return "$playerOpen && $activeHash && @get(" + resume + ", {filterSignals: {include: /^$/}})"
+}
 
 // TorrResume offers to jump to where the user stopped in a file; at 0 it
 // offers nothing. It hides once the video passes that point or another
@@ -82,7 +92,7 @@ func TorrResume(hash string, index int, at time.Duration) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue("'" + key + "'")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 50, Col: 42}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 60, Col: 42}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 			if templ_7745c5c3_Err != nil {
@@ -95,7 +105,7 @@ func TorrResume(hash string, index int, at time.Duration) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("$_resume === '%s' && $activeHash === '%s' && +$activeFileIndex === %d && $_time < %d", key, hash, index, int(at/time.Second)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 51, Col: 154}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 61, Col: 154}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 			if templ_7745c5c3_Err != nil {
@@ -116,7 +126,7 @@ func TorrResume(hash string, index int, at time.Duration) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(trf(ctx, "Resume from %s", clockTime(at)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 54, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 64, Col: 53}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -129,7 +139,7 @@ func TorrResume(hash string, index int, at time.Duration) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("$_video.currentTime = %d; $_resume = ''", int(at/time.Second)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 55, Col: 148}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 65, Col: 148}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 			if templ_7745c5c3_Err != nil {
@@ -142,7 +152,7 @@ func TorrResume(hash string, index int, at time.Duration) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Resume"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 55, Col: 170}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 65, Col: 170}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -155,7 +165,7 @@ func TorrResume(hash string, index int, at time.Duration) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Start over"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 56, Col: 108}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 66, Col: 108}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -232,7 +242,7 @@ func continueWatching(watching []store.Progress) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Continue watching"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 89, Col: 34}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 99, Col: 34}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -262,7 +272,7 @@ func continueWatching(watching []store.Progress) templ.Component {
 				var templ_7745c5c3_Var11 templ.SafeURL
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinURLErrs(progressPlay(p))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 95, Col: 30}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 105, Col: 30}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -280,7 +290,7 @@ func continueWatching(watching []store.Progress) templ.Component {
 					var templ_7745c5c3_Var12 string
 					templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(poster)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 98, Col: 25}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 108, Col: 25}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 					if templ_7745c5c3_Err != nil {
@@ -293,7 +303,7 @@ func continueWatching(watching []store.Progress) templ.Component {
 					var templ_7745c5c3_Var13 string
 					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(trf(ctx, "%s poster", p.Title))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 98, Col: 64}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 108, Col: 64}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 					if templ_7745c5c3_Err != nil {
@@ -324,7 +334,7 @@ func continueWatching(watching []store.Progress) templ.Component {
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(p.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 107, Col: 91}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 117, Col: 91}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 				if templ_7745c5c3_Err != nil {
@@ -337,7 +347,7 @@ func continueWatching(watching []store.Progress) templ.Component {
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(p.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 107, Col: 103}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 117, Col: 103}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 				if templ_7745c5c3_Err != nil {
@@ -355,7 +365,7 @@ func continueWatching(watching []store.Progress) templ.Component {
 					var templ_7745c5c3_Var16 string
 					templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(p.File)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 109, Col: 75}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 119, Col: 75}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 					if templ_7745c5c3_Err != nil {
@@ -368,7 +378,7 @@ func continueWatching(watching []store.Progress) templ.Component {
 					var templ_7745c5c3_Var17 string
 					templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(path.Base(p.File))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 109, Col: 97}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 119, Col: 97}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 					if templ_7745c5c3_Err != nil {
@@ -386,7 +396,7 @@ func continueWatching(watching []store.Progress) templ.Component {
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.Itoa(progressPercent(p)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 111, Col: 97}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 121, Col: 97}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 				if templ_7745c5c3_Err != nil {
@@ -399,7 +409,7 @@ func continueWatching(watching []store.Progress) templ.Component {
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Watched"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 111, Col: 141}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 121, Col: 141}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 				if templ_7745c5c3_Err != nil {
@@ -412,7 +422,7 @@ func continueWatching(watching []store.Progress) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(trf(ctx, "%s left", clockTime(p.Duration-p.Position)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 112, Col: 112}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 122, Col: 112}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -494,7 +504,7 @@ func torrAutoplay(browser bool) templ.Component {
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue(autoplayScript(p, true))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 151, Col: 109}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 161, Col: 109}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 				if templ_7745c5c3_Err != nil {
@@ -512,7 +522,7 @@ func torrAutoplay(browser bool) templ.Component {
 				var templ_7745c5c3_Var23 string
 				templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.ResolveAttributeValue(autoplayScript(p, false))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 153, Col: 78}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 163, Col: 78}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 				if templ_7745c5c3_Err != nil {
@@ -558,7 +568,7 @@ func progressSlot(kind string, id int) templ.Component {
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("@get('/api/progress/title?type=%s&id=%d')", kind, id))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 161, Col: 123}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 171, Col: 123}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var25)
 		if templ_7745c5c3_Err != nil {
@@ -608,7 +618,7 @@ func ProgressButton(p *store.Progress) templ.Component {
 			var templ_7745c5c3_Var27 templ.SafeURL
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinURLErrs(progressPlay(*p))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 170, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 180, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 			if templ_7745c5c3_Err != nil {
@@ -621,7 +631,7 @@ func ProgressButton(p *store.Progress) templ.Component {
 			var templ_7745c5c3_Var28 string
 			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.ResolveAttributeValue(path.Base(p.File))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 170, Col: 119}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 180, Col: 119}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
 			if templ_7745c5c3_Err != nil {
@@ -642,7 +652,7 @@ func ProgressButton(p *store.Progress) templ.Component {
 			var templ_7745c5c3_Var29 string
 			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(trf(ctx, "Continue · %s of %s", clockTime(p.Position), clockTime(p.Duration)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 172, Col: 83}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/progress.templ`, Line: 182, Col: 83}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {

@@ -34,7 +34,20 @@ type Progress struct {
 	// torrent finds a torrent in the TorrServer in use; nil when the
 	// browser relays it with each report (the web app).
 	torrent func(ctx context.Context, hash string) (torrserver.Torrent, bool)
+	// timecodes is the TorrServer in use, which keeps a timecode per file
+	// for its other players; nil when the browser talks to it (the web app).
+	timecodes func() Timecodes
 }
+
+// Timecodes keeps where files were left in a TorrServer (its /viewed API).
+type Timecodes interface {
+	SetViewed(ctx context.Context, hash string, index int, seconds float64) error
+	Timecode(ctx context.Context, hash string, index int) (time.Duration, error)
+}
+
+// MirrorTo keeps the TorrServer in use told where users stop, and resumes
+// files only it saw played from its timecode.
+func (p *Progress) MirrorTo(timecodes func() Timecodes) { p.timecodes = timecodes }
 
 // NewProgress keeps progress in s for the users user names. torrent, when
 // set, looks up the torrent a report names; when nil, reports carry it.
@@ -98,6 +111,23 @@ func (p *Progress) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/progress/title", p.handleTitle)
 }
 
+// otherPlayers is where TorrServer's other players left a file: the local
+// app asks TorrServer, the web app's browser sends it (?at=seconds).
+func (p *Progress) otherPlayers(ctx context.Context, r *http.Request, hash string, index int) time.Duration {
+	if p.timecodes == nil {
+		at, err := strconv.ParseFloat(r.URL.Query().Get("at"), 64)
+		if err != nil || at < 0 || at > math.MaxInt32 {
+			return 0
+		}
+		return time.Duration(at) * time.Second
+	}
+	at, err := p.timecodes().Timecode(ctx, hash, index)
+	if err != nil {
+		slog.Warn("reading TorrServer's timecode failed", "error", err)
+	}
+	return at
+}
+
 // handleTitle patches a title page's button to continue the file of it the
 // user last left unfinished, or an empty slot.
 func (p *Progress) handleTitle(w http.ResponseWriter, r *http.Request) {
@@ -140,11 +170,15 @@ func (p *Progress) handleResume(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Warn("reading progress failed", "error", logError(err))
 	}
-	if !found || kept.Finished() || kept.Position < resumeAfter {
-		kept.Position = 0
+	at := kept.Position
+	if !found {
+		at = p.otherPlayers(ctx, r, hash, index)
+	}
+	if kept.Finished() || at < resumeAfter {
+		at = 0
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.TorrResume(hash, index, kept.Position)); err != nil {
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.TorrResume(hash, index, at)); err != nil {
 		slog.Warn("patching the resume offer failed", "error", err)
 	}
 }
@@ -202,6 +236,11 @@ func (p *Progress) handleSave(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("saving progress failed", "error", logError(err))
 		http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
 		return
+	}
+	if p.timecodes != nil {
+		if err := p.timecodes().SetViewed(ctx, data.Hash, data.Index, math.Floor(data.Position)); err != nil {
+			slog.Warn("telling TorrServer the timecode failed", "error", err)
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

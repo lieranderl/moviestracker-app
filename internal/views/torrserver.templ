@@ -733,7 +733,7 @@ templ torrPlayerModalFor(browser bool) {
 			<div class="hidden" data-effect={ torrPlayback }></div>
 			<div class="hidden" data-effect={ torrQueueFetch }></div>
 		}
-		<div class="hidden" data-effect={ progressResumeFetch }></div>
+		<div class="hidden" data-effect={ progressResumeFetch(browser) }></div>
 		@torrAutoplay(browser)
 		<header class="flex items-center justify-between gap-4 pb-3 border-b border-base-content/10">
 			<div class="flex items-center gap-2 min-w-0">

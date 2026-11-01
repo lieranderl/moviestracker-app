@@ -127,6 +127,7 @@ var engineSections = []settingsSection{
 			{Key: "EnableDLNA", Label: "DLNA media server", Kind: kindBool, Help: "TVs and players that browse DLNA see your torrents."},
 			{Key: "EnableBonjour", Label: "Announce with Bonjour", Kind: kindBool, Help: "Lets TorrServer apps find it. Moviestracker keeps it off for the engine it runs."},
 			{Key: "FriendlyName", Label: "Name on the network", Kind: kindText},
+			{Key: "TrackTimecode", Label: "Remember where files were left", Kind: kindBool, Help: "TorrServer keeps where each file was left, so its other players resume where you stopped in Moviestracker. Needs MatriX.142 or newer."},
 		},
 	},
 	{

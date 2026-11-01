@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"html"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,10 +20,38 @@ import (
 const duneHash = "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"
 
 // progressServer is a local app whose TorrServer lists Dune, added from
-// its title page.
+// its title page; another player left Dune's sample at 10:00 there.
 func progressServer(t *testing.T) *Server {
+	s, _ := progressServerViewed(t)
+	return s
+}
+
+// progressServerViewed is progressServer and the timecodes its TorrServer
+// was told, by file.
+func progressServerViewed(t *testing.T) (*Server, *sync.Map) {
 	t.Helper()
+	var viewed sync.Map
+	viewed.Store(1, 600.0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/viewed" {
+			var req struct {
+				Action    string  `json:"action"`
+				FileIndex int     `json:"file_index"`
+				TimeCode  float64 `json:"timecode"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&req)
+			if req.Action == "set" {
+				viewed.Store(req.FileIndex, req.TimeCode)
+				return
+			}
+			list := []map[string]any{}
+			viewed.Range(func(k, v any) bool {
+				list = append(list, map[string]any{"hash": duneHash, "file_index": k, "timecode": v})
+				return true
+			})
+			_ = json.NewEncoder(w).Encode(list)
+			return
+		}
 		if r.URL.Path == "/echo" {
 			_, _ = w.Write([]byte("MatriX.146"))
 			return
@@ -38,7 +68,7 @@ func progressServer(t *testing.T) *Server {
 	cfg.TorrServer = torrserver.NewManager(ts.URL)
 	s := newTestServerWithConfig(t, cfg)
 	s.rememberTitle(duneHash, "movie", 438631)
-	return s
+	return s, &viewed
 }
 
 func postProgress(t *testing.T, s *Server, body string, signedInUser bool) *httptest.ResponseRecorder {
@@ -93,7 +123,7 @@ func TestTheLocalPlayerOffersToResumeWhereTheAccountStopped(t *testing.T) {
 			t.Errorf("resume patch lacks %q:\n%s", want, body)
 		}
 	}
-	if body := getResume(t, s, 1); strings.Contains(body, "Resume from") {
+	if body := getResume(t, s, 3); strings.Contains(body, "Resume from") {
 		t.Error("a file never played offers to resume")
 	}
 	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":9300,"duration":9360.2}`, true)
@@ -147,5 +177,19 @@ func TestATitlePageOffersToContinueWhereTheAccountStopped(t *testing.T) {
 	}
 	if body := get(t, s, "/api/progress/title?type=movie&id=1", true).Body.String(); strings.Contains(body, "Continue") {
 		t.Error("a title never played offers to continue")
+	}
+}
+
+func TestTheLocalPlayerTellsTorrServerWhereTheFileWasLeft(t *testing.T) {
+	s, viewed := progressServerViewed(t)
+	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":2530.4,"duration":9360.2}`, true)
+	if got, _ := viewed.Load(2); got != 2530.0 {
+		t.Errorf("TorrServer's timecode = %v, want 2530 for its other players", got)
+	}
+}
+
+func TestTheLocalPlayerResumesWhereAnotherTorrServerPlayerStopped(t *testing.T) {
+	if body := getResume(t, progressServer(t), 1); !strings.Contains(body, "Resume from 10:00") {
+		t.Errorf("resume = %s, want TorrServer's 10:00", body)
 	}
 }
