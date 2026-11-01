@@ -130,6 +130,7 @@ func New(cfg Config) http.Handler {
 	a.progress = handlers.NewProgress(a.cfg.Store, a.userID, nil)
 	a.progress.Register(mux)
 	a.catalog.ShowProgress(a.progress)
+	handlers.NewTitleStates(a.cfg.Store, a.userID, a.catalog).Register(mux)
 	mux.HandleFunc("POST /api/language", handlers.SetLanguage(a.secure(), a.saveLanguage))
 	app := http.NewCrossOriginProtection().Handler(handlers.Language(webSite(mux, cfg.BaseURL)))
 	return handlers.RecoveryMiddleware(handlers.SecurityHeadersMiddleware(true, handlers.LoggingMiddleware(app)))

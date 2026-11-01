@@ -2,13 +2,8 @@ package store
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io/fs"
 	"maps"
-	"os"
-	"path/filepath"
 	"slices"
 	"sync"
 )
@@ -25,14 +20,7 @@ type ProgressFile struct {
 // OpenProgressFile reads the progress kept at path; a missing file is none.
 func OpenProgressFile(path string, opts ...Option) (*ProgressFile, error) {
 	f := &ProgressFile{opts: newOptions(opts), path: path, users: map[string]map[string]Progress{}}
-	data, err := os.ReadFile(filepath.Clean(path)) // the data directory's file, not user input
-	if errors.Is(err, fs.ErrNotExist) {
-		return f, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read progress: %w", err)
-	}
-	if err := json.Unmarshal(data, &f.users); err != nil {
+	if err := readJSONFile(path, &f.users); err != nil {
 		return nil, fmt.Errorf("read progress %s: %w", path, err)
 	}
 	return f, nil
@@ -62,23 +50,7 @@ func (f *ProgressFile) SaveProgress(_ context.Context, uid string, p Progress) e
 
 // write replaces the file with f's progress. f.mu must be held.
 func (f *ProgressFile) write() error {
-	data, err := json.Marshal(f.users)
-	if err != nil {
-		return fmt.Errorf("save progress: %w", err)
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(f.path), ".progress-*")
-	if err != nil {
-		return fmt.Errorf("save progress: %w", err)
-	}
-	defer func() { _ = os.Remove(tmp.Name()) }()
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("save progress: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("save progress: %w", err)
-	}
-	if err := os.Rename(tmp.Name(), f.path); err != nil {
+	if err := writeJSONFile(f.path, f.users); err != nil {
 		return fmt.Errorf("save progress: %w", err)
 	}
 	return nil

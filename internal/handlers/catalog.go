@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/sources"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 )
 
 // Catalog serves the catalog: the home rows, lists, titles, people and
@@ -51,3 +54,25 @@ func (c *Catalog) Register(mux *http.ServeMux, home string) {
 
 // Home is the catalog's home page: trending titles and the discovery rows.
 func (c *Catalog) Home(w http.ResponseWriter, r *http.Request) { c.handleMoviesPage(w, r) }
+
+// Title is a title as TMDB names it in the request's language.
+func (c *Catalog) Title(ctx context.Context, kind string, id int) (tmdb.MediaItem, error) {
+	details := c.clients().Details
+	if details == nil {
+		return tmdb.MediaItem{}, errors.New("tmdb is not configured")
+	}
+	ctx, cancel := context.WithTimeout(ctx, c.catalogTimeout)
+	defer cancel()
+	if kind == "tv" {
+		tv, err := details.TV(ctx, id)
+		if err != nil {
+			return tmdb.MediaItem{}, err
+		}
+		return tv.MediaItem, nil
+	}
+	movie, err := details.Movie(ctx, id)
+	if err != nil {
+		return tmdb.MediaItem{}, err
+	}
+	return movie.MediaItem, nil
+}
