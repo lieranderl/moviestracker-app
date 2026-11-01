@@ -1,0 +1,86 @@
+package views
+
+// torrServerReasons tell a newcomer what TorrServer gives them.
+var torrServerReasons = []featureCard{
+	{Icon: "zap", Tone: "text-primary", Title: "Starts in seconds", Body: "TorrServer downloads a torrent in the order the film plays and streams it at the same time, so you watch without waiting for the whole download."},
+	{Icon: "shield-check", Tone: "text-success", Title: "Runs on your own device", Body: "The video goes from your TorrServer straight to this browser. Moviestracker never downloads, stores or relays any video: it keeps only your TorrServer's address."},
+	{Icon: "heart-handshake", Tone: "text-secondary", Title: "Free and open source", Body: "TorrServer is an independent project by YouROK, free for Windows, macOS, Linux, Docker and NAS. Its source code is public on GitHub."},
+}
+
+// torrServerFlow is how a release becomes a picture, step by step.
+var torrServerFlow = []string{
+	"You pick a release on Moviestracker",
+	"Your TorrServer fetches it piece by piece",
+	"You watch it in this browser",
+}
+
+// torrServerQuestions answer what newcomers ask before installing it.
+var torrServerQuestions = []struct{ Question, Answer string }{
+	{"Does it have to keep running?", "Yes, while you watch. It can start with your computer, or run all the time on a home server or NAS so it is always ready."},
+	{"Can I watch on my phone or another computer?", "Yes, when TorrServer runs on a machine they can reach. This site uses HTTPS, so a TorrServer on another machine needs an HTTPS address: once it is added, this page helps set up its certificate."},
+	{"Is it safe and legal?", "Like any torrent client, TorrServer shares the pieces it downloads with other people. Watch only what you have the right to, and follow the rules where you live."},
+}
+
+// webTorrServerIntro explains TorrServer to someone who has none yet: what
+// it is, why Moviestracker needs it, and how to install it.
+templ webTorrServerIntro() {
+	<section class="card bg-base-200/60 border border-primary/20 shadow-sm" aria-labelledby="ts-intro-title" data-on:click={ copyCommand(ctx) }>
+		<div class="card-body gap-6 p-6 sm:p-8">
+			<header class="space-y-2">
+				<h2 id="ts-intro-title" class="text-xl font-bold flex items-center gap-2">
+					@Icon("circle-help", "size-5 text-primary")
+					{ tr(ctx, "What is TorrServer?") }
+				</h2>
+				<p class="text-sm text-base-content/70 leading-relaxed max-w-3xl">
+					{ tr(ctx, "Moviestracker finds films, series and their torrent releases. To play one, it needs") }
+					<a href={ templ.SafeURL(torrServerRepoURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">TorrServer</a>{ tr(ctx, ": a small free program you run yourself, on this computer, a home server or a NAS.") }
+				</p>
+			</header>
+			@featureGrid(torrServerReasons)
+			<div class="space-y-3">
+				<h3 class="text-sm font-semibold">{ tr(ctx, "How it works") }</h3>
+				<ul class="steps steps-vertical sm:steps-horizontal w-full text-sm">
+					for _, step := range torrServerFlow {
+						<li class="step step-primary">{ tr(ctx, step) }</li>
+					}
+				</ul>
+			</div>
+			<div class="space-y-3">
+				<h3 class="text-sm font-semibold">{ tr(ctx, "Install it in a few minutes") }</h3>
+				@torrInstallTabs()
+				<p class="text-xs text-base-content/70">
+					{ tr(ctx, "Downloads, source code and documentation are on") }
+					<a href={ templ.SafeURL(torrServerRepoURL) } target="_blank" rel="noopener noreferrer" class="link link-primary inline-flex items-center gap-1">
+						@Icon("external-link", "size-3.5")
+						github.com/YouROK/TorrServer
+					</a>.
+				</p>
+			</div>
+			<div class="space-y-2">
+				for _, q := range torrServerQuestions {
+					<details class="collapse collapse-arrow bg-base-100 border border-base-content/10">
+						<summary class="collapse-title text-sm font-semibold">{ tr(ctx, q.Question) }</summary>
+						<div class="collapse-content">
+							<p class="text-sm text-base-content/70 leading-relaxed">{ tr(ctx, q.Answer) }</p>
+						</div>
+					</details>
+				}
+				@gstreamerWhy()
+			</div>
+		</div>
+	</section>
+}
+
+templ featureGrid(cards []featureCard) {
+	<ul class="grid grid-cols-1 md:grid-cols-3 gap-4">
+		for _, c := range cards {
+			<li class="flex gap-3 rounded-box bg-base-100 border border-base-content/10 p-4">
+				@Icon(c.Icon, "size-5 shrink-0 mt-0.5 "+c.Tone)
+				<div class="space-y-1">
+					<p class="text-sm font-semibold">{ tr(ctx, c.Title) }</p>
+					<p class="text-sm text-base-content/70 leading-relaxed">{ tr(ctx, c.Body) }</p>
+				</div>
+			</li>
+		}
+	</ul>
+}

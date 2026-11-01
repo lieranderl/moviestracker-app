@@ -81,6 +81,13 @@ func tableTexts() []string {
 	for _, o := range sortOptions {
 		out = append(out, o.Label)
 	}
+	for _, b := range torrServerReasons {
+		out = append(out, b.Title, b.Body)
+	}
+	out = append(out, torrServerFlow...)
+	for _, q := range torrServerQuestions {
+		out = append(out, q.Question, q.Answer)
+	}
 	for _, b := range gstreamerBenefits {
 		out = append(out, b.Title, b.Body)
 	}
