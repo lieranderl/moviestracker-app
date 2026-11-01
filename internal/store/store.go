@@ -55,6 +55,10 @@ type Store interface {
 	// RemoveFavorite forgets a favourite; one not kept is no error.
 	RemoveFavorite(ctx context.Context, uid, kind string, tmdbID int) error
 
+	// LibraryStamp changes whenever the user's favourites or watch states
+	// change, so what is worked out from them can be kept until then.
+	LibraryStamp(ctx context.Context, uid string) (string, error)
+
 	// TorrServers are the user's TorrServers, in the order added.
 	TorrServers(ctx context.Context, uid string) ([]TorrServer, error)
 	// SaveTorrServer keeps t: a new one (no ID) gets an ID, one with an ID
@@ -215,7 +219,13 @@ func checkTitleState(ts TitleState) (string, error) {
 }
 
 // newestFirst orders title states most recently marked first.
-func newestFirst(a, b TitleState) int { return b.UpdatedAt.Compare(a.UpdatedAt) }
+func newestFirst(a, b TitleState) int {
+	if c := b.UpdatedAt.Compare(a.UpdatedAt); c != 0 {
+		return c
+	}
+	// Marked at the same moment (a coarse clock): one order every time.
+	return strings.Compare(fmt.Sprintf("%s-%d", b.Kind, b.TMDBID), fmt.Sprintf("%s-%d", a.Kind, a.TMDBID))
+}
 
 // ProgressStore keeps where each user stopped watching. The local app keeps
 // it in a file (OpenProgressFile), by account name.

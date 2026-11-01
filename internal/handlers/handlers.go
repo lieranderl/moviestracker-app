@@ -311,7 +311,7 @@ func (s *Server) routes() {
 	s.titleStates.Register(s.mux)
 	s.customLists.Register(s.mux)
 	s.reviews.Register(s.mux)
-	NewRecommendations(s.titleStates.store, s.username, nil, s.Catalog).Register(s.mux)
+	NewRecommendations(NewLibrary(s.titleStates.store, nil, nil), s.username, s.Catalog).Register(s.mux)
 	s.releaseFilterPrefs.Register(s.mux)
 	s.mux.HandleFunc("GET /api/torrserver/stream/", s.handleTorrServerStreamProxy)
 

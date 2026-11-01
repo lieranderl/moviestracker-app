@@ -10,7 +10,6 @@ import (
 	"github.com/starfederation/datastar-go/datastar"
 
 	"github.com/lieranderl/moviestracker-app/internal/i18n"
-	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 )
@@ -26,18 +25,14 @@ const (
 // Recommendations fill the home page with titles like those the user
 // watched or saved, for both apps.
 type Recommendations struct {
-	titles store.TitleStateStore
-	user   func(*http.Request) (uid string, ok bool)
-	// favorites are the user's favourites; nil where none are kept (the
-	// local app).
-	favorites func(ctx context.Context, uid string) ([]store.Favorite, error)
-	catalog   *Catalog
+	library *Library
+	user    func(*http.Request) (uid string, ok bool)
+	catalog *Catalog
 }
 
-// NewRecommendations recommends from the titles users marked in titles
-// and, when favorites is set, their favourites.
-func NewRecommendations(titles store.TitleStateStore, user func(*http.Request) (string, bool), favorites func(context.Context, string) ([]store.Favorite, error), catalog *Catalog) *Recommendations {
-	return &Recommendations{titles: titles, user: user, favorites: favorites, catalog: catalog}
+// NewRecommendations recommends from the users' libraries.
+func NewRecommendations(library *Library, user func(*http.Request) (string, bool), catalog *Catalog) *Recommendations {
+	return &Recommendations{library: library, user: user, catalog: catalog}
 }
 
 // Register adds the recommendations' route to mux.
@@ -54,42 +49,6 @@ type seed struct {
 }
 
 func titleKey(kind string, id int) string { return fmt.Sprintf("%s-%d", kind, id) }
-
-// seeds are the titles to start from, watched ones first, then favourites
-// and Want to watch, newest first; marked is every title the user marked.
-func (rc *Recommendations) seeds(ctx context.Context, uid string) (seeds []seed, marked map[string]bool, err error) {
-	marked = map[string]bool{}
-	add := func(kind string, id int, title string, watched bool) {
-		if !marked[titleKey(kind, id)] {
-			seeds = append(seeds, seed{kind, id, title, watched})
-		}
-		marked[titleKey(kind, id)] = true
-	}
-	watched, err := rc.titles.TitleStates(ctx, uid, store.Watched)
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, t := range watched {
-		add(t.Kind, t.TMDBID, t.Title, true)
-	}
-	if rc.favorites != nil {
-		favs, err := rc.favorites(ctx, uid)
-		if err != nil {
-			return nil, nil, err
-		}
-		for _, f := range favs {
-			add(f.Kind, f.TMDBID, f.Title, false)
-		}
-	}
-	want, err := rc.titles.TitleStates(ctx, uid, store.WantToWatch)
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, t := range want {
-		add(t.Kind, t.TMDBID, t.Title, false)
-	}
-	return seeds, marked, nil
-}
 
 // related are TMDB's recommendations for a title.
 func (c *Catalog) related(ctx context.Context, kind string, id int) ([]tmdb.MediaItem, error) {
@@ -205,12 +164,12 @@ func (rc *Recommendations) handleRows(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
-	seeds, marked, err := rc.seeds(ctx, uid)
+	library, err := rc.library.Summary(ctx, uid)
 	cancel()
 	if err != nil {
 		slog.Warn("reading what to recommend from failed", "error", logError(err))
 	}
-	rows := rc.rows(r.Context(), seeds, marked)
+	rows := rc.rows(r.Context(), library.Seeds, library.Marked)
 	w.Header().Set("Cache-Control", "no-store")
 	if err := datastar.NewSSE(w, r).PatchElementTempl(views.RecommendationRows(rows)); err != nil {
 		slog.Warn("patching recommendations failed", "error", err)

@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -199,5 +200,67 @@ func TestAllAlertsOnOnePageNeedNoMarkAllRead(t *testing.T) {
 	page := getWith(t, h, "/alerts", session).Body.String()
 	if strings.Contains(page, "Mark all read") || strings.Contains(page, "after=") {
 		t.Error("three alerts offer Mark all read or older alerts")
+	}
+}
+
+// countingLibrary counts reads of users' whole libraries: their
+// favourites and their Watched and Want to watch lists.
+type countingLibrary struct {
+	*store.Memory
+	mu    sync.Mutex
+	reads int
+}
+
+func (c *countingLibrary) Favorites(ctx context.Context, uid string) ([]store.Favorite, error) {
+	c.mu.Lock()
+	c.reads++
+	c.mu.Unlock()
+	return c.Memory.Favorites(ctx, uid)
+}
+
+func (c *countingLibrary) TitleStates(ctx context.Context, uid, state string) ([]store.TitleState, error) {
+	c.mu.Lock()
+	c.reads++
+	c.mu.Unlock()
+	return c.Memory.TitleStates(ctx, uid, state)
+}
+
+func (c *countingLibrary) count() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.reads
+}
+
+// Pages ask for the alerts count and recommendations again and again; the
+// whole library is read again only after it changed.
+func TestTheLibraryIsReadAgainOnlyAfterItChanges(t *testing.T) {
+	g := newGoogle(t)
+	cfg := withTMDB(t, g.config())
+	users := &countingLibrary{Memory: store.NewMemory()}
+	cfg.Store = users
+	cfg.Releases = releases.NewMemory(map[releases.Feed][]releases.Release{
+		releases.DolbyVision: {{ID: 438631, Title: "Dune", PosterPath: "/d.jpg", FoundAt: now}},
+		releases.HDR10:       {{ID: 329865, Title: "Arrival", PosterPath: "/a.jpg", FoundAt: now}},
+	})
+	h := web.New(cfg)
+	session := signIn(t, h)
+	send(t, h, http.MethodPost, "/api/favorites?type=movie&id=438631", session)
+	if got := bellCount(t, h, session); got != "1" {
+		t.Fatalf("after following Dune the bell shows %q", got)
+	}
+	read := users.count()
+	for range 3 {
+		bellCount(t, h, session)
+		send(t, h, http.MethodGet, "/api/recommendations", session)
+	}
+	if got := users.count(); got != read {
+		t.Errorf("an unchanged library was read %d more times", got-read)
+	}
+	send(t, h, http.MethodPost, "/api/titles/state?type=movie&id=329865&state=want", session)
+	if got := bellCount(t, h, session); got != "2" {
+		t.Errorf("after wanting Arrival the bell shows %q, want 2", got)
+	}
+	if users.count() == read {
+		t.Error("a changed library was not read again")
 	}
 }

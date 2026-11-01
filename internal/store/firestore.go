@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"slices"
@@ -124,11 +125,41 @@ func (f *Firestore) AddFavorite(ctx context.Context, uid string, fav Favorite) e
 		fav.AddedAt = f.opts.now()
 	}
 	fav.AddedAt = fav.AddedAt.UTC()
-	_, err = f.favorites(uid).Doc(id).Create(ctx, favoriteRecord(fav))
-	if err != nil && status.Code(err) != codes.AlreadyExists {
+	err = f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error {
+		return tx.Create(f.favorites(uid).Doc(id), favoriteRecord(fav))
+	})
+	if status.Code(err) == codes.AlreadyExists {
+		return nil
+	}
+	if err != nil {
 		return fmt.Errorf("add favourite: %w", err)
 	}
 	return nil
+}
+
+// changeLibrary makes a change to the user's library and gives the library
+// a new stamp in one transaction, so a change is never kept without its
+// stamp (which would leave summaries of the library stale).
+func (f *Firestore) changeLibrary(ctx context.Context, uid string, change func(*firestore.Transaction) error) error {
+	return f.client.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
+		if err := change(tx); err != nil {
+			return err
+		}
+		return tx.Set(f.userDoc(uid), map[string]any{"libraryStamp": rand.Text()}, firestore.MergeAll)
+	})
+}
+
+// LibraryStamp implements Store.
+func (f *Firestore) LibraryStamp(ctx context.Context, uid string) (string, error) {
+	snap, err := f.userDoc(uid).Get(ctx)
+	if notFound(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("read the library stamp: %w", err)
+	}
+	stamp, _ := snap.Data()["libraryStamp"].(string)
+	return stamp, nil
 }
 
 // RemoveFavorite implements Store.
@@ -137,7 +168,10 @@ func (f *Firestore) RemoveFavorite(ctx context.Context, uid, kind string, tmdbID
 	if err != nil {
 		return err
 	}
-	if _, err := f.favorites(uid).Doc(id).Delete(ctx); err != nil {
+	err = f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error {
+		return tx.Delete(f.favorites(uid).Doc(id))
+	})
+	if err != nil {
 		return fmt.Errorf("remove favourite: %w", err)
 	}
 	return nil
@@ -317,13 +351,19 @@ func (f *Firestore) SetTitleState(ctx context.Context, uid string, ts TitleState
 		return err
 	}
 	if ts.State == "" {
-		if _, err := f.titles(uid).Doc(id).Delete(ctx); err != nil {
+		err := f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error {
+			return tx.Delete(f.titles(uid).Doc(id))
+		})
+		if err != nil {
 			return fmt.Errorf("clear watch state: %w", err)
 		}
 		return nil
 	}
 	ts.UpdatedAt = f.opts.now().UTC()
-	if _, err := f.titles(uid).Doc(id).Set(ctx, titleStateRecord(ts)); err != nil {
+	err = f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error {
+		return tx.Set(f.titles(uid).Doc(id), titleStateRecord(ts))
+	})
+	if err != nil {
 		return fmt.Errorf("save watch state: %w", err)
 	}
 	return nil
