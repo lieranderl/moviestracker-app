@@ -57,7 +57,7 @@ if (a) { evt.preventDefault(); $season = +a.dataset.season; @get('/api/tv/%d/sea
 templ TVPage(user *auth.User, t *tmdb.TVDetails, season *tmdb.Season, selected int) {
 	@layoutWithScripts(PageTitle(t.MediaItem), titleScripts(ctx)...) {
 		@Navbar(user)
-		<main class="grow pb-16" data-signals={ mediaPageSignals } data-on:click={ videoClick(ctx) }>
+		<main class="grow pb-16" data-signals={ mediaPageSignals(ctx) } data-on:click={ videoClick(ctx) }>
 			@detailHero(t.MediaItem, tvFacts(ctx, t), t.ContentRating, genreNames(t.Genres)) {
 				@trailerButton(t.TrailerKey, trf(ctx, "%s trailer", t.Title))
 				@heroLink("#seasons", "list-video", tr(ctx, "Episodes"))

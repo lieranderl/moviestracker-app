@@ -22,6 +22,7 @@ type memoryUser struct {
 	progress    map[string]Progress
 	titles      map[string]TitleState
 	updates     map[string]Update
+	filters     ReleaseFilters
 }
 
 // NewMemory returns an empty in-memory store.
@@ -255,5 +256,26 @@ func (m *Memory) MarkUpdatesSeen(_ context.Context, uid string) error {
 		u.Seen = true
 		m.user(uid).updates[id] = u
 	}
+	return nil
+}
+
+// ReleaseFilters implements Store.
+func (m *Memory) ReleaseFilters(_ context.Context, uid string) (ReleaseFilters, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	f := m.user(uid).filters
+	f.Qualities = slices.Clone(f.Qualities)
+	return f, nil
+}
+
+// SaveReleaseFilters implements Store.
+func (m *Memory) SaveReleaseFilters(_ context.Context, uid string, f ReleaseFilters) error {
+	if err := CheckReleaseFilters(f); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	f.Qualities = slices.Clone(f.Qualities)
+	m.user(uid).filters = f
 	return nil
 }
