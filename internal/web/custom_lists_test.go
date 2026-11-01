@@ -30,6 +30,11 @@ func TestAUserMakesAListAndOpensItFromMyLists(t *testing.T) {
 	if !strings.Contains(tabs, `href="`+href+`" role="tab" aria-selected="true"`) || !strings.Contains(tabs, "Sci-fi nights") {
 		t.Errorf("My lists' tabs do not show the list as open:\n%s", tabs)
 	}
+	// DaisyUI styles a tab only as a direct child of .tabs: the whole tab
+	// bar is patched, the fixed tabs with the user's own.
+	if !strings.Contains(tabs, `<nav id="list-tabs" role="tablist"`) || !strings.Contains(tabs, `href="/lists/want" role="tab"`) || strings.Contains(tabs, `class="contents"`) {
+		t.Errorf("the user's lists are not tabs of the tab bar itself:\n%s", tabs)
+	}
 	if page := html.UnescapeString(getWith(t, h, "/lists/want", session).Body.String()); !strings.Contains(page, "@get('/api/lists/tabs?active=want')") {
 		t.Error("Want to watch does not ask for the user's own lists as tabs")
 	}
@@ -62,9 +67,9 @@ func TestAUserAddsAMovieToTheirListFromItsPage(t *testing.T) {
 	if !strings.Contains(page, `href="/movie/438631"`) || !strings.Contains(page, "@delete('"+itemURL+"&from=list')") {
 		t.Errorf("the list page does not show Dune with a way to take it out")
 	}
-	res := send(t, h, http.MethodDelete, itemURL+"&from=list", session)
-	if !strings.Contains(res.Body.String(), "#list-item-movie-438631") {
-		t.Errorf("taking Dune out on the list page did not remove its card:\n%s", res.Body)
+	res := html.UnescapeString(send(t, h, http.MethodDelete, itemURL+"&from=list", session).Body.String())
+	if !strings.Contains(res, `id="custom-list"`) || !strings.Contains(res, ">0</span>") || !strings.Contains(res, "This list is empty") {
+		t.Errorf("taking Dune out on the list page did not show the list empty, counting 0:\n%s", res)
 	}
 	if kept, _, _ := users.CustomList(ctx, "1098765", l.ID); len(kept.Titles) != 0 {
 		t.Errorf("the list still keeps %+v", kept.Titles)
