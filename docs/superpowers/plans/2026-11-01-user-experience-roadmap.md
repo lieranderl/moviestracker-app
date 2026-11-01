@@ -212,7 +212,7 @@ pending, implemented, and deployed status separate in future updates here.
 
 ## Next implementation slice
 
-Continue with **R03**, then **R04**. They address observed and
+Continue with **R04**, then **R06**. They address observed and
 source-derived Phase 1 risks without introducing new product concepts. Continue Phase 1
 in focused PRs before the larger episode/discovery and collaboration work.
 
@@ -272,6 +272,18 @@ in focused PRs before the larger episode/discovery and collaboration work.
   works/404/500) confirmed the status line, Direct help and notice for each
   state in English and Russian, and that Play HLS switches the stream. The web
   app surface was covered by tests only.
+- **R03 — implemented, deployment unverified (1 November 2026):** the
+  update store now pages alerts by cursor (found time, then ID, so ties are
+  neither skipped nor repeated), counts unseen alerts on the server, marks
+  seen only given IDs, and marks all seen only up to a given time. Opening
+  `/alerts` marks only the alerts on that page seen and links older pages;
+  the bell shows the real unseen count (`99+` above 99). Mark all read covers
+  alerts found up to when the page was read, so later arrivals stay unread.
+  The bulk action reads unseen alerts and filters by time in code to avoid a
+  composite Firestore index. Store contract tests passed on the in-memory
+  store and the Firestore emulator; web handler tests cover 130 unread
+  alerts, older pages, a later arrival, malformed cursors and a failed read.
+  No browser check: the web app signs in only through Google.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding

@@ -6,6 +6,7 @@ import (
 	"maps"
 	"slices"
 	"sync"
+	"time"
 )
 
 // Memory is a Store in this process's memory: gone when it stops.
@@ -246,21 +247,64 @@ func (m *Memory) AddUpdates(_ context.Context, uid string, updates []Update) err
 }
 
 // Updates implements Store.
-func (m *Memory) Updates(_ context.Context, uid string) ([]Update, error) {
+func (m *Memory) Updates(_ context.Context, uid, after string) ([]Update, string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	out := slices.Collect(maps.Values(m.user(uid).updates))
 	slices.SortFunc(out, newestFound)
-	return out[:min(len(out), updateLimit)], nil
+	if after != "" {
+		at, id, err := parseUpdateCursor(after)
+		if err != nil {
+			return nil, "", err
+		}
+		last := Update{FoundAt: at}
+		out = slices.DeleteFunc(out, func(u Update) bool {
+			return newestFound(u, last) < 0 || (u.FoundAt.Equal(at) && u.ID() >= id)
+		})
+	}
+	if len(out) <= updateLimit {
+		return out, "", nil
+	}
+	return out[:updateLimit], updateCursor(out[updateLimit-1]), nil
+}
+
+// UnseenUpdates implements Store.
+func (m *Memory) UnseenUpdates(_ context.Context, uid string) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, u := range m.user(uid).updates {
+		if !u.Seen {
+			n++
+		}
+	}
+	return n, nil
 }
 
 // MarkUpdatesSeen implements Store.
-func (m *Memory) MarkUpdatesSeen(_ context.Context, uid string) error {
+func (m *Memory) MarkUpdatesSeen(_ context.Context, uid string, ids []string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	for id, u := range m.user(uid).updates {
-		u.Seen = true
-		m.user(uid).updates[id] = u
+	kept := m.user(uid).updates
+	for _, id := range ids {
+		if u, ok := kept[id]; ok {
+			u.Seen = true
+			kept[id] = u
+		}
+	}
+	return nil
+}
+
+// MarkAllUpdatesSeen implements Store.
+func (m *Memory) MarkAllUpdatesSeen(_ context.Context, uid string, through time.Time) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	kept := m.user(uid).updates
+	for id, u := range kept {
+		if !u.FoundAt.After(through) {
+			u.Seen = true
+			kept[id] = u
+		}
 	}
 	return nil
 }

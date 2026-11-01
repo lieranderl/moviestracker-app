@@ -2,10 +2,12 @@ package web
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
 	"net/http"
 	"slices"
+	"strconv"
+	"time"
 
 	"github.com/starfederation/datastar-go/datastar"
 
@@ -82,33 +84,38 @@ func (a *app) foundAlerts(ctx context.Context, uid string) ([]store.Update, erro
 	return found, nil
 }
 
-// alerts are the user's release alerts, with any the feeds newly hold for
-// them kept first. Only alerts not kept yet are written, as the navbar
-// asks on every page. An error says the kept alerts could not be read.
-func (a *app) alerts(r *http.Request, uid string) ([]store.Update, error) {
-	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
-	defer cancel()
-	kept, err := a.cfg.Store.Updates(ctx, uid)
-	if err != nil {
-		return nil, err
-	}
+// keepFoundAlerts keeps the alerts the feeds newly hold for the user. The
+// navbar asks on every page, so alerts already among the newest are not
+// written again. It says whether it kept any.
+func (a *app) keepFoundAlerts(ctx context.Context, uid string, newest []store.Update) bool {
 	found, err := a.foundAlerts(ctx, uid)
 	if err != nil {
 		slog.Warn("finding release alerts failed", "error", handlers.LogError(err))
 	}
 	known := map[string]bool{}
-	for _, u := range kept {
-		known[fmt.Sprint(u.Feed, u.TMDBID)] = true
+	for _, u := range newest {
+		known[u.ID()] = true
 	}
-	found = slices.DeleteFunc(found, func(u store.Update) bool { return known[fmt.Sprint(u.Feed, u.TMDBID)] })
+	found = slices.DeleteFunc(found, func(u store.Update) bool { return known[u.ID()] })
 	if len(found) == 0 {
-		return kept, nil
+		return false
 	}
 	if err := a.cfg.Store.AddUpdates(ctx, uid, found); err != nil {
 		slog.Warn("keeping release alerts failed", "error", handlers.LogError(err))
-		return kept, nil
+		return false
 	}
-	return a.cfg.Store.Updates(ctx, uid)
+	return true
+}
+
+// newestAlerts are the newest page of the user's release alerts, with any
+// the feeds newly hold for them kept first, and the older page's cursor.
+// An error says the kept alerts could not be read.
+func (a *app) newestAlerts(ctx context.Context, uid string) ([]store.Update, string, error) {
+	page, next, err := a.cfg.Store.Updates(ctx, uid, "")
+	if err != nil || !a.keepFoundAlerts(ctx, uid, page) {
+		return page, next, err
+	}
+	return a.cfg.Store.Updates(ctx, uid, "")
 }
 
 // handleAlertsCount patches the navbar's bell with the unseen updates.
@@ -118,15 +125,14 @@ func (a *app) handleAlertsCount(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	alerts, err := a.alerts(r, user.ID)
-	if err != nil {
+	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
+	defer cancel()
+	if _, _, err := a.newestAlerts(ctx, user.ID); err != nil {
 		slog.Warn("reading release alerts failed", "error", handlers.LogError(err))
 	}
-	unseen := 0
-	for _, u := range alerts {
-		if !u.Seen {
-			unseen++
-		}
+	unseen, err := a.cfg.Store.UnseenUpdates(ctx, user.ID)
+	if err != nil {
+		slog.Warn("counting release alerts failed", "error", handlers.LogError(err))
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	if err := datastar.NewSSE(w, r).PatchElementTempl(views.AlertsBell(unseen)); err != nil {
@@ -134,28 +140,90 @@ func (a *app) handleAlertsCount(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleAlertsPage lists the user's updates and marks them seen.
+// handleAlertsPage lists a page of the user's updates (?after= names the
+// older pages) and marks those shown seen; the others stay unseen.
 func (a *app) handleAlertsPage(w http.ResponseWriter, r *http.Request) {
 	user, ok := a.currentUser(r)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	alerts, err := a.alerts(r, user.ID)
+	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
+	defer cancel()
+	v := views.AlertsView{Through: a.now()}
+	var err error
+	if after := r.URL.Query().Get("after"); after == "" {
+		v.Alerts, v.Next, err = a.newestAlerts(ctx, user.ID)
+	} else {
+		v.Alerts, v.Next, err = a.cfg.Store.Updates(ctx, user.ID, after)
+	}
+	if errors.Is(err, store.ErrUpdateCursor) {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err != nil {
 		// Alerts the user could not see stay unseen.
 		slog.Warn("reading release alerts failed", "error", handlers.LogError(err))
+		v.Failed = true
 		w.WriteHeader(http.StatusServiceUnavailable)
 	} else {
-		ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
-		defer cancel()
-		if err := a.cfg.Store.MarkUpdatesSeen(ctx, user.ID); err != nil {
+		var shown []string
+		for _, u := range v.Alerts {
+			if !u.Seen {
+				shown = append(shown, u.ID())
+			}
+		}
+		if err := a.cfg.Store.MarkUpdatesSeen(ctx, user.ID, shown); err != nil {
 			slog.Warn("marking release alerts seen failed", "error", handlers.LogError(err))
 		}
+		if v.Unread, err = a.cfg.Store.UnseenUpdates(ctx, user.ID); err != nil {
+			slog.Warn("counting release alerts failed", "error", handlers.LogError(err))
+		}
 	}
-	if err := views.AlertsPage(a.catalogUser(r), alerts, err != nil).Render(r.Context(), w); err != nil {
+	if err := views.AlertsPage(a.catalogUser(r), v).Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "alerts", "error", err)
+	}
+}
+
+// handleMarkAllAlertsSeen marks seen the user's updates found up to
+// ?through= (Unix nanoseconds: when their alerts page was read), so ones
+// arriving later stay unseen, and patches the bell and the offer.
+func (a *app) handleMarkAllAlertsSeen(w http.ResponseWriter, r *http.Request) {
+	user, ok := a.currentUser(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	nanos, err := strconv.ParseInt(r.URL.Query().Get("through"), 10, 64)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	through := time.Unix(0, nanos)
+	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
+	defer cancel()
+	failed := false
+	if err := a.cfg.Store.MarkAllUpdatesSeen(ctx, user.ID, through); err != nil {
+		slog.Warn("marking all release alerts seen failed", "error", handlers.LogError(err))
+		failed = true
+	}
+	unseen, err := a.cfg.Store.UnseenUpdates(ctx, user.ID)
+	if err != nil {
+		slog.Warn("counting release alerts failed", "error", handlers.LogError(err))
+	}
+	sse := datastar.NewSSE(w, r)
+	if err := sse.PatchElementTempl(views.AlertsBell(unseen)); err != nil {
+		slog.Warn("patching the updates bell failed", "error", err)
+	}
+	// Unread alerts found later are not this offer's: it goes once the
+	// ones it covered are read.
+	left := 0
+	if failed {
+		left = max(unseen, 1)
+	}
+	if err := sse.PatchElementTempl(views.AlertsMarkAll(left, through, failed)); err != nil {
+		slog.Warn("patching the mark-all offer failed", "error", err)
 	}
 }

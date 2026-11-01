@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
+	"cloud.google.com/go/firestore/apiv1/firestorepb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -397,31 +398,95 @@ func (f *Firestore) AddUpdates(ctx context.Context, uid string, updates []Update
 	return nil
 }
 
-// Updates implements Store.
-func (f *Firestore) Updates(ctx context.Context, uid string) ([]Update, error) {
-	docs, err := f.updates(uid).OrderBy("foundAt", firestore.Desc).Limit(updateLimit).Documents(ctx).GetAll()
+// Updates implements Store. Ordered by foundAt and then document ID, both
+// descending, it needs only Firestore's single-field index on foundAt.
+func (f *Firestore) Updates(ctx context.Context, uid, after string) ([]Update, string, error) {
+	q := f.updates(uid).OrderBy("foundAt", firestore.Desc).OrderBy(firestore.DocumentID, firestore.Desc)
+	if after != "" {
+		at, id, err := parseUpdateCursor(after)
+		if err != nil {
+			return nil, "", err
+		}
+		q = q.StartAfter(at, id)
+	}
+	docs, err := q.Limit(updateLimit + 1).Documents(ctx).GetAll()
 	if err != nil {
-		return nil, fmt.Errorf("read updates: %w", err)
+		return nil, "", fmt.Errorf("read updates: %w", err)
 	}
 	out := make([]Update, 0, len(docs))
 	for _, doc := range docs {
 		var rec updateRecord
 		if err := doc.DataTo(&rec); err != nil {
-			return nil, fmt.Errorf("read update %s: %w", doc.Ref.ID, err)
+			return nil, "", fmt.Errorf("read update %s: %w", doc.Ref.ID, err)
 		}
 		out = append(out, Update(rec))
 	}
-	return out, nil
+	if len(out) <= updateLimit {
+		return out, "", nil
+	}
+	return out[:updateLimit], updateCursor(out[updateLimit-1]), nil
+}
+
+// UnseenUpdates implements Store, counting on the server.
+func (f *Firestore) UnseenUpdates(ctx context.Context, uid string) (int, error) {
+	unseen := f.updates(uid).Where("seen", "==", false)
+	res, err := unseen.NewAggregationQuery().WithCount("n").Get(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("count unseen updates: %w", err)
+	}
+	n, ok := res["n"].(*firestorepb.Value)
+	if !ok {
+		return 0, fmt.Errorf("count unseen updates: no count in %v", res)
+	}
+	return int(n.GetIntegerValue()), nil
 }
 
 // MarkUpdatesSeen implements Store.
-func (f *Firestore) MarkUpdatesSeen(ctx context.Context, uid string) error {
+func (f *Firestore) MarkUpdatesSeen(ctx context.Context, uid string, ids []string) error {
+	refs := make([]*firestore.DocumentRef, len(ids))
+	for i, id := range ids {
+		refs[i] = f.updates(uid).Doc(id)
+	}
+	return f.markSeen(ctx, refs)
+}
+
+// MarkAllUpdatesSeen implements Store. It reads the unseen updates and
+// leaves those found after through: filtering on foundAt in the query too
+// would need a composite index.
+func (f *Firestore) MarkAllUpdatesSeen(ctx context.Context, uid string, through time.Time) error {
 	docs, err := f.updates(uid).Where("seen", "==", false).Documents(ctx).GetAll()
 	if err != nil {
 		return fmt.Errorf("read unseen updates: %w", err)
 	}
+	var refs []*firestore.DocumentRef
 	for _, doc := range docs {
-		if _, err := doc.Ref.Update(ctx, []firestore.Update{{Path: "seen", Value: true}}); err != nil {
+		var rec updateRecord
+		if err := doc.DataTo(&rec); err != nil {
+			return fmt.Errorf("read update %s: %w", doc.Ref.ID, err)
+		}
+		if !rec.FoundAt.After(through) {
+			refs = append(refs, doc.Ref)
+		}
+	}
+	return f.markSeen(ctx, refs)
+}
+
+// markSeen marks these update documents seen; ones that do not exist are
+// left alone, so marking cannot create an update.
+func (f *Firestore) markSeen(ctx context.Context, refs []*firestore.DocumentRef) error {
+	bw := f.client.BulkWriter(ctx)
+	jobs := make([]*firestore.BulkWriterJob, 0, len(refs))
+	for _, ref := range refs {
+		job, err := bw.Update(ref, []firestore.Update{{Path: "seen", Value: true}})
+		if err != nil {
+			bw.End()
+			return fmt.Errorf("mark update seen: %w", err)
+		}
+		jobs = append(jobs, job)
+	}
+	bw.End()
+	for _, job := range jobs {
+		if _, err := job.Results(); err != nil && status.Code(err) != codes.NotFound {
 			return fmt.Errorf("mark update seen: %w", err)
 		}
 	}

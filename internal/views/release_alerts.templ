@@ -2,7 +2,9 @@ package views
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/store"
@@ -25,16 +27,53 @@ templ alertsSlot() {
 // AlertsBell leads to the updates, counting those not seen yet.
 templ AlertsBell(unseen int) {
 	<a id="alerts-bell" href="/alerts" class="btn btn-ghost btn-sm btn-circle indicator" aria-label={ tr(ctx, "Release alerts") } title={ tr(ctx, "Release alerts") }>
-		if unseen > 0 {
+		if unseen > 99 {
+			<span class="indicator-item badge badge-primary badge-xs">99+</span>
+		} else if unseen > 0 {
 			<span class="indicator-item badge badge-primary badge-xs">{ strconv.Itoa(unseen) }</span>
 		}
 		@Icon("bell", "size-4")
 	</a>
 }
 
+// AlertsView is a page of the user's release alerts.
+type AlertsView struct {
+	Alerts  []store.Update
+	Next    string    // cursor of the older page, "" when none is left
+	Unread  int       // alerts still unread after this page was shown
+	Through time.Time // when the page was read: Mark all read covers up to it
+	Failed  bool      // the alerts could not be read
+}
+
+// AlertsMarkAll offers to mark read the unread alerts this page did not
+// show, found up to through; failed says the last try did not work.
+templ AlertsMarkAll(unread int, through time.Time, failed bool) {
+	<div id="alerts-mark-all">
+		if unread > 0 {
+			<div role="status" class="alert alert-info alert-soft">
+				@Icon("bell-dot", "size-5")
+				<span>{ trn(ctx, unread, "%d older alert is still unread.", "%d older alerts are still unread.") }</span>
+				<button
+					type="button"
+					class="btn btn-sm btn-primary"
+					data-indicator:_marking
+					data-attr:disabled="$_marking"
+					data-on:click={ fmt.Sprintf("@post('/api/alerts/seen?through=%d')", through.UnixNano()) }
+				>
+					@Icon("check-check", "size-4")
+					{ tr(ctx, "Mark all read") }
+				</button>
+			</div>
+			if failed {
+				<p role="alert" class="text-sm text-error mt-2">{ tr(ctx, "Your alerts could not be marked read. Please try again.") }</p>
+			}
+		}
+	</div>
+}
+
 // AlertsPage lists what turned up for the movies the user follows, most
-// recently noticed first; failed says the alerts could not be read.
-templ AlertsPage(user *auth.User, alerts []store.Update, failed bool) {
+// recently noticed first, a page at a time.
+templ AlertsPage(user *auth.User, v AlertsView) {
 	@Layout(tr(ctx, "Release alerts")) {
 		@Navbar(user)
 		<main class="grow pb-20">
@@ -46,18 +85,19 @@ templ AlertsPage(user *auth.User, alerts []store.Update, failed bool) {
 					</h1>
 					<p class="text-sm text-base-content/70">{ tr(ctx, "Releases found for the movies in your favourites and Want to watch.") }</p>
 				</header>
-				if failed {
+				if v.Failed {
 					<div role="alert" class="alert alert-error alert-soft">
 						@Icon("circle-alert", "size-5")
 						<span>{ tr(ctx, "Your release alerts could not be loaded right now. Please try again in a moment.") }</span>
 					</div>
-				} else if len(alerts) == 0 {
+				} else if len(v.Alerts) == 0 {
 					@emptyState("bell", tr(ctx, "No release alerts yet"), tr(ctx, "Follow movies with Add to favourites or Want to watch: you hear here when they turn up in HDR10, Dolby Vision or on the trackers.")) {
 						@browseTrendingLink()
 					}
 				} else {
+					@AlertsMarkAll(v.Unread, v.Through, false)
 					<ul class="list bg-base-200/60 rounded-box border border-base-content/10">
-						for _, u := range alerts {
+						for _, u := range v.Alerts {
 							<li class="list-row items-center">
 								if poster := (tmdb.MediaItem{PosterPath: u.Poster}).PosterURL(); poster != "" {
 									<img src={ poster } alt="" class="w-12 aspect-[2/3] rounded-field object-cover" loading="lazy" width="48" height="72"/>
@@ -74,6 +114,12 @@ templ AlertsPage(user *auth.User, alerts []store.Update, failed bool) {
 							</li>
 						}
 					</ul>
+					if v.Next != "" {
+						<a href={ templ.SafeURL("/alerts?after=" + url.QueryEscape(v.Next)) } class="btn btn-sm btn-ghost gap-1.5">
+							{ tr(ctx, "Older alerts") }
+							@Icon("chevron-right", "size-4")
+						</a>
+					}
 				}
 			</div>
 			@toTopButton()
