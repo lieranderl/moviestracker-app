@@ -46,6 +46,9 @@ type settingField struct {
 	// AtStart marks a setting TorrServer reads only when it starts, so the
 	// managed engine restarts when it changes while it serves HTTPS.
 	AtStart bool
+	// Relaunch marks a setting the managed engine takes only when it starts:
+	// Moviestracker hands it the peer port at launch (internal/engine).
+	Relaunch bool
 	// Check validates a text field (trimmed); nil accepts anything.
 	Check func(string) error
 }
@@ -109,7 +112,7 @@ var engineSections = []settingsSection{
 		ID: "network", Title: "Network", Icon: "network",
 		Intro: "How peers reach TorrServer. Moviestracker keeps TorrServer's web API on this machine; these are for BitTorrent traffic.",
 		Fields: []settingField{
-			{Key: "PeersListenPort", Label: "Peer port", Kind: kindInt, Min: 0, Max: 65535, Scale: 1, Help: "0 picks a random port. Forward it on your router for more peers."},
+			{Key: "PeersListenPort", Label: "Peer port", Kind: kindInt, Min: 0, Max: 65535, Scale: 1, Relaunch: true, Help: "0 picks a random port. Forward it on your router for more peers."},
 			{Key: "DisableUPNP", Label: "Open the peer port with UPnP", Kind: kindBool, Invert: true},
 			{Key: "EnableIPv6", Label: "IPv6", Kind: kindBool},
 			{Key: "PublicIPv4", Label: "Public IPv4 address", Kind: kindText, Startup: true, Check: optionalIPv4, Help: "Empty lets TorrServer find it."},

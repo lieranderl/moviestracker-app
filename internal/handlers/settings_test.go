@@ -233,6 +233,21 @@ func TestStartupOptionsRestartTheManagedEngine(t *testing.T) {
 	}
 }
 
+func TestChangingThePeerPortRestartsTheManagedEngine(t *testing.T) {
+	opt, sup := withEngine(t)
+	l := newLocal(t, withAdmin(t), opt)
+	admin := l.admin(t)
+	l.action(t, "/api/settings/sources/torrserver", `{"torrserverMode":"managed"}`, admin)
+	before := sup.Status().PID
+
+	// The managed engine gets its peer port when it starts, so TorrServer
+	// takes a new one only with a restart.
+	rr := l.action(t, "/api/settings/engine/network", `{"network":{"PeersListenPort":51413}}`, admin)
+	if st := sup.Status(); st.State != engine.Running || st.PID == before {
+		t.Errorf("engine not restarted for the new peer port: %+v (was PID %d):\n%s", st, before, rr.Body.String())
+	}
+}
+
 func TestGStreamerSettingsAreChangedAndReset(t *testing.T) {
 	eng := newSettingsEngine(t, true)
 	l := newLocal(t, withAdmin(t), withEngineAt(eng.URL))

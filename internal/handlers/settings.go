@@ -300,7 +300,7 @@ func (s *Server) handleSaveEngineSettings(w http.ResponseWriter, r *http.Request
 	// TorrServer reads some settings only when it starts.
 	restart := startup != before
 	for _, f := range sec.Fields {
-		if _, changed := engineChanges[f.Key]; changed && f.AtStart && startup.HTTPS && s.managed() {
+		if _, changed := engineChanges[f.Key]; changed && s.managed() && (f.Relaunch || f.AtStart && startup.HTTPS) {
 			restart = true
 		}
 	}

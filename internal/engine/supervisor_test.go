@@ -432,3 +432,68 @@ func TestTheEngineStaysOnLoopbackAndServesHTTPSOnAPortOfItsOwn(t *testing.T) {
 		t.Errorf("plain HTTP engine args = %q, want loopback without --ssl", args)
 	}
 }
+
+// peerAddrs returns the peer address (--torrentaddr) each start of the engine
+// in dir was given, "" for none.
+func peerAddrs(t *testing.T, dir string) []string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(dir, "fake-peer-addrs")) // #nosec G304 -- test temp dir
+	if err != nil {
+		t.Fatalf("read peer addresses: %v", err)
+	}
+	return strings.Split(strings.TrimSuffix(string(raw), "\n"), "\n")
+}
+
+func TestAnEngineWithoutAPeerPortGetsOneTCPAndUDPCanBind(t *testing.T) {
+	dir := t.TempDir()
+	sup := newSupervisor(t, dir, freePort(t))
+	// The fake listens on its peer address with TCP and UDP, so it only
+	// runs when both binds were allowed.
+	if err := sup.Start(context.Background()); err != nil {
+		t.Fatalf("Start(): %v", err)
+	}
+	addrs := peerAddrs(t, dir)
+	if len(addrs) != 1 || !strings.HasPrefix(addrs[0], ":") {
+		t.Fatalf("peer addresses = %q, want one :port", addrs)
+	}
+	if port, err := strconv.Atoi(addrs[0][1:]); err != nil || port <= 0 {
+		t.Errorf("peer address %q has no port", addrs[0])
+	}
+}
+
+func TestEveryStartAttemptGetsAPeerPortOfItsOwn(t *testing.T) {
+	dir := t.TempDir()
+	sup := newSupervisor(t, dir, freePort(t), "FAKE_FAIL_STARTS=2")
+	if err := sup.Start(context.Background()); err != nil {
+		t.Fatalf("Start(): %v", err)
+	}
+	addrs := peerAddrs(t, dir)
+	if len(addrs) != 3 {
+		t.Fatalf("peer addresses = %q, want one for each of 3 starts", addrs)
+	}
+	if addrs[0] == addrs[1] && addrs[1] == addrs[2] {
+		t.Errorf("every start was given the same peer address %q", addrs[0])
+	}
+}
+
+func TestAPeerPortTheUserSetIsLeftToTheEngine(t *testing.T) {
+	dir := t.TempDir()
+	sup := newSupervisor(t, dir, freePort(t))
+	if err := sup.Start(context.Background()); err != nil {
+		t.Fatalf("Start(): %v", err)
+	}
+	url, user, pass := sup.Endpoint()
+	req, _ := http.NewRequest(http.MethodPost, url+"/settings", strings.NewReader(`{"action":"set","sets":{"PeersListenPort":51413}}`))
+	req.SetBasicAuth(user, pass)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("set the peer port: %v", err)
+	}
+	_ = resp.Body.Close()
+	if err := sup.Restart(context.Background()); err != nil {
+		t.Fatalf("Restart(): %v", err)
+	}
+	if addrs := peerAddrs(t, dir); len(addrs) != 2 || addrs[1] != "" {
+		t.Errorf("peer addresses = %q, want none on the start after the user set port 51413", addrs)
+	}
+}

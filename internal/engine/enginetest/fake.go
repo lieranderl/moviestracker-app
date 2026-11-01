@@ -41,6 +41,7 @@ func fakeTorrServer() {
 	httpAuth := fs.Bool("httpauth", false, "")
 	sslOn := fs.Bool("ssl", false, "")
 	sslPort := fs.Int("sslport", 0, "")
+	torrentAddr := fs.String("torrentaddr", "", "")
 	for _, name := range []string{"proxyurl", "proxymode", "pubipv4", "pubipv6", "maxsize", "torrentsdir"} {
 		fs.String(name, "", "")
 	}
@@ -58,6 +59,12 @@ func fakeTorrServer() {
 		user, pass, ok := r.BasicAuth()
 		return !*httpAuth || (ok && accounts[user] == pass)
 	}
+	// Every start's peer address goes on a line of fake-peer-addrs, so tests
+	// see what each start was given.
+	if f, err := os.OpenFile(filepath.Join(*dir, "fake-peer-addrs"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil { // #nosec G304 -- test fake
+		_, _ = fmt.Fprintln(f, *torrentAddr)
+		_ = f.Close()
+	}
 	// FAKE_FAIL_STARTS=n makes the first n starts in a directory exit at
 	// once, as a TorrServer that cannot start yet does.
 	if n, err := strconv.Atoi(os.Getenv("FAKE_FAIL_STARTS")); err == nil {
@@ -70,6 +77,22 @@ func fakeTorrServer() {
 			os.Exit(1)
 		}
 	}
+	// A peer address is listened on with TCP and UDP, as TorrServer's
+	// BitTorrent client does; a refused bind stops the start.
+	if *torrentAddr != "" {
+		tcp, err := net.Listen("tcp4", *torrentAddr)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "fake: BTS.Connect() error!", err)
+			os.Exit(1)
+		}
+		_ = tcp // held until the fake exits
+		udp, err := net.ListenPacket("udp4", *torrentAddr)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "fake: BTS.Connect() error! subsequent listen:", err)
+			os.Exit(1)
+		}
+		_ = udp
+	}
 	if after, err := time.ParseDuration(os.Getenv("FAKE_EXIT_AFTER")); err == nil {
 		time.AfterFunc(after, func() { os.Exit(1) })
 	}
@@ -77,15 +100,19 @@ func fakeTorrServer() {
 	// /args reports the command line, so tests see the flags the engine got.
 	mux.HandleFunc("GET /args", func(w http.ResponseWriter, r *http.Request) { _ = json.NewEncoder(w).Encode(os.Args[1:]) })
 	mux.HandleFunc("GET /echo", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("MatriX.fake")) })
-	// /settings keeps what was set across restarts, as TorrServer's BTSets.
+	// /settings keeps what was set across restarts, as TorrServer's BTSets,
+	// in TorrServer's settings.json.
 	var setsMu sync.Mutex
-	setsFile := filepath.Join(*dir, "fake-settings.json")
+	setsFile := filepath.Join(*dir, "settings.json")
 	sets := map[string]any{"CacheSize": 67108864}
 	if raw, err := os.ReadFile(setsFile); err == nil { // #nosec G304 -- test fake
-		_ = json.Unmarshal(raw, &sets)
+		var stored struct{ BitTorr map[string]any }
+		if json.Unmarshal(raw, &stored) == nil && stored.BitTorr != nil {
+			sets = stored.BitTorr
+		}
 	}
 	saveSets := func() {
-		raw, _ := json.Marshal(sets)
+		raw, _ := json.Marshal(map[string]any{"BitTorr": sets})
 		_ = os.WriteFile(setsFile, raw, 0o600)
 	}
 	// --sslport is kept in the settings, as TorrServer keeps it in its db.

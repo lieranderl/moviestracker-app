@@ -268,6 +268,14 @@ func (s *Supervisor) launch(ctx context.Context, stop <-chan struct{}) (*run, er
 		"--httpauth",
 	}
 	args = append(args, options.args()...)
+	peer, err := s.peerAddr()
+	if err != nil {
+		_ = out.Close()
+		return nil, err
+	}
+	if peer != "" {
+		args = append(args, "--torrentaddr", peer)
+	}
 	if options.HTTPS {
 		sslPort, err := loopbackPort(port + 1)
 		if err != nil {
