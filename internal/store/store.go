@@ -62,6 +62,35 @@ type Store interface {
 	ProgressStore
 	TitleStateStore
 	UpdateStore
+	ReleaseFilterStore
+}
+
+// ReleaseFilters are how a user last searched a title's releases.
+type ReleaseFilters struct {
+	Sort           string // "seeders", "date", "size" or "bitrate"; empty: seeders
+	Qualities      []int  // of 2160, 1080, 720, 480; none is all
+	HDR            bool
+	HideRecordings bool // camera and telesync recordings of a screening
+}
+
+// ReleaseFilterStore keeps each user's release filters. The local app keeps
+// them in a file (OpenFilterFile), by account name.
+type ReleaseFilterStore interface {
+	ReleaseFilters(ctx context.Context, uid string) (ReleaseFilters, error)
+	SaveReleaseFilters(ctx context.Context, uid string, f ReleaseFilters) error
+}
+
+// CheckReleaseFilters is why f cannot be kept, if it cannot.
+func CheckReleaseFilters(f ReleaseFilters) error {
+	if !slices.Contains([]string{"", "seeders", "date", "size", "bitrate"}, f.Sort) {
+		return fmt.Errorf("release sort %q is unknown", f.Sort)
+	}
+	for _, q := range f.Qualities {
+		if !slices.Contains([]int{2160, 1080, 720, 480}, q) {
+			return fmt.Errorf("release quality %d is unknown", q)
+		}
+	}
+	return nil
 }
 
 // Update tells a user a movie they follow turned up in one of the

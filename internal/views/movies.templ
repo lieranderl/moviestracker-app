@@ -50,6 +50,7 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 				if len(watching) > 0 {
 					@continueWatching(watching)
 				}
+				@recommendationsSlot()
 				if load := siteOf(ctx).RecentTorrents; load != nil {
 					@RecentTorrentsSlot(load)
 				}

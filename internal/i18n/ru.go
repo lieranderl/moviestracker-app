@@ -55,6 +55,8 @@ var ru = map[string]string{
 	"See all results":             "Все результаты",
 	"Suggestions":                 "Подсказки",
 	"TV series":                   "Сериал",
+	"Because you saved %s":        "Потому что вы сохранили «%s»",
+	"Because you watched %s":      "Потому что вы смотрели «%s»",
 	"Start over":                  "Сначала",
 	"Retry":                       "Повторить",
 	"Your TorrServers could not be loaded. Please try again.": "Не удалось загрузить ваши TorrServer. Попробуйте ещё раз.",

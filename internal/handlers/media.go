@@ -101,7 +101,7 @@ func (c *Catalog) handleMoviePage(w http.ResponseWriter, r *http.Request) {
 		renderMediaError(w, r, user, err)
 		return
 	}
-	templ.Handler(views.MoviePage(user, movie)).ServeHTTP(w, r)
+	templ.Handler(views.MoviePage(user, movie)).ServeHTTP(w, c.releaseFilters.withFilters(r))
 }
 
 func (c *Catalog) handlePersonPage(w http.ResponseWriter, r *http.Request) {

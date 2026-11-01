@@ -14,8 +14,51 @@ import (
 	"strings"
 )
 
+// ReleaseFilters are how the user last searched a title's releases, which
+// its Sources section starts with.
+type ReleaseFilters struct {
+	Sort           string
+	Qualities      []int
+	HDR            bool
+	HideRecordings bool
+}
+
+type releaseFiltersKey struct{}
+
+// WithReleaseFilters starts ctx's title pages with f.
+func WithReleaseFilters(ctx context.Context, f ReleaseFilters) context.Context {
+	return context.WithValue(ctx, releaseFiltersKey{}, f)
+}
+
+func releaseFiltersOf(ctx context.Context) ReleaseFilters {
+	f, _ := ctx.Value(releaseFiltersKey{}).(ReleaseFilters)
+	if f.Sort == "" {
+		f.Sort = "seeders"
+	}
+	return f
+}
+
 // mediaPageSignals is the client state shared by the movie and TV pages.
-const mediaPageSignals = `{ videoOpen: false, videoKey: '', videoTitle: '', torrMagnet: '', sending: false, trackers: [], voices: [], hideRecordings: false, toast: '', toastError: false }`
+func mediaPageSignals(ctx context.Context) string {
+	return fmt.Sprintf(`{ videoOpen: false, videoKey: '', videoTitle: '', torrMagnet: '', sending: false, trackers: [], voices: [], hideRecordings: %t, toast: '', toastError: false }`, releaseFiltersOf(ctx).HideRecordings)
+}
+
+// releaseFilterSignals are the search filters the Sources section starts
+// with: $qual has a slot per quality checkbox, its value while ticked.
+func releaseFilterSignals(ctx context.Context) string {
+	f := releaseFiltersOf(ctx)
+	slots := make([]string, len(searchQualities))
+	for i, q := range searchQualities {
+		if slices.Contains(f.Qualities, q.Value) {
+			slots[i] = strconv.Itoa(q.Value)
+		}
+	}
+	return fmt.Sprintf("sort: '%s', qual: ['%s'], hdr: %t", f.Sort, strings.Join(slots, "','"), f.HDR)
+}
+
+// saveReleaseFilters keeps the user's filters: a second after a filter
+// changes, and when a sort button is pressed (buttons fire no change).
+const saveReleaseFilters = `@post('/api/preferences/release-filters', {filterSignals: {include: /^(sort|qual|hdr|hideRecordings)$/}})`
 
 // videoClick opens the trailer dialog for any element carrying data-video.
 // Keys and names travel in data-* attributes, never inside the expression.
@@ -389,16 +432,16 @@ func sourcesSignals(ctx context.Context, mediaType string, selected int) string 
 		cloud = ", tsSelectorReady: false, tsSelected: localStorage.getItem('mt-ts-selected') || '', _tsAddResult: {adding: false, ok: false, problem: '', status: 0}"
 	}
 	if mediaType == "tv" {
-		return fmt.Sprintf("{ sort: 'seeders', qual: [], hdr: false, sourcesRequested: false, sourcesLoading: false, sourceSeason: '%d'%s }", selected, cloud)
+		return fmt.Sprintf("{ %s, sourcesRequested: false, sourcesLoading: false, sourceSeason: '%d'%s }", releaseFilterSignals(ctx), selected, cloud)
 	}
-	return "{ sort: 'seeders', qual: [], hdr: false, sourcesRequested: false, sourcesLoading: false" + cloud + " }"
+	return "{ " + releaseFilterSignals(ctx) + ", sourcesRequested: false, sourcesLoading: false" + cloud + " }"
 }
 
 // sourcesSection searches JacRed only when the user asks; series search one
 // season at a time. The TorrServer status badge loads on its own.
 templ sourcesSection(mediaType string, item tmdb.MediaItem, seasons []tmdb.SeasonSummary, selected int, releases tmdb.Releases) {
 	{{ id := item.ID }}
-	<section id="sources" class="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-5 scroll-mt-20" data-signals={ sourcesSignals(ctx, mediaType, selected) } data-media-id={ fmt.Sprint(id) } data-media-type={ mediaType } data-title={ PageTitle(item) } data-poster={ item.PosterURL() }
+	<section id="sources" class="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-5 scroll-mt-20" data-signals={ sourcesSignals(ctx, mediaType, selected) } data-on:change__debounce.1s={ saveReleaseFilters } data-media-id={ fmt.Sprint(id) } data-media-type={ mediaType } data-title={ PageTitle(item) } data-poster={ item.PosterURL() }
 		if siteOf(ctx).Cloud {
 			data-effect="localStorage.setItem('mt-ts-selected', $tsSelected); $_tsNavUrl = $tsSelected; tsResetAdd(el, $tsSelected)"
 			data-on:ts-added={ "$sending = evt.detail.adding; $_tsAddResult = evt.detail; if (evt.detail.ok) { $toastError = false; $toast = " + trJS(ctx, "Added to TorrServer") + " }" }
@@ -718,7 +761,7 @@ templ TorrentResults(results []jacred.Result, sort, search string) {
 						aria-pressed={ strconv.FormatBool(o.Key == sort) }
 						data-class={ fmt.Sprintf("{ 'btn-primary': $sort === '%s' }", o.Key) }
 						data-attr:aria-pressed={ fmt.Sprintf("$sort === '%s'", o.Key) }
-						data-on:click={ fmt.Sprintf("$sort = '%s'; %s", o.Key, search) }
+						data-on:click={ fmt.Sprintf("$sort = '%s'; %s; %s", o.Key, search, saveReleaseFilters) }
 					>{ tr(ctx, o.Label) }</button>
 				}
 			</div>

@@ -26,7 +26,7 @@ func withTMDB(t *testing.T, cfg web.Config) web.Config {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/3/movie/438631":
-			_, _ = w.Write([]byte(`{"id":438631,"title":"Dune","original_title":"Dune","poster_path":"/d.jpg","release_date":"2021-09-15"}`))
+			_, _ = w.Write([]byte(`{"id":438631,"title":"Dune","original_title":"Dune","poster_path":"/d.jpg","release_date":"2021-09-15","recommendations":{"results":[{"id":329865,"title":"Arrival","poster_path":"/a.jpg","release_date":"2016-11-10"},{"id":335984,"title":"Blade Runner 2049","poster_path":"/b.jpg","release_date":"2017-10-04"}]}}`))
 			return
 		case "/3/tv/95396":
 			_, _ = w.Write([]byte(`{"id":95396,"name":"Severance","original_name":"Severance","poster_path":"/s.jpg","first_air_date":"2022-02-17","seasons":[{"season_number":1,"name":"Season 1","air_date":"2022-02-17","episode_count":9}]}`))
