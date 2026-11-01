@@ -1,6 +1,6 @@
 # Moviestracker user experience roadmap
 
-Date: 1 November 2026. Status: approved roadmap; feature work not started.
+Date: 1 November 2026. Status: approved roadmap; Phase 1 in progress.
 
 ## Goal and delivery order
 
@@ -19,7 +19,8 @@ These are delivery priorities, not security severity ratings.
 
 Relative effort: **S** one narrow change; **M** several related slices;
 **L** coordinated UI, storage, and integration work. Estimates describe scope,
-not promised delivery dates. All roadmap items below are pending.
+not promised delivery dates. Items remain pending unless the delivery log
+records implementation; implementation does not imply deployment.
 
 Surfaces: **Both** means self-hosted app and cloud web app; **Web** means the
 cloud app; **App** means self-hosted deployments. Shared features use the same
@@ -211,9 +212,25 @@ pending, implemented, and deployed status separate in future updates here.
 
 ## Next implementation slice
 
-Start with **R01**, then **R02** and **R10**. They address directly observed
+Continue with **R02**, then **R10**. They address directly observed
 friction without introducing new persistent product concepts. Continue Phase 1
 in focused PRs before the larger episode/discovery and collaboration work.
+
+## Delivery log
+
+- **R01 — implemented, deployment unverified (1 November 2026):** replaced the
+  clipped title-page dropdown with the existing native dialog helper. The same
+  shared form, endpoints, and list fragments serve both apps. Browser checks
+  reproduced the old picker starting 107 px outside a 731 px viewport, then
+  verified the dialog bounds and accessible labels in 16 combinations of
+  movie/series, app/web, English/Russian, and 320/1280 px widths. Additional
+  checks covered the original width, narrow light-theme rendering, landscape,
+  keyboard access, Escape/Close/backdrop dismissal and focus return, and list
+  creation/membership using disposable in-memory data. The user chose browser
+  checks plus existing tests; automated browser infrastructure was not added.
+  Existing view/translation/handler race tests and the full `make ci` gate
+  passed. Real-device and additional browser-engine checks remain outside this
+  slice's recorded verification.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding
