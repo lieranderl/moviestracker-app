@@ -25,6 +25,8 @@ func iconPath(name string) string {
 		return "<path d=\"M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z\"/><path d=\"m16 9-5.5 5.5L8 12\"/>"
 	case "bell":
 		return "<path d=\"M10.268 21a2 2 0 0 0 3.464 0\"/><path d=\"M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326\"/>"
+	case "bell-dot":
+		return "<path d=\"M10.268 21a2 2 0 0 0 3.464 0\"/><path d=\"M11.68 2.009A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673c-.824-.85-1.678-1.731-2.21-3.348\"/><circle cx=\"18\" cy=\"5\" r=\"3\"/>"
 	case "bookmark":
 		return "<path d=\"M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z\"/>"
 	case "calendar":
@@ -35,6 +37,8 @@ func iconPath(name string) string {
 		return "<path d=\"M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6\"/><path d=\"M2 12a9 9 0 0 1 8 8\"/><path d=\"M2 16a5 5 0 0 1 4 4\"/><line x1=\"2\" x2=\"2.01\" y1=\"20\" y2=\"20\"/>"
 	case "check":
 		return "<path d=\"M20 6 9 17l-5-5\"/>"
+	case "check-check":
+		return "<path d=\"M18 6 7 17l-5-5\"/><path d=\"m22 10-7.5 7.5L13 16\"/>"
 	case "chevron-down":
 		return "<path d=\"m6 9 6 6 6-6\"/>"
 	case "chevron-left":

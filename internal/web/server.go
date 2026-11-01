@@ -117,6 +117,7 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("GET /favorites", a.handleFavoritesPage)
 	mux.HandleFunc("GET /alerts", a.handleAlertsPage)
 	mux.HandleFunc("GET /api/alerts/count", a.handleAlertsCount)
+	mux.HandleFunc("POST /api/alerts/seen", a.handleMarkAllAlertsSeen)
 	mux.HandleFunc("GET /api/favorites/state", a.handleFavoriteState)
 	mux.HandleFunc("POST /api/favorites", a.handleAddFavorite)
 	mux.HandleFunc("DELETE /api/favorites", a.handleRemoveFavorite)

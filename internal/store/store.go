@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -113,7 +114,7 @@ type Update struct {
 // updateFeeds are the release feeds updates come from.
 var updateFeeds = []string{"latesttorrentsmovies", "hdr10movies", "dvmovies"}
 
-// updateLimit is how many updates Updates returns.
+// updateLimit is how many updates a page of Updates holds.
 const updateLimit = 100
 
 // UpdateStore keeps what users were told about new releases.
@@ -121,10 +122,39 @@ type UpdateStore interface {
 	// AddUpdates keeps updates the user was not told about yet; one already
 	// kept stays as it was, seen or not.
 	AddUpdates(ctx context.Context, uid string, updates []Update) error
-	// Updates are the user's latest updates, most recently found first.
-	Updates(ctx context.Context, uid string) ([]Update, error)
-	// MarkUpdatesSeen marks all the user's updates seen.
-	MarkUpdatesSeen(ctx context.Context, uid string) error
+	// Updates are a page of the user's updates, most recently found first,
+	// starting after the one the cursor after names ("" for the newest).
+	// next is the cursor of the following page, "" when none is left.
+	Updates(ctx context.Context, uid, after string) (page []Update, next string, err error)
+	// UnseenUpdates counts the user's updates not seen yet.
+	UnseenUpdates(ctx context.Context, uid string) (int, error)
+	// MarkUpdatesSeen marks the user's updates with these IDs (Update.ID)
+	// seen; IDs the user has no update for are ignored.
+	MarkUpdatesSeen(ctx context.Context, uid string, ids []string) error
+	// MarkAllUpdatesSeen marks the user's updates found up to through seen;
+	// ones found later stay as they are.
+	MarkAllUpdatesSeen(ctx context.Context, uid string, through time.Time) error
+}
+
+// ID names the update among the user's: its feed and TMDB ID
+// ("dvmovies-438631").
+func (u Update) ID() string { return fmt.Sprintf("%s-%d", u.Feed, u.TMDBID) }
+
+// updateCursor names the update a page ends with: when it was found and its
+// ID ("1790000000000000000.dvmovies-438631").
+func updateCursor(u Update) string { return fmt.Sprintf("%d.%s", u.FoundAt.UnixNano(), u.ID()) }
+
+// ErrUpdateCursor is a page cursor Updates did not make.
+var ErrUpdateCursor = errors.New("update cursor is malformed")
+
+// parseUpdateCursor reads a cursor updateCursor made.
+func parseUpdateCursor(cursor string) (time.Time, string, error) {
+	at, id, ok := strings.Cut(cursor, ".")
+	nanos, err := strconv.ParseInt(at, 10, 64)
+	if !ok || err != nil || id == "" {
+		return time.Time{}, "", fmt.Errorf("%w: %q", ErrUpdateCursor, cursor)
+	}
+	return time.Unix(0, nanos).UTC(), id, nil
 }
 
 // updateID is an update's key: its feed and TMDB ID ("dvmovies-438631").
@@ -138,8 +168,14 @@ func updateID(u Update) (string, error) {
 	return fmt.Sprintf("%s-%d", u.Feed, u.TMDBID), nil
 }
 
-// newestFound orders updates most recently found first.
-func newestFound(a, b Update) int { return b.FoundAt.Compare(a.FoundAt) }
+// newestFound orders updates most recently found first, then by ID
+// descending, so updates found at the same moment keep one order.
+func newestFound(a, b Update) int {
+	if c := b.FoundAt.Compare(a.FoundAt); c != 0 {
+		return c
+	}
+	return strings.Compare(b.ID(), a.ID())
+}
 
 // Watch states a user gives a title.
 const (
