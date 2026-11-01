@@ -28,6 +28,7 @@ type memoryUser struct {
 	updates     map[string]Update
 	filters     ReleaseFilters
 	lists       shelf
+	reviews     map[string]Review
 }
 
 // NewMemory returns an empty in-memory store.
@@ -39,7 +40,7 @@ func NewMemory(opts ...Option) *Memory {
 func (m *Memory) user(uid string) *memoryUser {
 	u, ok := m.users[uid]
 	if !ok {
-		u = &memoryUser{favorites: map[string]Favorite{}, progress: map[string]Progress{}, titles: map[string]TitleState{}, updates: map[string]Update{}, lists: shelf{}}
+		u = &memoryUser{favorites: map[string]Favorite{}, progress: map[string]Progress{}, titles: map[string]TitleState{}, updates: map[string]Update{}, lists: shelf{}, reviews: map[string]Review{}}
 		m.users[uid] = u
 	}
 	return u
@@ -364,4 +365,32 @@ func (m *Memory) RemoveFromList(_ context.Context, uid, id, kind string, tmdbID 
 	defer m.mu.Unlock()
 	_, err := m.user(uid).lists.remove(id, kind, tmdbID, m.opts.now().UTC())
 	return err
+}
+
+// SaveReview implements Store.
+func (m *Memory) SaveReview(_ context.Context, uid string, r Review) error {
+	r, id, empty, err := checkReview(r)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if empty {
+		delete(m.user(uid).reviews, id)
+		return nil
+	}
+	r.UpdatedAt = m.opts.now().UTC()
+	m.user(uid).reviews[id] = r
+	return nil
+}
+
+// Review implements Store.
+func (m *Memory) Review(_ context.Context, uid, kind string, tmdbID int) (Review, error) {
+	id, err := titleID(kind, tmdbID)
+	if err != nil {
+		return Review{}, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.user(uid).reviews[id], nil
 }
