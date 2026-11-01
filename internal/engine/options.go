@@ -15,6 +15,10 @@ type Options struct {
 	// own (--sslport): other devices reach it through the gateway, which
 	// serves the same certificate on 8091.
 	HTTPS bool
+	// OwnPeerPort has the engine listen for peers on a port Moviestracker
+	// picks even when the user set one (PeersListenPort): for starting again
+	// after a peer port it could not use.
+	OwnPeerPort bool
 }
 
 // args turns the options into TorrServer flags.

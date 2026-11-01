@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/config"
+	"github.com/lieranderl/moviestracker-app/internal/engine"
 	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
 	"github.com/lieranderl/moviestracker-app/internal/views"
@@ -300,7 +301,7 @@ func (s *Server) handleSaveEngineSettings(w http.ResponseWriter, r *http.Request
 	// TorrServer reads some settings only when it starts.
 	restart := startup != before
 	for _, f := range sec.Fields {
-		if _, changed := engineChanges[f.Key]; changed && f.AtStart && startup.HTTPS && s.managed() {
+		if _, changed := engineChanges[f.Key]; changed && s.managed() && (f.Relaunch || f.AtStart && startup.HTTPS) {
 			restart = true
 		}
 	}
@@ -347,7 +348,12 @@ func (s *Server) saveStartup(startup config.EngineStartup) error {
 
 // restartWithStartup restarts the managed engine with new startup options.
 func (s *Server) restartWithStartup(ctx context.Context, startup config.EngineStartup) error {
-	s.engine.SetOptions(EngineOptions(startup))
+	return s.restartWithOptions(ctx, EngineOptions(startup))
+}
+
+// restartWithOptions restarts the managed engine with options.
+func (s *Server) restartWithOptions(ctx context.Context, options engine.Options) error {
+	s.engine.SetOptions(options)
 	if err := s.engine.Restart(ctx); err != nil {
 		return err
 	}
@@ -357,20 +363,25 @@ func (s *Server) restartWithStartup(ctx context.Context, startup config.EngineSt
 
 // recoverEngine brings the managed engine back after it did not start with
 // new settings (startErr): it starts without HTTPS, which TorrServer may be
-// unable to serve, puts back the engine settings that were changed and the
-// startup options that were in use, and starts with them again.
+// unable to serve, and on a peer port of Moviestracker's when the peer port
+// changed, which TorrServer may be unable to use; puts back the engine
+// settings that were changed and the startup options that were in use, and
+// starts with them again.
 func (s *Server) recoverEngine(ctx context.Context, before config.EngineStartup, previous map[string]any, startErr error) views.SourceStatus {
 	slog.Warn("engine did not restart with new settings; restoring the previous ones", "error", startErr)
 	safe := before
 	safe.HTTPS = false
-	err := s.restartWithStartup(ctx, safe)
+	_, peerChanged := previous["PeersListenPort"]
+	options := EngineOptions(safe)
+	options.OwnPeerPort = peerChanged
+	err := s.restartWithOptions(ctx, options)
 	if err == nil && len(previous) > 0 {
 		err = s.torrServer.Client().UpdateSettings(ctx, previous)
 	}
 	if err == nil {
 		err = s.saveStartup(before)
 	}
-	if err == nil && before != safe {
+	if err == nil && (before != safe || peerChanged) {
 		err = s.restartWithStartup(ctx, before)
 	}
 	if err != nil {
