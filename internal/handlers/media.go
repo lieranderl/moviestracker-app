@@ -259,6 +259,12 @@ func (c *Catalog) handleTorrentSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	title.query.Qualities, title.query.HDR = qualitiesParam(r), r.URL.Query().Get("hdr") == "1"
+	filtered := len(title.query.Qualities) > 0 || title.query.HDR
+	if len(title.query.Qualities) == 0 {
+		// JacRed's best-seeded page of everything can be crowded with other
+		// titles of the same name; a page per quality is not.
+		title.query.Qualities = []int{2160, 1080, 720, 480}
+	}
 	results, err := c.clients().Torrents.Search(ctx, title.query)
 	if err != nil {
 		slog.Warn("jacred search failed", "title", title.label, "error", err)
@@ -267,7 +273,7 @@ func (c *Catalog) handleTorrentSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	sort := sortParam(r)
 	search := views.SourcesSearch(mediaType, title.id)
-	if err := sse.PatchElementTempl(views.TorrentResults(jacred.Sort(title.withRuntimes(results), sort), sort, search)); err != nil {
+	if err := sse.PatchElementTempl(views.TorrentResults(jacred.Sort(title.withRuntimes(results), sort), sort, search, filtered)); err != nil {
 		logSSEError(r, "patch torrent results", err)
 	}
 }

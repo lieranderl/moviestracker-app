@@ -112,7 +112,7 @@ func allPages() map[string]templ.Component {
 		}),
 		"person": views.PersonPage(testUser, &tmdb.Person{ID: 6193, Name: hostileName, Biography: strings.Repeat("A long biography. ", 60),
 			Credits: []tmdb.Credit{{MediaItem: tmdb.MediaItem{ID: 1, Title: hostileName, MediaType: "tv"}, Role: hostileName}}}),
-		"torrent-results": views.TorrentResults(hostileReleases, "seeders", views.SourcesSearch("movie", 1)),
+		"torrent-results": views.TorrentResults(hostileReleases, "seeders", views.SourcesSearch("movie", 1), false),
 		"discover-rail":   views.DiscoverRailLoaded(views.DiscoverRails[0], media),
 		"search": views.SearchPage(testUser, views.SearchView{Query: hostileName, Results: &tmdb.SearchResults{
 			Movies: media, People: []tmdb.PersonSummary{{ID: 1, Name: hostileName, KnownFor: []string{hostileName}}},

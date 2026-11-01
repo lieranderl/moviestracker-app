@@ -8,6 +8,7 @@ import (
 	"html"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -507,5 +508,41 @@ func TestSourcesOfferQualityAndHDRBeforeSearching(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("sources lack %q", want)
 		}
+	}
+}
+
+func TestASearchItsFiltersEmptySaysSoAndOffersAllQualities(t *testing.T) {
+	server := newMediaServer(t, &fakeTMDBDetails{movies: map[int]*tmdb.MovieDetails{27205: inception}}, &fakeJacRed{}, "")
+	filtered := html.UnescapeString(get(t, server, "/api/torrents?type=movie&id=27205&quality=2160,1080", true).Body.String())
+	if !strings.Contains(filtered, "No releases match your filters.") || !strings.Contains(filtered, "$qual = $qual.map(() => '')") {
+		t.Errorf("a filtered search with no releases does not say the filters hid them, with a way to clear them:\n%s", filtered)
+	}
+	if hdr := html.UnescapeString(get(t, server, "/api/torrents?type=movie&id=27205&hdr=1", true).Body.String()); !strings.Contains(hdr, "No releases match your filters.") {
+		t.Error("an HDR search with no releases blames JacRed, not the filter")
+	}
+	plain := html.UnescapeString(get(t, server, "/api/torrents?type=movie&id=27205", true).Body.String())
+	if !strings.Contains(plain, "No releases found on JacRed for this title.") || strings.Contains(plain, "match your filters") {
+		t.Errorf("an unfiltered search with no releases says:\n%s", plain)
+	}
+}
+
+// JacRed's best-seeded page of everything can be crowded with other titles
+// of the same name, so a search with no quality picked asks for each
+// quality on its own, as several picked ones are.
+func TestASearchWithNoQualityPickedAsksForEveryQuality(t *testing.T) {
+	torrents := &fakeJacRed{}
+	server := newMediaServer(t, &fakeTMDBDetails{movies: map[int]*tmdb.MovieDetails{27205: inception}}, torrents, "")
+	get(t, server, "/api/torrents?type=movie&id=27205", true)
+	get(t, server, "/api/torrents?type=movie&id=27205&quality=720", true)
+	torrents.mu.Lock()
+	defer torrents.mu.Unlock()
+	if len(torrents.queries) != 2 {
+		t.Fatalf("%d searches, want 2", len(torrents.queries))
+	}
+	if got := torrents.queries[0].Qualities; !slices.Equal(got, []int{2160, 1080, 720, 480}) {
+		t.Errorf("no quality picked searched %v, want every quality", got)
+	}
+	if got := torrents.queries[1].Qualities; !slices.Equal(got, []int{720}) {
+		t.Errorf("720p picked searched %v, want 720 only", got)
 	}
 }

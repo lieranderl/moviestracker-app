@@ -733,10 +733,18 @@ var sortOptions = []struct{ Key, Label string }{
 }
 
 // TorrentResults lists releases sorted by sort; search re-runs the query
-// (see SourcesSearch) when a different sort is picked.
-templ TorrentResults(results []jacred.Result, sort, search string) {
+// (see SourcesSearch) when a different sort is picked. filtered says the
+// quality or HDR filters narrowed the search: when it finds nothing, they
+// can be cleared at once, rather than JacRed blamed.
+templ TorrentResults(results []jacred.Result, sort, search string, filtered bool) {
 	<div id="torrent-results" class="space-y-4">
-		if len(results) == 0 {
+		if len(results) == 0 && filtered {
+			<div role="status" class="alert alert-soft">
+				@Icon("funnel-x", "size-5")
+				<span>{ tr(ctx, "No releases match your filters.") }</span>
+				<button type="button" class="btn btn-sm" data-on:click={ "$qual = $qual.map(() => ''); $hdr = false; " + search + "; " + saveReleaseFilters }>{ tr(ctx, "Show all qualities") }</button>
+			</div>
+		} else if len(results) == 0 {
 			<div role="status" class="alert alert-soft">
 				@Icon("search-x", "size-5")
 				<span>{ tr(ctx, "No releases found on JacRed for this title.") }</span>

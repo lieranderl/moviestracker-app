@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"cloud.google.com/go/firestore/apiv1/firestorepb"
@@ -81,11 +82,14 @@ func TestPagesLoadTheirBrowserHelpersBeforeDatastar(t *testing.T) {
 }
 
 func TestSeriesSourcesSearchTheChosenSeasonAndRequireSignIn(t *testing.T) {
+	var mu sync.Mutex // a search asks for each quality at once
 	var season string
 	requests := 0
 	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		season = r.URL.Query().Get("season")
 		requests++
+		mu.Unlock()
 		_, _ = w.Write([]byte(`{"results":[]}`))
 	}))
 	t.Cleanup(fake.Close)
@@ -100,10 +104,14 @@ func TestSeriesSourcesSearchTheChosenSeasonAndRequireSignIn(t *testing.T) {
 	}
 	session := signIn(t, h)
 	res := getWith(t, h, "/api/torrents?type=tv&id=95396&season=2", session)
+	mu.Lock()
+	defer mu.Unlock()
 	if !strings.Contains(res.Body.String(), "Choose a season") || requests != 0 {
 		t.Error("an unknown season reached JacRed rather than being explained")
 	}
+	mu.Unlock()
 	res = getWith(t, h, "/api/torrents?type=tv&id=95396&season=1", session)
+	mu.Lock()
 	if res.Code != http.StatusOK || season != "1" || !strings.Contains(res.Body.String(), "No releases found") {
 		t.Errorf("season search = %d, season %q: %s", res.Code, season, res.Body)
 	}
