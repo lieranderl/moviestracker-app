@@ -214,6 +214,86 @@ func (f *Firestore) RemoveTorrServer(ctx context.Context, uid, id string) error 
 	return nil
 }
 
+// progressRecord is a users/{uid}/progress/{hash}-{file} document.
+// Positions are whole seconds.
+type progressRecord struct {
+	Hash      string    `firestore:"hash"`
+	Index     int       `firestore:"index"`
+	File      string    `firestore:"file,omitempty"`
+	Title     string    `firestore:"title"`
+	Poster    string    `firestore:"poster,omitempty"`
+	Kind      string    `firestore:"kind,omitempty"`
+	TMDBID    int       `firestore:"tmdbId,omitempty"`
+	Position  int64     `firestore:"position"`
+	Duration  int64     `firestore:"duration"`
+	UpdatedAt time.Time `firestore:"updatedAt"`
+}
+
+func (f *Firestore) progress(uid string) *firestore.CollectionRef {
+	return f.userDoc(uid).Collection("progress")
+}
+
+// SaveProgress implements Store.
+func (f *Firestore) SaveProgress(ctx context.Context, uid string, p Progress) error {
+	id, err := progressID(p.Hash, p.Index)
+	if err != nil {
+		return err
+	}
+	rec := progressRecord{
+		Hash: p.Hash, Index: p.Index, File: p.File, Title: p.Title, Poster: p.Poster, Kind: p.Kind, TMDBID: p.TMDBID,
+		Position: int64(p.Position / time.Second), Duration: int64(p.Duration / time.Second), UpdatedAt: f.opts.now().UTC(),
+	}
+	if _, err := f.progress(uid).Doc(id).Set(ctx, rec); err != nil {
+		return fmt.Errorf("save progress: %w", err)
+	}
+	return nil
+}
+
+// Progress implements Store.
+func (f *Firestore) Progress(ctx context.Context, uid, hash string, index int) (Progress, bool, error) {
+	id, err := progressID(hash, index)
+	if err != nil {
+		return Progress{}, false, err
+	}
+	snap, err := f.progress(uid).Doc(id).Get(ctx)
+	if notFound(err) {
+		return Progress{}, false, nil
+	}
+	if err != nil {
+		return Progress{}, false, fmt.Errorf("read progress: %w", err)
+	}
+	p, err := readProgress(snap)
+	return p, err == nil, err
+}
+
+// RecentProgress implements Store.
+func (f *Firestore) RecentProgress(ctx context.Context, uid string, limit int) ([]Progress, error) {
+	docs, err := f.progress(uid).OrderBy("updatedAt", firestore.Desc).Limit(recentWindow).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("read progress: %w", err)
+	}
+	all := make([]Progress, 0, len(docs))
+	for _, doc := range docs {
+		p, err := readProgress(doc)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, p)
+	}
+	return unfinished(all, limit), nil
+}
+
+func readProgress(snap *firestore.DocumentSnapshot) (Progress, error) {
+	var rec progressRecord
+	if err := snap.DataTo(&rec); err != nil {
+		return Progress{}, fmt.Errorf("read progress %s: %w", snap.Ref.ID, err)
+	}
+	return Progress{
+		Hash: rec.Hash, Index: rec.Index, File: rec.File, Title: rec.Title, Poster: rec.Poster, Kind: rec.Kind, TMDBID: rec.TMDBID,
+		Position: time.Duration(rec.Position) * time.Second, Duration: time.Duration(rec.Duration) * time.Second, UpdatedAt: rec.UpdatedAt,
+	}, nil
+}
+
 func notFound(err error) bool {
 	var se interface{ GRPCStatus() *status.Status }
 	return errors.As(err, &se) && se.GRPCStatus().Code() == codes.NotFound

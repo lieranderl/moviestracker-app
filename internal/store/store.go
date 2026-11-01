@@ -1,5 +1,5 @@
 // Package store keeps what the cloud web app remembers for each signed-in
-// user: their preferences and favourites. Firestore holds it in the cloud;
+// user: their preferences, favourites and where they stopped watching. Firestore holds it in the cloud;
 // the in-memory store is for tests and for local runs without Firestore.
 //
 // Firestore layout, in the moviestracker database (the Qwik app's catalog
@@ -8,6 +8,7 @@
 //	users/{uid}                        preferences and profile
 //	users/{uid}/favorites/{kind}-{id}  one favourite title
 //	users/{uid}/torrservers/{id}       one of the user's TorrServers
+//	users/{uid}/progress/{hash}-{file} where they stopped in one file
 package store
 
 import (
@@ -54,6 +55,39 @@ type Store interface {
 	SaveTorrServer(ctx context.Context, uid string, t TorrServer) (TorrServer, error)
 	// RemoveTorrServer forgets one; one not kept is no error.
 	RemoveTorrServer(ctx context.Context, uid, id string) error
+
+	ProgressStore
+}
+
+// ProgressStore keeps where each user stopped watching. The local app keeps
+// it in a file (OpenProgressFile), by account name.
+type ProgressStore interface {
+	// SaveProgress keeps where the user is in one file, stamped now.
+	SaveProgress(ctx context.Context, uid string, p Progress) error
+	// Progress is where the user stopped in a torrent's file, if anywhere.
+	Progress(ctx context.Context, uid, hash string, index int) (Progress, bool, error)
+	// RecentProgress is up to limit files the user has not finished,
+	// most recently watched first, from their last recentWindow files.
+	RecentProgress(ctx context.Context, uid string, limit int) ([]Progress, error)
+}
+
+// recentWindow is how many recently watched files RecentProgress looks
+// through: finished ones are skipped there, so no Firestore index is needed.
+const recentWindow = 200
+
+// Progress is where a user stopped in one file of a torrent. The title,
+// poster and TMDB title (if TorrServer knows it) say what it is.
+type Progress struct {
+	Hash      string // the torrent's info hash
+	Index     int    // the file's TorrServer ID
+	File      string // the file's path in the torrent
+	Title     string
+	Poster    string // TMDB image path or an http(s) URL
+	Kind      string // "movie" or "tv"; empty when unknown
+	TMDBID    int
+	Position  time.Duration
+	Duration  time.Duration
+	UpdatedAt time.Time
 }
 
 // TorrServer is a TorrServer a user streams from. Only its address is kept:
@@ -95,6 +129,37 @@ func favoriteID(kind string, tmdbID int) (string, error) {
 		return "", fmt.Errorf("favourite TMDB ID %d is not positive", tmdbID)
 	}
 	return fmt.Sprintf("%s-%d", kind, tmdbID), nil
+}
+
+// Finished reports whether p is watched to the end: 92% of it, or all but
+// its last three minutes (the credits).
+func (p Progress) Finished() bool {
+	return p.Duration > 0 && (p.Position*100 >= p.Duration*92 || p.Duration-p.Position <= 3*time.Minute)
+}
+
+// progressID is a file's key: its torrent's hash and its ID ("0123…-1").
+func progressID(hash string, index int) (string, error) {
+	if len(hash) != 40 || strings.Trim(strings.ToLower(hash), "0123456789abcdef") != "" {
+		return "", fmt.Errorf("torrent hash %q is not 40 hex digits", hash)
+	}
+	if index <= 0 {
+		return "", fmt.Errorf("file ID %d is not positive", index)
+	}
+	return fmt.Sprintf("%s-%d", strings.ToLower(hash), index), nil
+}
+
+// unfinished is up to limit of ps that are not finished, in order.
+func unfinished(ps []Progress, limit int) []Progress {
+	out := []Progress{}
+	for _, p := range ps {
+		if len(out) == limit {
+			break
+		}
+		if !p.Finished() {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // Option configures a store.

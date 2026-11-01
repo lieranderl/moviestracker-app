@@ -18,7 +18,7 @@ func webNext() string {
 }
 
 func webPlayerSignals() string {
-	return strings.TrimSuffix(torrPageSignals(false, true, ""), "}") + `, _tsPlayerProblem: '', _tsProbeProblem: '', _tsPlayerOrigin: '', _tsPlayingFile: '' }`
+	return strings.TrimSuffix(torrPageSignals(false, true, ""), "}") + `, _tsPlayerProblem: '', _tsProbeProblem: '', _tsPlayerOrigin: '', _tsPlayingFile: '', _progressTorrent: null }`
 }
 
 func playerStart(browser bool) string {
@@ -81,6 +81,7 @@ func webPlayerLoaded() string {
 	return `const d = evt.detail; if (d.nonce !== $playNonce || d.hash !== $activeHash || d.index !== +$activeFileIndex || !$playerOpen) return
 $_tsPlayerProblem = d.problem; $_tsProbeProblem = d.probeProblem
 if (!d.torrent || d.problem) return
+$_progressTorrent = d.torrent
 const audio = d.probe?.Tracks?.filter(t => t.Type === 'audio') || []
 $audioTrack = audio.find(t => t.Language?.toLowerCase() === $audioLang.toLowerCase())?.Index ?? audio[0]?.Index ?? 0
 @post('/api/ts/player', {payload:d})`

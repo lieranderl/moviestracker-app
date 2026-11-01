@@ -97,6 +97,22 @@ type Torrent struct {
 	Timestamp int64 `json:"timestamp,omitempty"`
 }
 
+// TMDB is the TMDB title the torrent was added for ("movie" or "tv" and
+// its ID), as the web app records it in the torrent's data; kind is empty
+// when the torrent has none.
+func (t Torrent) TMDB() (kind string, id int) {
+	var data struct {
+		TMDB struct {
+			ID   int    `json:"id"`
+			Type string `json:"type"`
+		} `json:"tmdb"`
+	}
+	if json.Unmarshal([]byte(t.Data), &data) != nil || data.TMDB.ID <= 0 || (data.TMDB.Type != "movie" && data.TMDB.Type != "tv") {
+		return "", 0
+	}
+	return data.TMDB.Type, data.TMDB.ID
+}
+
 // DisplayName returns Title if available, otherwise Name, otherwise Hash.
 func (t Torrent) DisplayName() string {
 	if t.Title != "" {

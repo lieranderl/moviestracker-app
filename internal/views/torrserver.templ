@@ -21,7 +21,7 @@ func torrPageSignals(gst, canRemove bool, linkOrigin string) string {
 	gst: %t, canRemove: %t, linkOrigin: %s,
 	playerOpen: false, streamUrl: '', streamCleanUrl: '', streamHlsUrl: '', streamTitle: '', activeHash: '', activeFileIndex: 1,
 	streamBase: '', playKind: 'direct', playNonce: 0, audioTrack: -1, mediaInfoOpen: false, subTrack: -1,
-	_seekHint: '', _seekSum: 0, _seekAt: 0, _zone: '',
+	_resume: '', _seekHint: '', _seekSum: 0, _seekAt: 0, _zone: '',
 	_paused: true, _time: 0, _dur: 0, _vol: 1, _muted: false, _fs: false, _idle: false, _waiting: false, _seeking: false, _unplayable: '',
 	_queue: [], _queueHash: '', _listMenu: false,
 	_audioMenu: false, _subMenu: false, audioLang: localStorage.getItem('torrAudioLang') || '',
@@ -733,6 +733,7 @@ templ torrPlayerModalFor(browser bool) {
 			<div class="hidden" data-effect={ torrPlayback }></div>
 			<div class="hidden" data-effect={ torrQueueFetch }></div>
 		}
+		<div class="hidden" data-effect={ progressResumeFetch }></div>
 		<header class="flex items-center justify-between gap-4 pb-3 border-b border-base-content/10">
 			<div class="flex items-center gap-2 min-w-0">
 				@playKindSwitch(browser)
@@ -773,6 +774,7 @@ templ torrPlayerModalFor(browser bool) {
 				data-on:playing="$_waiting = false"
 				data-on:canplay="$_waiting = false"
 				data-on:timeupdate="$_seeking || ($_time = el.currentTime)"
+				data-on:timeupdate__throttle.15s={ progressSave(browser) }
 				data-on:durationchange="$_dur = Number.isFinite(el.duration) ? el.duration : 0"
 				data-on:volumechange="$_vol = el.muted ? 0 : el.volume; $_muted = el.muted || el.volume === 0"
 				data-on:emptied="$_time = 0; $_dur = 0; $_paused = true; $_waiting = false"
@@ -780,6 +782,7 @@ templ torrPlayerModalFor(browser bool) {
 				data-on:torr-unplayable="$_unplayable = evt.detail"
 				data-class:controls-shown={ torrControlsShown }
 			></video>
+			@TorrResume("", 0, 0)
 			<span class="loading loading-spinner loading-lg text-primary absolute inset-0 m-auto pointer-events-none" data-show="$_waiting && !$_unplayable"></span>
 			<!-- The browser refused the stream (player.js names the format it cannot decode). -->
 			<div class="absolute inset-0 z-20 grid place-items-center p-6 bg-black/90" data-show="$_unplayable" role="alert">

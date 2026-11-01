@@ -126,6 +126,7 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("POST /api/ts/add-result", a.handleBrowserAddResult)
 	mux.HandleFunc("POST /api/ts/settings", a.handleBrowserSettings)
 	mux.HandleFunc("POST /api/ts/settings/validate", a.handleValidateBrowserSettings)
+	handlers.NewProgress(a.cfg.Store, a.userID, nil).Register(mux)
 	mux.HandleFunc("POST /api/language", handlers.SetLanguage(a.secure(), a.saveLanguage))
 	app := http.NewCrossOriginProtection().Handler(handlers.Language(webSite(mux, cfg.BaseURL)))
 	return handlers.RecoveryMiddleware(handlers.SecurityHeadersMiddleware(true, handlers.LoggingMiddleware(app)))

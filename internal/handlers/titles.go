@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -141,4 +143,34 @@ func (s *Server) findTitle(ctx context.Context, t torrserver.Torrent) (int, erro
 		}
 	}
 	return 0, nil
+}
+
+// username is the signed-in account's name, by which its progress is kept.
+func (s *Server) username(r *http.Request) (string, bool) {
+	user := s.userFromRequest(r)
+	if user == nil {
+		return "", false
+	}
+	return user.Username, true
+}
+
+// progressTorrent is the torrent hash names in TorrServer's list, carrying
+// the TMDB title it was added for (as the web app's torrents carry it).
+func (s *Server) progressTorrent(ctx context.Context, hash string) (torrserver.Torrent, bool) {
+	torrents, err := s.torrServer.Client().ListTorrents(ctx)
+	if err != nil {
+		slog.Warn("listing torrents for progress failed", "error", err)
+		return torrserver.Torrent{}, false
+	}
+	i := slices.IndexFunc(torrents, func(t torrserver.Torrent) bool { return strings.EqualFold(t.Hash, hash) })
+	if i < 0 {
+		return torrserver.Torrent{}, false
+	}
+	t := torrents[i]
+	if ref, ok := s.store.State().Titles[strings.ToLower(hash)]; ok {
+		if kind, _ := t.TMDB(); kind == "" {
+			t.Data = fmt.Sprintf(`{"tmdb":{"id":%d,"type":%q}}`, ref.ID, ref.Kind)
+		}
+	}
+	return t, true
 }

@@ -26,7 +26,7 @@ func webNext() string {
 }
 
 func webPlayerSignals() string {
-	return strings.TrimSuffix(torrPageSignals(false, true, ""), "}") + `, _tsPlayerProblem: '', _tsProbeProblem: '', _tsPlayerOrigin: '', _tsPlayingFile: '' }`
+	return strings.TrimSuffix(torrPageSignals(false, true, ""), "}") + `, _tsPlayerProblem: '', _tsProbeProblem: '', _tsPlayerOrigin: '', _tsPlayingFile: '', _progressTorrent: null }`
 }
 
 func playerStart(browser bool) string {
@@ -226,6 +226,7 @@ func webPlayerLoaded() string {
 	return `const d = evt.detail; if (d.nonce !== $playNonce || d.hash !== $activeHash || d.index !== +$activeFileIndex || !$playerOpen) return
 $_tsPlayerProblem = d.problem; $_tsProbeProblem = d.probeProblem
 if (!d.torrent || d.problem) return
+$_progressTorrent = d.torrent
 const audio = d.probe?.Tracks?.filter(t => t.Type === 'audio') || []
 $audioTrack = audio.find(t => t.Language?.toLowerCase() === $audioLang.toLowerCase())?.Index ?? audio[0]?.Index ?? 0
 @post('/api/ts/player', {payload:d})`
@@ -271,7 +272,7 @@ func WebPlayerControls(hash string, index, nonce int, files []torrserver.FileSta
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(hash)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 107, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 108, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
@@ -284,7 +285,7 @@ func WebPlayerControls(hash string, index, nonce int, files []torrserver.FileSta
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(index))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 108, Col: 32}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 109, Col: 32}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 		if templ_7745c5c3_Err != nil {
@@ -297,7 +298,7 @@ func WebPlayerControls(hash string, index, nonce int, files []torrserver.FileSta
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(nonce))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 109, Col: 32}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 110, Col: 32}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 		if templ_7745c5c3_Err != nil {
@@ -310,7 +311,7 @@ func WebPlayerControls(hash string, index, nonce int, files []torrserver.FileSta
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(data))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 110, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 111, Col: 27}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 		if templ_7745c5c3_Err != nil {
@@ -323,7 +324,7 @@ func WebPlayerControls(hash string, index, nonce int, files []torrserver.FileSta
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(webRelayCurrent)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 111, Col: 29}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 112, Col: 29}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 		if templ_7745c5c3_Err != nil {
@@ -336,7 +337,7 @@ func WebPlayerControls(hash string, index, nonce int, files []torrserver.FileSta
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue("if (" + webRelayCurrent + ") { $_queue = JSON.parse(el.dataset.queue); $_queueHash = el.dataset.hash }")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 112, Col: 118}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 113, Col: 118}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 		if templ_7745c5c3_Err != nil {
@@ -384,7 +385,7 @@ func WebPlayerSlot(id, hash string, index, nonce int, content templ.Component) t
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.ResolveAttributeValue(id)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 123, Col: 13}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 124, Col: 13}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 		if templ_7745c5c3_Err != nil {
@@ -397,7 +398,7 @@ func WebPlayerSlot(id, hash string, index, nonce int, content templ.Component) t
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(hash)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 123, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 124, Col: 49}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 		if templ_7745c5c3_Err != nil {
@@ -410,7 +411,7 @@ func WebPlayerSlot(id, hash string, index, nonce int, content templ.Component) t
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(index))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 123, Col: 82}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 124, Col: 82}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 		if templ_7745c5c3_Err != nil {
@@ -423,7 +424,7 @@ func WebPlayerSlot(id, hash string, index, nonce int, content templ.Component) t
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(nonce))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 123, Col: 115}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 124, Col: 115}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 		if templ_7745c5c3_Err != nil {
@@ -436,7 +437,7 @@ func WebPlayerSlot(id, hash string, index, nonce int, content templ.Component) t
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.ResolveAttributeValue(webRelayCurrent)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 123, Col: 145}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 124, Col: 145}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 		if templ_7745c5c3_Err != nil {
@@ -489,7 +490,7 @@ func playerSlot(id string, browser bool) templ.Component {
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.ResolveAttributeValue(id)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 132, Col: 14}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_player.templ`, Line: 133, Col: 14}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 			if templ_7745c5c3_Err != nil {
