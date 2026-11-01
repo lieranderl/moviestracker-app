@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -264,10 +263,10 @@ func TestListsMadeAtOnceStillStopAtFifty(t *testing.T) {
 }
 
 func TestAChangeTheListFileCouldNotSaveIsSavedWhenTriedAgain(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("a read-only directory still takes new files on Windows")
+	dir := filepath.Join(t.TempDir(), "data")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
 	}
-	dir := t.TempDir()
 	path := filepath.Join(dir, "lists.json")
 	s, err := store.OpenListFile(path)
 	if err != nil {
@@ -278,15 +277,15 @@ func TestAChangeTheListFileCouldNotSaveIsSavedWhenTriedAgain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(dir, 0o500); err != nil {
+	if err := os.RemoveAll(dir); err != nil { // the data volume is gone for a moment
 		t.Fatal(err)
 	}
 	failed := s.AddToList(ctx, "anna", l.ID, duneTitle)
-	if err := os.Chmod(dir, 0o700); err != nil {
+	if err := os.Mkdir(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	if failed == nil {
-		t.Fatal("adding to a list in a read-only directory succeeded")
+		t.Fatal("adding to a list whose directory is gone succeeded")
 	}
 	if got, _, _ := s.CustomList(ctx, "anna", l.ID); len(got.Titles) != 0 {
 		t.Errorf("after the failed save the list shows %q, want nothing", listTitles(got))
