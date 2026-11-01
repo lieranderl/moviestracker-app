@@ -62,7 +62,7 @@ func titleScripts(ctx context.Context) []string {
 var cloudLinks = []navLink{
 	{Href: "/", Label: "Home", Icon: "house"},
 	{Href: "/search", Label: "Search", Icon: "search"},
-	{Href: "/favorites", Label: "Favourites", Icon: "heart"},
+	{Href: "/favorites", Label: "My lists", Icon: "library"},
 	{Href: "/torrserver", Label: "TorrServer", Icon: "server"},
 }
 

@@ -58,6 +58,7 @@ templ MoviePage(user *auth.User, m *tmdb.MovieDetails) {
 			@detailHero(m.MediaItem, movieFacts(ctx, m), m.Certification, genreNames(m.Genres)) {
 				@trailerButton(m.TrailerKey, trf(ctx, "%s trailer", m.Title))
 				@progressSlot("movie", m.ID)
+				@watchStateSlot("movie", m.ID)
 				if siteOf(ctx).Cloud {
 					@favoriteSlot("movie", m.ID)
 				}

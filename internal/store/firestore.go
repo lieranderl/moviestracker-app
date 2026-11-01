@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -98,7 +99,7 @@ func (f *Firestore) Favorites(ctx context.Context, uid string) ([]Favorite, erro
 
 // IsFavorite implements Store.
 func (f *Firestore) IsFavorite(ctx context.Context, uid, kind string, tmdbID int) (bool, error) {
-	id, err := favoriteID(kind, tmdbID)
+	id, err := titleID(kind, tmdbID)
 	if err != nil {
 		return false, err
 	}
@@ -114,7 +115,7 @@ func (f *Firestore) IsFavorite(ctx context.Context, uid, kind string, tmdbID int
 
 // AddFavorite implements Store.
 func (f *Firestore) AddFavorite(ctx context.Context, uid string, fav Favorite) error {
-	id, err := favoriteID(fav.Kind, fav.TMDBID)
+	id, err := titleID(fav.Kind, fav.TMDBID)
 	if err != nil {
 		return err
 	}
@@ -131,7 +132,7 @@ func (f *Firestore) AddFavorite(ctx context.Context, uid string, fav Favorite) e
 
 // RemoveFavorite implements Store.
 func (f *Firestore) RemoveFavorite(ctx context.Context, uid, kind string, tmdbID int) error {
-	id, err := favoriteID(kind, tmdbID)
+	id, err := titleID(kind, tmdbID)
 	if err != nil {
 		return err
 	}
@@ -292,6 +293,78 @@ func readProgress(snap *firestore.DocumentSnapshot) (Progress, error) {
 		Hash: rec.Hash, Index: rec.Index, File: rec.File, Title: rec.Title, Poster: rec.Poster, Kind: rec.Kind, TMDBID: rec.TMDBID,
 		Position: time.Duration(rec.Position) * time.Second, Duration: time.Duration(rec.Duration) * time.Second, UpdatedAt: rec.UpdatedAt,
 	}, nil
+}
+
+// titleStateRecord is a users/{uid}/titles/{kind}-{id} document.
+type titleStateRecord struct {
+	Kind      string    `firestore:"kind"`
+	TMDBID    int       `firestore:"tmdbId"`
+	Title     string    `firestore:"title"`
+	Poster    string    `firestore:"poster,omitempty"`
+	State     string    `firestore:"state"`
+	UpdatedAt time.Time `firestore:"updatedAt"`
+}
+
+func (f *Firestore) titles(uid string) *firestore.CollectionRef {
+	return f.userDoc(uid).Collection("titles")
+}
+
+// SetTitleState implements Store.
+func (f *Firestore) SetTitleState(ctx context.Context, uid string, ts TitleState) error {
+	id, err := checkTitleState(ts)
+	if err != nil {
+		return err
+	}
+	if ts.State == "" {
+		if _, err := f.titles(uid).Doc(id).Delete(ctx); err != nil {
+			return fmt.Errorf("clear watch state: %w", err)
+		}
+		return nil
+	}
+	ts.UpdatedAt = f.opts.now().UTC()
+	if _, err := f.titles(uid).Doc(id).Set(ctx, titleStateRecord(ts)); err != nil {
+		return fmt.Errorf("save watch state: %w", err)
+	}
+	return nil
+}
+
+// TitleState implements Store.
+func (f *Firestore) TitleState(ctx context.Context, uid, kind string, tmdbID int) (TitleState, error) {
+	id, err := titleID(kind, tmdbID)
+	if err != nil {
+		return TitleState{}, err
+	}
+	snap, err := f.titles(uid).Doc(id).Get(ctx)
+	if notFound(err) {
+		return TitleState{}, nil
+	}
+	if err != nil {
+		return TitleState{}, fmt.Errorf("read watch state: %w", err)
+	}
+	var rec titleStateRecord
+	if err := snap.DataTo(&rec); err != nil {
+		return TitleState{}, fmt.Errorf("read watch state: %w", err)
+	}
+	return TitleState(rec), nil
+}
+
+// TitleStates implements Store. They are sorted here: ordering by updatedAt
+// in a query filtered by state would need a composite index.
+func (f *Firestore) TitleStates(ctx context.Context, uid, state string) ([]TitleState, error) {
+	docs, err := f.titles(uid).Where("state", "==", state).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("read watch states: %w", err)
+	}
+	out := make([]TitleState, 0, len(docs))
+	for _, doc := range docs {
+		var rec titleStateRecord
+		if err := doc.DataTo(&rec); err != nil {
+			return nil, fmt.Errorf("read watch state %s: %w", doc.Ref.ID, err)
+		}
+		out = append(out, TitleState(rec))
+	}
+	slices.SortFunc(out, newestFirst)
+	return out, nil
 }
 
 func notFound(err error) bool {

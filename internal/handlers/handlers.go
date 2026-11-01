@@ -66,6 +66,7 @@ type Server struct {
 	playing         atomic.Int64                      // media responses streaming through the proxy
 	live            *live.Hub                         // shared pollers behind every live view
 	progress        *Progress                         // where each account stopped watching
+	titleStates     *TitleStates                      // what each account wants to watch or watched
 	plays           *playback.Tracker                 // what plays through the proxy
 	sampler         *stats.Sampler                    // this machine, for the dashboard
 	startedAt       time.Time
@@ -140,8 +141,14 @@ func NewServer(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	titles, err := store.OpenTitleFile(filepath.Join(cfg.Store.Dir(), "titles.json"))
+	if err != nil {
+		return nil, err
+	}
+	s.titleStates = NewTitleStates(titles, s.username, s.Catalog)
 	s.progress = NewProgress(progress, s.username, s.progressTorrent)
 	s.ShowProgress(s.progress)
+	s.progress.MarkFinishedMoviesIn(s.titleStates)
 	s.progress.MirrorTo(func() Timecodes { return s.torrServer.Client() })
 	s.routes()
 	// Rejects cross-origin POSTs (Sec-Fetch-Site / Origin), so no other site
@@ -282,6 +289,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/torrserver/recent", s.handleRecentTorrents)
 	s.mux.HandleFunc("GET /api/torrserver/torrent-stats", s.handleTorrentStats)
 	s.progress.Register(s.mux)
+	s.titleStates.Register(s.mux)
 	s.mux.HandleFunc("GET /api/torrserver/stream/", s.handleTorrServerStreamProxy)
 
 	// Signed links for external players (VLC, TVs, playlists): no session.

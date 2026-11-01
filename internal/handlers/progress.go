@@ -38,7 +38,13 @@ type Progress struct {
 	// timecodes is the TorrServer in use, which keeps a timecode per file
 	// for its other players; nil when the browser talks to it (the web app).
 	timecodes func() Timecodes
+	// watched marks movies watched once finished; nil marks nothing.
+	watched *TitleStates
 }
+
+// MarkFinishedMoviesIn marks a movie watched in ts when the player reports
+// it finished. Series are left alone: one episode is not the series.
+func (p *Progress) MarkFinishedMoviesIn(ts *TitleStates) { p.watched = ts }
 
 // Timecodes keeps where files were left in a TorrServer (its /viewed API).
 type Timecodes interface {
@@ -248,6 +254,9 @@ func (p *Progress) handleSave(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("saving progress failed", "error", logError(err))
 		http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
 		return
+	}
+	if p.watched != nil && rec.Finished() && rec.Kind == "movie" {
+		p.watched.markWatched(r, uid, rec.TMDBID, rec.Title)
 	}
 	if p.timecodes != nil {
 		if err := p.timecodes().SetViewed(ctx, data.Hash, data.Index, math.Floor(data.Position)); err != nil {

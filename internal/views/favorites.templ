@@ -46,36 +46,7 @@ templ FavoriteButton(kind string, id int, on bool) {
 }
 
 // FavoritesPage lists the signed-in user's favourites, newest first;
-// failed says they could not be read.
+// failed says they could not be read. It is My lists' first tab.
 templ FavoritesPage(user *auth.User, items []tmdb.MediaItem, failed bool) {
-	@Layout(tr(ctx, "Favourites")) {
-		@Navbar(user)
-		<main class="grow pb-20">
-			<div class="max-w-7xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
-				<header class="space-y-1">
-					<h1 class="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
-						@Icon("heart", "size-6 text-error")
-						{ tr(ctx, "Favourites") }
-					</h1>
-					<p class="text-sm text-base-content/70">{ tr(ctx, "Movies and series you keep, newest first.") }</p>
-				</header>
-				if failed {
-					<div role="alert" class="alert alert-error alert-soft">
-						@Icon("circle-alert", "size-5")
-						<span>{ tr(ctx, "Your favourites could not be loaded right now. Please try again in a moment.") }</span>
-					</div>
-				} else if len(items) == 0 {
-					@emptyState("heart", tr(ctx, "No favourites yet"), tr(ctx, "Open a movie or series and press Add to favourites.")) {
-						@browseTrendingLink()
-					}
-				} else {
-					<ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-						@BrowseItems(items)
-					</ul>
-				}
-			</div>
-			@toTopButton()
-		</main>
-		@siteFooter()
-	}
+	@ListsPage(user, ListFavorites, items, failed)
 }

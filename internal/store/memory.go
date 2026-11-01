@@ -20,6 +20,7 @@ type memoryUser struct {
 	favorites   map[string]Favorite
 	torrServers []TorrServer // in the order added
 	progress    map[string]Progress
+	titles      map[string]TitleState
 }
 
 // NewMemory returns an empty in-memory store.
@@ -31,7 +32,7 @@ func NewMemory(opts ...Option) *Memory {
 func (m *Memory) user(uid string) *memoryUser {
 	u, ok := m.users[uid]
 	if !ok {
-		u = &memoryUser{favorites: map[string]Favorite{}, progress: map[string]Progress{}}
+		u = &memoryUser{favorites: map[string]Favorite{}, progress: map[string]Progress{}, titles: map[string]TitleState{}}
 		m.users[uid] = u
 	}
 	return u
@@ -66,7 +67,7 @@ func (m *Memory) Favorites(_ context.Context, uid string) ([]Favorite, error) {
 
 // IsFavorite implements Store.
 func (m *Memory) IsFavorite(_ context.Context, uid, kind string, tmdbID int) (bool, error) {
-	id, err := favoriteID(kind, tmdbID)
+	id, err := titleID(kind, tmdbID)
 	if err != nil {
 		return false, err
 	}
@@ -78,7 +79,7 @@ func (m *Memory) IsFavorite(_ context.Context, uid, kind string, tmdbID int) (bo
 
 // AddFavorite implements Store.
 func (m *Memory) AddFavorite(_ context.Context, uid string, f Favorite) error {
-	id, err := favoriteID(f.Kind, f.TMDBID)
+	id, err := titleID(f.Kind, f.TMDBID)
 	if err != nil {
 		return err
 	}
@@ -94,7 +95,7 @@ func (m *Memory) AddFavorite(_ context.Context, uid string, f Favorite) error {
 
 // RemoveFavorite implements Store.
 func (m *Memory) RemoveFavorite(_ context.Context, uid, kind string, tmdbID int) error {
-	id, err := favoriteID(kind, tmdbID)
+	id, err := titleID(kind, tmdbID)
 	if err != nil {
 		return err
 	}
@@ -170,4 +171,46 @@ func (m *Memory) RecentProgress(_ context.Context, uid string, limit int) ([]Pro
 	m.mu.Unlock()
 	slices.SortFunc(all, func(a, b Progress) int { return b.UpdatedAt.Compare(a.UpdatedAt) })
 	return unfinished(all[:min(len(all), recentWindow)], limit), nil
+}
+
+// SetTitleState implements Store.
+func (m *Memory) SetTitleState(_ context.Context, uid string, ts TitleState) error {
+	id, err := checkTitleState(ts)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if ts.State == "" {
+		delete(m.user(uid).titles, id)
+		return nil
+	}
+	ts.UpdatedAt = m.opts.now().UTC()
+	m.user(uid).titles[id] = ts
+	return nil
+}
+
+// TitleState implements Store.
+func (m *Memory) TitleState(_ context.Context, uid, kind string, tmdbID int) (TitleState, error) {
+	id, err := titleID(kind, tmdbID)
+	if err != nil {
+		return TitleState{}, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.user(uid).titles[id], nil
+}
+
+// TitleStates implements Store.
+func (m *Memory) TitleStates(_ context.Context, uid, state string) ([]TitleState, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := []TitleState{}
+	for _, ts := range m.user(uid).titles {
+		if ts.State == state {
+			out = append(out, ts)
+		}
+	}
+	slices.SortFunc(out, newestFirst)
+	return out, nil
 }

@@ -9,6 +9,7 @@
 //	users/{uid}/favorites/{kind}-{id}  one favourite title
 //	users/{uid}/torrservers/{id}       one of the user's TorrServers
 //	users/{uid}/progress/{hash}-{file} where they stopped in one file
+//	users/{uid}/titles/{kind}-{id}     a title they want to watch or watched
 package store
 
 import (
@@ -57,7 +58,48 @@ type Store interface {
 	RemoveTorrServer(ctx context.Context, uid, id string) error
 
 	ProgressStore
+	TitleStateStore
 }
+
+// Watch states a user gives a title.
+const (
+	WantToWatch = "want"
+	Watched     = "watched"
+)
+
+// TitleState is a title a user wants to watch or has watched, as TMDB names
+// it. A title has one state: watching it takes it off Want to watch.
+type TitleState struct {
+	Kind      string // "movie" or "tv"
+	TMDBID    int
+	Title     string
+	Poster    string // TMDB image path
+	State     string // WantToWatch or Watched; empty: neither
+	UpdatedAt time.Time
+}
+
+// TitleStateStore keeps each user's watch states. The local app keeps them
+// in a file (OpenTitleFile), by account name.
+type TitleStateStore interface {
+	// SetTitleState gives a title its state, stamped now; an empty state
+	// forgets it.
+	SetTitleState(ctx context.Context, uid string, ts TitleState) error
+	// TitleState is the title's state; an empty State when it has none.
+	TitleState(ctx context.Context, uid, kind string, tmdbID int) (TitleState, error)
+	// TitleStates are the user's titles in state, most recently marked first.
+	TitleStates(ctx context.Context, uid, state string) ([]TitleState, error)
+}
+
+// checkTitleState is why ts cannot be kept, if it cannot; its key otherwise.
+func checkTitleState(ts TitleState) (string, error) {
+	if ts.State != "" && ts.State != WantToWatch && ts.State != Watched {
+		return "", fmt.Errorf("watch state %q is not %q or %q", ts.State, WantToWatch, Watched)
+	}
+	return titleID(ts.Kind, ts.TMDBID)
+}
+
+// newestFirst orders title states most recently marked first.
+func newestFirst(a, b TitleState) int { return b.UpdatedAt.Compare(a.UpdatedAt) }
 
 // ProgressStore keeps where each user stopped watching. The local app keeps
 // it in a file (OpenProgressFile), by account name.
@@ -120,13 +162,13 @@ func checkTorrServer(t TorrServer) (TorrServer, error) {
 // newID is a new random document ID.
 func newID() string { return strings.ToLower(rand.Text()[:16]) }
 
-// favoriteID is a favourite's key: its kind and TMDB ID ("movie-438631").
-func favoriteID(kind string, tmdbID int) (string, error) {
+// titleID is a title's key: its kind and TMDB ID ("movie-438631").
+func titleID(kind string, tmdbID int) (string, error) {
 	if kind != "movie" && kind != "tv" {
-		return "", fmt.Errorf("favourite kind %q is not movie or tv", kind)
+		return "", fmt.Errorf("title kind %q is not movie or tv", kind)
 	}
 	if tmdbID <= 0 {
-		return "", fmt.Errorf("favourite TMDB ID %d is not positive", tmdbID)
+		return "", fmt.Errorf("title TMDB ID %d is not positive", tmdbID)
 	}
 	return fmt.Sprintf("%s-%d", kind, tmdbID), nil
 }

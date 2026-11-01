@@ -1,6 +1,7 @@
 package views
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -80,6 +81,9 @@ func tableTexts() []string {
 	}
 	for _, o := range sortOptions {
 		out = append(out, o.Label)
+	}
+	for _, tab := range listTabs(WithSite(context.Background(), Site{Cloud: true})) {
+		out = append(out, tab.Label, tab.Empty, tab.EmptyHelp, tab.Failed)
 	}
 	for _, b := range torrServerReasons {
 		out = append(out, b.Title, b.Body)

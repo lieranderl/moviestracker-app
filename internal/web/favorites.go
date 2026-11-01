@@ -128,22 +128,5 @@ func (a *app) handleFavoritesPage(w http.ResponseWriter, r *http.Request) {
 
 // title is the movie or series TMDB knows by id.
 func (a *app) title(ctx context.Context, kind string, id int) (tmdb.MediaItem, error) {
-	details := a.cfg.Sources.Details
-	if details == nil {
-		return tmdb.MediaItem{}, errors.New("tmdb is not configured")
-	}
-	ctx, cancel := context.WithTimeout(ctx, catalogTimeout)
-	defer cancel()
-	if kind == "tv" {
-		tv, err := details.TV(ctx, id)
-		if err != nil {
-			return tmdb.MediaItem{}, err
-		}
-		return tv.MediaItem, nil
-	}
-	movie, err := details.Movie(ctx, id)
-	if err != nil {
-		return tmdb.MediaItem{}, err
-	}
-	return movie.MediaItem, nil
+	return a.catalog.Title(ctx, kind, id)
 }
