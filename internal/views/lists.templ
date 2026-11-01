@@ -76,15 +76,7 @@ templ listsLayout(user *auth.User, active string) {
 						@Icon("library", "size-6 text-primary")
 						{ tr(ctx, "My lists") }
 					</h1>
-					<nav role="tablist" class="tabs tabs-box w-fit max-w-full flex-nowrap overflow-x-auto" aria-label={ tr(ctx, "My lists") }>
-						for _, tab := range listTabs(ctx) {
-							<a href={ templ.SafeURL(tab.Href) } role="tab" aria-selected={ boolAttr(tab.ID == active) } class={ "tab gap-2 shrink-0", templ.KV("tab-active", tab.ID == active) }>
-								@Icon(tab.Icon, "size-4")
-								{ tr(ctx, tab.Label) }
-							</a>
-						}
-						@customListTabsSlot(active)
-					</nav>
+					@ListTabs(active, nil, true)
 				</header>
 				{ children... }
 			</div>

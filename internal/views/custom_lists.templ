@@ -39,12 +39,12 @@ func ListItemID(kind string, id int) string { return fmt.Sprintf("list-item-%s-%
 // ticked when the title is in it, asked for when the page loads, and a
 // form that makes a list with the title in it.
 templ listPickerSlot(kind string, id int) {
-	<details class="dropdown dropdown-end" data-on:click__outside="el.open = false">
+	<details class="dropdown dropdown-top dropdown-end" data-on:click__outside="el.open = false">
 		<summary class="btn sm:btn-lg btn-ghost text-neutral-content border-neutral-content/30 hover:bg-neutral-content/10 gap-2">
 			@Icon("list-plus", "size-5")
 			{ tr(ctx, "Add to list") }
 		</summary>
-		<div class="dropdown-content z-30 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-box bg-base-200 text-base-content border border-base-content/10 shadow-2xl p-2 space-y-2">
+		<div class="dropdown-content z-30 mb-2 w-72 max-w-[calc(100vw-2rem)] rounded-box bg-base-200 text-base-content border border-base-content/10 shadow-2xl p-2 space-y-2">
 			<ul id="list-picker" class="menu menu-sm w-full p-0" data-init={ fmt.Sprintf("@get('/api/lists/title?type=%s&id=%d')", kind, id) }>
 				<li class="menu-disabled"><span class="loading loading-spinner loading-xs" aria-label={ tr(ctx, "Loading") }></span></li>
 			</ul>
@@ -84,16 +84,26 @@ templ ListPicker(kind string, id int, lists []PickerList) {
 	</ul>
 }
 
-// customListTabsSlot is where My lists' tabs for the user's own lists go;
-// it asks for them when the page loads, with active's open.
-templ customListTabsSlot(active string) {
-	<span id="custom-list-tabs" class="contents" data-init={ fmt.Sprintf("@get('/api/lists/tabs?active=%s')", active) }></span>
-}
-
-// CustomListTabs are My lists' tabs for the user's own lists, then one
-// that makes a new list.
-templ CustomListTabs(active string, lists []ListLink) {
-	<span id="custom-list-tabs" class="contents">
+// ListTabs is My lists' tab bar with active open: the fixed tabs, the
+// user's own lists, and one that makes a list. With load it asks for the
+// user's lists, which come as the whole bar: DaisyUI styles a tab only as a
+// direct child of .tabs.
+templ ListTabs(active string, lists []ListLink, load bool) {
+	<nav
+		id="list-tabs"
+		role="tablist"
+		class="tabs tabs-box w-fit max-w-full flex-nowrap overflow-x-auto"
+		aria-label={ tr(ctx, "My lists") }
+		if load {
+			data-init={ fmt.Sprintf("@get('/api/lists/tabs?active=%s')", active) }
+		}
+	>
+		for _, tab := range listTabs(ctx) {
+			<a href={ templ.SafeURL(tab.Href) } role="tab" aria-selected={ boolAttr(tab.ID == active) } class={ "tab gap-2 shrink-0", templ.KV("tab-active", tab.ID == active) }>
+				@Icon(tab.Icon, "size-4")
+				{ tr(ctx, tab.Label) }
+			</a>
+		}
 		for _, l := range lists {
 			<a href={ templ.SafeURL(customListHref(l.ID)) } role="tab" aria-selected={ boolAttr(l.ID == active) } class={ "tab gap-2 shrink-0", templ.KV("tab-active", l.ID == active) }>
 				@Icon("list", "size-4")
@@ -104,7 +114,7 @@ templ CustomListTabs(active string, lists []ListLink) {
 			@Icon("plus", "size-4")
 			{ tr(ctx, "New list") }
 		</button>
-	</span>
+	</nav>
 }
 
 // newListDialog names a new list and makes it; the server opens it.
@@ -138,46 +148,52 @@ templ NewListError(msg string) {
 // CustomListPage is My lists with the user's own list v open.
 templ CustomListPage(user *auth.User, v CustomListView) {
 	@listsLayout(user, v.ID) {
-		<section class="space-y-4" aria-labelledby="custom-list-name">
-			<header class="flex flex-wrap items-center justify-between gap-3">
-				<h2 id="custom-list-name" class="text-xl font-bold flex items-center gap-2 min-w-0">
-					@Icon("list", "size-5 text-primary")
-					<span class="truncate">{ v.Name }</span>
-					<span class="badge badge-neutral badge-sm">{ fmt.Sprint(len(v.Items)) }</span>
-				</h2>
-				<div class="flex flex-wrap items-center gap-2">
-					if v.Sharing {
-						@ListShare(v.ID, v.ShareID)
-					}
-					<button type="button" class="btn btn-sm btn-ghost text-error gap-2" data-on:click={ "confirm(" + trJS(ctx, "Delete this list? Its titles stay in your other lists.") + ") && @delete('/api/lists/" + v.ID + "')" }>
-						@Icon("trash-2", "size-4")
-						{ tr(ctx, "Delete list") }
-					</button>
-				</div>
-			</header>
-			if len(v.Items) == 0 {
-				@emptyState("list", tr(ctx, "This list is empty"), tr(ctx, "Open a movie or series and add it with Add to list.")) {
-					@browseTrendingLink()
-				}
-			} else {
-				<ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-					for _, item := range v.Items {
-						<li id={ ListItemID(item.MediaType, item.ID) } class="relative">
-							@mediaCard(item, "w-full")
-							<button
-								type="button"
-								class="btn btn-circle btn-sm absolute top-2 right-2 z-10"
-								aria-label={ trf(ctx, "Take %s out of the list", item.Title) }
-								data-on:click={ fmt.Sprintf("@delete('%s&from=list')", listTitleURL(v.ID, item.MediaType, item.ID)) }
-							>
-								@Icon("x", "size-4")
-							</button>
-						</li>
-					}
-				</ul>
-			}
-		</section>
+		@CustomListSection(v)
 	}
+}
+
+// CustomListSection is the user's list v: its name and count, its controls
+// and its titles, each with a way to take it out.
+templ CustomListSection(v CustomListView) {
+	<section id="custom-list" class="space-y-4" aria-labelledby="custom-list-name">
+		<header class="flex flex-wrap items-center justify-between gap-3">
+			<h2 id="custom-list-name" class="text-xl font-bold flex items-center gap-2 min-w-0">
+				@Icon("list", "size-5 text-primary")
+				<span class="truncate">{ v.Name }</span>
+				<span class="badge badge-neutral badge-sm">{ fmt.Sprint(len(v.Items)) }</span>
+			</h2>
+			<div class="flex flex-wrap items-center gap-2">
+				if v.Sharing {
+					@ListShare(v.ID, v.ShareID)
+				}
+				<button type="button" class="btn btn-sm btn-ghost text-error gap-2" data-on:click={ "confirm(" + trJS(ctx, "Delete this list? Its titles stay in your other lists.") + ") && @delete('/api/lists/" + v.ID + "')" }>
+					@Icon("trash-2", "size-4")
+					{ tr(ctx, "Delete list") }
+				</button>
+			</div>
+		</header>
+		if len(v.Items) == 0 {
+			@emptyState("list", tr(ctx, "This list is empty"), tr(ctx, "Open a movie or series and add it with Add to list.")) {
+				@browseTrendingLink()
+			}
+		} else {
+			<ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+				for _, item := range v.Items {
+					<li id={ ListItemID(item.MediaType, item.ID) } class="relative">
+						@mediaCard(item, "w-full")
+						<button
+							type="button"
+							class="btn btn-circle btn-sm absolute top-2 right-2 z-10"
+							aria-label={ trf(ctx, "Take %s out of the list", item.Title) }
+							data-on:click={ fmt.Sprintf("@delete('%s&from=list')", listTitleURL(v.ID, item.MediaType, item.ID)) }
+						>
+							@Icon("x", "size-4")
+						</button>
+					</li>
+				}
+			</ul>
+		}
+	</section>
 }
 
 // ListShare turns the link to list on or, with the link to copy, off.

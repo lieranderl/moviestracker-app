@@ -115,10 +115,14 @@ func (cl *CustomLists) handlePage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	v := views.CustomListView{ID: l.ID, Name: l.Name, Items: listItems(l), Sharing: cl.sharing != nil, ShareID: l.ShareID}
-	if err := views.CustomListPage(cl.catalog.userFromRequest(r), v).Render(r.Context(), w); err != nil {
+	if err := views.CustomListPage(cl.catalog.userFromRequest(r), cl.view(l)).Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "custom list", "error", err)
 	}
+}
+
+// view is l as its page shows it.
+func (cl *CustomLists) view(l store.CustomList) views.CustomListView {
+	return views.CustomListView{ID: l.ID, Name: l.Name, Items: listItems(l), Sharing: cl.sharing != nil, ShareID: l.ShareID}
 }
 
 // listItems are l's titles as cards show them.
@@ -149,7 +153,7 @@ func (cl *CustomLists) handleTabs(w http.ResponseWriter, r *http.Request) {
 		links = append(links, views.ListLink{ID: l.ID, Name: l.Name})
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.CustomListTabs(r.URL.Query().Get("active"), links)); err != nil {
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.ListTabs(r.URL.Query().Get("active"), links, false)); err != nil {
 		slog.Warn("patching list tabs failed", "error", err)
 	}
 }
@@ -309,13 +313,27 @@ func (cl *CustomLists) handleTakeOut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.Query().Get("from") == "list" {
-		w.Header().Set("Cache-Control", "no-store")
-		if err := datastar.NewSSE(w, r).RemoveElementByID(views.ListItemID(kind, id)); err != nil {
-			slog.Warn("removing a list card failed", "error", err)
-		}
+		cl.patchSection(w, r, uid, r.PathValue("id"))
 		return
 	}
 	cl.patchPicker(w, r, uid, kind, id, nil)
+}
+
+// patchSection patches a list's page with the list as it is now: its count
+// and, once empty, that it is.
+func (cl *CustomLists) patchSection(w http.ResponseWriter, r *http.Request, uid, id string) {
+	ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
+	defer cancel()
+	l, ok, err := cl.store.CustomList(ctx, uid, id)
+	if err != nil || !ok {
+		slog.Warn("reading a list failed", "error", logError(err))
+		Navigate(w, r, "/lists/c/"+id)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.CustomListSection(cl.view(l))); err != nil {
+		slog.Warn("patching a list failed", "error", err)
+	}
 }
 
 // patchListError says in the page why a list could not be made or filled.
