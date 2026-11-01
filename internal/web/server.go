@@ -142,6 +142,7 @@ func New(cfg Config) http.Handler {
 	filters.Register(mux)
 	a.catalog.RememberReleaseFilters(filters)
 	titleStates := handlers.NewTitleStates(a.cfg.Store, a.userID, a.catalog)
+	handlers.NewRecommendations(a.cfg.Store, a.userID, a.cfg.Store.Favorites, a.catalog).Register(mux)
 	titleStates.Register(mux)
 	a.progress.MarkFinishedMoviesIn(titleStates)
 	mux.HandleFunc("POST /api/language", handlers.SetLanguage(a.secure(), a.saveLanguage))

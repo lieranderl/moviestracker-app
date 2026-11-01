@@ -1,0 +1,42 @@
+package views
+
+import (
+	"fmt"
+
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+)
+
+// RecommendationRow is a home row of titles like one the user watched or
+// saved.
+type RecommendationRow struct {
+	Title string
+	Items []tmdb.MediaItem
+}
+
+// recommendationsSlot is where the home page's recommendation rows go; it
+// asks for them once the page has loaded.
+templ recommendationsSlot() {
+	<div id="recommendations" class="contents" data-init="@get('/api/recommendations')"></div>
+}
+
+// RecommendationRows are the home page's recommendation rows; with none
+// the slot stays empty.
+templ RecommendationRows(rows []RecommendationRow) {
+	<div id="recommendations" class="space-y-10">
+		for i, row := range rows {
+			<section class="relative space-y-4" aria-labelledby={ fmt.Sprintf("recommended-%d-title", i) }>
+				<h2 id={ fmt.Sprintf("recommended-%d-title", i) } class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
+					@Icon("sparkles", "size-5 text-accent")
+					{ row.Title }
+				</h2>
+				@carousel() {
+					for _, item := range row.Items {
+						<li class="carousel-item">
+							@MediaCard(item)
+						</li>
+					}
+				}
+			</section>
+		}
+	</div>
+}
