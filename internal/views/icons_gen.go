@@ -33,6 +33,8 @@ func iconPath(name string) string {
 		return "<rect width=\"18\" height=\"14\" x=\"3\" y=\"5\" rx=\"2\" ry=\"2\"/><path d=\"M7 15h4M15 15h2M7 11h2M13 11h4\"/>"
 	case "cast":
 		return "<path d=\"M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6\"/><path d=\"M2 12a9 9 0 0 1 8 8\"/><path d=\"M2 16a5 5 0 0 1 4 4\"/><line x1=\"2\" x2=\"2.01\" y1=\"20\" y2=\"20\"/>"
+	case "check":
+		return "<path d=\"M20 6 9 17l-5-5\"/>"
 	case "chevron-down":
 		return "<path d=\"m6 9 6 6 6-6\"/>"
 	case "chevron-left":
@@ -177,6 +179,8 @@ func iconPath(name string) string {
 		return "<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5\"/>"
 	case "rotate-cw":
 		return "<path d=\"M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8\"/><path d=\"M21 3v5h-5\"/>"
+	case "save":
+		return "<path d=\"M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z\"/><path d=\"M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7\"/><path d=\"M7 3v4a1 1 0 0 0 1 1h7\"/>"
 	case "scale":
 		return "<path d=\"M12 3v18\"/><path d=\"m19 8 3 8a5 5 0 0 1-6 0zV7\"/><path d=\"M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1\"/><path d=\"m5 8 3 8a5 5 0 0 1-6 0zV7\"/><path d=\"M7 21h10\"/>"
 	case "search":

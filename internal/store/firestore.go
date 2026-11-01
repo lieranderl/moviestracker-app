@@ -738,3 +738,57 @@ func (f *Firestore) RemoveFromList(ctx context.Context, uid, id, kind string, tm
 		return l, changed, nil
 	})
 }
+
+// reviewRecord is a users/{uid}/reviews/{kind}-{id} document.
+type reviewRecord struct {
+	Kind      string    `firestore:"kind"`
+	TMDBID    int       `firestore:"tmdbId"`
+	Title     string    `firestore:"title"`
+	Poster    string    `firestore:"poster,omitempty"`
+	Rating    int       `firestore:"rating,omitempty"`
+	Note      string    `firestore:"note,omitempty"`
+	UpdatedAt time.Time `firestore:"updatedAt"`
+}
+
+func (f *Firestore) reviews(uid string) *firestore.CollectionRef {
+	return f.userDoc(uid).Collection("reviews")
+}
+
+// SaveReview implements Store.
+func (f *Firestore) SaveReview(ctx context.Context, uid string, r Review) error {
+	r, id, empty, err := checkReview(r)
+	if err != nil {
+		return err
+	}
+	if empty {
+		if _, err := f.reviews(uid).Doc(id).Delete(ctx); err != nil {
+			return fmt.Errorf("clear review: %w", err)
+		}
+		return nil
+	}
+	r.UpdatedAt = f.opts.now().UTC()
+	if _, err := f.reviews(uid).Doc(id).Set(ctx, reviewRecord(r)); err != nil {
+		return fmt.Errorf("save review: %w", err)
+	}
+	return nil
+}
+
+// Review implements Store.
+func (f *Firestore) Review(ctx context.Context, uid, kind string, tmdbID int) (Review, error) {
+	id, err := titleID(kind, tmdbID)
+	if err != nil {
+		return Review{}, err
+	}
+	snap, err := f.reviews(uid).Doc(id).Get(ctx)
+	if notFound(err) {
+		return Review{}, nil
+	}
+	if err != nil {
+		return Review{}, fmt.Errorf("read review: %w", err)
+	}
+	var rec reviewRecord
+	if err := snap.DataTo(&rec); err != nil {
+		return Review{}, fmt.Errorf("read review: %w", err)
+	}
+	return Review(rec), nil
+}

@@ -13,6 +13,7 @@
 //	users/{uid}/updates/{feed}-{id}    a release they were told about
 //	users/{uid}/lists/{id}             a list the user made, with its titles
 //	sharedLists/{shareId}              whose list a public link opens
+//	users/{uid}/reviews/{kind}-{id}    a user's rating of a title and note on it
 package store
 
 import (
@@ -67,6 +68,7 @@ type Store interface {
 	ReleaseFilterStore
 	CustomListStore
 	ListSharing
+	ReviewStore
 }
 
 // ReleaseFilters are how a user last searched a title's releases.

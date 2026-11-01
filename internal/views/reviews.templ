@@ -1,0 +1,80 @@
+package views
+
+import "fmt"
+
+func reviewURL(kind string, id int) string {
+	return fmt.Sprintf("/api/titles/review?type=%s&id=%d", kind, id)
+}
+
+// reviewPost saves $reviewRating and $reviewNote for a title.
+func reviewPost(kind string, id int) string {
+	return fmt.Sprintf("@post('%s', {filterSignals: {include: /^review(Rating|Note)$/}})", reviewURL(kind, id))
+}
+
+// reviewSlot is a title page's section for the user's rating and note: it
+// asks for them when the page loads, and the note can be edited only once
+// they arrive ($_reviewReady), so a save cannot overwrite them.
+templ reviewSlot(kind string, id int) {
+	<section class="max-w-7xl mx-auto px-4 sm:px-8 pt-10" aria-labelledby="title-review-heading" data-signals="{ reviewRating: 0, reviewNote: '', _reviewReady: false }">
+		<div class="card bg-base-200/60 border border-base-content/10">
+			<div class="card-body gap-4">
+				<h2 id="title-review-heading" class="card-title text-lg gap-2">
+					@Icon("star", "size-5 text-warning")
+					{ tr(ctx, "Your rating and note") }
+				</h2>
+				<div id="title-review" data-init={ fmt.Sprintf("@get('%s')", reviewURL(kind, id)) }>
+					<span class="loading loading-dots loading-sm text-base-content/50" aria-label={ tr(ctx, "Loading") }></span>
+				</div>
+				<fieldset class="fieldset">
+					<legend class="fieldset-legend">{ tr(ctx, "Note, just for you") }</legend>
+					<textarea class="textarea w-full h-24" maxlength="2000" placeholder={ tr(ctx, "What did you think? Who recommended it?") } data-bind:review-note data-attr:disabled="!$_reviewReady"></textarea>
+				</fieldset>
+				<div class="card-actions items-center">
+					<button type="button" class="btn btn-sm btn-primary gap-2" data-attr:disabled="!$_reviewReady" data-on:click={ reviewPost(kind, id) }>
+						@Icon("save", "size-4")
+						{ tr(ctx, "Save note") }
+					</button>
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+// TitleReview is the user's rating of a title, out of 10: picking a star
+// saves it, and marks the title watched. saved says it was just saved.
+templ TitleReview(kind string, id int, rating int, saved bool) {
+	<div id="title-review" class="flex flex-wrap items-center gap-3">
+		<div class="rating rating-sm sm:rating-md" role="radiogroup" aria-label={ tr(ctx, "Your rating") }>
+			for n := 1; n <= 10; n++ {
+				<input
+					type="radio"
+					name="title-rating"
+					class="mask mask-star-2 bg-warning"
+					aria-label={ trf(ctx, "%d of 10", n) }
+					checked?={ n == rating }
+					data-on:change={ fmt.Sprintf("$reviewRating = %d; %s", n, reviewPost(kind, id)) }
+				/>
+			}
+		</div>
+		if rating > 0 {
+			<span class="badge badge-warning badge-soft font-semibold">{ fmt.Sprintf("%d/10", rating) }</span>
+			<button type="button" class="btn btn-xs btn-ghost" data-on:click={ "$reviewRating = 0; " + reviewPost(kind, id) }>{ tr(ctx, "Clear rating") }</button>
+		}
+		if saved {
+			<span role="status" class="text-sm text-success flex items-center gap-1">
+				@Icon("check", "size-4")
+				{ tr(ctx, "Saved") }
+			</span>
+		}
+	</div>
+}
+
+// TitleReviewFailed says the user's rating and note could not be loaded,
+// with a way to ask again; until they load nothing can be changed.
+templ TitleReviewFailed(kind string, id int) {
+	<div id="title-review" role="alert" class="alert alert-warning alert-soft">
+		@Icon("triangle-alert", "size-5")
+		<span>{ tr(ctx, "Your rating and note could not be loaded right now.") }</span>
+		<button type="button" class="btn btn-sm" data-on:click={ fmt.Sprintf("@get('%s')", reviewURL(kind, id)) }>{ tr(ctx, "Try again") }</button>
+	</div>
+}
