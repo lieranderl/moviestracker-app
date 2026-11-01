@@ -431,3 +431,39 @@ func TestReleasesFoundBeforeARefusalAreKept(t *testing.T) {
 		t.Errorf("searching again kept %q, want both releases", titles(results))
 	}
 }
+
+// A quality whose search was cut short by a refusal leaves the merged
+// answer incomplete: it is not cached, so searching again, once JacRed
+// answers, finds what the refusal hid.
+func TestSeveralQualitiesCutShortByARefusalAreSearchedAgain(t *testing.T) {
+	var mu sync.Mutex
+	refuse := true
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		release := func(title, hash string) {
+			_, _ = fmt.Fprintf(w, `{"results":[{"title":%q,"tracker":"rutor","seeders":10,"year":2024,"quality":%s,"magnet":"magnet:?xt=urn:btih:%s%s","source_url":"https://rutor.info/%s"}]}`,
+				title, q.Get("quality"), hash, q.Get("quality"), hash)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		switch {
+		case q.Get("query") == "The Bear":
+			release("The Bear (2024) WEBRip", "aa")
+		case refuse:
+			w.WriteHeader(http.StatusTooManyRequests)
+		default:
+			release("The Bear [3] (2024) LostFilm", "bb")
+		}
+	}, WithSearchAPI())
+	q := Query{IMDbID: "tt14452776", EnglishTitle: "The Bear", Year: 2022, Season: 3, SeasonYear: 2024, Qualities: []int{1080, 2160}}
+	results, err := client.Search(context.Background(), q)
+	if err != nil || len(results) != 2 {
+		t.Fatalf("kept %q (err %v), want each quality's release by name", titles(results), err)
+	}
+	mu.Lock()
+	refuse = false
+	mu.Unlock()
+	if results, _ = client.Search(context.Background(), q); len(results) != 4 {
+		t.Errorf("searching again kept %q, want the IMDb releases too", titles(results))
+	}
+}

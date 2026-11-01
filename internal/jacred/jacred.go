@@ -390,49 +390,53 @@ func (a apiResult) raw() rawResult {
 // Search returns playable releases, most seeded first. Results are cached
 // briefly and must be treated as read-only.
 func (c *Client) Search(ctx context.Context, q Query) ([]Result, error) {
+	results, _, err := c.searchCached(ctx, q)
+	return results, err
+}
+
+// searchCached is Search, and whether its answer is complete: one cut
+// short by a refusal keeps what was found before it, uncached.
+func (c *Client) searchCached(ctx context.Context, q Query) (results []Result, complete bool, err error) {
 	names := q.names()
 	if len(names) == 0 && q.imdb() == "" {
-		return nil, nil
+		return nil, true, nil
 	}
 	key := strings.ToLower(fmt.Sprintf("%q\x00%s\x00%s\x00%d\x00%d\x00%d\x00%v\x00%t", names, q.imdb(), q.primary(), q.Year, q.Season, q.SeasonYear, q.Qualities, q.HDR))
 	if results, ok := c.cached(key); ok {
-		return results, nil
+		return results, true, nil
 	}
 
-	var results []Result
-	if c.searchAPI && !c.jackettAPI && len(q.Qualities) > 1 {
-		var complete bool
-		var err error
+	switch {
+	case c.searchAPI && !c.jackettAPI && len(q.Qualities) > 1:
 		if results, complete, err = c.searchEachQuality(ctx, q); err != nil || !complete {
-			return results, err
+			return results, false, err
 		}
-	} else if c.searchAPI && !c.jackettAPI {
-		var complete bool
-		var err error
+	case c.searchAPI && !c.jackettAPI:
 		if results, complete, err = c.searchByNames(ctx, q); err != nil || !complete {
-			return results, err
+			return results, false, err
 		}
-	} else {
+	default:
 		raw, err := c.search(ctx, q.primary(), q)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		results = normalize(raw, q)
 	}
 	c.store(key, results)
-	return results, nil
+	return results, true, nil
 }
 
 // searchEachQuality searches each of q's qualities on its own, at once,
 // and merges what they find: the API filters one quality, and one search
 // for several would get its best-seeded page of everything, where releases
-// of the qualities picked can be crowded out. A search that fails leaves
-// the others' releases, which are then not complete; when all fail, the
-// first failure is the error.
+// of the qualities picked can be crowded out. A search that fails or is cut
+// short leaves the others' releases, which are then not complete; when all
+// fail, the first failure is the error.
 func (c *Client) searchEachQuality(ctx context.Context, q Query) (results []Result, complete bool, err error) {
 	type found struct {
-		results []Result
-		err     error
+		results  []Result
+		complete bool
+		err      error
 	}
 	each := make([]found, len(q.Qualities))
 	var wg sync.WaitGroup
@@ -440,8 +444,8 @@ func (c *Client) searchEachQuality(ctx context.Context, q Query) (results []Resu
 		one := q
 		one.Qualities = []int{quality}
 		wg.Go(func() {
-			r, err := c.Search(ctx, one)
-			each[i] = found{r, err}
+			r, complete, err := c.searchCached(ctx, one)
+			each[i] = found{r, complete, err}
 		})
 	}
 	wg.Wait()
@@ -452,6 +456,7 @@ func (c *Client) searchEachQuality(ctx context.Context, q Query) (results []Resu
 			complete, err = false, cmp.Or(err, f.err)
 			continue
 		}
+		complete = complete && f.complete
 		all = append(all, f.results...)
 	}
 	results = merged(all)
