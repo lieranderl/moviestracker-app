@@ -163,18 +163,30 @@ templ NextUnwatched(t *tmdb.TVDetails, m EpisodeMarks) {
 // user marks its aired episodes watched one by one or all at once.
 templ SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) {
 	<div id="season-episodes" class="space-y-4">
-		if m.Track && slices.ContainsFunc(s.Episodes, EpisodeAired) {
-			<div class="flex flex-wrap gap-2" role="group" aria-label={ tr(ctx, "Mark the season") }>
-				<button type="button" class="btn btn-sm btn-ghost gap-1.5" data-on:click={ fmt.Sprintf("@post('%s')", SeasonMarkURL(s.ShowID, s.Number, true)) }>
-					@Icon("check-check", "size-4")
-					{ tr(ctx, "Mark season watched") }
-				</button>
-				<button type="button" class="btn btn-sm btn-ghost gap-1.5" data-on:click={ fmt.Sprintf("@post('%s')", SeasonMarkURL(s.ShowID, s.Number, false)) }>
-					@Icon("rotate-ccw", "size-4")
-					{ tr(ctx, "Mark season unwatched") }
-				</button>
-			</div>
-		}
+		<div class="flex flex-wrap items-center gap-2">
+			if m.Track && slices.ContainsFunc(s.Episodes, EpisodeAired) {
+				<div class="flex flex-wrap gap-2" role="group" aria-label={ tr(ctx, "Mark the season") }>
+					<button type="button" class="btn btn-sm btn-ghost gap-1.5" data-on:click={ fmt.Sprintf("@post('%s')", SeasonMarkURL(s.ShowID, s.Number, true)) }>
+						@Icon("check-check", "size-4")
+						{ tr(ctx, "Mark season watched") }
+					</button>
+					<button type="button" class="btn btn-sm btn-ghost gap-1.5" data-on:click={ fmt.Sprintf("@post('%s')", SeasonMarkURL(s.ShowID, s.Number, false)) }>
+						@Icon("rotate-ccw", "size-4")
+						{ tr(ctx, "Mark season unwatched") }
+					</button>
+				</div>
+			}
+			<button
+				type="button"
+				class={ "btn btn-sm gap-1.5 ms-auto", templ.KV("btn-primary btn-soft", m.HideSpoilers), templ.KV("btn-ghost", !m.HideSpoilers) }
+				aria-pressed={ boolAttr(m.HideSpoilers) }
+				title={ tr(ctx, "Hide summaries and pictures of episodes you have not watched") }
+				data-on:click={ fmt.Sprintf("@post('%s')", SpoilersURL(s.ShowID, s.Number, !m.HideSpoilers)) }
+			>
+				@Icon("eye-off", "size-4")
+				{ tr(ctx, "Hide spoilers") }
+			</button>
+		</div>
 		if s.Overview != "" {
 			<p class="text-sm text-base-content/70 max-w-3xl leading-relaxed">{ s.Overview }</p>
 		}
@@ -183,49 +195,69 @@ templ SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) {
 		}
 		<ol class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 			for _, e := range s.Episodes {
-				<li class="card card-side bg-base-200/60 border border-base-content/5 overflow-hidden">
-					<figure class="w-36 sm:w-56 shrink-0 bg-base-300 aspect-video self-start">
-						if e.StillURL() != "" {
-							<img src={ e.StillURL() } alt="" class="size-full object-cover" loading="lazy" decoding="async" width="224" height="126"/>
-						} else {
-							@Icon("tv", "size-8 opacity-30")
-						}
-					</figure>
-					<div class="card-body p-3 sm:p-4 gap-1 min-w-0">
-						<p class="text-xs font-mono text-base-content/70 flex flex-wrap gap-x-2">
-							<span class="font-semibold text-primary">{ e.Code() }</span>
-							if r := runtime(ctx, e.Runtime); r != "" {
-								<span>{ r }</span>
-							}
-							if e.AirDate != "" {
-								<span>{ e.AirDate }</span>
-							}
-						</p>
-						<div class="flex items-start justify-between gap-2">
-							<h3 class="font-semibold leading-snug line-clamp-2">{ e.Name }</h3>
-							if m.Track && EpisodeAired(e) {
-								{{ on := m.watched(s.Number, e.Number) }}
-								<button
-									type="button"
-									id={ fmt.Sprintf("episode-%d-%d", s.Number, e.Number) }
-									aria-pressed={ boolAttr(on) }
-									aria-label={ trf(ctx, "Watched %s", e.Code()) }
-									title={ tr(ctx, "Watched") }
-									class={ "btn btn-xs btn-circle shrink-0", templ.KV("btn-primary", on), templ.KV("btn-ghost", !on) }
-									data-on:click={ fmt.Sprintf("@post('%s')", EpisodeURL(s.ShowID, s.Number, e.Number, !on)) }
-								>
-									@Icon("eye", "size-3.5")
-								</button>
-							}
-						</div>
-						if e.Overview != "" {
-							<p class="text-xs sm:text-sm text-base-content/70 line-clamp-3">{ e.Overview }</p>
-						}
-					</div>
-				</li>
+				@EpisodeCard(s.ShowID, e, m, false)
 			}
 		</ol>
 	</div>
+}
+
+// EpisodeCard is one episode of a season. With spoilers hidden, an episode
+// the user has not watched (or that has not aired) keeps its summary and
+// still out of the page until revealed.
+templ EpisodeCard(showID int, e tmdb.Episode, m EpisodeMarks, revealed bool) {
+	{{ hidden := m.hides(e) && !revealed }}
+	<li id={ fmt.Sprintf("episode-card-%d-%d", e.SeasonNumber, e.Number) } class="card card-side bg-base-200/60 border border-base-content/5 overflow-hidden">
+		<figure class="w-36 sm:w-56 shrink-0 bg-base-300 aspect-video self-start">
+			if e.StillURL() != "" && !hidden {
+				<img src={ e.StillURL() } alt="" class="size-full object-cover" loading="lazy" decoding="async" width="224" height="126"/>
+			} else if hidden {
+				@Icon("eye-off", "size-8 opacity-30")
+			} else {
+				@Icon("tv", "size-8 opacity-30")
+			}
+		</figure>
+		<div class="card-body p-3 sm:p-4 gap-1 min-w-0">
+			<p class="text-xs font-mono text-base-content/70 flex flex-wrap gap-x-2">
+				<span class="font-semibold text-primary">{ e.Code() }</span>
+				if r := runtime(ctx, e.Runtime); r != "" {
+					<span>{ r }</span>
+				}
+				if e.AirDate != "" {
+					<span>{ e.AirDate }</span>
+				}
+			</p>
+			<div class="flex items-start justify-between gap-2">
+				<h3 class="font-semibold leading-snug line-clamp-2">{ e.Name }</h3>
+				if m.Track && EpisodeAired(e) {
+					{{ on := m.watched(e.SeasonNumber, e.Number) }}
+					<button
+						type="button"
+						id={ fmt.Sprintf("episode-%d-%d", e.SeasonNumber, e.Number) }
+						aria-pressed={ boolAttr(on) }
+						aria-label={ trf(ctx, "Watched %s", e.Code()) }
+						title={ tr(ctx, "Watched") }
+						class={ "btn btn-xs btn-circle shrink-0", templ.KV("btn-primary", on), templ.KV("btn-ghost", !on) }
+						data-on:click={ fmt.Sprintf("@post('%s')", EpisodeURL(showID, e.SeasonNumber, e.Number, !on)) }
+					>
+						@Icon("eye", "size-3.5")
+					</button>
+				}
+			</div>
+			if hidden {
+				<p class="text-xs sm:text-sm text-base-content/70 flex flex-wrap items-center gap-2">
+					{ tr(ctx, "Hidden to avoid spoilers") }
+					<button
+						type="button"
+						class="btn btn-xs btn-ghost"
+						aria-label={ trf(ctx, "Show %s", e.Code()) }
+						data-on:click={ fmt.Sprintf("@get('%s')", RevealURL(showID, e.SeasonNumber, e.Number)) }
+					>{ tr(ctx, "Show") }</button>
+				</p>
+			} else if e.Overview != "" {
+				<p class="text-xs sm:text-sm text-base-content/70 line-clamp-3">{ e.Overview }</p>
+			}
+		</div>
+	</li>
 }
 
 templ SeasonError() {
