@@ -428,6 +428,46 @@ func (f *Firestore) MarkUpdatesSeen(ctx context.Context, uid string) error {
 	return nil
 }
 
+// releaseFiltersRecord is the releaseFilters field of a users/{uid}
+// document.
+type releaseFiltersRecord struct {
+	Sort           string `firestore:"sort,omitempty"`
+	Qualities      []int  `firestore:"qualities,omitempty"`
+	HDR            bool   `firestore:"hdr,omitempty"`
+	HideRecordings bool   `firestore:"hideRecordings,omitempty"`
+}
+
+// ReleaseFilters implements Store.
+func (f *Firestore) ReleaseFilters(ctx context.Context, uid string) (ReleaseFilters, error) {
+	snap, err := f.userDoc(uid).Get(ctx)
+	if notFound(err) {
+		return ReleaseFilters{}, nil
+	}
+	if err != nil {
+		return ReleaseFilters{}, fmt.Errorf("read release filters: %w", err)
+	}
+	var rec struct {
+		Filters releaseFiltersRecord `firestore:"releaseFilters"`
+	}
+	if err := snap.DataTo(&rec); err != nil {
+		return ReleaseFilters{}, fmt.Errorf("read release filters: %w", err)
+	}
+	return ReleaseFilters(rec.Filters), nil
+}
+
+// SaveReleaseFilters implements Store. Only the field is replaced, so the
+// user's other preferences stay.
+func (f *Firestore) SaveReleaseFilters(ctx context.Context, uid string, filters ReleaseFilters) error {
+	if err := CheckReleaseFilters(filters); err != nil {
+		return err
+	}
+	_, err := f.userDoc(uid).Set(ctx, map[string]any{"releaseFilters": releaseFiltersRecord(filters)}, firestore.Merge([]string{"releaseFilters"}))
+	if err != nil {
+		return fmt.Errorf("save release filters: %w", err)
+	}
+	return nil
+}
+
 func notFound(err error) bool {
 	var se interface{ GRPCStatus() *status.Status }
 	return errors.As(err, &se) && se.GRPCStatus().Code() == codes.NotFound

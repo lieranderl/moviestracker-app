@@ -141,3 +141,10 @@ func TestAReleaseKnownOnlyAsTenBitStillSaysSo(t *testing.T) {
 		t.Error("a release whose only known format is 10-bit lacks its badge")
 	}
 }
+
+func TestPickingASortOrderRemembersIt(t *testing.T) {
+	out := html.UnescapeString(render(t, views.TorrentResults(releases(), "seeders", "")))
+	if !strings.Contains(out, "$sort = 'bitrate'; ; @post('/api/preferences/release-filters'") {
+		t.Errorf("the bitrate sort button does not save the filters:\n%s", out)
+	}
+}
