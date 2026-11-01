@@ -150,6 +150,10 @@ func MoviePage(user *auth.User, m *tmdb.MovieDetails) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
+				templ_7745c5c3_Err = listPickerSlot("movie", m.ID).Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 				if siteOf(ctx).Cloud {
 					templ_7745c5c3_Err = favoriteSlot("movie", m.ID).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {

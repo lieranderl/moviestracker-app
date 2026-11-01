@@ -69,11 +69,16 @@ func (ts *TitleStates) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// target is the signed-in user and the title (?type=movie|tv&id=N) of a
-// request. It answers the request itself (401, 400) and returns ok=false
-// when there is none.
+// target is the signed-in user and the title of a request (titleTarget).
 func (ts *TitleStates) target(w http.ResponseWriter, r *http.Request) (uid, kind string, id int, ok bool) {
-	uid, ok = ts.user(r)
+	return titleTarget(w, r, ts.user)
+}
+
+// titleTarget is the user user signs in and the title (?type=movie|tv&id=N)
+// of a request. It answers the request itself (401, 400) and returns
+// ok=false when there is none.
+func titleTarget(w http.ResponseWriter, r *http.Request, user func(*http.Request) (string, bool)) (uid, kind string, id int, ok bool) {
+	uid, ok = user(r)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return "", "", 0, false

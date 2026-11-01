@@ -59,6 +59,7 @@ templ MoviePage(user *auth.User, m *tmdb.MovieDetails) {
 				@trailerButton(m.TrailerKey, trf(ctx, "%s trailer", m.Title))
 				@progressSlot("movie", m.ID)
 				@watchStateSlot("movie", m.ID)
+				@listPickerSlot("movie", m.ID)
 				if siteOf(ctx).Cloud {
 					@favoriteSlot("movie", m.ID)
 				}

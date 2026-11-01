@@ -69,6 +69,8 @@ var (
 	ErrNoList = errors.New("no such list")
 	// ErrTooManyLists is why a user with maxLists lists cannot make more.
 	ErrTooManyLists = fmt.Errorf("a user keeps at most %d lists", maxLists)
+	// ErrListName is why a list is not named so.
+	ErrListName = fmt.Errorf("a list name has 1 to %d characters", maxListName)
 	// ErrListFull is why a list of maxListTitles takes no more.
 	ErrListFull = fmt.Errorf("a list holds at most %d titles", maxListTitles)
 )
@@ -87,7 +89,7 @@ const maxListName = 60
 func checkListName(name string) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || utf8.RuneCountInString(name) > maxListName {
-		return "", fmt.Errorf("a list name has 1 to %d characters", maxListName)
+		return "", ErrListName
 	}
 	return name, nil
 }

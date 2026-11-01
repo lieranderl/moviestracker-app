@@ -1,0 +1,236 @@
+package views
+
+import (
+	"fmt"
+
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+)
+
+// ListLink is one of a user's own lists, as My lists' tabs name it.
+type ListLink struct {
+	ID, Name string
+}
+
+// CustomListView is one of the user's own lists, opened in My lists.
+type CustomListView struct {
+	ID, Name string
+	Items    []tmdb.MediaItem // newest added first
+	Sharing  bool             // the site shares lists by link
+	ShareID  string           // its link's ID; empty while not shared
+}
+
+// PickerList is one of the user's lists in a title's Add to list menu.
+type PickerList struct {
+	ID, Name string
+	In       bool // the title is in it
+}
+
+func customListHref(id string) string { return "/lists/c/" + id }
+
+func listTitleURL(list, kind string, id int) string {
+	return fmt.Sprintf("/api/lists/%s/titles?type=%s&id=%d", list, kind, id)
+}
+
+// ListItemID is a title's card's ID on its list's page.
+func ListItemID(kind string, id int) string { return fmt.Sprintf("list-item-%s-%d", kind, id) }
+
+// listPickerSlot is a title page's Add to list menu: the user's lists, each
+// ticked when the title is in it, asked for when the page loads, and a
+// form that makes a list with the title in it.
+templ listPickerSlot(kind string, id int) {
+	<details class="dropdown dropdown-end" data-on:click__outside="el.open = false">
+		<summary class="btn sm:btn-lg btn-ghost text-neutral-content border-neutral-content/30 hover:bg-neutral-content/10 gap-2">
+			@Icon("list-plus", "size-5")
+			{ tr(ctx, "Add to list") }
+		</summary>
+		<div class="dropdown-content z-30 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-box bg-base-200 text-base-content border border-base-content/10 shadow-2xl p-2 space-y-2">
+			<ul id="list-picker" class="menu menu-sm w-full p-0" data-init={ fmt.Sprintf("@get('/api/lists/title?type=%s&id=%d')", kind, id) }>
+				<li class="menu-disabled"><span class="loading loading-spinner loading-xs" aria-label={ tr(ctx, "Loading") }></span></li>
+			</ul>
+			<form class="join w-full" data-signals="{ listName: '' }" data-on:submit={ fmt.Sprintf("@post('/api/lists?type=%s&id=%d', {filterSignals: {include: /^listName$/}})", kind, id) }>
+				<input type="text" required maxlength="60" autocomplete="off" class="input input-sm join-item w-full" aria-label={ tr(ctx, "New list") } placeholder={ tr(ctx, "New list") } data-bind:list-name/>
+				<button type="submit" class="btn btn-sm btn-primary join-item" aria-label={ tr(ctx, "Make list") }>
+					@Icon("plus", "size-4")
+				</button>
+			</form>
+			<div id="new-list-error"></div>
+		</div>
+	</details>
+}
+
+// ListPicker is the user's lists in a title's Add to list menu: ticking
+// one adds the title to it, unticking takes it out.
+templ ListPicker(kind string, id int, lists []PickerList) {
+	<ul id="list-picker" class="menu menu-sm w-full p-0 max-h-72 overflow-y-auto flex-nowrap">
+		if len(lists) == 0 {
+			<li class="menu-disabled"><span>{ tr(ctx, "No lists yet: name one below.") }</span></li>
+		}
+		for _, l := range lists {
+			<li>
+				<label class="flex items-center gap-2">
+					<input
+						type="checkbox"
+						class="checkbox checkbox-sm checkbox-primary"
+						data-list={ l.ID }
+						aria-checked={ boolAttr(l.In) }
+						checked?={ l.In }
+						data-on:change={ fmt.Sprintf("el.checked ? @post('%[1]s') : @delete('%[1]s')", listTitleURL(l.ID, kind, id)) }
+					/>
+					<span class="truncate">{ l.Name }</span>
+				</label>
+			</li>
+		}
+	</ul>
+}
+
+// customListTabsSlot is where My lists' tabs for the user's own lists go;
+// it asks for them when the page loads, with active's open.
+templ customListTabsSlot(active string) {
+	<span id="custom-list-tabs" class="contents" data-init={ fmt.Sprintf("@get('/api/lists/tabs?active=%s')", active) }></span>
+}
+
+// CustomListTabs are My lists' tabs for the user's own lists, then one
+// that makes a new list.
+templ CustomListTabs(active string, lists []ListLink) {
+	<span id="custom-list-tabs" class="contents">
+		for _, l := range lists {
+			<a href={ templ.SafeURL(customListHref(l.ID)) } role="tab" aria-selected={ boolAttr(l.ID == active) } class={ "tab gap-2 shrink-0", templ.KV("tab-active", l.ID == active) }>
+				@Icon("list", "size-4")
+				<span class="max-w-40 truncate">{ l.Name }</span>
+			</a>
+		}
+		<button type="button" role="tab" aria-selected="false" class="tab gap-2 shrink-0" data-on:click="$_newListOpen = true">
+			@Icon("plus", "size-4")
+			{ tr(ctx, "New list") }
+		</button>
+	</span>
+}
+
+// newListDialog names a new list and makes it; the server opens it.
+templ newListDialog() {
+	@modalDialog("new-list", "_newListOpen", "", "", "max-w-md", templ.Attributes{"data-signals": "{ _newListOpen: false, listName: '' }"}) {
+		@modalHeader("new-list", tr(ctx, "New list"), "list-plus", "text-primary")
+		<form class="mt-4 space-y-4" data-on:submit="@post('/api/lists', {filterSignals: {include: /^listName$/}})">
+			<fieldset class="fieldset">
+				<legend class="fieldset-legend">{ tr(ctx, "Name") }</legend>
+				<input type="text" required maxlength="60" autocomplete="off" class="input w-full" placeholder={ tr(ctx, "Sci-fi nights") } data-bind:list-name/>
+			</fieldset>
+			<div id="new-list-error"></div>
+			<div class="modal-action mt-0">
+				<button type="submit" class="btn btn-primary gap-2">
+					@Icon("plus", "size-4")
+					{ tr(ctx, "Make list") }
+				</button>
+			</div>
+		</form>
+	}
+}
+
+// NewListError says why the list could not be made.
+templ NewListError(msg string) {
+	<div id="new-list-error" role="alert" class="alert alert-error alert-soft text-sm">
+		@Icon("circle-alert", "size-4")
+		<span>{ msg }</span>
+	</div>
+}
+
+// CustomListPage is My lists with the user's own list v open.
+templ CustomListPage(user *auth.User, v CustomListView) {
+	@listsLayout(user, v.ID) {
+		<section class="space-y-4" aria-labelledby="custom-list-name">
+			<header class="flex flex-wrap items-center justify-between gap-3">
+				<h2 id="custom-list-name" class="text-xl font-bold flex items-center gap-2 min-w-0">
+					@Icon("list", "size-5 text-primary")
+					<span class="truncate">{ v.Name }</span>
+					<span class="badge badge-neutral badge-sm">{ fmt.Sprint(len(v.Items)) }</span>
+				</h2>
+				<div class="flex flex-wrap items-center gap-2">
+					if v.Sharing {
+						@ListShare(v.ID, v.ShareID)
+					}
+					<button type="button" class="btn btn-sm btn-ghost text-error gap-2" data-on:click={ "confirm(" + trJS(ctx, "Delete this list? Its titles stay in your other lists.") + ") && @delete('/api/lists/" + v.ID + "')" }>
+						@Icon("trash-2", "size-4")
+						{ tr(ctx, "Delete list") }
+					</button>
+				</div>
+			</header>
+			if len(v.Items) == 0 {
+				@emptyState("list", tr(ctx, "This list is empty"), tr(ctx, "Open a movie or series and add it with Add to list.")) {
+					@browseTrendingLink()
+				}
+			} else {
+				<ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+					for _, item := range v.Items {
+						<li id={ ListItemID(item.MediaType, item.ID) } class="relative">
+							@mediaCard(item, "w-full")
+							<button
+								type="button"
+								class="btn btn-circle btn-sm absolute top-2 right-2 z-10"
+								aria-label={ trf(ctx, "Take %s out of the list", item.Title) }
+								data-on:click={ fmt.Sprintf("@delete('%s&from=list')", listTitleURL(v.ID, item.MediaType, item.ID)) }
+							>
+								@Icon("x", "size-4")
+							</button>
+						</li>
+					}
+				</ul>
+			}
+		</section>
+	}
+}
+
+// ListShare turns the link to list on or, with the link to copy, off.
+templ ListShare(list, shareID string) {
+	{{ share := "/api/lists/" + list + "/share" }}
+	<div id="list-share" class="flex flex-wrap items-center gap-2">
+		if shareID == "" {
+			<button type="button" class="btn btn-sm btn-ghost gap-2" title={ tr(ctx, "Anyone with the link can see this list.") } data-on:click={ "@post('" + share + "')" }>
+				@Icon("share-2", "size-4")
+				{ tr(ctx, "Share link") }
+			</button>
+		} else {
+			{{ link := "location.origin + '/l/" + shareID + "'" }}
+			<label class="input input-sm w-64">
+				@Icon("link", "size-4 opacity-60")
+				<input type="text" readonly class="grow" aria-label={ tr(ctx, "Anyone with the link can see this list.") } data-attr:value={ link }/>
+			</label>
+			<button type="button" class="btn btn-sm btn-primary gap-2" data-signals="{ _listCopied: false }" data-on:click={ "navigator.clipboard.writeText(" + link + ").then(() => $_listCopied = true)" }>
+				@Icon("copy", "size-4")
+				<span data-text={ "$_listCopied ? " + trJS(ctx, "Copied") + " : " + trJS(ctx, "Copy link") }>{ tr(ctx, "Copy link") }</span>
+			</button>
+			<button type="button" class="btn btn-sm btn-ghost gap-2" data-on:click={ "@delete('" + share + "')" }>
+				@Icon("link-2-off", "size-4")
+				{ tr(ctx, "Stop sharing") }
+			</button>
+		}
+	</div>
+}
+
+// SharedListPage is a list someone shared by its link: its titles, to
+// look at only.
+templ SharedListPage(user *auth.User, name string, items []tmdb.MediaItem) {
+	@Layout(name) {
+		@Navbar(user)
+		<main class="grow pb-20">
+			<div class="max-w-7xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
+				<header class="space-y-1">
+					<p class="text-sm text-base-content/70 flex items-center gap-2">
+						@Icon("share-2", "size-4")
+						{ tr(ctx, "A list shared on Moviestracker") }
+					</p>
+					<h1 class="text-2xl sm:text-3xl font-bold tracking-tight">{ name }</h1>
+				</header>
+				if len(items) == 0 {
+					@emptyState("list", tr(ctx, "This list is empty"), tr(ctx, "Its owner has not added anything yet.")) {
+					}
+				} else {
+					<ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+						@BrowseItems(items)
+					</ul>
+				}
+			</div>
+		</main>
+		@siteFooter()
+	}
+}
