@@ -11,6 +11,8 @@
 //	users/{uid}/progress/{hash}-{file} where they stopped in one file
 //	users/{uid}/titles/{kind}-{id}     a title they want to watch or watched
 //	users/{uid}/updates/{feed}-{id}    a release they were told about
+//	users/{uid}/lists/{id}             a list the user made, with its titles
+//	sharedLists/{shareId}              whose list a public link opens
 package store
 
 import (
@@ -63,6 +65,8 @@ type Store interface {
 	TitleStateStore
 	UpdateStore
 	ReleaseFilterStore
+	CustomListStore
+	ListSharing
 }
 
 // ReleaseFilters are how a user last searched a title's releases.

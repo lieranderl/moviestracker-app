@@ -42,6 +42,31 @@ func listTabs(ctx context.Context) []listTab {
 // ListsPage is My lists on the tab named active, its titles newest first;
 // failed says they could not be read.
 templ ListsPage(user *auth.User, active string, items []tmdb.MediaItem, failed bool) {
+	@listsLayout(user, active) {
+		for _, tab := range listTabs(ctx) {
+			if tab.ID == active {
+				if failed {
+					<div role="alert" class="alert alert-error alert-soft">
+						@Icon("circle-alert", "size-5")
+						<span>{ tr(ctx, tab.Failed) }</span>
+					</div>
+				} else if len(items) == 0 {
+					@emptyState(tab.Icon, tr(ctx, tab.Empty), tr(ctx, tab.EmptyHelp)) {
+						@browseTrendingLink()
+					}
+				} else {
+					<ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+						@BrowseItems(items)
+					</ul>
+				}
+			}
+		}
+	}
+}
+
+// listsLayout is My lists with the tab active open: the fixed tabs, then
+// the user's own lists, which it asks for.
+templ listsLayout(user *auth.User, active string) {
 	@Layout(tr(ctx, "My lists")) {
 		@Navbar(user)
 		<main class="grow pb-20">
@@ -51,34 +76,19 @@ templ ListsPage(user *auth.User, active string, items []tmdb.MediaItem, failed b
 						@Icon("library", "size-6 text-primary")
 						{ tr(ctx, "My lists") }
 					</h1>
-					<nav role="tablist" class="tabs tabs-box w-fit" aria-label={ tr(ctx, "My lists") }>
+					<nav role="tablist" class="tabs tabs-box w-fit max-w-full flex-nowrap overflow-x-auto" aria-label={ tr(ctx, "My lists") }>
 						for _, tab := range listTabs(ctx) {
-							<a href={ templ.SafeURL(tab.Href) } role="tab" aria-selected={ boolAttr(tab.ID == active) } class={ "tab gap-2", templ.KV("tab-active", tab.ID == active) }>
+							<a href={ templ.SafeURL(tab.Href) } role="tab" aria-selected={ boolAttr(tab.ID == active) } class={ "tab gap-2 shrink-0", templ.KV("tab-active", tab.ID == active) }>
 								@Icon(tab.Icon, "size-4")
 								{ tr(ctx, tab.Label) }
 							</a>
 						}
+						@customListTabsSlot(active)
 					</nav>
 				</header>
-				for _, tab := range listTabs(ctx) {
-					if tab.ID == active {
-						if failed {
-							<div role="alert" class="alert alert-error alert-soft">
-								@Icon("circle-alert", "size-5")
-								<span>{ tr(ctx, tab.Failed) }</span>
-							</div>
-						} else if len(items) == 0 {
-							@emptyState(tab.Icon, tr(ctx, tab.Empty), tr(ctx, tab.EmptyHelp)) {
-								@browseTrendingLink()
-							}
-						} else {
-							<ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-								@BrowseItems(items)
-							</ul>
-						}
-					}
-				}
+				{ children... }
 			</div>
+			@newListDialog()
 			@toTopButton()
 		</main>
 		@siteFooter()

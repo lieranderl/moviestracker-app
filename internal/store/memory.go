@@ -10,10 +10,14 @@ import (
 
 // Memory is a Store in this process's memory: gone when it stops.
 type Memory struct {
-	opts  options
-	mu    sync.Mutex
-	users map[string]*memoryUser
+	opts   options
+	mu     sync.Mutex
+	users  map[string]*memoryUser
+	shared map[string]sharedList // by share ID
 }
+
+// sharedList is whose list a link opens.
+type sharedList struct{ uid, id string }
 
 type memoryUser struct {
 	prefs       Preferences
@@ -23,18 +27,19 @@ type memoryUser struct {
 	titles      map[string]TitleState
 	updates     map[string]Update
 	filters     ReleaseFilters
+	lists       shelf
 }
 
 // NewMemory returns an empty in-memory store.
 func NewMemory(opts ...Option) *Memory {
-	return &Memory{opts: newOptions(opts), users: map[string]*memoryUser{}}
+	return &Memory{opts: newOptions(opts), users: map[string]*memoryUser{}, shared: map[string]sharedList{}}
 }
 
 // user is uid's data, created empty on first use. m.mu must be held.
 func (m *Memory) user(uid string) *memoryUser {
 	u, ok := m.users[uid]
 	if !ok {
-		u = &memoryUser{favorites: map[string]Favorite{}, progress: map[string]Progress{}, titles: map[string]TitleState{}, updates: map[string]Update{}}
+		u = &memoryUser{favorites: map[string]Favorite{}, progress: map[string]Progress{}, titles: map[string]TitleState{}, updates: map[string]Update{}, lists: shelf{}}
 		m.users[uid] = u
 	}
 	return u
@@ -278,4 +283,85 @@ func (m *Memory) SaveReleaseFilters(_ context.Context, uid string, f ReleaseFilt
 	f.Qualities = slices.Clone(f.Qualities)
 	m.user(uid).filters = f
 	return nil
+}
+
+// CreateCustomList implements Store.
+func (m *Memory) CreateCustomList(_ context.Context, uid, name string) (CustomList, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.user(uid).lists.create(name, m.opts.now().UTC())
+}
+
+// CustomLists implements Store.
+func (m *Memory) CustomLists(_ context.Context, uid string) ([]CustomList, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.user(uid).lists.all(), nil
+}
+
+// RemoveCustomList implements Store.
+func (m *Memory) RemoveCustomList(_ context.Context, uid, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	lists := m.user(uid).lists
+	delete(m.shared, lists[id].ShareID)
+	return lists.delete(id)
+}
+
+// ShareList implements Store.
+func (m *Memory) ShareList(_ context.Context, uid, id string, on bool) (CustomList, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	lists := m.user(uid).lists
+	l, ok := lists[id]
+	if !ok {
+		return CustomList{}, ErrNoList
+	}
+	switch {
+	case on && l.ShareID == "":
+		l.ShareID = newShareID()
+		m.shared[l.ShareID] = sharedList{uid: uid, id: id}
+	case !on && l.ShareID != "":
+		delete(m.shared, l.ShareID)
+		l.ShareID = ""
+	}
+	lists[id] = l
+	l, _ = lists.get(id)
+	return l, nil
+}
+
+// SharedList implements Store.
+func (m *Memory) SharedList(_ context.Context, shareID string) (CustomList, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ref, ok := m.shared[shareID]
+	if !ok {
+		return CustomList{}, false, nil
+	}
+	l, ok := m.user(ref.uid).lists.get(ref.id)
+	return l, ok, nil
+}
+
+// CustomList implements Store.
+func (m *Memory) CustomList(_ context.Context, uid, id string) (CustomList, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	l, ok := m.user(uid).lists.get(id)
+	return l, ok, nil
+}
+
+// AddToList implements Store.
+func (m *Memory) AddToList(_ context.Context, uid, id string, t ListTitle) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, err := m.user(uid).lists.add(id, t, m.opts.now().UTC())
+	return err
+}
+
+// RemoveFromList implements Store.
+func (m *Memory) RemoveFromList(_ context.Context, uid, id, kind string, tmdbID int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, err := m.user(uid).lists.remove(id, kind, tmdbID, m.opts.now().UTC())
+	return err
 }

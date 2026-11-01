@@ -67,6 +67,7 @@ type Server struct {
 	live               *live.Hub                         // shared pollers behind every live view
 	progress           *Progress                         // where each account stopped watching
 	titleStates        *TitleStates                      // what each account wants to watch or watched
+	customLists        *CustomLists                      // the lists each account makes
 	releaseFilterPrefs *ReleaseFilterPrefs               // how each account last searched releases
 	plays              *playback.Tracker                 // what plays through the proxy
 	sampler            *stats.Sampler                    // this machine, for the dashboard
@@ -147,6 +148,11 @@ func NewServer(cfg Config) (*Server, error) {
 		return nil, err
 	}
 	s.titleStates = NewTitleStates(titles, s.username, s.Catalog)
+	lists, err := store.OpenListFile(filepath.Join(cfg.Store.Dir(), "lists.json"))
+	if err != nil {
+		return nil, err
+	}
+	s.customLists = NewCustomLists(lists, nil, s.username, s.Catalog)
 	filters, err := store.OpenFilterFile(filepath.Join(cfg.Store.Dir(), "filters.json"))
 	if err != nil {
 		return nil, err
@@ -297,6 +303,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/torrserver/torrent-stats", s.handleTorrentStats)
 	s.progress.Register(s.mux)
 	s.titleStates.Register(s.mux)
+	s.customLists.Register(s.mux)
 	NewRecommendations(s.titleStates.store, s.username, nil, s.Catalog).Register(s.mux)
 	s.releaseFilterPrefs.Register(s.mux)
 	s.mux.HandleFunc("GET /api/torrserver/stream/", s.handleTorrServerStreamProxy)
