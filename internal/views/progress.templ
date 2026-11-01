@@ -183,9 +183,9 @@ templ progressSlot(kind string, id int) {
 // with none it is an empty slot.
 templ ProgressButton(p *store.Progress) {
 	if p == nil {
-		<span id="progress-button" class="contents"></span>
+		<span id="progress-button" class="contents" data-init="$_resumable = false"></span>
 	} else {
-		<a id="progress-button" href={ progressPlay(*p) } class="btn sm:btn-lg btn-secondary gap-2" title={ path.Base(p.File) }>
+		<a id="progress-button" href={ progressPlay(*p) } class="btn sm:btn-lg btn-primary gap-2" title={ path.Base(p.File) } data-init="$_resumable = true">
 			@Icon("history", "size-5")
 			{ trf(ctx, "Continue · %s of %s", clockTime(p.Position), clockTime(p.Duration)) }
 		</a>

@@ -309,6 +309,16 @@ in focused PRs before the larger episode/discovery and collaboration work.
   cover the categories and the contact route; a local browser check of
   `/privacy` confirmed the list, the mailto link and no horizontal overflow.
   This is not a legal compliance assessment.
+- **R08 — implemented, deployment unverified (2 November 2026):** title
+  pages in both apps lead with Continue (now primary) when there is a file to
+  resume, then Find sources, which is primary until Continue appears: the
+  progress slot sets `$_resumable` when it arrives and Find sources drops to
+  the secondary style through `data-class`. Trailer, Episodes, watch state,
+  Add to list and favourites follow in one secondary style. View tests cover
+  order and emphasis for movies and series and the progress button's signal;
+  a local browser check of a movie page (desktop and 375 px) confirmed Find
+  sources first and primary with the rest secondary and no overflow. The
+  Continue state was covered by view tests only.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding

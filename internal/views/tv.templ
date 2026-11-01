@@ -59,15 +59,15 @@ templ TVPage(user *auth.User, t *tmdb.TVDetails, season *tmdb.Season, selected i
 		@Navbar(user)
 		<main class="grow pb-16" data-signals={ mediaPageSignals(ctx) } data-on:click={ videoClick(ctx) }>
 			@detailHero(t.MediaItem, tvFacts(ctx, t), t.ContentRating, genreNames(t.Genres)) {
+				@progressSlot("tv", t.ID)
+				@findSourcesLink()
 				@trailerButton(t.TrailerKey, trf(ctx, "%s trailer", t.Title))
 				@heroLink("#seasons", "list-video", tr(ctx, "Episodes"))
-				@progressSlot("tv", t.ID)
 				@watchStateSlot("tv", t.ID)
 				@listPickerSlot("tv", t.ID)
 				if siteOf(ctx).Cloud {
 					@favoriteSlot("tv", t.ID)
 				}
-				@heroLink("#sources", "magnet", tr(ctx, "Find sources"))
 			}
 			@reviewSlot("tv", t.ID)
 			@aboutSection(t.MediaItem, t.Tagline, tvAbout(ctx, t), officialLinks("title", t.Links, t.Homepage))
