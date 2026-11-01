@@ -290,6 +290,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/torrserver/torrent-stats", s.handleTorrentStats)
 	s.progress.Register(s.mux)
 	s.titleStates.Register(s.mux)
+	NewRecommendations(s.titleStates.store, s.username, nil, s.Catalog).Register(s.mux)
 	s.mux.HandleFunc("GET /api/torrserver/stream/", s.handleTorrServerStreamProxy)
 
 	// Signed links for external players (VLC, TVs, playlists): no session.

@@ -52,6 +52,8 @@ var ru = map[string]string{
 	"New release on the trackers": "Новый релиз на трекерах",
 	"Now in HDR10":                "Теперь в HDR10",
 	"Now in Dolby Vision":         "Теперь в Dolby Vision",
+	"Because you saved %s":        "Потому что вы сохранили «%s»",
+	"Because you watched %s":      "Потому что вы смотрели «%s»",
 	"Start over":                  "Сначала",
 	"Retry":                       "Повторить",
 	"Your TorrServers could not be loaded. Please try again.": "Не удалось загрузить ваши TorrServer. Попробуйте ещё раз.",
