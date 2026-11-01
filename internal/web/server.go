@@ -145,6 +145,7 @@ func New(cfg Config) http.Handler {
 	titleStates := handlers.NewTitleStates(a.cfg.Store, a.userID, a.catalog)
 	handlers.NewRecommendations(a.cfg.Store, a.userID, a.cfg.Store.Favorites, a.catalog).Register(mux)
 	titleStates.Register(mux)
+	handlers.NewEpisodes(a.cfg.Store, a.userID, a.catalog).Register(mux)
 	handlers.NewReviews(a.cfg.Store, a.cfg.Store, a.userID, a.catalog).Register(mux)
 	handlers.NewCustomLists(a.cfg.Store, a.cfg.Store, a.userID, a.catalog).Register(mux)
 	a.progress.MarkFinishedMoviesIn(titleStates)

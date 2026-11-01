@@ -3,6 +3,7 @@ package views
 import (
 	"context"
 	"fmt"
+	"slices"
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
@@ -91,7 +92,9 @@ templ seasonsSection(t *tmdb.TVDetails, season *tmdb.Season, selected int) {
 			class="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-5 scroll-mt-20"
 			data-signals={ fmt.Sprintf("{ season: %d, seasonLoading: false }", selected) }
 		>
-			@sectionHeading(tr(ctx, "Seasons & episodes"), "")
+			@sectionHeading(tr(ctx, "Seasons & episodes"), "") {
+				@NextUnwatched(t, episodeMarksOf(ctx))
+			}
 			<nav
 				class="tabs tabs-box w-full sm:w-fit max-w-full flex-nowrap overflow-x-auto"
 				aria-label={ tr(ctx, "Seasons") }
@@ -112,7 +115,7 @@ templ seasonsSection(t *tmdb.TVDetails, season *tmdb.Season, selected int) {
 			</nav>
 			<div class="transition-opacity" data-class="{ 'opacity-50': $seasonLoading }">
 				if season != nil {
-					@SeasonEpisodes(season)
+					@SeasonEpisodes(season, episodeMarksOf(ctx))
 				} else {
 					@SeasonError()
 				}
@@ -137,9 +140,41 @@ func seasonSourcesLabel(ctx context.Context, s tmdb.SeasonSummary) string {
 	return seasonLabel(ctx, s) + " · " + trf(ctx, "%d of %d aired", s.Aired, s.EpisodeCount)
 }
 
-// SeasonEpisodes is patched by the season SSE endpoint.
-templ SeasonEpisodes(s *tmdb.Season) {
+// NextUnwatched names the first aired episode the user has not watched.
+templ NextUnwatched(t *tmdb.TVDetails, m EpisodeMarks) {
+	<div id="next-unwatched">
+		if m.Track {
+			if season, episode, ok, any := nextUnwatched(t, m); ok {
+				<a href={ templ.SafeURL(fmt.Sprintf("/tv/%d?season=%d#seasons", t.ID, season)) } class="btn btn-sm btn-primary btn-outline gap-1.5">
+					@Icon("skip-forward", "size-4")
+					{ trf(ctx, "Next: %s", fmt.Sprintf("S%02dE%02d", season, episode)) }
+				</a>
+			} else if any {
+				<span class="badge badge-success badge-soft gap-1.5">
+					@Icon("check-check", "size-3.5")
+					{ tr(ctx, "All aired episodes watched") }
+				</span>
+			}
+		}
+	</div>
+}
+
+// SeasonEpisodes is patched by the season SSE endpoint; with m.Track the
+// user marks its aired episodes watched one by one or all at once.
+templ SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) {
 	<div id="season-episodes" class="space-y-4">
+		if m.Track && slices.ContainsFunc(s.Episodes, EpisodeAired) {
+			<div class="flex flex-wrap gap-2" role="group" aria-label={ tr(ctx, "Mark the season") }>
+				<button type="button" class="btn btn-sm btn-ghost gap-1.5" data-on:click={ fmt.Sprintf("@post('%s')", SeasonMarkURL(s.ShowID, s.Number, true)) }>
+					@Icon("check-check", "size-4")
+					{ tr(ctx, "Mark season watched") }
+				</button>
+				<button type="button" class="btn btn-sm btn-ghost gap-1.5" data-on:click={ fmt.Sprintf("@post('%s')", SeasonMarkURL(s.ShowID, s.Number, false)) }>
+					@Icon("rotate-ccw", "size-4")
+					{ tr(ctx, "Mark season unwatched") }
+				</button>
+			</div>
+		}
 		if s.Overview != "" {
 			<p class="text-sm text-base-content/70 max-w-3xl leading-relaxed">{ s.Overview }</p>
 		}
@@ -166,7 +201,23 @@ templ SeasonEpisodes(s *tmdb.Season) {
 								<span>{ e.AirDate }</span>
 							}
 						</p>
-						<h3 class="font-semibold leading-snug line-clamp-2">{ e.Name }</h3>
+						<div class="flex items-start justify-between gap-2">
+							<h3 class="font-semibold leading-snug line-clamp-2">{ e.Name }</h3>
+							if m.Track && EpisodeAired(e) {
+								{{ on := m.watched(s.Number, e.Number) }}
+								<button
+									type="button"
+									id={ fmt.Sprintf("episode-%d-%d", s.Number, e.Number) }
+									aria-pressed={ boolAttr(on) }
+									aria-label={ trf(ctx, "Watched %s", e.Code()) }
+									title={ tr(ctx, "Watched") }
+									class={ "btn btn-xs btn-circle shrink-0", templ.KV("btn-primary", on), templ.KV("btn-ghost", !on) }
+									data-on:click={ fmt.Sprintf("@post('%s')", EpisodeURL(s.ShowID, s.Number, e.Number, !on)) }
+								>
+									@Icon("eye", "size-3.5")
+								</button>
+							}
+						</div>
 						if e.Overview != "" {
 							<p class="text-xs sm:text-sm text-base-content/70 line-clamp-3">{ e.Overview }</p>
 						}

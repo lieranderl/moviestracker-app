@@ -30,6 +30,7 @@ type memoryUser struct {
 	filters     ReleaseFilters
 	lists       shelf
 	reviews     map[string]Review
+	episodes    map[int]seriesEpisodes // by series ID
 }
 
 // NewMemory returns an empty in-memory store.
@@ -41,7 +42,7 @@ func NewMemory(opts ...Option) *Memory {
 func (m *Memory) user(uid string) *memoryUser {
 	u, ok := m.users[uid]
 	if !ok {
-		u = &memoryUser{favorites: map[string]Favorite{}, progress: map[string]Progress{}, titles: map[string]TitleState{}, updates: map[string]Update{}, lists: shelf{}, reviews: map[string]Review{}}
+		u = &memoryUser{favorites: map[string]Favorite{}, progress: map[string]Progress{}, titles: map[string]TitleState{}, updates: map[string]Update{}, lists: shelf{}, reviews: map[string]Review{}, episodes: map[int]seriesEpisodes{}}
 		m.users[uid] = u
 	}
 	return u
@@ -437,4 +438,26 @@ func (m *Memory) Review(_ context.Context, uid, kind string, tmdbID int) (Review
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.user(uid).reviews[id], nil
+}
+
+// WatchedEpisodes implements Store.
+func (m *Memory) WatchedEpisodes(_ context.Context, uid string, tvID int) (map[int][]int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.user(uid).episodes[tvID].bySeason(), nil
+}
+
+// MarkEpisodes implements Store.
+func (m *Memory) MarkEpisodes(_ context.Context, uid string, tvID, season int, episodes []int, watched bool) error {
+	if err := checkEpisodes(tvID, season, episodes); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	all := m.user(uid).episodes
+	if all[tvID] == nil {
+		all[tvID] = seriesEpisodes{}
+	}
+	all[tvID].mark(season, episodes, watched)
+	return nil
 }
