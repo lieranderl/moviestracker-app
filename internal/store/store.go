@@ -54,6 +54,10 @@ type Store interface {
 	AddFavorite(ctx context.Context, uid string, f Favorite) error
 	// RemoveFavorite forgets a favourite; one not kept is no error.
 	RemoveFavorite(ctx context.Context, uid, kind string, tmdbID int) error
+	// FavoritesPage is a page of the user's favourites, newest first,
+	// starting after the one the cursor after names ("" for the newest).
+	// next is the following page's cursor, "" when none is left.
+	FavoritesPage(ctx context.Context, uid, after string) (page []Favorite, next string, err error)
 
 	// TorrServers are the user's TorrServers, in the order added.
 	TorrServers(ctx context.Context, uid string) ([]TorrServer, error)
@@ -140,22 +144,62 @@ type UpdateStore interface {
 // ("dvmovies-438631").
 func (u Update) ID() string { return fmt.Sprintf("%s-%d", u.Feed, u.TMDBID) }
 
-// updateCursor names the update a page ends with: when it was found and its
-// ID ("1790000000000000000.dvmovies-438631").
-func updateCursor(u Update) string { return fmt.Sprintf("%d.%s", u.FoundAt.UnixNano(), u.ID()) }
+// updateCursor names the update a page ends with.
+func updateCursor(u Update) string { return pageCursor(u.FoundAt, u.ID()) }
 
-// ErrUpdateCursor is a page cursor Updates did not make.
-var ErrUpdateCursor = errors.New("update cursor is malformed")
+// pageCursor names the record a page ends with: its time and key
+// ("1790000000000000000.dvmovies-438631"). Pages are ordered by time and
+// then key, both descending.
+func pageCursor(at time.Time, key string) string { return fmt.Sprintf("%d.%s", at.UnixNano(), key) }
 
-// parseUpdateCursor reads a cursor updateCursor made.
-func parseUpdateCursor(cursor string) (time.Time, string, error) {
+// ErrCursor is a page cursor the store did not make.
+var ErrCursor = errors.New("page cursor is malformed")
+
+// parseCursor reads a cursor pageCursor made.
+func parseCursor(cursor string) (time.Time, string, error) {
 	at, id, ok := strings.Cut(cursor, ".")
 	nanos, err := strconv.ParseInt(at, 10, 64)
 	if !ok || err != nil || id == "" {
-		return time.Time{}, "", fmt.Errorf("%w: %q", ErrUpdateCursor, cursor)
+		return time.Time{}, "", fmt.Errorf("%w: %q", ErrCursor, cursor)
 	}
 	return time.Unix(0, nanos).UTC(), id, nil
 }
+
+// libraryPageSize is how many titles a page of favourites or of a watch
+// list holds.
+const libraryPageSize = 60
+
+// pageOf is the page of items following the cursor after, size at most,
+// and the next page's cursor. at and key order items newest first, then
+// by key descending, as Firestore pages them.
+func pageOf[T any](items []T, at func(T) time.Time, key func(T) string, after string, size int) ([]T, string, error) {
+	newest := func(a, b T) int {
+		if c := at(b).Compare(at(a)); c != 0 {
+			return c
+		}
+		return strings.Compare(key(b), key(a))
+	}
+	items = slices.SortedFunc(slices.Values(items), newest)
+	if after != "" {
+		t, k, err := parseCursor(after)
+		if err != nil {
+			return nil, "", err
+		}
+		items = slices.DeleteFunc(items, func(it T) bool {
+			return at(it).After(t) || (at(it).Equal(t) && key(it) >= k)
+		})
+	}
+	if len(items) <= size {
+		return items, "", nil
+	}
+	last := items[size-1]
+	return items[:size], pageCursor(at(last), key(last)), nil
+}
+
+func favoriteAt(f Favorite) time.Time { return f.AddedAt }
+func favoriteKey(f Favorite) string   { return fmt.Sprintf("%s-%d", f.Kind, f.TMDBID) }
+func titleAt(t TitleState) time.Time  { return t.UpdatedAt }
+func titleKey(t TitleState) string    { return fmt.Sprintf("%s-%d", t.Kind, t.TMDBID) }
 
 // updateID is an update's key: its feed and TMDB ID ("dvmovies-438631").
 func updateID(u Update) (string, error) {
@@ -204,6 +248,10 @@ type TitleStateStore interface {
 	TitleState(ctx context.Context, uid, kind string, tmdbID int) (TitleState, error)
 	// TitleStates are the user's titles in state, most recently marked first.
 	TitleStates(ctx context.Context, uid, state string) ([]TitleState, error)
+	// TitleStatesPage is a page of them, starting after the one the cursor
+	// after names ("" for the newest); next is the following page's
+	// cursor, "" when none is left.
+	TitleStatesPage(ctx context.Context, uid, state, after string) (page []TitleState, next string, err error)
 }
 
 // checkTitleState is why ts cannot be kept, if it cannot; its key otherwise.

@@ -47,6 +47,6 @@ templ FavoriteButton(kind string, id int, on bool) {
 
 // FavoritesPage lists the signed-in user's favourites, newest first;
 // failed says they could not be read. It is My lists' first tab.
-templ FavoritesPage(user *auth.User, items []tmdb.MediaItem, failed bool) {
-	@ListsPage(user, ListFavorites, items, failed)
+templ FavoritesPage(user *auth.User, items []tmdb.MediaItem, more string, failed bool) {
+	@ListsPage(user, ListFavorites, items, more, failed)
 }

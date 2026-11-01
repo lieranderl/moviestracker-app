@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/starfederation/datastar-go/datastar"
@@ -51,7 +52,11 @@ func (ts *TitleStates) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
 	defer cancel()
-	kept, err := ts.store.TitleStates(ctx, uid, list)
+	kept, next, err := ts.store.TitleStatesPage(ctx, uid, list, r.URL.Query().Get("after"))
+	if errors.Is(err, store.ErrCursor) {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
 	if err != nil {
 		slog.Warn("reading watch states failed", "error", logError(err))
 	}
@@ -64,7 +69,7 @@ func (ts *TitleStates) handleList(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
-	if err := views.ListsPage(ts.catalog.userFromRequest(r), list, items, err != nil).Render(r.Context(), w); err != nil {
+	if err := views.ListsPage(ts.catalog.userFromRequest(r), list, items, MorePath(r, next), err != nil).Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "lists", "error", err)
 	}
 }
@@ -171,4 +176,13 @@ func (ts *TitleStates) markWatched(r *http.Request, uid string, id int, title st
 	if err := ts.store.SetTitleState(write, uid, rec); err != nil {
 		slog.Warn("marking a finished movie watched failed", "error", logError(err))
 	}
+}
+
+// MorePath is the address of the page of a list after this request's,
+// whose cursor is next; "" when none is left.
+func MorePath(r *http.Request, next string) string {
+	if next == "" {
+		return ""
+	}
+	return r.URL.Path + "?after=" + url.QueryEscape(next)
 }
