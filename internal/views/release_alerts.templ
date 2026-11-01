@@ -33,8 +33,8 @@ templ AlertsBell(unseen int) {
 }
 
 // AlertsPage lists what turned up for the movies the user follows, most
-// recently noticed first.
-templ AlertsPage(user *auth.User, alerts []store.Update) {
+// recently noticed first; failed says the alerts could not be read.
+templ AlertsPage(user *auth.User, alerts []store.Update, failed bool) {
 	@Layout(tr(ctx, "Release alerts")) {
 		@Navbar(user)
 		<main class="grow pb-20">
@@ -46,7 +46,12 @@ templ AlertsPage(user *auth.User, alerts []store.Update) {
 					</h1>
 					<p class="text-sm text-base-content/70">{ tr(ctx, "Releases found for the movies in your favourites and Want to watch.") }</p>
 				</header>
-				if len(alerts) == 0 {
+				if failed {
+					<div role="alert" class="alert alert-error alert-soft">
+						@Icon("circle-alert", "size-5")
+						<span>{ tr(ctx, "Your release alerts could not be loaded right now. Please try again in a moment.") }</span>
+					</div>
+				} else if len(alerts) == 0 {
 					@emptyState("bell", tr(ctx, "No release alerts yet"), tr(ctx, "Follow movies with Add to favourites or Want to watch: you hear here when they turn up in HDR10, Dolby Vision or on the trackers.")) {
 						@browseTrendingLink()
 					}
