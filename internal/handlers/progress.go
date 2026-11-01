@@ -105,7 +105,7 @@ func (p *Progress) PlayRequest(r *http.Request) (views.PlayRequest, bool) {
 		ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
 		defer cancel()
 		if kept, found, err := p.store.Progress(ctx, uid, hash, index); err == nil && found {
-			req.Title = kept.Title
+			req.Title, req.Kind, req.TMDBID = kept.Title, kept.Kind, kept.TMDBID
 		}
 	}
 	return req, true

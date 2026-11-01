@@ -1,6 +1,7 @@
 package views
 
 import (
+	"net/url"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -137,6 +138,12 @@ type PlayRequest struct {
 	Hash  string
 	Index int
 	Title string
+	// Kind and TMDBID are the title the file was added for, when known.
+	Kind   string
+	TMDBID int
+	// Missing says TorrServer answered without the file: the page explains
+	// that and leads back to the title's sources instead of playing.
+	Missing bool
 	// Clean and HLS are the file's links for external players, which the
 	// local app signs; the web app's browser makes its own.
 	Clean, HLS string
@@ -155,6 +162,8 @@ func autoplayScript(p PlayRequest, browser bool) string {
 	title, _ := json.Marshal(p.Title)
 	start := fmt.Sprintf("$activeHash = '%s'; $activeFileIndex = %d; $streamTitle = %s; $playKind = 'direct'; ", p.Hash, p.Index, title)
 	if browser {
+		href, _ := resumeRecovery(p)
+		start += "$_resumeHref = " + jsString(href) + "; "
 		return "if ($_autoplay && $tsSelected && $tsStatus.ok) { $_autoplay = false; " + start + webStartPlay() + " }"
 	}
 	clean, _ := json.Marshal(p.Clean)
@@ -162,9 +171,49 @@ func autoplayScript(p PlayRequest, browser bool) string {
 	return start + fmt.Sprintf("$streamCleanUrl = %s; $streamHlsUrl = %s; ", clean, hls) + torrStartPlay
 }
 
+// resumeRecovery is where to find a file again: its title's sources when
+// known, otherwise a search for its name.
+func resumeRecovery(p PlayRequest) (href string, byTitle bool) {
+	if p.TMDBID > 0 && (p.Kind == "movie" || p.Kind == "tv") {
+		return fmt.Sprintf("/%s/%d#sources", p.Kind, p.TMDBID), true
+	}
+	if p.Title != "" {
+		return "/search?q=" + url.QueryEscape(p.Title), false
+	}
+	return "/search", false
+}
+
+// resumeMissing explains a Continue watching link whose file TorrServer no
+// longer has, and leads to finding it again.
+templ resumeMissing() {
+	if p, ok := ctx.Value(playRequestKey{}).(PlayRequest); ok && p.Missing {
+		{{ href, byTitle := resumeRecovery(p) }}
+		<div id="resume-missing" role="alert" class="alert alert-warning alert-soft">
+			@Icon("file-question", "size-5")
+			<span>
+				if p.Title != "" {
+					{ trf(ctx, "%s is no longer on your TorrServer.", p.Title) }
+				} else {
+					{ tr(ctx, "This file is no longer on your TorrServer.") }
+				}
+				{ tr(ctx, "Add a release again to keep watching.") }
+			</span>
+			<a href={ templ.SafeURL(href) } class="btn btn-sm btn-primary gap-1.5">
+				if byTitle {
+					@Icon("magnet", "size-4")
+					{ tr(ctx, "Find sources") }
+				} else {
+					@Icon("search", "size-4")
+					{ tr(ctx, "Search") }
+				}
+			</a>
+		</div>
+	}
+}
+
 // torrAutoplay opens the player on the file the page's link asks for.
 templ torrAutoplay(browser bool) {
-	if p, ok := ctx.Value(playRequestKey{}).(PlayRequest); ok {
+	if p, ok := ctx.Value(playRequestKey{}).(PlayRequest); ok && !p.Missing {
 		if browser {
 			<div id="torr-autoplay" class="hidden" data-signals:_autoplay="true" data-effect={ autoplayScript(p, true) }></div>
 		} else {

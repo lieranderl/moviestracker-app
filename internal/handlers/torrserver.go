@@ -42,19 +42,23 @@ func (s *Server) handleTorrServerPage(w http.ResponseWriter, r *http.Request) {
 
 	client := s.torrServer.Client()
 	echo, _ := client.Echo(ctx)
-	torrents, _ := client.ListTorrents(ctx)
+	torrents, listErr := client.ListTorrents(ctx)
 	s.matchTitles(torrents)
 
 	page := r.Context()
 	if play, ok := s.progress.PlayRequest(r); ok {
+		found := false
 		for _, t := range torrents {
 			for _, f := range t.FileStats {
 				if strings.EqualFold(t.Hash, play.Hash) && f.ID == play.Index {
 					play.Clean, play.HLS = s.shareLink(t.Hash, f), s.hlsShareLink(t.Hash, f)
 					play.Title = cmp.Or(play.Title, t.DisplayName())
+					found = true
 				}
 			}
 		}
+		// Only a TorrServer that answered can say the file is gone.
+		play.Missing = !found && listErr == nil && echo.Version != ""
 		page = views.WithPlayRequest(page, play)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

@@ -17,7 +17,7 @@ func webNext() string {
 }
 
 func webPlayerSignals() string {
-	return strings.TrimSuffix(torrPageSignals(false, false, true, ""), "}") + `, _tsPlayerProblem: '', _tsProbeProblem: '', _tsPlayerOrigin: '', _tsPlayingFile: '', _progressTorrent: null }`
+	return strings.TrimSuffix(torrPageSignals(false, false, true, ""), "}") + `, _tsPlayerProblem: '', _tsProbeProblem: '', _resumeHref: '/search', _tsPlayerOrigin: '', _tsPlayingFile: '', _progressTorrent: null }`
 }
 
 func playerStart(browser bool) string {
@@ -69,7 +69,15 @@ templ webPlayerTransport() {
 }
 
 templ webPlayerProblems() {
-	<div class="alert alert-warning alert-soft mt-3" role="alert" data-show="$_tsPlayerProblem || $_tsProbeProblem">
+	<div class="alert alert-warning alert-soft mt-3" role="alert" data-show="$_tsPlayerProblem === 'missing'">
+		@Icon("file-question", "size-5")
+		<span>
+			{ tr(ctx, "This file is no longer on your TorrServer.") }
+			{ tr(ctx, "Add a release again to keep watching.") }
+		</span>
+		<a href="/search" class="btn btn-sm btn-primary" data-attr:href="$_resumeHref">{ tr(ctx, "Find it again") }</a>
+	</div>
+	<div class="alert alert-warning alert-soft mt-3" role="alert" data-show="($_tsPlayerProblem && $_tsPlayerProblem !== 'missing') || $_tsProbeProblem">
 		<span>{ tr(ctx,"TorrServer could not load playback information. Check the connection or login, then retry.") }</span>
 		<button class="btn btn-sm" type="button" data-on:click={ webStartPlay() }>{ tr(ctx,"Retry") }</button>
 	</div>
