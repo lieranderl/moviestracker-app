@@ -86,7 +86,9 @@ templ WebPrivacy() {
 					</ul>
 				}
 				@privacySection(tr(ctx, "Your choices")) {
-					<p>{ tr(ctx, "You can change or remove any of this in the app at any time and stop sharing a list, and signing out deletes your session cookie. You can also remove Moviestracker's access to your Google account:") }</p>
+					<p>{ tr(ctx, "You can remove favourites, watch marks, lists, ratings, notes and TorrServers and change your release filters and language in the app at any time, and stop sharing a list. Signing out deletes your session cookie.") }</p>
+					<p>{ tr(ctx, "Where you stopped watching and your release alerts cannot be removed in the app yet: write to us to have them deleted.") }</p>
+					<p>{ tr(ctx, "You can also remove Moviestracker's access to your Google account:") }</p>
 					<p>
 						<a href={ templ.SafeURL(googleConnectionsURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">{ tr(ctx, "Google account connections") }</a>
 					</p>

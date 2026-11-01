@@ -303,7 +303,9 @@ in focused PRs before the larger episode/discovery and collaboration work.
   Data and deletion requests go to the private address the user confirmed
   (`mailto:`), asked from the Google account's email address; the public
   issue tracker is no longer offered and the page asks people not to post
-  personal details there. Policy date updated; Russian translated. Web tests
+  personal details there. Removal in the app is promised only for what the
+  app can remove; progress and alerts are deleted on request until R07.
+  Policy date updated; Russian translated. Web tests
   cover the categories and the contact route; a local browser check of
   `/privacy` confirmed the list, the mailto link and no horizontal overflow.
   This is not a legal compliance assessment.
