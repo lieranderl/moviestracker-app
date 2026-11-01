@@ -90,3 +90,18 @@ func TestOpeningTheAddTorrServerFormScrollsToIt(t *testing.T) {
 		t.Errorf("opening the add TorrServer form does not scroll to it: %s", form)
 	}
 }
+
+// The web app says a TorrServer has no GStreamer only when it answered so;
+// a failed check is reported as such.
+func TestTheWebTorrServerPanelTellsAFailedGStreamerCheckFromNoGStreamer(t *testing.T) {
+	out := html.UnescapeString(renderIn(t, context.Background(), views.WebTorrServerPage(testUser, nil, nil)))
+	for _, want := range []string{
+		`data-show="$tsStatus.hlsKnown && !$tsStatus.hls"`,
+		`data-show="!$tsStatus.hlsKnown"`, "Couldn't check whether this TorrServer can convert to HLS",
+		"$gstKnown = $tsStatus.hlsKnown",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("web TorrServer page lacks %q", want)
+		}
+	}
+}

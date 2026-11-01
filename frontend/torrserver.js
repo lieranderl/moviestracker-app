@@ -97,18 +97,21 @@ const begin = (el) => {
 
 // status is a full ts-status detail: Datastar merges an object assigned to a
 // signal, so every field is always sent.
-const status = (fields) => ({ checking: false, ok: false, version: "", hls: false, problem: "", status: 0, ...fields });
+const status = (fields) => ({ checking: false, ok: false, version: "", hls: false, hlsKnown: false, problem: "", status: 0, ...fields });
 
 // canConvert says whether a -gst build's GStreamer works: its /gst/echo
 // answers 200 with a health report ({"gstreamer": {"works": true}, …});
-// other builds have no /gst/echo.
+// other builds have no /gst/echo (404). Any other answer leaves it unknown:
+// { hls, hlsKnown }.
 const canConvert = async (url, signal) => {
   const gst = await call(url, "gst/echo", { read: (res) => res.json(), signal });
-  return gst.value?.gstreamer?.works === true;
+  if (gst.status === 404) return { hls: false, hlsKnown: true };
+  if (gst.problem || typeof gst.value?.gstreamer !== "object") return { hls: false, hlsKnown: false };
+  return { hls: gst.value.gstreamer.works === true, hlsKnown: true };
 };
 
 // tsCheck asks the TorrServer at url for its version and whether it can
-// convert to HLS, then fires ts-status on el: { ok, version, hls } or
+// convert to HLS, then fires ts-status on el: { ok, version, hls, hlsKnown } or
 // { ok: false, problem, status }. A newer check on el discards this one.
 //
 // It fires nothing before its first await: called from a data-effect, an
@@ -128,7 +131,7 @@ window.tsCheck = async (el, url) => {
   }
   const hls = await canConvert(url, signal);
   if (signal.aborted) return;
-  tell(el, "ts-status", status({ ok: true, version: echo.value.trim(), hls }));
+  tell(el, "ts-status", status({ ok: true, version: echo.value.trim(), ...hls }));
 };
 
 // shown is the list each element last reported, so an unchanged list is not

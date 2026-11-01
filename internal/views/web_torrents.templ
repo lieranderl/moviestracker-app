@@ -29,7 +29,7 @@ templ webTorrentsBox() {
 		class="space-y-4"
 		data-ref:_list
 		data-show="$tsSelected && $tsStatus.ok"
-		data-effect="$gst = $tsStatus.hls; $tsSelected && $tsStatus.ok && tsList(el, $tsSelected)"
+		data-effect="$gst = $tsStatus.hls; $gstKnown = $tsStatus.hlsKnown; $tsSelected && $tsStatus.ok && tsList(el, $tsSelected)"
 		data-on-interval__duration.5s="$tsSelected && $tsStatus.ok && tsList(el, $tsSelected)"
 		data-on:click={ webListActions(ctx) }
 		data-on:ts-files={ `if (evt.detail.url !== $tsSelected) return; if (evt.detail.torrent) { @post('/api/ts/files', {payload: {hash:evt.detail.hash, index:1, kind:'direct', torrent:evt.detail.torrent}}) } else { $toastError = true; $toast = ` + trJS(ctx, "TorrServer could not load playback information. Check the connection or login, then retry.") + ` }` }

@@ -212,8 +212,8 @@ pending, implemented, and deployed status separate in future updates here.
 
 ## Next implementation slice
 
-Continue with **R12**, then **R03**. They address directly observed
-friction without introducing new persistent product concepts. Continue Phase 1
+Continue with **R03**, then **R04**. They address observed and
+source-derived Phase 1 risks without introducing new product concepts. Continue Phase 1
 in focused PRs before the larger episode/discovery and collaboration work.
 
 ## Delivery log
@@ -256,6 +256,22 @@ in focused PRs before the larger episode/discovery and collaboration work.
   release) confirmed rows at 1280 and 320 px (badge visible, no horizontal
   overflow), the file menu's full path, and Russian rendering. The web app
   surface was covered by tests only.
+- **R12 — implemented, deployment unverified (1 November 2026):** HLS
+  support is now known available, known unavailable (no `/gst/echo`, or
+  GStreamer not working), or unknown (the check failed, erred or timed out);
+  unknown is never reported as unsupported, and HLS controls stay hidden
+  unless support is confirmed. Direct's help mentions HLS only when it is
+  available, otherwise VLC through the file menu. The self-hosted status line
+  and the web connection panel name an unknown check. When the browser cannot
+  decode a file, the player offers Play HLS where available, otherwise says
+  whether conversion is unavailable or unchecked, and keeps the Direct-link
+  advice; that notice now follows the theme (its text was unreadable in dark
+  theme). Why HLS was absent in the deployed E8 case remains undiagnosed.
+  Client, browser-check, view and live-signal tests cover the three states. A
+  local browser check (self-hosted app, fake TorrServer answering
+  works/404/500) confirmed the status line, Direct help and notice for each
+  state in English and Russian, and that Play HLS switches the stream. The web
+  app surface was covered by tests only.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding

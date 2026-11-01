@@ -17,7 +17,7 @@ func webNext() string {
 }
 
 func webPlayerSignals() string {
-	return strings.TrimSuffix(torrPageSignals(false, true, ""), "}") + `, _tsPlayerProblem: '', _tsProbeProblem: '', _tsPlayerOrigin: '', _tsPlayingFile: '', _progressTorrent: null }`
+	return strings.TrimSuffix(torrPageSignals(false, false, true, ""), "}") + `, _tsPlayerProblem: '', _tsProbeProblem: '', _tsPlayerOrigin: '', _tsPlayingFile: '', _progressTorrent: null }`
 }
 
 func playerStart(browser bool) string {

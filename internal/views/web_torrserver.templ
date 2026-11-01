@@ -18,7 +18,7 @@ func webTorrServerSignals(servers []store.TorrServer) string {
 	if len(servers) > 0 {
 		first = servers[0].URL
 	}
-	return fmt.Sprintf(`{ tsSelected: localStorage.getItem('mt-ts-selected') || %q, tsStatus: {checking: false, ok: false, version: '', hls: false, problem: '', status: 0}, tsAddOpen: false, tsName: '', tsUrl: '', tsUser: '', tsPass: '', tsFormError: '', tsForget: '' }`, first)
+	return fmt.Sprintf(`{ tsSelected: localStorage.getItem('mt-ts-selected') || %q, tsStatus: {checking: false, ok: false, version: '', hls: false, hlsKnown: false, problem: '', status: 0}, tsAddOpen: false, tsName: '', tsUrl: '', tsUser: '', tsPass: '', tsFormError: '', tsForget: '' }`, first)
 }
 
 // webTorrServerAdd saves the form's login in this browser, then sends only
@@ -176,7 +176,8 @@ templ webTorrServerStatus() {
 					</span>
 				</summary>
 				<div class="collapse-content p-0 space-y-3">
-					<p class="pt-3 text-sm text-base-content/70" data-show="!$tsStatus.hls">{ tr(ctx, "This TorrServer has no GStreamer, so videos play only in formats the browser supports. Its -gst build converts the others to HLS.") }</p>
+					<p class="pt-3 text-sm text-base-content/70" data-show="$tsStatus.hlsKnown && !$tsStatus.hls">{ tr(ctx, "This TorrServer has no GStreamer, so videos play only in formats the browser supports. Its -gst build converts the others to HLS.") }</p>
+					<p class="pt-3 text-sm text-base-content/70" data-show="!$tsStatus.hlsKnown">{ tr(ctx, "Couldn't check whether this TorrServer can convert to HLS, so HLS stays off. Reconnect to check again.") }</p>
 					<div
 						id="ts-https"
 						class="pt-3 space-y-3"

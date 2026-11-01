@@ -52,7 +52,7 @@ func webTorrentsBox() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section id=\"ts-torrents-box\" class=\"space-y-4\" data-ref:_list data-show=\"$tsSelected && $tsStatus.ok\" data-effect=\"$gst = $tsStatus.hls; $tsSelected && $tsStatus.ok && tsList(el, $tsSelected)\" data-on-interval__duration.5s=\"$tsSelected && $tsStatus.ok && tsList(el, $tsSelected)\" data-on:click=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section id=\"ts-torrents-box\" class=\"space-y-4\" data-ref:_list data-show=\"$tsSelected && $tsStatus.ok\" data-effect=\"$gst = $tsStatus.hls; $gstKnown = $tsStatus.hlsKnown; $tsSelected && $tsStatus.ok && tsList(el, $tsSelected)\" data-on-interval__duration.5s=\"$tsSelected && $tsStatus.ok && tsList(el, $tsSelected)\" data-on:click=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

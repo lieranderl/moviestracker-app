@@ -14,11 +14,12 @@ import (
 
 // torrPageSignals is the client state for the TorrServer page. $gst mirrors
 // TorrServer's GStreamer support (kept current by the SSE stream) and gates
-// every HLS/probe control.
-func torrPageSignals(gst, canRemove bool, linkOrigin string) string {
+// every HLS/probe control; $gstKnown is false while that support could not
+// be checked, so "cannot" is never claimed for "unknown".
+func torrPageSignals(gst, gstKnown, canRemove bool, linkOrigin string) string {
 	origin, _ := json.Marshal(linkOrigin)
 	return fmt.Sprintf(`{
-	gst: %t, canRemove: %t, linkOrigin: %s,
+	gst: %t, gstKnown: %t, canRemove: %t, linkOrigin: %s,
 	playerOpen: false, streamUrl: '', streamCleanUrl: '', streamHlsUrl: '', streamTitle: '', activeHash: '', activeFileIndex: 1,
 	streamBase: '', playKind: 'direct', playNonce: 0, audioTrack: -1, mediaInfoOpen: false, subTrack: -1,
 	_resume: '', _resumeAt: 0, _seekHint: '', _seekSum: 0, _seekAt: 0, _zone: '',
@@ -30,7 +31,7 @@ func torrPageSignals(gst, canRemove bool, linkOrigin string) string {
 	fileMenuOpen: false, _file: {hash: '', index: 1, title: '', clean: '', hls: '', video: false},
 	confirmOpen: false, confirmHash: '', confirmName: '',
 	filterQuery: '', toast: '', toastError: false
-}`, gst, canRemove, origin)
+}`, gst, gstKnown, canRemove, origin)
 }
 
 // torrListActions is the single delegated click handler for every torrent and
@@ -337,7 +338,7 @@ templ TorrServer(user *auth.User, engine, linkOrigin string, links StreamLinks, 
 		<main
 			id="torrserver-app"
 			class="grow w-full max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6"
-			data-signals={ torrPageSignals(echo.GSTAvailable, user.IsAdmin(), linkOrigin) }
+			data-signals={ torrPageSignals(echo.GSTAvailable, echo.GSTKnown, user.IsAdmin(), linkOrigin) }
 		>
 			<!-- Header & server status -->
 			<section class="card bg-base-200/60 border border-base-content/10 shadow-lg">
@@ -444,10 +445,15 @@ templ torrStatus(echo torrserver.EchoInfo) {
 				<span class="status status-success animate-pulse"></span>
 				{ trf(ctx, "GStreamer v%s Active (HLS / Remux Ready)", echo.GSTVersion) }
 			</span>
-		} else {
+		} else if echo.GSTKnown {
 			<span class="flex items-center gap-1.5 text-warning font-semibold">
 				<span class="status status-warning"></span>
 				{ tr(ctx, "GStreamer Inactive (Direct HTTP Streaming Only)") }
+			</span>
+		} else {
+			<span class="flex items-center gap-1.5 text-base-content/70 font-semibold">
+				<span class="status status-neutral"></span>
+				{ tr(ctx, "Couldn't check GStreamer: HLS stays off until TorrServer answers") }
 			</span>
 		}
 		if echo.Discoverer {
@@ -835,10 +841,23 @@ templ torrPlayerModalFor(browser bool) {
 			@TorrResume("", 0, 0)
 			<span class="loading loading-spinner loading-lg text-primary absolute inset-0 m-auto pointer-events-none" data-show="$_waiting && !$_unplayable"></span>
 			<!-- The browser refused the stream (player.js names the format it cannot decode). -->
-			<div class="absolute inset-0 z-20 grid place-items-center p-6 bg-black/90" data-show="$_unplayable" role="alert">
+			<div class="absolute inset-0 z-20 grid place-items-center p-6 bg-base-content/90" data-show="$_unplayable" role="alert">
 				<div class="max-w-md text-center space-y-2 text-base-100">
 					@Icon("circle-alert", "size-8 mx-auto text-warning")
 					<p class="font-semibold">{ tr(ctx, "This browser cannot play") } <span data-text="$_unplayable"></span> { tr(ctx, "of this file.") }</p>
+					<div data-show="$gst">
+						<button
+							type="button"
+							class="btn btn-sm btn-secondary gap-1.5"
+							data-on:click={ "$_unplayable = ''; $playKind = 'hls'\n" + playerStart(browser) }
+						>
+							@Icon("play", "size-4")
+							{ trf(ctx, "Play %s", "HLS") }
+						</button>
+						<p class="text-sm opacity-80 mt-2">{ tr(ctx, "HLS converts it as it plays, in any browser.") }</p>
+					</div>
+					<p class="text-sm opacity-80" data-show="$gstKnown && !$gst">{ tr(ctx, "This TorrServer cannot convert it to HLS: its GStreamer build can.") }</p>
+					<p class="text-sm opacity-80" data-show="!$gstKnown">{ tr(ctx, "Couldn't check whether this TorrServer can convert it to HLS.") }</p>
 					<p class="text-sm opacity-80">{ tr(ctx, "Copy its Direct link below for VLC, another player or your TV, which play it as it is.") }</p>
 				</div>
 			</div>
@@ -1570,7 +1589,11 @@ templ streamGroup(kind string, play templ.Attributes) {
 	{{
 		hls := kind == "hls"
 		label, aria := tr(ctx, "Direct"), tr(ctx, "Direct: the original file")
-		playHelp := tr(ctx, "Play the original file here. Browsers can't play every format: if it stays black or silent, use HLS or VLC")
+		playHelp := tr(ctx, "Play the original file here. Browsers can't play every format: if it stays black or silent, open it in VLC from the file's menu")
+		playHelpHLS := ""
+		if !hls {
+			playHelpHLS = "$gst ? " + trJS(ctx, "Play the original file here. Browsers can't play every format: if it stays black or silent, use HLS or VLC") + " : " + jsString(playHelp)
+		}
 		if hls {
 			label, aria = "HLS", tr(ctx, "HLS: converted by GStreamer")
 			playHelp = tr(ctx, "Play here, converted by GStreamer: works in every browser, picks audio tracks")
@@ -1594,6 +1617,9 @@ templ streamGroup(kind string, play templ.Attributes) {
 			class={ "btn btn-xs btn-square shadow-none", templ.KV("btn-primary", !hls), templ.KV("btn-secondary", hls) }
 			aria-label={ trf(ctx, "Play %s", label) }
 			title={ playHelp }
+			if playHelpHLS != "" {
+				data-attr:title={ playHelpHLS }
+			}
 		>
 			@Icon("play", "size-3.5")
 		</button>
