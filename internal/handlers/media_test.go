@@ -43,6 +43,9 @@ type fakeTMDBDetails struct {
 	genres        map[string][]tmdb.Genre
 	genresErr     error
 
+	titleIn  map[i18n.Lang]map[string]tmdb.MediaItem
+	titleErr error
+
 	mu       sync.Mutex
 	asked    []string // "list page" asked of ListPage
 	discover []string // "query page" asked of Discover
@@ -119,6 +122,18 @@ func lookup[T any](m map[int]*T, id int, err error) (*T, error) {
 
 func (f *fakeTMDBDetails) Movie(_ context.Context, id int) (*tmdb.MovieDetails, error) {
 	return lookup(f.movies, id, f.err)
+}
+
+// Title answers names in the language asked: titleIn holds them by
+// language and "kind-id"; titleErr fails every lookup.
+func (f *fakeTMDBDetails) Title(ctx context.Context, kind string, id int) (tmdb.MediaItem, error) {
+	if f.titleErr != nil {
+		return tmdb.MediaItem{}, f.titleErr
+	}
+	if it, ok := f.titleIn[i18n.FromContext(ctx)][fmt.Sprintf("%s-%d", kind, id)]; ok {
+		return it, nil
+	}
+	return tmdb.MediaItem{}, tmdb.ErrNotFound
 }
 
 func (f *fakeTMDBDetails) TV(_ context.Context, id int) (*tmdb.TVDetails, error) {

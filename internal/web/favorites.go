@@ -116,6 +116,7 @@ func (a *app) handleFavoritesPage(w http.ResponseWriter, r *http.Request) {
 	for _, f := range favs {
 		items = append(items, tmdb.MediaItem{ID: f.TMDBID, Title: f.Title, PosterPath: f.Poster, MediaType: f.Kind})
 	}
+	items = a.catalog.LocalizeTitles(r.Context(), items)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err != nil {

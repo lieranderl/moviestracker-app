@@ -59,6 +59,7 @@ func (ts *TitleStates) handleList(w http.ResponseWriter, r *http.Request) {
 	for _, t := range kept {
 		items = append(items, tmdb.MediaItem{ID: t.TMDBID, Title: t.Title, PosterPath: t.Poster, MediaType: t.Kind})
 	}
+	items = ts.catalog.LocalizeTitles(r.Context(), items)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err != nil {
