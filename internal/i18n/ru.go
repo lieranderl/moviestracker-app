@@ -371,6 +371,7 @@ var ru = map[string]string{
 	"Added":                      "Добавлен",
 	"Peers":                      "Пиры",
 	"Send to TorrServer":         "Отправить в TorrServer",
+	"Add to %s":                  "Добавить в %s",
 	"Copy magnet link":           "Копировать magnet-ссылку",
 	"Open on %s":                 "Открыть на %s",
 	"Open source page on %s":     "Открыть страницу источника на %s",
