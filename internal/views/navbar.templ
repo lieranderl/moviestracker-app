@@ -74,6 +74,9 @@ templ Navbar(user *auth.User) {
 						</label>
 					</form>
 				}
+				if user != nil && siteOf(ctx).Cloud {
+					@alertsSlot()
+				}
 				if rel, ok := newRelease(ctx); ok && user.IsAdmin() {
 					@releaseBadge(rel)
 				}

@@ -21,6 +21,7 @@ type memoryUser struct {
 	torrServers []TorrServer // in the order added
 	progress    map[string]Progress
 	titles      map[string]TitleState
+	updates     map[string]Update
 }
 
 // NewMemory returns an empty in-memory store.
@@ -32,7 +33,7 @@ func NewMemory(opts ...Option) *Memory {
 func (m *Memory) user(uid string) *memoryUser {
 	u, ok := m.users[uid]
 	if !ok {
-		u = &memoryUser{favorites: map[string]Favorite{}, progress: map[string]Progress{}, titles: map[string]TitleState{}}
+		u = &memoryUser{favorites: map[string]Favorite{}, progress: map[string]Progress{}, titles: map[string]TitleState{}, updates: map[string]Update{}}
 		m.users[uid] = u
 	}
 	return u
@@ -213,4 +214,46 @@ func (m *Memory) TitleStates(_ context.Context, uid, state string) ([]TitleState
 	}
 	slices.SortFunc(out, newestFirst)
 	return out, nil
+}
+
+// AddUpdates implements Store.
+func (m *Memory) AddUpdates(_ context.Context, uid string, updates []Update) error {
+	ids := make([]string, len(updates))
+	for i, u := range updates {
+		id, err := updateID(u)
+		if err != nil {
+			return err
+		}
+		ids[i] = id
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	kept := m.user(uid).updates
+	for i, u := range updates {
+		if _, ok := kept[ids[i]]; !ok {
+			u.FoundAt, u.Seen = u.FoundAt.UTC(), false
+			kept[ids[i]] = u
+		}
+	}
+	return nil
+}
+
+// Updates implements Store.
+func (m *Memory) Updates(_ context.Context, uid string) ([]Update, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := slices.Collect(maps.Values(m.user(uid).updates))
+	slices.SortFunc(out, newestFound)
+	return out[:min(len(out), updateLimit)], nil
+}
+
+// MarkUpdatesSeen implements Store.
+func (m *Memory) MarkUpdatesSeen(_ context.Context, uid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for id, u := range m.user(uid).updates {
+		u.Seen = true
+		m.user(uid).updates[id] = u
+	}
+	return nil
 }

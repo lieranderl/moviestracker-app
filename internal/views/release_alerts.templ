@@ -1,0 +1,83 @@
+package views
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/store"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+)
+
+// alertLabels say what each release feed's update means.
+var alertLabels = map[string]string{
+	"latesttorrentsmovies": "New release on the trackers",
+	"hdr10movies":          "Now in HDR10",
+	"dvmovies":             "Now in Dolby Vision",
+}
+
+// alertsSlot is where the web app's navbar bell goes; it asks for the
+// unseen updates when the page loads.
+templ alertsSlot() {
+	<span id="alerts-bell" class="contents" data-init="@get('/api/alerts/count')"></span>
+}
+
+// AlertsBell leads to the updates, counting those not seen yet.
+templ AlertsBell(unseen int) {
+	<a id="alerts-bell" href="/alerts" class="btn btn-ghost btn-sm btn-circle indicator" aria-label={ tr(ctx, "Release alerts") } title={ tr(ctx, "Release alerts") }>
+		if unseen > 0 {
+			<span class="indicator-item badge badge-primary badge-xs">{ strconv.Itoa(unseen) }</span>
+		}
+		@Icon("bell", "size-4")
+	</a>
+}
+
+// AlertsPage lists what turned up for the movies the user follows, most
+// recently noticed first; failed says the alerts could not be read.
+templ AlertsPage(user *auth.User, alerts []store.Update, failed bool) {
+	@Layout(tr(ctx, "Release alerts")) {
+		@Navbar(user)
+		<main class="grow pb-20">
+			<div class="max-w-3xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
+				<header class="space-y-1">
+					<h1 class="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
+						@Icon("bell", "size-6 text-primary")
+						{ tr(ctx, "Release alerts") }
+					</h1>
+					<p class="text-sm text-base-content/70">{ tr(ctx, "Releases found for the movies in your favourites and Want to watch.") }</p>
+				</header>
+				if failed {
+					<div role="alert" class="alert alert-error alert-soft">
+						@Icon("circle-alert", "size-5")
+						<span>{ tr(ctx, "Your release alerts could not be loaded right now. Please try again in a moment.") }</span>
+					</div>
+				} else if len(alerts) == 0 {
+					@emptyState("bell", tr(ctx, "No release alerts yet"), tr(ctx, "Follow movies with Add to favourites or Want to watch: you hear here when they turn up in HDR10, Dolby Vision or on the trackers.")) {
+						@browseTrendingLink()
+					}
+				} else {
+					<ul class="list bg-base-200/60 rounded-box border border-base-content/10">
+						for _, u := range alerts {
+							<li class="list-row items-center">
+								if poster := (tmdb.MediaItem{PosterPath: u.Poster}).PosterURL(); poster != "" {
+									<img src={ poster } alt="" class="w-12 aspect-[2/3] rounded-field object-cover" loading="lazy" width="48" height="72"/>
+								} else {
+									@Icon("film", "size-8 opacity-40")
+								}
+								<div class="min-w-0">
+									<a href={ templ.SafeURL(fmt.Sprintf("/movie/%d#sources", u.TMDBID)) } class="font-semibold link link-hover line-clamp-1">{ u.Title }</a>
+									<p class="text-sm text-base-content/70">{ tr(ctx, alertLabels[u.Feed]) }</p>
+								</div>
+								if !u.Seen {
+									<span class="badge badge-primary badge-sm">{ tr(ctx, "New") }</span>
+								}
+							</li>
+						}
+					</ul>
+				}
+			</div>
+			@toTopButton()
+		</main>
+		@siteFooter()
+	}
+}

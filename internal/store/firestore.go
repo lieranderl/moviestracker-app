@@ -367,6 +367,67 @@ func (f *Firestore) TitleStates(ctx context.Context, uid, state string) ([]Title
 	return out, nil
 }
 
+// updateRecord is a users/{uid}/updates/{feed}-{id} document.
+type updateRecord struct {
+	Feed    string    `firestore:"feed"`
+	TMDBID  int       `firestore:"tmdbId"`
+	Title   string    `firestore:"title"`
+	Poster  string    `firestore:"poster,omitempty"`
+	FoundAt time.Time `firestore:"foundAt"`
+	Seen    bool      `firestore:"seen"`
+}
+
+func (f *Firestore) updates(uid string) *firestore.CollectionRef {
+	return f.userDoc(uid).Collection("updates")
+}
+
+// AddUpdates implements Store.
+func (f *Firestore) AddUpdates(ctx context.Context, uid string, updates []Update) error {
+	for _, u := range updates {
+		id, err := updateID(u)
+		if err != nil {
+			return err
+		}
+		u.FoundAt, u.Seen = u.FoundAt.UTC(), false
+		_, err = f.updates(uid).Doc(id).Create(ctx, updateRecord(u))
+		if err != nil && status.Code(err) != codes.AlreadyExists {
+			return fmt.Errorf("add update: %w", err)
+		}
+	}
+	return nil
+}
+
+// Updates implements Store.
+func (f *Firestore) Updates(ctx context.Context, uid string) ([]Update, error) {
+	docs, err := f.updates(uid).OrderBy("foundAt", firestore.Desc).Limit(updateLimit).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("read updates: %w", err)
+	}
+	out := make([]Update, 0, len(docs))
+	for _, doc := range docs {
+		var rec updateRecord
+		if err := doc.DataTo(&rec); err != nil {
+			return nil, fmt.Errorf("read update %s: %w", doc.Ref.ID, err)
+		}
+		out = append(out, Update(rec))
+	}
+	return out, nil
+}
+
+// MarkUpdatesSeen implements Store.
+func (f *Firestore) MarkUpdatesSeen(ctx context.Context, uid string) error {
+	docs, err := f.updates(uid).Where("seen", "==", false).Documents(ctx).GetAll()
+	if err != nil {
+		return fmt.Errorf("read unseen updates: %w", err)
+	}
+	for _, doc := range docs {
+		if _, err := doc.Ref.Update(ctx, []firestore.Update{{Path: "seen", Value: true}}); err != nil {
+			return fmt.Errorf("mark update seen: %w", err)
+		}
+	}
+	return nil
+}
+
 func notFound(err error) bool {
 	var se interface{ GRPCStatus() *status.Status }
 	return errors.As(err, &se) && se.GRPCStatus().Code() == codes.NotFound

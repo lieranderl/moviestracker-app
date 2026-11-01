@@ -266,6 +266,12 @@ func Navbar(user *auth.User) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
+		if user != nil && siteOf(ctx).Cloud {
+			templ_7745c5c3_Err = alertsSlot().Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
 		if rel, ok := newRelease(ctx); ok && user.IsAdmin() {
 			templ_7745c5c3_Err = releaseBadge(rel).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
@@ -293,7 +299,7 @@ func Navbar(user *auth.User) templ.Component {
 			var templ_7745c5c3_Var10 templ.SafeURL
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(signInHref(ctx)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 85, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 88, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -314,7 +320,7 @@ func Navbar(user *auth.User) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Sign in"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 87, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 90, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -419,7 +425,7 @@ func torrServerDot() templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(torrServerNavTitle(ctx))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 123, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 126, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 		if templ_7745c5c3_Err != nil {
@@ -465,7 +471,7 @@ func tabBar(status bool) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Main"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 131, Col: 134}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 134, Col: 134}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 		if templ_7745c5c3_Err != nil {
@@ -483,7 +489,7 @@ func tabBar(status bool) templ.Component {
 			var templ_7745c5c3_Var17 templ.SafeURL
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(l.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 134, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 137, Col: 32}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
@@ -496,7 +502,7 @@ func tabBar(status bool) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue("{ 'dock-active': " + onPage(l.Href) + " }")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 135, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 138, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 			if templ_7745c5c3_Err != nil {
@@ -509,7 +515,7 @@ func tabBar(status bool) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(onPage(l.Href) + " ? 'page' : null")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 136, Col: 64}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 139, Col: 64}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 			if templ_7745c5c3_Err != nil {
@@ -527,7 +533,7 @@ func tabBar(status bool) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue(torrServerNavTitle(ctx))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 138, Col: 46}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 141, Col: 46}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 				if templ_7745c5c3_Err != nil {
@@ -553,7 +559,7 @@ func tabBar(status bool) templ.Component {
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, l.Label))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 143, Col: 23}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 146, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
@@ -621,7 +627,7 @@ func releaseBadge(rel Release) templ.Component {
 		var templ_7745c5c3_Var23 string
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.ResolveAttributeValue(trf(ctx, "Moviestracker %s is available", rel.Version))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 165, Col: 138}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 168, Col: 138}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 		if templ_7745c5c3_Err != nil {
@@ -642,7 +648,7 @@ func releaseBadge(rel Release) templ.Component {
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(trf(ctx, "Moviestracker %s is available", rel.Version))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 167, Col: 80}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 170, Col: 80}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
@@ -655,7 +661,7 @@ func releaseBadge(rel Release) templ.Component {
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(rel.Version)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 168, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 171, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
@@ -718,7 +724,7 @@ func avatarFace(user *auth.User, size string) templ.Component {
 		var templ_7745c5c3_Var29 string
 		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(user.Initials())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 176, Col: 89}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 179, Col: 89}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 		if templ_7745c5c3_Err != nil {
@@ -736,7 +742,7 @@ func avatarFace(user *auth.User, size string) templ.Component {
 			var templ_7745c5c3_Var30 string
 			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.ResolveAttributeValue(user.Picture)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 178, Col: 25}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 181, Col: 25}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
 			if templ_7745c5c3_Err != nil {
@@ -780,7 +786,7 @@ func userMenu(user *auth.User) templ.Component {
 		var templ_7745c5c3_Var32 string
 		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "User menu"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 188, Col: 35}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 191, Col: 35}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
 		if templ_7745c5c3_Err != nil {
@@ -801,7 +807,7 @@ func userMenu(user *auth.User) templ.Component {
 		var templ_7745c5c3_Var33 string
 		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Signed in as"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 201, Col: 83}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 204, Col: 83}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {
@@ -822,7 +828,7 @@ func userMenu(user *auth.User) templ.Component {
 		var templ_7745c5c3_Var34 string
 		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(user.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 210, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 213, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 		if templ_7745c5c3_Err != nil {
@@ -835,7 +841,7 @@ func userMenu(user *auth.User) templ.Component {
 		var templ_7745c5c3_Var35 string
 		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(user.Username)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 211, Col: 82}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 214, Col: 82}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 		if templ_7745c5c3_Err != nil {
@@ -853,7 +859,7 @@ func userMenu(user *auth.User) templ.Component {
 			var templ_7745c5c3_Var36 string
 			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, user.Role))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 213, Col: 93}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 216, Col: 93}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 			if templ_7745c5c3_Err != nil {
@@ -876,7 +882,7 @@ func userMenu(user *auth.User) templ.Component {
 			var templ_7745c5c3_Var37 templ.SafeURL
 			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(l.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 221, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 224, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 			if templ_7745c5c3_Err != nil {
@@ -897,7 +903,7 @@ func userMenu(user *auth.User) templ.Component {
 			var templ_7745c5c3_Var38 string
 			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, l.Label))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 223, Col: 23}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 226, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 			if templ_7745c5c3_Err != nil {
@@ -924,7 +930,7 @@ func userMenu(user *auth.User) templ.Component {
 			var templ_7745c5c3_Var39 string
 			templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Settings"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 231, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 234, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 			if templ_7745c5c3_Err != nil {
@@ -950,7 +956,7 @@ func userMenu(user *auth.User) templ.Component {
 		var templ_7745c5c3_Var40 string
 		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Sign Out"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 241, Col: 26}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/navbar.templ`, Line: 244, Col: 26}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 		if templ_7745c5c3_Err != nil {
