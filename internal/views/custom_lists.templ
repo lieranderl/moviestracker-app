@@ -35,28 +35,30 @@ func listTitleURL(list, kind string, id int) string {
 // ListItemID is a title's card's ID on its list's page.
 func ListItemID(kind string, id int) string { return fmt.Sprintf("list-item-%s-%d", kind, id) }
 
-// listPickerSlot is a title page's Add to list menu: the user's lists, each
-// ticked when the title is in it, asked for when the page loads, and a
-// form that makes a list with the title in it.
+// listPickerSlot is a title page's Add to list dialog: the user's lists,
+// each ticked when the title is in it, and a form that makes a list with
+// the title in it. The top layer escapes the hero's clipping and keeps
+// the picker in the viewport when its trigger wraps onto another line.
 templ listPickerSlot(kind string, id int) {
-	<details class="dropdown dropdown-top dropdown-end" data-on:click__outside="el.open = false">
-		<summary class="btn sm:btn-lg btn-ghost text-neutral-content border-neutral-content/30 hover:bg-neutral-content/10 gap-2">
-			@Icon("list-plus", "size-5")
-			{ tr(ctx, "Add to list") }
-		</summary>
-		<div class="dropdown-content z-30 mb-2 w-72 max-w-[calc(100vw-2rem)] rounded-box bg-base-200 text-base-content border border-base-content/10 shadow-2xl p-2 space-y-2">
+	<button type="button" class="btn sm:btn-lg btn-ghost text-neutral-content border-neutral-content/30 hover:bg-neutral-content/10 gap-2" aria-haspopup="dialog" data-on:click="$_listPickerOpen = true">
+		@Icon("list-plus", "size-5")
+		{ tr(ctx, "Add to list") }
+	</button>
+	@modalDialog("title-list-picker", "_listPickerOpen", "", "", "max-w-sm text-base-content", templ.Attributes{"data-signals": "{ _listPickerOpen: false }"}) {
+		@modalHeader("title-list-picker", tr(ctx, "Add to list"), "list-plus", "text-primary")
+		<div class="pt-3 space-y-2">
 			<ul id="list-picker" class="menu menu-sm w-full p-0" data-init={ fmt.Sprintf("@get('/api/lists/title?type=%s&id=%d')", kind, id) }>
 				<li class="menu-disabled"><span class="loading loading-spinner loading-xs" aria-label={ tr(ctx, "Loading") }></span></li>
 			</ul>
 			<form class="join w-full" data-signals="{ listName: '' }" data-on:submit={ fmt.Sprintf("@post('/api/lists?type=%s&id=%d', {filterSignals: {include: /^listName$/}})", kind, id) }>
-				<input type="text" required maxlength="60" autocomplete="off" class="input input-sm join-item w-full" aria-label={ tr(ctx, "New list") } placeholder={ tr(ctx, "New list") } data-bind:list-name/>
+				<input type="text" required maxlength="60" autocomplete="off" class="input input-sm join-item min-w-0 w-full" aria-label={ tr(ctx, "New list") } placeholder={ tr(ctx, "New list") } data-bind:list-name/>
 				<button type="submit" class="btn btn-sm btn-primary join-item" aria-label={ tr(ctx, "Make list") }>
 					@Icon("plus", "size-4")
 				</button>
 			</form>
 			<div id="new-list-error"></div>
 		</div>
-	</details>
+	}
 }
 
 // ListPicker is the user's lists in a title's Add to list menu: ticking

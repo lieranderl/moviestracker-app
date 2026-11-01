@@ -60,6 +60,45 @@ func quickDashboard(c *handlers.Config) {
 	c.StreamIdle = 150 * time.Millisecond
 }
 
+// dashboardResponse ends a stream once its public output has arrived.
+type dashboardResponse struct {
+	*httptest.ResponseRecorder
+	want   []string
+	cancel context.CancelFunc
+}
+
+func (w *dashboardResponse) Flush() {
+	w.ResponseRecorder.Flush()
+	for _, want := range w.want {
+		if !strings.Contains(w.Body.String(), want) {
+			return
+		}
+	}
+	w.cancel()
+}
+
+// dashboardUntil waits for an observable patch, rather than assuming that
+// collecting machine and upstream metadata finishes within a fixed window.
+func dashboardUntil(t *testing.T, l *local, cookie *http.Cookie, want ...string) string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "/api/dashboard?stream=true", nil)
+	req.AddCookie(cookie)
+	rr := &dashboardResponse{ResponseRecorder: httptest.NewRecorder(), want: want, cancel: cancel}
+	l.server.ServeHTTP(rr, req)
+	body := rr.Body.String()
+	if rr.Code != http.StatusOK {
+		t.Fatalf("dashboard status %d, want 200:\n%s", rr.Code, body)
+	}
+	for _, text := range want {
+		if !strings.Contains(body, text) {
+			t.Fatalf("dashboard never showed %q before the deadline:\n%s", text, body)
+		}
+	}
+	return body
+}
+
 func TestTheDashboardShowsWhatIsPlayingAndWhereFrom(t *testing.T) {
 	engine, release := playingEngine(t)
 	l := newLocal(t, withAdmin(t), withEngineAt(engine.URL), quickDashboard)
@@ -244,7 +283,7 @@ func TestTheDashboardKeepsTheAppApartFromTheMachine(t *testing.T) {
 
 func TestATorrServerOnAnotherMachineIsNamedNotMeasured(t *testing.T) {
 	l := newLocal(t, withAdmin(t), withEngineAt("http://192.0.2.10:8090"), quickDashboard)
-	body := openStreams(t, l, l.admin(t), 400*time.Millisecond, "/api/dashboard?stream=true")[0]
+	body := dashboardUntil(t, l, l.admin(t), "runs on another machine")
 	if !strings.Contains(body, "runs on another machine") {
 		t.Error("the System card does not say where a remote TorrServer runs")
 	}
@@ -303,7 +342,7 @@ func httpsEngine(t *testing.T, notAfter time.Time, loadError string) *settingsEn
 func TestTheDashboardShowsTorrServersHTTPSCertificate(t *testing.T) {
 	eng := httpsEngine(t, time.Now().AddDate(0, 2, 0), "")
 	l := newLocal(t, withAdmin(t), withEngineAt(eng.URL), quickDashboard)
-	body := openStreams(t, l, l.admin(t), 400*time.Millisecond, "/api/dashboard?stream=true")[0]
+	body := dashboardUntil(t, l, l.admin(t), "trusted by the TorrServer machine", `id="dash-problems"`)
 
 	app := section(t, body, "dash-app")
 	for _, want := range []string{"HTTPS", ":8091", "ts.example", "Let&#39;s Encrypt (R11)", "trusted by the TorrServer machine", time.Now().AddDate(0, 2, 0).UTC().Format(time.DateOnly)} {
@@ -318,8 +357,22 @@ func TestTheDashboardShowsTorrServersHTTPSCertificate(t *testing.T) {
 
 func TestTheDashboardWarnsTwoWeeksBeforeTheHTTPSCertificateExpires(t *testing.T) {
 	eng := httpsEngine(t, time.Now().Add(5*24*time.Hour+time.Hour), "")
-	l := newLocal(t, withAdmin(t), withEngineAt(eng.URL), quickDashboard)
-	body := openStreams(t, l, l.admin(t), 400*time.Millisecond, "/api/dashboard?stream=true")[0]
+	// Certificate metadata can arrive after the first dashboard patches.
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/ssl/") {
+			timer := time.NewTimer(600 * time.Millisecond)
+			defer timer.Stop()
+			select {
+			case <-timer.C:
+			case <-r.Context().Done():
+				return
+			}
+		}
+		eng.Config.Handler.ServeHTTP(w, r)
+	}))
+	t.Cleanup(slow.Close)
+	l := newLocal(t, withAdmin(t), withEngineAt(slow.URL), quickDashboard)
+	body := dashboardUntil(t, l, l.admin(t), "HTTPS certificate expires in 5 days")
 	if problems := section(t, body, "dash-problems"); !strings.Contains(problems, "HTTPS certificate expires in 5 days") {
 		t.Errorf("Problems card does not warn about the certificate:\n%s", problems)
 	}
@@ -328,7 +381,7 @@ func TestTheDashboardWarnsTwoWeeksBeforeTheHTTPSCertificateExpires(t *testing.T)
 func TestTheDashboardSaysWhenTorrServerCannotLoadItsCertificate(t *testing.T) {
 	eng := httpsEngine(t, time.Now().AddDate(1, 0, 0), "open /etc/letsencrypt/live/ts.example/privkey.pem: permission denied")
 	l := newLocal(t, withAdmin(t), withEngineAt(eng.URL), quickDashboard)
-	body := openStreams(t, l, l.admin(t), 400*time.Millisecond, "/api/dashboard?stream=true")[0]
+	body := dashboardUntil(t, l, l.admin(t), "TorrServer cannot load its HTTPS certificate")
 	if problems := section(t, body, "dash-problems"); !strings.Contains(problems, "cannot load its HTTPS certificate") || !strings.Contains(problems, "permission denied") {
 		t.Errorf("Problems card does not say the certificate fails to load:\n%s", problems)
 	}
