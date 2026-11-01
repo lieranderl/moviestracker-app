@@ -604,3 +604,20 @@ test("the TorrServer check tells HLS it could not check from HLS the TorrServer 
     expect(statuses.at(-1)).toMatchObject({ ok: true, version: "MatriX.146", ...want });
   }
 });
+
+test("a file TorrServer no longer has is reported missing, not as a connection problem", async () => {
+  const hash = "08ada5a7a6183aae1e09d831df6748d566095a10";
+  const load = async (respond, index) => {
+    const el = new EventTarget();
+    const events = [];
+    el.addEventListener("ts-player", (evt) => events.push(evt.detail));
+    globalThis.fetch = requests = mock(respond);
+    await client.tsPlayerLoad(el, server, hash, index, "direct", 1);
+    return events.at(-1);
+  };
+  expect((await load(async () => new Response("not found", { status: 404 }), 1)).problem).toBe("missing");
+  const gone = await load(async () => Response.json({ hash, file_stats: [{ id: 1, path: "Sintel.mp4" }] }), 3);
+  expect(gone.problem).toBe("missing");
+  expect(gone.torrent).toBeNull();
+  expect((await load(async () => new Response("boom", { status: 500 }), 1)).problem).toBe("status");
+});

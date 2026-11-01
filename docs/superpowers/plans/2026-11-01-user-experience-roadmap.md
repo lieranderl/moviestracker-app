@@ -309,6 +309,17 @@ in focused PRs before the larger episode/discovery and collaboration work.
   cover the categories and the contact route; a local browser check of
   `/privacy` confirmed the list, the mailto link and no horizontal overflow.
   This is not a legal compliance assessment.
+- **R15 — partly implemented, deployment unverified (2 November 2026):**
+  missing progress targets now offer recovery in both apps. When a Continue
+  watching link's torrent or file is no longer on a TorrServer that answered,
+  the self-hosted TorrServer page shows why instead of opening a player with
+  nothing to play, and the web player reports a `missing` problem (404, or a
+  file list without the file; a torrent still fetching metadata is not
+  missing) instead of a connection problem. Both lead to the title's sources
+  when the progress knows its TMDB title, otherwise to a search for its name.
+  Handler, view and browser tests cover both apps; a local browser check
+  confirmed the self-hosted message and search fallback. A wider audit of
+  loading, retry, empty and stale-response states remains open.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding
