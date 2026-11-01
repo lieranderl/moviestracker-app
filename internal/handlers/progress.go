@@ -256,7 +256,7 @@ func (p *Progress) handleSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if p.watched != nil && rec.Finished() && rec.Kind == "movie" {
-		p.watched.markWatched(ctx, r, uid, rec.TMDBID, rec.Title)
+		p.watched.markWatched(r, uid, rec.TMDBID, rec.Title)
 	}
 	if p.timecodes != nil {
 		if err := p.timecodes().SetViewed(ctx, data.Hash, data.Index, math.Floor(data.Position)); err != nil {

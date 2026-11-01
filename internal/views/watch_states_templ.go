@@ -135,7 +135,7 @@ func watchStateButton(kind string, id int, value, state, icon, label string) tem
 			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		var templ_7745c5c3_Var6 = []any{"btn sm:btn-lg join-item gap-2", templ.KV("btn-primary", state == value), templ.KV("btn-ghost text-white border-white/30 hover:bg-white/10", state != value)}
+		var templ_7745c5c3_Var6 = []any{"btn sm:btn-lg join-item gap-2", templ.KV("btn-primary", state == value), templ.KV("btn-ghost text-neutral-content border-neutral-content/30 hover:bg-neutral-content/10", state != value)}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var6...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

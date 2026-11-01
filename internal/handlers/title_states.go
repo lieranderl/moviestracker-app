@@ -148,16 +148,22 @@ func (ts *TitleStates) handleSet(w http.ResponseWriter, r *http.Request) {
 
 // markWatched marks a movie the user finished watched, named as TMDB names
 // it (as the torrent was titled when TMDB does not answer). One already
-// watched stays as it was.
-func (ts *TitleStates) markWatched(ctx context.Context, r *http.Request, uid string, id int, title string) {
-	if kept, err := ts.store.TitleState(ctx, uid, "movie", id); err == nil && kept.State == store.Watched {
+// watched stays as it was. Each store call has its own deadline, so a slow
+// TMDB lookup between them does not leave the write none.
+func (ts *TitleStates) markWatched(r *http.Request, uid string, id int, title string) {
+	read, cancel := context.WithTimeout(r.Context(), progressTimeout)
+	kept, err := ts.store.TitleState(read, uid, "movie", id)
+	cancel()
+	if err == nil && kept.State == store.Watched {
 		return
 	}
 	rec := store.TitleState{Kind: "movie", TMDBID: id, Title: title, State: store.Watched}
 	if item, err := ts.catalog.Title(r.Context(), "movie", id); err == nil {
 		rec.Title, rec.Poster = item.Title, item.PosterPath
 	}
-	if err := ts.store.SetTitleState(ctx, uid, rec); err != nil {
+	write, cancel := context.WithTimeout(r.Context(), progressTimeout)
+	defer cancel()
+	if err := ts.store.SetTitleState(write, uid, rec); err != nil {
 		slog.Warn("marking a finished movie watched failed", "error", logError(err))
 	}
 }

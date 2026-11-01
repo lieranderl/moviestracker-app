@@ -26,7 +26,7 @@ templ watchStateButton(kind string, id int, value, state, icon, label string) {
 		type="button"
 		data-state={ value }
 		aria-pressed={ boolAttr(state == value) }
-		class={ "btn sm:btn-lg join-item gap-2", templ.KV("btn-primary", state == value), templ.KV("btn-ghost text-white border-white/30 hover:bg-white/10", state != value) }
+		class={ "btn sm:btn-lg join-item gap-2", templ.KV("btn-primary", state == value), templ.KV("btn-ghost text-neutral-content border-neutral-content/30 hover:bg-neutral-content/10", state != value) }
 		if state == value {
 			data-on:click={ fmt.Sprintf("@delete('%s')", watchStateURL(kind, id)) }
 		} else {
