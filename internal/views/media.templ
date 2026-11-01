@@ -40,7 +40,7 @@ func releaseFiltersOf(ctx context.Context) ReleaseFilters {
 
 // mediaPageSignals is the client state shared by the movie and TV pages.
 func mediaPageSignals(ctx context.Context) string {
-	return fmt.Sprintf(`{ videoOpen: false, videoKey: '', videoTitle: '', torrMagnet: '', sending: false, trackers: [], voices: [], hideRecordings: %t, toast: '', toastError: false }`, releaseFiltersOf(ctx).HideRecordings)
+	return fmt.Sprintf(`{ videoOpen: false, videoKey: '', videoTitle: '', torrMagnet: '', sending: false, _resumable: false, trackers: [], voices: [], hideRecordings: %t, toast: '', toastError: false }`, releaseFiltersOf(ctx).HideRecordings)
 }
 
 // releaseFilterSignals are the search filters the Sources section starts
@@ -168,11 +168,24 @@ templ detailHero(item tmdb.MediaItem, facts []string, rating string, genres stri
 // trailerButton is picked up by the page-level videoClick delegate.
 templ trailerButton(key, title string) {
 	if key != "" {
-		<button type="button" class="btn sm:btn-lg bg-white text-black border-white hover:bg-white/85 gap-2" data-video={ key } data-title={ title }>
+		<button type="button" class="btn sm:btn-lg btn-ghost text-white border-white/30 hover:bg-white/10 gap-2" data-video={ key } data-title={ title }>
 			@Icon("play", "size-5 fill-current")
 			{ tr(ctx, "Play trailer") }
 		</button>
 	}
+}
+
+// findSourcesLink is the title's primary action until the progress slot
+// offers something to resume ($_resumable), then a secondary one.
+templ findSourcesLink() {
+	<a
+		href="#sources"
+		class="btn sm:btn-lg btn-primary gap-2"
+		data-class="{'btn-primary': !$_resumable, 'btn-ghost': $_resumable, 'text-white': $_resumable, 'border-white/30': $_resumable}"
+	>
+		@Icon("magnet", "size-5")
+		{ tr(ctx, "Find sources") }
+	</a>
 }
 
 templ heroLink(href templ.SafeURL, icon, label string) {
