@@ -309,6 +309,15 @@ in focused PRs before the larger episode/discovery and collaboration work.
   cover the categories and the contact route; a local browser check of
   `/privacy` confirmed the list, the mailto link and no horizontal overflow.
   This is not a legal compliance assessment.
+- **R14 — implemented, deployment unverified (2 November 2026):** Want to
+  watch, Watched, favourites, custom lists and the "Because you…" headings
+  name titles in the interface language by their canonical TMDB IDs, through
+  a light cached lookup (name and poster), at most eight at a time and for at
+  most 1.5 s; a title not named in time, or at all, keeps its saved name. A
+  local browser check found the self-hosted app's health-tracking TMDB
+  wrapper hid the new lookup; it now passes it through. After that, the
+  Russian Watched list and recommendation heading showed «Дюна» for a title
+  saved as "Dune"; a cold first load can still fall back to the saved name.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding

@@ -107,6 +107,7 @@ type tmdbClient interface {
 	tmdb.CatalogProvider
 	tmdb.DetailsProvider
 	tmdb.PosterProvider
+	tmdb.TitleProvider
 }
 
 // watchedTMDB records the health of every TMDB call.
@@ -132,6 +133,10 @@ func (w watchedTMDB) Movie(ctx context.Context, id int) (*tmdb.MovieDetails, err
 
 func (w watchedTMDB) MoviePoster(ctx context.Context, id int) (string, error) {
 	return watch(w.h, "TMDB", func() (string, error) { return w.c.MoviePoster(ctx, id) })
+}
+
+func (w watchedTMDB) Title(ctx context.Context, kind string, id int) (tmdb.MediaItem, error) {
+	return watch(w.h, "TMDB", func() (tmdb.MediaItem, error) { return w.c.Title(ctx, kind, id) })
 }
 
 func (w watchedTMDB) TV(ctx context.Context, id int) (*tmdb.TVDetails, error) {

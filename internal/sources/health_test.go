@@ -11,6 +11,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/config"
 	"github.com/lieranderl/moviestracker-app/internal/jacred"
 	"github.com/lieranderl/moviestracker-app/internal/sources"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 )
 
 func TestServiceHealthFollowsTheOutcomeOfRealCalls(t *testing.T) {
@@ -93,5 +94,22 @@ func TestHealthCountsCallsAndFailuresOfTheLastHour(t *testing.T) {
 	_, _ = clients.Details.Movie(ctx, 701)
 	if tm := health.Snapshot()["TMDB"]; tm.Calls != 1 || tm.Failures != 0 {
 		t.Errorf("an hour later TMDB = %d calls, %d failures; want only the new call", tm.Calls, tm.Failures)
+	}
+}
+
+// The connected TMDB names saved titles in the asked language, as the bare
+// client does.
+func TestConnectedTMDBNamesTitles(t *testing.T) {
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"id":438631,"title":"Дюна","poster_path":"/d.jpg"}`))
+	}))
+	defer fake.Close()
+	clients := sources.Connector{TMDBBaseURL: fake.URL, Health: sources.NewHealth()}.Connect(config.Sources{TMDBKey: "token"})
+	names, ok := clients.Details.(tmdb.TitleProvider)
+	if !ok {
+		t.Fatal("the connected TMDB does not name titles")
+	}
+	if it, err := names.Title(context.Background(), "movie", 438631); err != nil || it.Title != "Дюна" {
+		t.Errorf("Title() = %+v, %v", it, err)
 	}
 }

@@ -115,7 +115,9 @@ func (cl *CustomLists) handlePage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := views.CustomListPage(cl.catalog.userFromRequest(r), cl.view(l)).Render(r.Context(), w); err != nil {
+	v := cl.view(l)
+	v.Items = cl.catalog.LocalizeTitles(r.Context(), v.Items)
+	if err := views.CustomListPage(cl.catalog.userFromRequest(r), v).Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "custom list", "error", err)
 	}
 }
