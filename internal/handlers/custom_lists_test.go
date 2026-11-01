@@ -41,3 +41,11 @@ func TestAnAccountKeepsItsOwnListsInTheLocalApp(t *testing.T) {
 		t.Error("the local app offers to share a list, which only the web app does")
 	}
 }
+
+func TestTheLocalListsHintDoesNotOfferSharing(t *testing.T) {
+	s := titlesServer(t)
+	tabs := sendAs(t, s, http.MethodGet, "/api/lists/tabs?active=want")
+	if !strings.Contains(tabs, "Make your own lists") || strings.Contains(tabs, "share") {
+		t.Errorf("the local hint should explain lists without sharing:\n%s", tabs)
+	}
+}
