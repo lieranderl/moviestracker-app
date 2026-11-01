@@ -33,7 +33,7 @@ func TestTheTitlePageLeadsWithResumeOrFindSources(t *testing.T) {
 	for kind, page := range pages {
 		row := heroActions(t, page)
 		progress, sources, trailer := strings.Index(row, `id="progress-button"`), strings.Index(row, `href="#sources"`), strings.Index(row, `data-video="abc"`)
-		if progress < 0 || sources < 0 || trailer < 0 || !(progress < sources && sources < trailer) {
+		if progress < 0 || sources < 0 || trailer < 0 || progress >= sources || sources >= trailer {
 			t.Errorf("%s: actions are not Resume, Find sources, then the trailer:\n%s", kind, row)
 		}
 		find := regexp.MustCompile(`<a href="#sources"[^>]*>`).FindString(row)
