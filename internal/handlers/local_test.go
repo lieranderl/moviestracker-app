@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -475,6 +476,26 @@ func freePort(t *testing.T) int {
 	}
 	defer func() { _ = ln.Close() }()
 	return ln.Addr().(*net.TCPAddr).Port
+}
+
+// freePeerPort returns a port TCP and UDP are both free on.
+func freePeerPort(t *testing.T) int {
+	t.Helper()
+	for range 20 {
+		tcp, err := net.Listen("tcp4", ":0") // #nosec G102 -- test: a peer port listens on every interface
+		if err != nil {
+			t.Fatal(err)
+		}
+		port := tcp.Addr().(*net.TCPAddr).Port
+		udp, err := net.ListenPacket("udp4", ":"+strconv.Itoa(port)) // #nosec G102 -- as above
+		_ = tcp.Close()
+		if err == nil {
+			_ = udp.Close()
+			return port
+		}
+	}
+	t.Fatal("no port free for TCP and UDP")
+	return 0
 }
 
 // The settings check says when JacRed wants a key, and how many searches

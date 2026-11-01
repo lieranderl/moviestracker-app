@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"html"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -242,9 +244,31 @@ func TestChangingThePeerPortRestartsTheManagedEngine(t *testing.T) {
 
 	// The managed engine gets its peer port when it starts, so TorrServer
 	// takes a new one only with a restart.
-	rr := l.action(t, "/api/settings/engine/network", `{"network":{"PeersListenPort":51413}}`, admin)
+	rr := l.action(t, "/api/settings/engine/network", `{"network":{"PeersListenPort":`+strconv.Itoa(freePeerPort(t))+`}}`, admin)
 	if st := sup.Status(); st.State != engine.Running || st.PID == before {
 		t.Errorf("engine not restarted for the new peer port: %+v (was PID %d):\n%s", st, before, rr.Body.String())
+	}
+}
+
+func TestAPeerPortTheEngineCannotUseIsUndone(t *testing.T) {
+	l, sup, admin := managedLocal(t)
+	// Another program holds UDP on the port, as a Windows reserved range does.
+	held, err := net.ListenPacket("udp4", ":0") // #nosec G102 -- test: a peer port listens on every interface
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = held.Close() }()
+	taken := held.LocalAddr().(*net.UDPAddr).Port
+
+	rr := l.action(t, "/api/settings/engine/network", `{"network":{"PeersListenPort":`+strconv.Itoa(taken)+`}}`, admin)
+	if !strings.Contains(rr.Body.String(), "previous ones are back") {
+		t.Errorf("a failed restart was not reported:\n%s", rr.Body.String())
+	}
+	if st := sup.Status(); st.State != engine.Running {
+		t.Fatalf("engine left stopped after a peer port it cannot use: %+v", st)
+	}
+	if port := engineSettings(t, sup).Int("PeersListenPort"); port != 0 {
+		t.Errorf("peer port = %d, want 0 back", port)
 	}
 }
 

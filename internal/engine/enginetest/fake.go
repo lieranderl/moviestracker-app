@@ -77,22 +77,6 @@ func fakeTorrServer() {
 			os.Exit(1)
 		}
 	}
-	// A peer address is listened on with TCP and UDP, as TorrServer's
-	// BitTorrent client does; a refused bind stops the start.
-	if *torrentAddr != "" {
-		tcp, err := net.Listen("tcp4", *torrentAddr)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "fake: BTS.Connect() error!", err)
-			os.Exit(1)
-		}
-		_ = tcp // held until the fake exits
-		udp, err := net.ListenPacket("udp4", *torrentAddr)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "fake: BTS.Connect() error! subsequent listen:", err)
-			os.Exit(1)
-		}
-		_ = udp
-	}
 	if after, err := time.ParseDuration(os.Getenv("FAKE_EXIT_AFTER")); err == nil {
 		time.AfterFunc(after, func() { os.Exit(1) })
 	}
@@ -114,6 +98,27 @@ func fakeTorrServer() {
 	saveSets := func() {
 		raw, _ := json.Marshal(map[string]any{"BitTorr": sets})
 		_ = os.WriteFile(setsFile, raw, 0o600)
+	}
+	// The peer address, or else a peer port the user set, is listened on
+	// with TCP and UDP, as TorrServer's BitTorrent client does; a refused
+	// bind stops the start.
+	peerAddr := *torrentAddr
+	if port, _ := sets["PeersListenPort"].(float64); peerAddr == "" && port > 0 {
+		peerAddr = ":" + strconv.Itoa(int(port))
+	}
+	if peerAddr != "" {
+		tcp, err := net.Listen("tcp4", peerAddr)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "fake: BTS.Connect() error!", err)
+			os.Exit(1)
+		}
+		_ = tcp // held until the fake exits
+		udp, err := net.ListenPacket("udp4", peerAddr)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "fake: BTS.Connect() error! subsequent listen:", err)
+			os.Exit(1)
+		}
+		_ = udp
 	}
 	// --sslport is kept in the settings, as TorrServer keeps it in its db.
 	if *sslOn && *sslPort > 0 {

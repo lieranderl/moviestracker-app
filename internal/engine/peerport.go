@@ -13,12 +13,11 @@ import (
 
 // peerAddr is the BitTorrent address (--torrentaddr) for the next start: a
 // port TCP and UDP can both listen on, or "" when the user set a peer port
-// (PeersListenPort), which TorrServer then uses. Left to itself TorrServer
-// takes a random TCP port and then wants UDP on the same number, which
-// Windows refuses when the number is in a reserved range.
+// (PeersListenPort), which TorrServer then uses, unless Options.OwnPeerPort.
+// Left to itself TorrServer takes a random TCP port and then wants UDP on the
+// same number, which Windows refuses when the number is in a reserved range.
 func (s *Supervisor) peerAddr() (string, error) {
-	set, known := userPeerPort(s.cfg.Dir)
-	if set || !known {
+	if set, known := userPeerPort(s.cfg.Dir); (set || !known) && !s.Options().OwnPeerPort {
 		return "", nil
 	}
 	for range 20 {

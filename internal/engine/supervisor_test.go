@@ -482,8 +482,9 @@ func TestAPeerPortTheUserSetIsLeftToTheEngine(t *testing.T) {
 	if err := sup.Start(context.Background()); err != nil {
 		t.Fatalf("Start(): %v", err)
 	}
+	peerPort := freePeerPort(t)
 	url, user, pass := sup.Endpoint()
-	req, _ := http.NewRequest(http.MethodPost, url+"/settings", strings.NewReader(`{"action":"set","sets":{"PeersListenPort":51413}}`))
+	req, _ := http.NewRequest(http.MethodPost, url+"/settings", strings.NewReader(`{"action":"set","sets":{"PeersListenPort":`+strconv.Itoa(peerPort)+`}}`))
 	req.SetBasicAuth(user, pass)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -494,6 +495,26 @@ func TestAPeerPortTheUserSetIsLeftToTheEngine(t *testing.T) {
 		t.Fatalf("Restart(): %v", err)
 	}
 	if addrs := peerAddrs(t, dir); len(addrs) != 2 || addrs[1] != "" {
-		t.Errorf("peer addresses = %q, want none on the start after the user set port 51413", addrs)
+		t.Errorf("peer addresses = %q, want none on the start after the user set port %d", addrs, peerPort)
 	}
+}
+
+// freePeerPort returns a port TCP and UDP are both free on.
+func freePeerPort(t *testing.T) int {
+	t.Helper()
+	for range 20 {
+		tcp, err := net.Listen("tcp4", ":0") // #nosec G102 -- test: a peer port listens on every interface
+		if err != nil {
+			t.Fatal(err)
+		}
+		port := tcp.Addr().(*net.TCPAddr).Port
+		udp, err := net.ListenPacket("udp4", ":"+strconv.Itoa(port)) // #nosec G102 -- as above
+		_ = tcp.Close()
+		if err == nil {
+			_ = udp.Close()
+			return port
+		}
+	}
+	t.Fatal("no port free for TCP and UDP")
+	return 0
 }
