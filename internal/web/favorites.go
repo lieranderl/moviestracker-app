@@ -108,7 +108,15 @@ func (a *app) handleFavoritesPage(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
 	defer cancel()
-	favs, next, err := a.cfg.Store.FavoritesPage(ctx, user.ID, r.URL.Query().Get("after"))
+	query := handlers.ParseLibraryQuery(r)
+	var favs []store.Favorite
+	var next string
+	var err error
+	if query.Active() { // searching or sorting reads every favourite
+		favs, err = a.cfg.Store.Favorites(ctx, user.ID)
+	} else {
+		favs, next, err = a.cfg.Store.FavoritesPage(ctx, user.ID, r.URL.Query().Get("after"))
+	}
 	if errors.Is(err, store.ErrCursor) {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
@@ -116,17 +124,25 @@ func (a *app) handleFavoritesPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Warn("reading favourites failed", "error", handlers.LogError(err))
 	}
-	items := make([]tmdb.MediaItem, 0, len(favs))
+	entries := make([]handlers.LibraryEntry, 0, len(favs))
 	for _, f := range favs {
-		items = append(items, tmdb.MediaItem{ID: f.TMDBID, Title: f.Title, PosterPath: f.Poster, MediaType: f.Kind})
+		entries = append(entries, handlers.LibraryEntry{Item: tmdb.MediaItem{ID: f.TMDBID, Title: f.Title, PosterPath: f.Poster, MediaType: f.Kind}, At: f.AddedAt})
 	}
-	items = a.catalog.LocalizeTitles(r.Context(), items)
+	var ratings map[string]int
+	if query.Sort == "rating" && err == nil {
+		ratings, err = handlers.Ratings(ctx, a.cfg.Store, user.ID)
+		if err != nil {
+			slog.Warn("reading ratings failed", "error", handlers.LogError(err))
+		}
+	}
+	entries = a.catalog.LocalizeLibraryEntries(r.Context(), entries)
+	items, query := handlers.ApplyLibraryQuery(entries, query, ratings)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
-	if err := views.FavoritesPage(a.catalogUser(r), items, handlers.MorePath(r, next), err != nil).Render(r.Context(), w); err != nil {
+	if err := views.FavoritesPage(a.catalogUser(r), items, handlers.MorePath(r, next), query, err != nil).Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "favourites", "error", err)
 	}
 }

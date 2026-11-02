@@ -423,6 +423,16 @@ in focused PRs before the larger episode/discovery and collaboration work.
   browser check showed the buttons and the toast; TMDB lookups fail on the
   local network, so a successful mark was covered by tests only.
 
+- **R13 — implemented, deployment unverified (2 November 2026):** Want to
+  watch, Watched (both apps) and favourites (web) have a GET form to search by
+  title, narrow to movies or series, and sort by most recent, title or the
+  user's rating, so every view is a shareable address. Decisions: with any
+  control set the whole list is read, filtered and sorted (the default view
+  keeps R05's 60-title pages); the count is of matching titles; by rating,
+  higher first, unrated titles last, ties most recent first. Stores gained a
+  Reviews list (memory, file, Firestore emulator tested). Handler and web
+  tests cover search, narrowing, both sorts, counts and kept controls; a local
+  browser check confirmed the controls at desktop and 375 px.
 - **R25 — implemented, deployment unverified (2 November 2026):** series
   pages in both apps have Follow, kept per user (memory, Firestore, local
   file), and a new Upcoming episodes page (user menu) lists each followed
@@ -462,6 +472,17 @@ in focused PRs before the larger episode/discovery and collaboration work.
   and turning protection off. The local browser check could not load series
   pages (the app's TMDB connection failed over IPv6 on this machine), so the
   rendering is covered by tests only.
+- **R20 — implemented, deployment unverified (2 November 2026):**
+  recommendation cards in both apps offer More like this and Not interested.
+  Feedback is kept per user (memory, Firestore, local file) and is part of
+  the library summary, so changes refresh cached recommendations. Hidden
+  titles leave every row at once, with an Undo, and stay hidden; titles asked
+  for more like start the first rows; a reset brings everything back.
+  Ranking is rule-based: watched titles rated highest lead the seeds, and
+  one rated 4 or less starts no row. Store contract and handler tests cover
+  all of it; no browser check (recommendations need TMDB, which the local
+  app could not reach over IPv6). Account export/deletion (R07) must add the
+  feedback collection once both are merged.
 - **R16 — partly implemented, deployment unverified (2 November 2026):** a
   browser audit (self-hosted app: home, TorrServer and list pages) found no
   unnamed controls or unlabeled fields; only inline text links were under 24
