@@ -17,7 +17,9 @@ type Memory struct {
 	mu     sync.Mutex
 	users  map[string]*memoryUser
 	shared map[string]sharedList // by share ID
-	stamps int                   // library changes, of every user
+	// deleted is when each deleted account was deleted.
+	deleted map[string]time.Time
+	stamps  int // library changes, of every user
 }
 
 // sharedList is whose list a link opens.
@@ -37,6 +39,7 @@ type memoryUser struct {
 	episodes    map[int]seriesEpisodes // by series ID
 	checkpoints AlertCheckpoints
 	muted       map[int]MutedTitle     // by TMDB ID
+	feeds       map[string]AlertFeed   // alert choices, by feed
 	follows     map[int]FollowedSeries // by series ID
 }
 
@@ -497,6 +500,57 @@ func (m *Memory) Review(_ context.Context, uid, kind string, tmdbID int) (Review
 	return m.user(uid).reviews[id], nil
 }
 
+// ExportAccount implements Store.
+func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error) {
+	favs, _ := m.Favorites(ctx, uid)
+	servers, _ := m.TorrServers(ctx, uid)
+	watched, _ := m.TitleStates(ctx, uid, Watched)
+	want, _ := m.TitleStates(ctx, uid, WantToWatch)
+	filters, _ := m.ReleaseFilters(ctx, uid)
+	lists, _ := m.CustomLists(ctx, uid)
+	follows, _ := m.FollowedSeries(ctx, uid)
+	choices, _ := withAlertChoices(ctx, m, uid, Account{}) // read before the lock below
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u := m.user(uid)
+	updates := slices.SortedFunc(maps.Values(u.updates), newestFound)
+	return Account{
+		Preferences: u.prefs, Favorites: favs, TorrServers: servers,
+		Progress:    slices.SortedFunc(maps.Values(u.progress), func(a, b Progress) int { return b.UpdatedAt.Compare(a.UpdatedAt) }),
+		TitleStates: append(watched, want...), Updates: updates, ReleaseFilters: filters, Lists: lists,
+		Reviews: slices.Collect(maps.Values(u.reviews)), Episodes: u.watchedEpisodes(),
+		Follows: follows, MutedAlerts: choices.MutedAlerts, AlertFeeds: choices.AlertFeeds,
+	}, nil
+}
+
+// AccountDeletedAt implements Store.
+func (m *Memory) AccountDeletedAt(_ context.Context, uid string) (time.Time, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	at := m.deleted[uid]
+	if m.opts.now().Sub(at) > DeletedAccountKept {
+		return time.Time{}, nil
+	}
+	return at, nil
+}
+
+// DeleteAccount implements Store.
+func (m *Memory) DeleteAccount(_ context.Context, uid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.deleted == nil {
+		m.deleted = map[string]time.Time{}
+	}
+	m.deleted[uid] = m.opts.now().UTC()
+	for id, s := range m.shared {
+		if s.uid == uid {
+			delete(m.shared, id)
+		}
+	}
+	delete(m.users, uid)
+	return nil
+}
+
 // WatchedEpisodes implements Store.
 func (m *Memory) WatchedEpisodes(_ context.Context, uid string, tvID int) (map[int][]int, error) {
 	m.mu.Lock()
@@ -517,6 +571,17 @@ func (m *Memory) MarkEpisodes(_ context.Context, uid string, tvID, season int, e
 	}
 	all[tvID].mark(season, episodes, watched)
 	return nil
+}
+
+// watchedEpisodes are all the user's watched episodes, by series.
+func (u *memoryUser) watchedEpisodes() map[int]map[int][]int {
+	out := map[int]map[int][]int{}
+	for tvID, series := range u.episodes {
+		if seasons := series.bySeason(); len(seasons) > 0 {
+			out[tvID] = seasons
+		}
+	}
+	return out
 }
 
 // AlertCheckpoints implements Store.
@@ -599,4 +664,30 @@ func (m *Memory) MutedAlerts(_ context.Context, uid string) ([]MutedTitle, error
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return slices.SortedFunc(maps.Values(m.user(uid).muted), newestMuted), nil
+}
+
+// SetAlertFeed implements Store.
+func (m *Memory) SetAlertFeed(_ context.Context, uid, feed string, on bool) error {
+	if feed == "" {
+		return errors.New("alert feed: none named")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u := m.user(uid)
+	if u.feeds == nil {
+		u.feeds = map[string]AlertFeed{}
+	}
+	choice := AlertFeed{Off: true}
+	if on {
+		choice = AlertFeed{On: m.opts.now().UTC()}
+	}
+	u.feeds[feed] = choice
+	return nil
+}
+
+// AlertFeeds implements Store.
+func (m *Memory) AlertFeeds(_ context.Context, uid string) (map[string]AlertFeed, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return maps.Clone(m.user(uid).feeds), nil
 }

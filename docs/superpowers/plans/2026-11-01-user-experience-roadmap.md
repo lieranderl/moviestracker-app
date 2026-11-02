@@ -309,6 +309,45 @@ in focused PRs before the larger episode/discovery and collaboration work.
   cover the categories and the contact route; a local browser check of
   `/privacy` confirmed the list, the mailto link and no horizontal overflow.
   This is not a legal compliance assessment.
+- **R15 — partly implemented, deployment unverified (2 November 2026):**
+  missing progress targets now offer recovery in both apps. When a Continue
+  watching link's torrent or file is no longer on a TorrServer that answered,
+  the self-hosted TorrServer page shows why instead of opening a player with
+  nothing to play, and the web player reports a `missing` problem (404, or a
+  file list without the file; a torrent still fetching metadata is not
+  missing) instead of a connection problem. Both lead to the title's sources
+  when the progress knows its TMDB title, otherwise to a search for its name.
+  Handler, view and browser tests cover both apps; a local browser check
+  confirmed the self-hosted message and search fallback. A wider audit of
+  loading, retry, empty and stale-response states remains open.
+- **R07 — implemented, deployment unverified (2 November 2026):** a web
+  Your data page (user menu) downloads everything kept for the account as
+  JSON and deletes the account. Decisions: authentication is the signed-in
+  session plus typing a confirmation word in a native dialog; deletion is
+  immediate (shared-list links first, then every user collection, the user
+  document last) and idempotent, so a failed attempt is retried by trying
+  again; there is no recovery, and signing in again starts an empty account.
+  Copies in Google Cloud backups or logs follow Google Cloud's own retention,
+  which this change does not configure. The privacy page now points to Your
+  data, and the email route remains for questions and failed deletions.
+  Store contract tests (memory and Firestore emulator) cover the full export,
+  deletion of every category, revoked shared links, isolation and retries;
+  web tests cover the download, the page and confirmed deletion with sign-out.
+  No browser check: the web app signs in only through Google.
+- **R09 — declined (2 November 2026):** moving Continue watching above the
+  billboard was built and checked in the browser, then rejected on review as
+  visually worse; it was not merged and the home page stays billboard-first.
+  Any later attempt should keep the billboard first and be shown before
+  merging.
+- **R11 — implemented, deployment unverified (2 November 2026):** on the
+  web app each release's send button reads "Add to <server name>" for the
+  TorrServer picked in the selector (truncated, with the full name in its
+  tooltip and accessible name); with no server it stays "TorrServer". The
+  label and the destination both follow `$tsSelected`, so switching servers
+  changes them together. The local app, with one TorrServer, keeps its label
+  and gains an accessible name. View tests cover the label, the selector's
+  names and the local button; no browser check, as web title pages need a
+  Google sign-in.
 - **R14 — implemented, deployment unverified (2 November 2026):** Want to
   watch, Watched, favourites, custom lists and the "Because you…" headings
   name titles in the interface language by their canonical TMDB IDs, through
@@ -415,6 +454,26 @@ in focused PRs before the larger episode/discovery and collaboration work.
   notifications and per-feed choices. App lifecycle: the self-hosted app
   has no background discovery; it shows nothing on its own when closed, and
   this slice promises nothing there.
+- **R27 — per-feed choices (2 November 2026):** the alerts page has a
+  switch per release feed (new on the trackers, HDR10, Dolby Vision). A feed
+  turned off brings no alerts; it is still read, so turned back on it alerts
+  only for releases found afterwards. Kept on the user's document (memory
+  and Firestore, emulator-tested); privacy page updated. Series air-date
+  notifications remain open.
+
+- **R16 — partly implemented, deployment unverified (2 November 2026):** a
+  browser audit (self-hosted app: home, TorrServer and list pages) found no
+  unnamed controls or unlabeled fields; only inline text links were under 24
+  px, which WCAG 2.5.8 exempts. Title pages could not load locally (TMDB over
+  IPv6 failed on this machine), so a view test now renders the home, movie,
+  series and TorrServer pages and fails on any button or link without an
+  accessible name. The demonstrated failure was motion: the billboard
+  advanced and played trailers on its own and animations looped regardless
+  of the viewer's setting. With prefers-reduced-motion the billboard now
+  changes slides and plays trailers only on request, and the stylesheet stops
+  looping animations and transitions. Not yet verified: screen-reader
+  announcements and a full keyboard walk-through of every page, which remain
+  open.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding

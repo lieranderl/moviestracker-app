@@ -420,12 +420,11 @@ if (b.dataset.action === 'send') {
 // for a title with the current $sort, the qualities ($qual) and HDR ($hdr)
 // picked, and $sourceSeason for series. It is built only from server ints,
 // never from upstream text.
+// The choices go as signals to one address: Datastar cancels a search
+// still running when the next starts, so a late answer never replaces a
+// newer one.
 func SourcesSearch(mediaType string, id int) string {
-	season := ""
-	if mediaType == "tv" {
-		season = " + '&season=' + $sourceSeason"
-	}
-	return fmt.Sprintf("$sourcesRequested = true; @get('/api/torrents?type=%s&id=%d&sort=' + $sort%s + '&quality=' + $qual.filter(Boolean).join(',') + ($hdr ? '&hdr=1' : ''), {filterSignals: {include: /^$/}})", mediaType, id, season)
+	return fmt.Sprintf("$sourcesRequested = true; @get('/api/torrents?type=%s&id=%d', {filterSignals: {include: /^(sort|qual|hdr|sourceSeason)$/}})", mediaType, id)
 }
 
 // researchSources searches again with search (see SourcesSearch) once
@@ -442,7 +441,7 @@ func TorrentAddURL(mediaType string, id int) string {
 func sourcesSignals(ctx context.Context, mediaType string, selected int) string {
 	cloud := ""
 	if siteOf(ctx).Cloud {
-		cloud = ", tsSelectorReady: false, tsSelected: localStorage.getItem('mt-ts-selected') || '', _tsAddResult: {adding: false, ok: false, problem: '', status: 0}"
+		cloud = ", tsSelectorReady: false, _tsSelectedName: '', tsSelected: localStorage.getItem('mt-ts-selected') || '', _tsAddResult: {adding: false, ok: false, problem: '', status: 0}"
 	}
 	if mediaType == "tv" {
 		return fmt.Sprintf("{ %s, sourcesRequested: false, sourcesLoading: false, sourceSeason: '%d'%s }", releaseFilterSignals(ctx), selected, cloud)
@@ -904,6 +903,12 @@ const rowShown = `(!$trackers.some(Boolean) || $trackers.includes(el.dataset.tra
 	`(!$voices.some(Boolean) || el.dataset.voices.split('|').some(v => v && $voices.includes(v))) && ` +
 	`!($hideRecordings && el.dataset.recording)`
 
+// sendLabel names the TorrServer a release is sent to, as a Datastar
+// expression: the web app's selected one ($_tsSelectedName).
+func sendLabel(ctx context.Context) string {
+	return trJS(ctx, "Add to %s") + ".replace('%s', $_tsSelectedName)"
+}
+
 templ torrentRow(r jacred.Result) {
 	<li
 		class="list-row items-center gap-3 sm:gap-4"
@@ -956,9 +961,19 @@ templ torrentRow(r jacred.Result) {
 				} else {
 					data-attr:disabled="$sending"
 				}
-				title={ tr(ctx, "Send to TorrServer") }>
-				@Icon("send", "size-4")
-				<span>TorrServer</span>
+				title={ tr(ctx, "Send to TorrServer") }
+				aria-label={ tr(ctx, "Send to TorrServer") }
+				if siteOf(ctx).Cloud {
+					data-attr:title={ sendLabel(ctx) }
+					data-attr:aria-label={ sendLabel(ctx) }
+				}
+			>
+				@Icon("send", "size-4 shrink-0")
+				if siteOf(ctx).Cloud {
+					<span class="truncate max-w-32" data-text={ "$_tsSelectedName ? " + sendLabel(ctx) + " : 'TorrServer'" }>TorrServer</span>
+				} else {
+					<span>TorrServer</span>
+				}
 			</button>
 			<button type="button" class="btn btn-ghost btn-sm btn-square" data-action="copy" data-magnet={ r.Magnet } title={ tr(ctx, "Copy magnet link") } aria-label={ tr(ctx, "Copy magnet link") }>
 				@Icon("magnet", "size-4")

@@ -54,6 +54,8 @@ type app struct {
 	progress *handlers.Progress
 	library  *handlers.Library // users' library summaries, kept until their library changes
 	feeds    *cachedFeeds      // the backend's release feeds, as the home rows read them
+	// deletions are when accounts were deleted, for ending their sessions.
+	deletions deletions
 }
 
 func (a *app) now() time.Time {
@@ -116,10 +118,14 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("GET "+signInPath+"/callback", a.handleSignInCallback)
 	mux.HandleFunc("POST /api/logout", a.handleSignOut)
 	mux.HandleFunc("GET /favorites", a.handleFavoritesPage)
+	mux.HandleFunc("GET "+views.AccountPath, a.handleAccountPage)
+	mux.HandleFunc("GET /account/export", a.handleAccountExport)
+	mux.HandleFunc("POST /api/account/delete", a.handleAccountDelete)
 	mux.HandleFunc("GET /alerts", a.handleAlertsPage)
 	mux.HandleFunc("GET /api/alerts/count", a.handleAlertsCount)
 	mux.HandleFunc("POST /api/alerts/seen", a.handleMarkAllAlertsSeen)
 	mux.HandleFunc("POST /api/alerts/mute", a.handleMuteAlerts)
+	mux.HandleFunc("POST /api/alerts/feeds", a.handleAlertFeed)
 	mux.HandleFunc("GET /api/favorites/state", a.handleFavoriteState)
 	mux.HandleFunc("POST /api/favorites", a.handleAddFavorite)
 	mux.HandleFunc("DELETE /api/favorites", a.handleRemoveFavorite)

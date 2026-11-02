@@ -115,3 +115,16 @@ video.controls-shown::-webkit-media-text-track-container {
   transform: translateY(-4.5rem);
   transition: transform 0.2s ease-out;
 }
+
+/* A viewer who asked for reduced motion gets no looping animations and no
+   motion between states. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
