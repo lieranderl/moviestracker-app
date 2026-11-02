@@ -145,6 +145,11 @@ type UpdateStore interface {
 	// MarkAllUpdatesSeen marks the user's updates found up to through seen;
 	// ones found later stay as they are.
 	MarkAllUpdatesSeen(ctx context.Context, uid string, through time.Time) error
+	// AlertCheckpoints are how far the user's release alerts have looked
+	// through the feeds; empty when they never have.
+	AlertCheckpoints(ctx context.Context, uid string) (AlertCheckpoints, error)
+	// SaveAlertCheckpoints replaces the user's checkpoints.
+	SaveAlertCheckpoints(ctx context.Context, uid string, c AlertCheckpoints) error
 }
 
 // ID names the update among the user's: its feed and TMDB ID
@@ -405,6 +410,15 @@ func newOptions(opts []Option) options {
 		opt(&o)
 	}
 	return o
+}
+
+// AlertCheckpoints are how far a user's release alerts have looked through
+// the feeds: by feed, the newest release looked through, for the library
+// (its LibraryStamp) it was looked through for. A changed library follows
+// other movies, so its alerts look through the feeds again.
+type AlertCheckpoints struct {
+	Library string
+	Feeds   map[string]time.Time
 }
 
 // ErrTitleStateChanged says a title's state is no longer the one a change

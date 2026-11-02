@@ -323,6 +323,20 @@ in focused PRs before the larger episode/discovery and collaboration work.
   deletion of every category, revoked shared links, isolation and retries;
   web tests cover the download, the page and confirmed deletion with sign-out.
   No browser check: the web app signs in only through Google.
+- **R09 — declined (2 November 2026):** moving Continue watching above the
+  billboard was built and checked in the browser, then rejected on review as
+  visually worse; it was not merged and the home page stays billboard-first.
+  Any later attempt should keep the billboard first and be shown before
+  merging.
+- **R11 — implemented, deployment unverified (2 November 2026):** on the
+  web app each release's send button reads "Add to <server name>" for the
+  TorrServer picked in the selector (truncated, with the full name in its
+  tooltip and accessible name); with no server it stays "TorrServer". The
+  label and the destination both follow `$tsSelected`, so switching servers
+  changes them together. The local app, with one TorrServer, keeps its label
+  and gains an accessible name. View tests cover the label, the selector's
+  names and the local button; no browser check, as web title pages need a
+  Google sign-in.
 - **R14 — implemented, deployment unverified (2 November 2026):** Want to
   watch, Watched, favourites, custom lists and the "Because you…" headings
   name titles in the interface language by their canonical TMDB IDs, through
@@ -370,6 +384,20 @@ in focused PRs before the larger episode/discovery and collaboration work.
   Firestore emulator (including pre-paging records); web and handler tests
   cover read reuse, invalidation and paging. The full library is still read
   when a summary is rebuilt after a change.
+- **R26 — implemented on the web, deployment unverified (2 November
+  2026):** release feed items keep their found time, and each user keeps
+  alert checkpoints: per feed, the newest release already looked through,
+  for the library stamp it was looked through for. A check reads each feed
+  only until its checkpoint, so an unchanged state costs one page per feed;
+  a first check, a long absence or a library change (newly followed movies)
+  looks up to 20 pages (400 releases) deep. Checkpoints move only after the
+  alerts found are kept, and alert IDs stay feed-plus-title, so a release
+  found twice never alerts twice. History limit: the backend feeds hold at
+  most 50 pages of 20 releases each, and alerts look 20 pages deep; a
+  release that has dropped further, or out of the backend, brings no alert.
+  The App still has no background discovery (R27). Store contract tests
+  pass on memory and the Firestore emulator; a web test covers a catch-up
+  150 releases deep and a recheck reading at most three pages.
 - **R23 — implemented in both apps, deployment unverified (2 November
   2026):** a signed-in visitor's title cards (home rows, Discover, search,
   lists, similar titles) carry Want to watch and Watched buttons, shown on
@@ -405,6 +433,20 @@ in focused PRs before the larger episode/discovery and collaboration work.
   releases; file-based resume is unchanged and no seek position moves
   between releases. Torrserver and handler tests cover exact and uncertain
   names and that the series stays unmarked.
+
+- **R16 — partly implemented, deployment unverified (2 November 2026):** a
+  browser audit (self-hosted app: home, TorrServer and list pages) found no
+  unnamed controls or unlabeled fields; only inline text links were under 24
+  px, which WCAG 2.5.8 exempts. Title pages could not load locally (TMDB over
+  IPv6 failed on this machine), so a view test now renders the home, movie,
+  series and TorrServer pages and fails on any button or link without an
+  accessible name. The demonstrated failure was motion: the billboard
+  advanced and played trailers on its own and animations looped regardless
+  of the viewer's setting. With prefers-reduced-motion the billboard now
+  changes slides and plays trailers only on request, and the stylesheet stops
+  looping animations and transitions. Not yet verified: screen-reader
+  announcements and a full keyboard walk-through of every page, which remain
+  open.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding

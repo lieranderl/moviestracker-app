@@ -16,13 +16,26 @@ func torrServerURLs(servers []store.TorrServer) string {
 	return string(data)
 }
 
+// torrServerNames are the servers' names by address.
+func torrServerNames(servers []store.TorrServer) string {
+	names := make(map[string]string, len(servers))
+	for _, s := range servers {
+		names[s.URL] = s.Name
+	}
+	data, _ := json.Marshal(names)
+	return string(data)
+}
+
 // WebSourceSelector chooses among the signed-in user's TorrServers. A
-// stale browser selection falls back to the first saved address.
+// stale browser selection falls back to the first saved address; the
+// selected server's name ($_tsSelectedName) labels the send buttons.
 templ WebSourceSelector(servers []store.TorrServer) {
 	{{ first := ""; if len(servers) > 0 { first = servers[0].URL } }}
 	<div id="ts-source-selector" class="flex flex-wrap items-center gap-2"
 		data-server-urls={ torrServerURLs(servers) }
+		data-server-names={ torrServerNames(servers) }
 		data-first-server={ first }
+		data-effect="$_tsSelectedName = JSON.parse(el.dataset.serverNames)[$tsSelected] || ''"
 		data-init="if (!JSON.parse(el.dataset.serverUrls).includes($tsSelected)) { $tsSelected = el.dataset.firstServer }; $tsSelectorReady = true"
 	>
 		if len(servers) > 0 {
