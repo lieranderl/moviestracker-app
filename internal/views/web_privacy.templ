@@ -22,6 +22,7 @@ var privacyCookies = []privacyCookie{
 	{Name: "mt_session", Purpose: "Keeps you signed in. Signed, so it cannot be forged.", Lifetime: "30 days"},
 	{Name: "mt_signin", Purpose: "Protects one sign-in with Google from forgery.", Lifetime: "10 minutes"},
 	{Name: "mt_lang", Purpose: "Remembers the interface language you picked.", Lifetime: "1 year"},
+	{Name: "mt_spoilers", Purpose: "Remembers whether you hide spoilers of episodes you have not watched.", Lifetime: "1 year"},
 }
 
 // WebPrivacy is the cloud web app's privacy policy, public to everyone.
@@ -97,7 +98,7 @@ templ WebPrivacy() {
 						{ tr(ctx, "On the Your data page you can download everything we keep for your account, or delete your account with all of it at once.") }
 						<a href={ templ.SafeURL(AccountPath) } class="link link-primary">{ tr(ctx, "Your data") }</a>
 					</p>
-					<p>{ tr(ctx, "When you delete your account, we keep only its Google account ID and the time of deletion, for 30 days, to sign it out on your other devices.") }</p>
+					<p>{ tr(ctx, "To sign out your other devices, we keep a deletion record with your Google account ID, deletion time and whether cleanup is pending. Pending cleanup is retained until completed; completed deletion records are kept for 30 days.") }</p>
 					<p>{ tr(ctx, "You can also remove Moviestracker's access to your Google account:") }</p>
 					<p>
 						<a href={ templ.SafeURL(googleConnectionsURL) } target="_blank" rel="noopener noreferrer" class="link link-primary">{ tr(ctx, "Google account connections") }</a>

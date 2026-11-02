@@ -64,7 +64,7 @@ func (f *Firestore) Preferences(ctx context.Context, uid string) (Preferences, e
 
 // SavePreferences implements Store.
 func (f *Firestore) SavePreferences(ctx context.Context, uid string, p Preferences) error {
-	_, err := f.userDoc(uid).Set(ctx, map[string]any{"language": p.Language}, firestore.MergeAll)
+	err := f.accountSet(ctx, uid, f.userDoc(uid), map[string]any{"language": p.Language}, firestore.MergeAll)
 	if err != nil {
 		return fmt.Errorf("save preferences: %w", err)
 	}
@@ -143,7 +143,7 @@ func (f *Firestore) AddFavorite(ctx context.Context, uid string, fav Favorite) e
 // a new stamp in one transaction, so a change is never kept without its
 // stamp (which would leave summaries of the library stale).
 func (f *Firestore) changeLibrary(ctx context.Context, uid string, change func(*firestore.Transaction) error) error {
-	return f.client.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
+	return f.accountTransaction(ctx, uid, func(_ context.Context, tx *firestore.Transaction) error {
 		if err := change(tx); err != nil {
 			return err
 		}
@@ -245,7 +245,7 @@ func (f *Firestore) SaveTorrServer(ctx context.Context, uid string, t TorrServer
 	}
 	if t.ID != "" {
 		doc := f.torrServers(uid).Doc(t.ID)
-		_, err := doc.Update(ctx, []firestore.Update{{Path: "name", Value: t.Name}, {Path: "url", Value: t.URL}})
+		err := f.accountUpdate(ctx, uid, doc, []firestore.Update{{Path: "name", Value: t.Name}, {Path: "url", Value: t.URL}})
 		if err == nil {
 			snap, err := doc.Get(ctx)
 			if err != nil {
@@ -265,7 +265,7 @@ func (f *Firestore) SaveTorrServer(ctx context.Context, uid string, t TorrServer
 		t.ID = newID()
 	}
 	t.AddedAt = f.opts.now().UTC()
-	if _, err := f.torrServers(uid).Doc(t.ID).Set(ctx, torrServerRecord{Name: t.Name, URL: t.URL, AddedAt: t.AddedAt}); err != nil {
+	if err := f.accountSet(ctx, uid, f.torrServers(uid).Doc(t.ID), torrServerRecord{Name: t.Name, URL: t.URL, AddedAt: t.AddedAt}); err != nil {
 		return TorrServer{}, fmt.Errorf("save TorrServer: %w", err)
 	}
 	return t, nil
@@ -276,7 +276,7 @@ func (f *Firestore) RemoveTorrServer(ctx context.Context, uid, id string) error 
 	if id == "" || strings.Contains(id, "/") {
 		return nil
 	}
-	if _, err := f.torrServers(uid).Doc(id).Delete(ctx); err != nil {
+	if err := f.accountDelete(ctx, uid, f.torrServers(uid).Doc(id)); err != nil {
 		return fmt.Errorf("remove TorrServer: %w", err)
 	}
 	return nil
@@ -311,7 +311,7 @@ func (f *Firestore) SaveProgress(ctx context.Context, uid string, p Progress) er
 		Hash: p.Hash, Index: p.Index, File: p.File, Title: p.Title, Poster: p.Poster, Kind: p.Kind, TMDBID: p.TMDBID,
 		Position: int64(p.Position / time.Second), Duration: int64(p.Duration / time.Second), UpdatedAt: f.opts.now().UTC(),
 	}
-	if _, err := f.progress(uid).Doc(id).Set(ctx, rec); err != nil {
+	if err := f.accountTransaction(ctx, uid, func(_ context.Context, tx *firestore.Transaction) error { return tx.Set(f.progress(uid).Doc(id), rec) }); err != nil {
 		return fmt.Errorf("save progress: %w", err)
 	}
 	return nil
@@ -573,7 +573,7 @@ func (f *Firestore) keyWatchLists(ctx context.Context, uid string) error {
 			return fmt.Errorf("key watch state: %w", err)
 		}
 	}
-	if _, err := f.userDoc(uid).Set(ctx, map[string]any{"watchListsKeyed": true}, firestore.MergeAll); err != nil {
+	if err := f.accountSet(ctx, uid, f.userDoc(uid), map[string]any{"watchListsKeyed": true}, firestore.MergeAll); err != nil {
 		return fmt.Errorf("note the watch lists keyed: %w", err)
 	}
 	return nil
@@ -601,7 +601,7 @@ func (f *Firestore) AddUpdates(ctx context.Context, uid string, updates []Update
 			return err
 		}
 		u.FoundAt, u.Seen = u.FoundAt.UTC(), false
-		_, err = f.updates(uid).Doc(id).Create(ctx, updateRecord(u))
+		err = f.accountCreate(ctx, uid, f.updates(uid).Doc(id), updateRecord(u))
 		if err != nil && status.Code(err) != codes.AlreadyExists {
 			return fmt.Errorf("add update: %w", err)
 		}
@@ -658,7 +658,7 @@ func (f *Firestore) MarkUpdatesSeen(ctx context.Context, uid string, ids []strin
 	for i, id := range ids {
 		refs[i] = f.updates(uid).Doc(id)
 	}
-	return f.markSeen(ctx, refs)
+	return f.markSeen(ctx, uid, refs)
 }
 
 // MarkAllUpdatesSeen implements Store. It reads the unseen updates and
@@ -679,26 +679,30 @@ func (f *Firestore) MarkAllUpdatesSeen(ctx context.Context, uid string, through 
 			refs = append(refs, doc.Ref)
 		}
 	}
-	return f.markSeen(ctx, refs)
+	return f.markSeen(ctx, uid, refs)
 }
 
 // markSeen marks these update documents seen; ones that do not exist are
 // left alone, so marking cannot create an update.
-func (f *Firestore) markSeen(ctx context.Context, refs []*firestore.DocumentRef) error {
-	bw := f.client.BulkWriter(ctx)
-	jobs := make([]*firestore.BulkWriterJob, 0, len(refs))
-	for _, ref := range refs {
-		job, err := bw.Update(ref, []firestore.Update{{Path: "seen", Value: true}})
+func (f *Firestore) markSeen(ctx context.Context, uid string, refs []*firestore.DocumentRef) error {
+	for start := 0; start < len(refs); start += 400 {
+		batch := refs[start:min(start+400, len(refs))]
+		err := f.accountTransaction(ctx, uid, func(_ context.Context, tx *firestore.Transaction) error {
+			docs, err := tx.GetAll(batch)
+			if err != nil {
+				return err
+			}
+			for _, doc := range docs {
+				if doc.Exists() {
+					if err := tx.Update(doc.Ref, []firestore.Update{{Path: "seen", Value: true}}); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		})
 		if err != nil {
-			bw.End()
-			return fmt.Errorf("mark update seen: %w", err)
-		}
-		jobs = append(jobs, job)
-	}
-	bw.End()
-	for _, job := range jobs {
-		if _, err := job.Results(); err != nil && status.Code(err) != codes.NotFound {
-			return fmt.Errorf("mark update seen: %w", err)
+			return fmt.Errorf("mark updates seen: %w", err)
 		}
 	}
 	return nil
@@ -737,7 +741,7 @@ func (f *Firestore) SaveReleaseFilters(ctx context.Context, uid string, filters 
 	if err := CheckReleaseFilters(filters); err != nil {
 		return err
 	}
-	_, err := f.userDoc(uid).Set(ctx, map[string]any{"releaseFilters": releaseFiltersRecord(filters)}, firestore.Merge([]string{"releaseFilters"}))
+	err := f.accountSet(ctx, uid, f.userDoc(uid), map[string]any{"releaseFilters": releaseFiltersRecord(filters)}, firestore.Merge([]string{"releaseFilters"}))
 	if err != nil {
 		return fmt.Errorf("save release filters: %w", err)
 	}
@@ -818,7 +822,7 @@ func (f *Firestore) CreateCustomList(ctx context.Context, uid, name string) (Cus
 		return CustomList{}, err
 	}
 	l := CustomList{ID: newID(), Name: name, Titles: []ListTitle{}, UpdatedAt: f.opts.now().UTC()}
-	err = f.client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+	err = f.accountTransaction(ctx, uid, func(ctx context.Context, tx *firestore.Transaction) error {
 		n, err := f.listCount(tx, uid)
 		if err != nil {
 			return err
@@ -966,7 +970,7 @@ func (f *Firestore) changeList(ctx context.Context, uid, id string, change func(
 	if !ok {
 		return ErrNoList
 	}
-	err := f.client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+	err := f.accountTransaction(ctx, uid, func(ctx context.Context, tx *firestore.Transaction) error {
 		snap, err := tx.Get(doc)
 		if notFound(err) {
 			return ErrNoList
@@ -1049,23 +1053,6 @@ func (f *Firestore) SaveReview(ctx context.Context, uid string, r Review) error 
 		return fmt.Errorf("save review: %w", err)
 	}
 	return nil
-}
-
-// Reviews implements Store.
-func (f *Firestore) Reviews(ctx context.Context, uid string) ([]Review, error) {
-	docs, err := f.reviews(uid).Documents(ctx).GetAll()
-	if err != nil {
-		return nil, fmt.Errorf("read reviews: %w", err)
-	}
-	out := make([]Review, 0, len(docs))
-	for _, doc := range docs {
-		var rec reviewRecord
-		if err := doc.DataTo(&rec); err != nil {
-			return nil, fmt.Errorf("read review %s: %w", doc.Ref.ID, err)
-		}
-		out = append(out, Review(rec))
-	}
-	return out, nil
 }
 
 // Review implements Store.
@@ -1176,7 +1163,8 @@ func (f *Firestore) ExportAccount(ctx context.Context, uid string) (Account, err
 // pointing at a deleted list; the user's document goes last, so a retry
 // after a failure still finds what is left.
 func (f *Firestore) DeleteAccount(ctx context.Context, uid string) error {
-	if err := f.noteDeleted(ctx, uid); err != nil {
+	owner, err := f.beginAccountDeletion(ctx, uid)
+	if err != nil || owner == "" {
 		return err
 	}
 	links, err := f.sharedLists().Where("uid", "==", uid).Documents(ctx).GetAll()
@@ -1187,7 +1175,7 @@ func (f *Firestore) DeleteAccount(ctx context.Context, uid string) error {
 	for _, doc := range links {
 		refs = append(refs, doc.Ref)
 	}
-	if err := f.deleteDocs(ctx, refs); err != nil {
+	if err := f.deleteAccountDocs(ctx, uid, owner, refs); err != nil {
 		return err
 	}
 	for _, name := range userCollections {
@@ -1195,12 +1183,97 @@ func (f *Firestore) DeleteAccount(ctx context.Context, uid string) error {
 		if err != nil {
 			return fmt.Errorf("read %s: %w", name, err)
 		}
-		if err := f.deleteDocs(ctx, docs); err != nil {
+		if err := f.deleteAccountDocs(ctx, uid, owner, docs); err != nil {
 			return err
 		}
 	}
-	if _, err := f.userDoc(uid).Delete(ctx); err != nil {
-		return fmt.Errorf("delete the user: %w", err)
+	if err := f.deletionTransaction(ctx, uid, owner, func(tx *firestore.Transaction) error {
+		if err := tx.Delete(f.userDoc(uid)); err != nil {
+			return err
+		}
+		return tx.Update(f.deletedAccounts().Doc(uid), []firestore.Update{{Path: "pending", Value: false}, {Path: "owner", Value: firestore.Delete}})
+	}); err != nil {
+		return fmt.Errorf("complete account deletion: %w", err)
+	}
+	f.pruneDeletedAccounts(ctx)
+	return nil
+}
+
+// beginAccountDeletion claims cleanup ownership atomically. A newer retry can
+// replace the owner; every batch checks ownership, so an older worker stops.
+func (f *Firestore) beginAccountDeletion(ctx context.Context, uid string) (string, error) {
+	owner := rand.Text()
+	now := f.opts.now().UTC()
+	claimed := false
+	err := f.client.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
+		claimed = false
+		snap, err := tx.Get(f.deletedAccounts().Doc(uid))
+		if err != nil && !notFound(err) {
+			return err
+		}
+		var at time.Time
+		var pending bool
+		if err == nil {
+			at, _ = snap.Data()["at"].(time.Time)
+			pending, _ = snap.Data()["pending"].(bool)
+		}
+		if onlyResumeDeletion(ctx) && !pending {
+			return nil
+		}
+		if issued, ok := accountSessionTime(ctx, uid); ok {
+			if !pending && !at.IsZero() && !issued.After(at) {
+				return ErrAccountDeleted
+			}
+			if issued.After(now) {
+				now = issued
+			}
+		}
+		if !pending {
+			at = deletionFenceTime(now)
+		}
+		claimed = true
+		return tx.Set(f.deletedAccounts().Doc(uid), map[string]any{"at": at, "pending": true, "owner": owner})
+	})
+	if err != nil {
+		return "", fmt.Errorf("begin account deletion: %w", err)
+	}
+	if !claimed {
+		return "", nil
+	}
+	return owner, nil
+}
+
+func (f *Firestore) deletionTransaction(ctx context.Context, uid, owner string, change func(*firestore.Transaction) error) error {
+	return f.client.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
+		snap, err := tx.Get(f.deletedAccounts().Doc(uid))
+		if notFound(err) {
+			return ErrAccountDeleted
+		}
+		if err != nil {
+			return err
+		}
+		pending, _ := snap.Data()["pending"].(bool)
+		kept, _ := snap.Data()["owner"].(string)
+		if !pending || kept != owner {
+			return ErrAccountDeleted
+		}
+		return change(tx)
+	})
+}
+
+func (f *Firestore) deleteAccountDocs(ctx context.Context, uid, owner string, refs []*firestore.DocumentRef) error {
+	for start := 0; start < len(refs); start += 400 {
+		batch := refs[start:min(start+400, len(refs))]
+		if err := f.deletionTransaction(ctx, uid, owner, func(tx *firestore.Transaction) error {
+			for _, ref := range batch {
+				if err := tx.Delete(ref); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			return fmt.Errorf("delete account records: %w", err)
+		}
 	}
 	return nil
 }
@@ -1211,27 +1284,33 @@ func (f *Firestore) deletedAccounts() *firestore.CollectionRef {
 	return f.client.Collection("deletedAccounts")
 }
 
-// noteDeleted notes the account deleted now, first, so its sessions end
-// even if deleting the rest has to be tried again; notes older than any
-// session are dropped on the way.
-func (f *Firestore) noteDeleted(ctx context.Context, uid string) error {
-	now := f.opts.now().UTC()
-	if _, err := f.deletedAccounts().Doc(uid).Set(ctx, map[string]any{"at": now}); err != nil {
-		return fmt.Errorf("note the deleted account: %w", err)
-	}
-	stale, err := f.deletedAccounts().Where("at", "<", now.Add(-DeletedAccountKept)).Limit(100).Documents(ctx).GetAll()
+// pruneDeletedAccounts removes only the completed snapshots read: a note
+// replaced by a new deletion is protected by its update-time precondition.
+func (f *Firestore) pruneDeletedAccounts(ctx context.Context) {
+	stale, err := f.deletedAccounts().Where("at", "<", f.opts.now().UTC().Add(-DeletedAccountKept)).Limit(100).Documents(ctx).GetAll()
 	if err != nil {
 		slog.Warn("reading stale deleted-account notes failed", "error", err)
-		return nil
+		return
 	}
-	refs := make([]*firestore.DocumentRef, 0, len(stale))
+	bw := f.client.BulkWriter(ctx)
+	jobs := make([]*firestore.BulkWriterJob, 0, len(stale))
 	for _, doc := range stale {
-		refs = append(refs, doc.Ref)
+		if pending, _ := doc.Data()["pending"].(bool); pending {
+			continue
+		}
+		job, err := bw.Delete(doc.Ref, firestore.LastUpdateTime(doc.UpdateTime))
+		if err != nil {
+			slog.Warn("dropping stale deleted-account note failed", "error", err)
+			continue
+		}
+		jobs = append(jobs, job)
 	}
-	if err := f.deleteDocs(ctx, refs); err != nil {
-		slog.Warn("dropping stale deleted-account notes failed", "error", err)
+	bw.End()
+	for _, job := range jobs {
+		if _, err := job.Results(); err != nil && status.Code(err) != codes.NotFound && status.Code(err) != codes.FailedPrecondition {
+			slog.Warn("dropping stale deleted-account note failed", "error", err)
+		}
 	}
-	return nil
 }
 
 // AccountDeletedAt implements Store.
@@ -1244,35 +1323,11 @@ func (f *Firestore) AccountDeletedAt(ctx context.Context, uid string) (time.Time
 		return time.Time{}, fmt.Errorf("read the deleted account: %w", err)
 	}
 	at, _ := snap.Data()["at"].(time.Time)
-	if f.opts.now().Sub(at) > DeletedAccountKept {
+	pending, _ := snap.Data()["pending"].(bool)
+	if !pending && f.opts.now().Sub(at) > DeletedAccountKept {
 		return time.Time{}, nil
 	}
 	return at, nil
-}
-
-// deleteDocs deletes these documents; deleting one gone already is no
-// error.
-func (f *Firestore) deleteDocs(ctx context.Context, refs []*firestore.DocumentRef) error {
-	if len(refs) == 0 {
-		return nil
-	}
-	bw := f.client.BulkWriter(ctx)
-	jobs := make([]*firestore.BulkWriterJob, 0, len(refs))
-	for _, ref := range refs {
-		job, err := bw.Delete(ref)
-		if err != nil {
-			bw.End()
-			return fmt.Errorf("delete %s: %w", ref.Path, err)
-		}
-		jobs = append(jobs, job)
-	}
-	bw.End()
-	for _, job := range jobs {
-		if _, err := job.Results(); err != nil && status.Code(err) != codes.NotFound {
-			return fmt.Errorf("delete: %w", err)
-		}
-	}
-	return nil
 }
 
 // episodesRecord is a users/{uid}/episodes/{tvID} document: the series'
@@ -1308,7 +1363,7 @@ func (f *Firestore) MarkEpisodes(ctx context.Context, uid string, tvID, season i
 		return err
 	}
 	doc := f.episodes(uid).Doc(strconv.Itoa(tvID))
-	err := f.client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+	err := f.accountTransaction(ctx, uid, func(ctx context.Context, tx *firestore.Transaction) error {
 		rec := episodesRecord{Seasons: seriesEpisodes{}}
 		snap, err := tx.Get(doc)
 		switch {
@@ -1330,6 +1385,150 @@ func (f *Firestore) MarkEpisodes(ctx context.Context, uid string, tvID, season i
 	})
 	if err != nil {
 		return fmt.Errorf("mark episodes: %w", err)
+	}
+	return nil
+}
+
+// accountTransaction fences an authenticated write against account deletion.
+// Both the write and deletion lock the same revocation document.
+func (f *Firestore) accountTransaction(ctx context.Context, uid string, change func(context.Context, *firestore.Transaction) error) error {
+	return f.client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		if issued, ok := accountSessionTime(ctx, uid); ok {
+			snap, err := tx.Get(f.deletedAccounts().Doc(uid))
+			if err != nil && !notFound(err) {
+				return err
+			}
+			if err == nil {
+				if pending, _ := snap.Data()["pending"].(bool); pending {
+					return ErrAccountDeleted
+				}
+				if at, ok := snap.Data()["at"].(time.Time); ok && !issued.After(at) {
+					return ErrAccountDeleted
+				}
+			}
+		}
+		return change(ctx, tx)
+	})
+}
+
+func (f *Firestore) accountSet(ctx context.Context, uid string, doc *firestore.DocumentRef, data any, opts ...firestore.SetOption) error {
+	return f.accountTransaction(ctx, uid, func(_ context.Context, tx *firestore.Transaction) error { return tx.Set(doc, data, opts...) })
+}
+func (f *Firestore) accountUpdate(ctx context.Context, uid string, doc *firestore.DocumentRef, updates []firestore.Update) error {
+	return f.accountTransaction(ctx, uid, func(_ context.Context, tx *firestore.Transaction) error { return tx.Update(doc, updates) })
+}
+func (f *Firestore) accountCreate(ctx context.Context, uid string, doc *firestore.DocumentRef, data any) error {
+	return f.accountTransaction(ctx, uid, func(_ context.Context, tx *firestore.Transaction) error { return tx.Create(doc, data) })
+}
+func (f *Firestore) accountDelete(ctx context.Context, uid string, doc *firestore.DocumentRef) error {
+	return f.accountTransaction(ctx, uid, func(_ context.Context, tx *firestore.Transaction) error { return tx.Delete(doc) })
+}
+
+// AccountDeletionPending implements Store.
+func (f *Firestore) AccountDeletionPending(ctx context.Context, uid string) (bool, error) {
+	snap, err := f.deletedAccounts().Doc(uid).Get(ctx)
+	if notFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read pending account deletion: %w", err)
+	}
+	pending, _ := snap.Data()["pending"].(bool)
+	return pending, nil
+}
+
+// followRecord is a users/{uid}/follows/{tvID} document.
+type followRecord struct {
+	TMDBID int       `firestore:"tmdbId"`
+	Title  string    `firestore:"title"`
+	Poster string    `firestore:"poster,omitempty"`
+	At     time.Time `firestore:"at"`
+}
+
+func (f *Firestore) follows(uid string) *firestore.CollectionRef {
+	return f.userDoc(uid).Collection("follows")
+}
+
+// Follow implements Store.
+func (f *Firestore) Follow(ctx context.Context, uid string, s FollowedSeries, on bool) error {
+	if err := checkFollow(s); err != nil {
+		return err
+	}
+	doc := f.follows(uid).Doc(strconv.Itoa(s.TMDBID))
+	var err error
+	if on {
+		err = f.accountSet(ctx, uid, doc, followRecord{s.TMDBID, s.Title, s.Poster, f.opts.now().UTC()})
+	} else {
+		err = f.accountDelete(ctx, uid, doc)
+	}
+	if err != nil {
+		return fmt.Errorf("follow a series: %w", err)
+	}
+	return nil
+}
+
+// Following implements Store.
+func (f *Firestore) Following(ctx context.Context, uid string, tvID int) (bool, error) {
+	_, err := f.follows(uid).Doc(strconv.Itoa(tvID)).Get(ctx)
+	if notFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read a followed series: %w", err)
+	}
+	return true, nil
+}
+
+// FollowedSeries implements Store.
+func (f *Firestore) FollowedSeries(ctx context.Context, uid string) ([]FollowedSeries, error) {
+	docs, err := f.follows(uid).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("read followed series: %w", err)
+	}
+	out := make([]FollowedSeries, 0, len(docs))
+	for _, doc := range docs {
+		var rec followRecord
+		if err := doc.DataTo(&rec); err != nil {
+			return nil, fmt.Errorf("read followed series %s: %w", doc.Ref.ID, err)
+		}
+		out = append(out, FollowedSeries(rec))
+	}
+	slices.SortFunc(out, newestFollowed)
+	return out, nil
+}
+
+// AlertCheckpoints implements Store: the alertCheckpoints map of the user's
+// document.
+func (f *Firestore) AlertCheckpoints(ctx context.Context, uid string) (AlertCheckpoints, error) {
+	snap, err := f.userDoc(uid).Get(ctx)
+	if notFound(err) {
+		return AlertCheckpoints{}, nil
+	}
+	if err != nil {
+		return AlertCheckpoints{}, fmt.Errorf("read alert checkpoints: %w", err)
+	}
+	raw, _ := snap.Data()["alertCheckpoints"].(map[string]any)
+	c := AlertCheckpoints{Feeds: map[string]time.Time{}}
+	c.Library, _ = raw["library"].(string)
+	feeds, _ := raw["feeds"].(map[string]any)
+	for feed, v := range feeds {
+		if at, ok := v.(time.Time); ok {
+			c.Feeds[feed] = at
+		}
+	}
+	return c, nil
+}
+
+// SaveAlertCheckpoints implements Store.
+func (f *Firestore) SaveAlertCheckpoints(ctx context.Context, uid string, c AlertCheckpoints) error {
+	feeds := make(map[string]any, len(c.Feeds))
+	for feed, at := range c.Feeds {
+		feeds[feed] = at.UTC()
+	}
+	// Merging on the field replaces it whole, dropping feeds no longer kept.
+	data := map[string]any{"alertCheckpoints": map[string]any{"library": c.Library, "feeds": feeds}}
+	if err := f.accountSet(ctx, uid, f.userDoc(uid), data, firestore.Merge([]string{"alertCheckpoints"})); err != nil {
+		return fmt.Errorf("save alert checkpoints: %w", err)
 	}
 	return nil
 }
@@ -1406,101 +1605,28 @@ func (f *Firestore) ResetFeedback(ctx context.Context, uid string) error {
 }
 
 // followRecord is a users/{uid}/follows/{tvID} document.
-type followRecord struct {
-	TMDBID int       `firestore:"tmdbId"`
-	Title  string    `firestore:"title"`
-	Poster string    `firestore:"poster,omitempty"`
-	At     time.Time `firestore:"at"`
-}
-
-func (f *Firestore) follows(uid string) *firestore.CollectionRef {
-	return f.userDoc(uid).Collection("follows")
-}
 
 // Follow implements Store.
-func (f *Firestore) Follow(ctx context.Context, uid string, s FollowedSeries, on bool) error {
-	if err := checkFollow(s); err != nil {
-		return err
-	}
-	doc := f.follows(uid).Doc(strconv.Itoa(s.TMDBID))
-	var err error
-	if on {
-		_, err = doc.Set(ctx, followRecord{s.TMDBID, s.Title, s.Poster, f.opts.now().UTC()})
-	} else {
-		_, err = doc.Delete(ctx)
-	}
-	if err != nil {
-		return fmt.Errorf("follow a series: %w", err)
-	}
-	return nil
-}
 
 // Following implements Store.
-func (f *Firestore) Following(ctx context.Context, uid string, tvID int) (bool, error) {
-	_, err := f.follows(uid).Doc(strconv.Itoa(tvID)).Get(ctx)
-	if notFound(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("read a followed series: %w", err)
-	}
-	return true, nil
-}
 
 // FollowedSeries implements Store.
-func (f *Firestore) FollowedSeries(ctx context.Context, uid string) ([]FollowedSeries, error) {
-	docs, err := f.follows(uid).Documents(ctx).GetAll()
+
+func (f *Firestore) Reviews(ctx context.Context, uid string) ([]Review, error) {
+	docs, err := f.reviews(uid).Documents(ctx).GetAll()
 	if err != nil {
-		return nil, fmt.Errorf("read followed series: %w", err)
+		return nil, fmt.Errorf("read reviews: %w", err)
 	}
-	out := make([]FollowedSeries, 0, len(docs))
+	out := make([]Review, 0, len(docs))
 	for _, doc := range docs {
-		var rec followRecord
+		var rec reviewRecord
 		if err := doc.DataTo(&rec); err != nil {
-			return nil, fmt.Errorf("read followed series %s: %w", doc.Ref.ID, err)
+			return nil, fmt.Errorf("read review %s: %w", doc.Ref.ID, err)
 		}
-		out = append(out, FollowedSeries(rec))
+		out = append(out, Review(rec))
 	}
-	slices.SortFunc(out, newestFollowed)
 	return out, nil
 }
-
-// AlertCheckpoints implements Store: the alertCheckpoints map of the user's
-// document.
-func (f *Firestore) AlertCheckpoints(ctx context.Context, uid string) (AlertCheckpoints, error) {
-	snap, err := f.userDoc(uid).Get(ctx)
-	if notFound(err) {
-		return AlertCheckpoints{}, nil
-	}
-	if err != nil {
-		return AlertCheckpoints{}, fmt.Errorf("read alert checkpoints: %w", err)
-	}
-	raw, _ := snap.Data()["alertCheckpoints"].(map[string]any)
-	c := AlertCheckpoints{Feeds: map[string]time.Time{}}
-	c.Library, _ = raw["library"].(string)
-	feeds, _ := raw["feeds"].(map[string]any)
-	for feed, v := range feeds {
-		if at, ok := v.(time.Time); ok {
-			c.Feeds[feed] = at
-		}
-	}
-	return c, nil
-}
-
-// SaveAlertCheckpoints implements Store.
-func (f *Firestore) SaveAlertCheckpoints(ctx context.Context, uid string, c AlertCheckpoints) error {
-	feeds := make(map[string]any, len(c.Feeds))
-	for feed, at := range c.Feeds {
-		feeds[feed] = at.UTC()
-	}
-	// Merging on the field replaces it whole, dropping feeds no longer kept.
-	data := map[string]any{"alertCheckpoints": map[string]any{"library": c.Library, "feeds": feeds}}
-	if _, err := f.userDoc(uid).Set(ctx, data, firestore.Merge([]string{"alertCheckpoints"})); err != nil {
-		return fmt.Errorf("save alert checkpoints: %w", err)
-	}
-	return nil
-}
-
 func (f *Firestore) MuteAlerts(ctx context.Context, uid string, t MutedTitle, on bool) error {
 	if t.TMDBID <= 0 {
 		return fmt.Errorf("mute alerts: no movie")

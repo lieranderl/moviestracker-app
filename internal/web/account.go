@@ -12,6 +12,7 @@ import (
 
 	"github.com/lieranderl/moviestracker-app/internal/handlers"
 	"github.com/lieranderl/moviestracker-app/internal/i18n"
+	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 )
 
@@ -58,9 +59,22 @@ func (a *app) handleAccountExport(w http.ResponseWriter, r *http.Request) {
 // the confirmation word ($deleteConfirm), then signs them out.
 func (a *app) handleAccountDelete(w http.ResponseWriter, r *http.Request) {
 	user, ok := a.currentUser(r)
+	var continuation *session
 	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		signed, valid := a.signedSession(r)
+		if valid {
+			ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
+			pending, err := a.cfg.Store.AccountDeletionPending(ctx, signed.ID)
+			cancel()
+			if err == nil && pending {
+				user, ok = signed.User, true
+				continuation = &signed
+			}
+		}
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
 	}
 	var signals struct {
 		DeleteConfirm string `json:"deleteConfirm"`
@@ -73,15 +87,15 @@ func (a *app) handleAccountDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
 	defer cancel()
+	if continuation != nil {
+		ctx = store.WithAccountSession(store.ResumeAccountDeletion(ctx), user.ID, continuation.issuedAt())
+	}
 	if err := a.cfg.Store.DeleteAccount(ctx, user.ID); err != nil {
 		slog.Warn("deleting an account failed", "error", handlers.LogError(err))
 		a.patchDeleteProblem(w, r, i18n.T(r.Context(), "Your account could not be deleted completely. Please try again: what is left is deleted then."))
 		return
 	}
 	slog.Info("an account was deleted")
-	if at, err := a.cfg.Store.AccountDeletedAt(ctx, user.ID); err == nil {
-		a.deletions.note(user.ID, at, a.now())
-	}
 	http.SetCookie(w, a.cookie(sessionCookie, "", "/", -1))
 	handlers.Navigate(w, r, "/")
 }

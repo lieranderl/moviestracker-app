@@ -38,10 +38,10 @@ type memoryUser struct {
 	filters     ReleaseFilters
 	lists       shelf
 	reviews     map[string]Review
-	episodes    map[int]seriesEpisodes   // by series ID
-	feedback    map[string]feedbackEntry // by feedbackKey
-	follows     map[int]FollowedSeries   // by series ID
+	episodes    map[int]seriesEpisodes // by series ID
 	checkpoints AlertCheckpoints
+	feedback    map[string]feedbackEntry
+	follows     map[int]FollowedSeries // by series ID
 }
 
 // NewMemory returns an empty in-memory store.
@@ -67,9 +67,12 @@ func (m *Memory) Preferences(_ context.Context, uid string) (Preferences, error)
 }
 
 // SavePreferences implements Store.
-func (m *Memory) SavePreferences(_ context.Context, uid string, p Preferences) error {
+func (m *Memory) SavePreferences(ctx context.Context, uid string, p Preferences) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	m.user(uid).prefs = p
 	return nil
 }
@@ -99,13 +102,16 @@ func (m *Memory) IsFavorite(_ context.Context, uid, kind string, tmdbID int) (bo
 }
 
 // AddFavorite implements Store.
-func (m *Memory) AddFavorite(_ context.Context, uid string, f Favorite) error {
+func (m *Memory) AddFavorite(ctx context.Context, uid string, f Favorite) error {
 	id, err := titleID(f.Kind, f.TMDBID)
 	if err != nil {
 		return err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	favs := m.user(uid).favorites
 	if _, ok := favs[id]; !ok {
 		f.AddedAt = cmp.Or(f.AddedAt, m.opts.now()).UTC()
@@ -141,13 +147,16 @@ func (m *Memory) TitleStatesPage(ctx context.Context, uid, state, after string) 
 }
 
 // RemoveFavorite implements Store.
-func (m *Memory) RemoveFavorite(_ context.Context, uid, kind string, tmdbID int) error {
+func (m *Memory) RemoveFavorite(ctx context.Context, uid, kind string, tmdbID int) error {
 	id, err := titleID(kind, tmdbID)
 	if err != nil {
 		return err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	delete(m.user(uid).favorites, id)
 	m.libraryChanged(uid)
 	return nil
@@ -161,13 +170,16 @@ func (m *Memory) TorrServers(_ context.Context, uid string) ([]TorrServer, error
 }
 
 // SaveTorrServer implements Store.
-func (m *Memory) SaveTorrServer(_ context.Context, uid string, t TorrServer) (TorrServer, error) {
+func (m *Memory) SaveTorrServer(ctx context.Context, uid string, t TorrServer) (TorrServer, error) {
 	t, err := checkTorrServer(t)
 	if err != nil {
 		return TorrServer{}, err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return TorrServer{}, err
+	}
 	u := m.user(uid)
 	if i := slices.IndexFunc(u.torrServers, func(s TorrServer) bool { return s.ID == t.ID }); t.ID != "" && i >= 0 {
 		u.torrServers[i].Name, u.torrServers[i].URL = t.Name, t.URL
@@ -179,22 +191,28 @@ func (m *Memory) SaveTorrServer(_ context.Context, uid string, t TorrServer) (To
 }
 
 // RemoveTorrServer implements Store.
-func (m *Memory) RemoveTorrServer(_ context.Context, uid, id string) error {
+func (m *Memory) RemoveTorrServer(ctx context.Context, uid, id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	u := m.user(uid)
 	u.torrServers = slices.DeleteFunc(u.torrServers, func(s TorrServer) bool { return s.ID == id })
 	return nil
 }
 
 // SaveProgress implements Store.
-func (m *Memory) SaveProgress(_ context.Context, uid string, p Progress) error {
+func (m *Memory) SaveProgress(ctx context.Context, uid string, p Progress) error {
 	id, err := progressID(p.Hash, p.Index)
 	if err != nil {
 		return err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	p.UpdatedAt = m.opts.now().UTC()
 	m.user(uid).progress[id] = p
 	return nil
@@ -222,13 +240,16 @@ func (m *Memory) RecentProgress(_ context.Context, uid string, limit int) ([]Pro
 }
 
 // SetTitleState implements Store.
-func (m *Memory) SetTitleState(_ context.Context, uid string, ts TitleState) error {
+func (m *Memory) SetTitleState(ctx context.Context, uid string, ts TitleState) error {
 	id, err := checkTitleState(ts)
 	if err != nil {
 		return err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	m.libraryChanged(uid)
 	if ts.State == "" {
 		delete(m.user(uid).titles, id)
@@ -240,13 +261,16 @@ func (m *Memory) SetTitleState(_ context.Context, uid string, ts TitleState) err
 }
 
 // ChangeTitleState implements Store.
-func (m *Memory) ChangeTitleState(_ context.Context, uid string, ts, from TitleState) (TitleState, error) {
+func (m *Memory) ChangeTitleState(ctx context.Context, uid string, ts, from TitleState) (TitleState, error) {
 	id, err := checkTitleState(ts)
 	if err != nil {
 		return TitleState{}, err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return TitleState{}, err
+	}
 	titles := m.user(uid).titles
 	if !sameMark(titles[id], from) {
 		return TitleState{}, ErrTitleStateChanged
@@ -287,7 +311,7 @@ func (m *Memory) TitleStates(_ context.Context, uid, state string) ([]TitleState
 }
 
 // AddUpdates implements Store.
-func (m *Memory) AddUpdates(_ context.Context, uid string, updates []Update) error {
+func (m *Memory) AddUpdates(ctx context.Context, uid string, updates []Update) error {
 	ids := make([]string, len(updates))
 	for i, u := range updates {
 		id, err := updateID(u)
@@ -298,6 +322,9 @@ func (m *Memory) AddUpdates(_ context.Context, uid string, updates []Update) err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	kept := m.user(uid).updates
 	for i, u := range updates {
 		if _, ok := kept[ids[i]]; !ok {
@@ -344,9 +371,12 @@ func (m *Memory) UnseenUpdates(_ context.Context, uid string) (int, error) {
 }
 
 // MarkUpdatesSeen implements Store.
-func (m *Memory) MarkUpdatesSeen(_ context.Context, uid string, ids []string) error {
+func (m *Memory) MarkUpdatesSeen(ctx context.Context, uid string, ids []string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	kept := m.user(uid).updates
 	for _, id := range ids {
 		if u, ok := kept[id]; ok {
@@ -358,9 +388,12 @@ func (m *Memory) MarkUpdatesSeen(_ context.Context, uid string, ids []string) er
 }
 
 // MarkAllUpdatesSeen implements Store.
-func (m *Memory) MarkAllUpdatesSeen(_ context.Context, uid string, through time.Time) error {
+func (m *Memory) MarkAllUpdatesSeen(ctx context.Context, uid string, through time.Time) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	kept := m.user(uid).updates
 	for id, u := range kept {
 		if !u.FoundAt.After(through) {
@@ -381,21 +414,27 @@ func (m *Memory) ReleaseFilters(_ context.Context, uid string) (ReleaseFilters, 
 }
 
 // SaveReleaseFilters implements Store.
-func (m *Memory) SaveReleaseFilters(_ context.Context, uid string, f ReleaseFilters) error {
+func (m *Memory) SaveReleaseFilters(ctx context.Context, uid string, f ReleaseFilters) error {
 	if err := CheckReleaseFilters(f); err != nil {
 		return err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	f.Qualities = slices.Clone(f.Qualities)
 	m.user(uid).filters = f
 	return nil
 }
 
 // CreateCustomList implements Store.
-func (m *Memory) CreateCustomList(_ context.Context, uid, name string) (CustomList, error) {
+func (m *Memory) CreateCustomList(ctx context.Context, uid, name string) (CustomList, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return CustomList{}, err
+	}
 	return m.user(uid).lists.create(name, m.opts.now().UTC())
 }
 
@@ -407,18 +446,24 @@ func (m *Memory) CustomLists(_ context.Context, uid string) ([]CustomList, error
 }
 
 // RemoveCustomList implements Store.
-func (m *Memory) RemoveCustomList(_ context.Context, uid, id string) error {
+func (m *Memory) RemoveCustomList(ctx context.Context, uid, id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	lists := m.user(uid).lists
 	delete(m.shared, lists[id].ShareID)
 	return lists.delete(id)
 }
 
 // ShareList implements Store.
-func (m *Memory) ShareList(_ context.Context, uid, id string, on bool) (CustomList, error) {
+func (m *Memory) ShareList(ctx context.Context, uid, id string, on bool) (CustomList, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return CustomList{}, err
+	}
 	lists := m.user(uid).lists
 	l, ok := lists[id]
 	if !ok {
@@ -458,29 +503,38 @@ func (m *Memory) CustomList(_ context.Context, uid, id string) (CustomList, bool
 }
 
 // AddToList implements Store.
-func (m *Memory) AddToList(_ context.Context, uid, id string, t ListTitle) error {
+func (m *Memory) AddToList(ctx context.Context, uid, id string, t ListTitle) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	_, err := m.user(uid).lists.add(id, t, m.opts.now().UTC())
 	return err
 }
 
 // RemoveFromList implements Store.
-func (m *Memory) RemoveFromList(_ context.Context, uid, id, kind string, tmdbID int) error {
+func (m *Memory) RemoveFromList(ctx context.Context, uid, id, kind string, tmdbID int) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	_, err := m.user(uid).lists.remove(id, kind, tmdbID, m.opts.now().UTC())
 	return err
 }
 
 // SaveReview implements Store.
-func (m *Memory) SaveReview(_ context.Context, uid string, r Review) error {
+func (m *Memory) SaveReview(ctx context.Context, uid string, r Review) error {
 	r, id, empty, err := checkReview(r)
 	if err != nil {
 		return err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	m.libraryChanged(uid) // ratings shape recommendations
 	if empty {
 		delete(m.user(uid).reviews, id)
@@ -489,13 +543,6 @@ func (m *Memory) SaveReview(_ context.Context, uid string, r Review) error {
 	r.UpdatedAt = m.opts.now().UTC()
 	m.user(uid).reviews[id] = r
 	return nil
-}
-
-// Reviews implements Store.
-func (m *Memory) Reviews(_ context.Context, uid string) ([]Review, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return slices.Collect(maps.Values(m.user(uid).reviews)), nil
 }
 
 // Review implements Store.
@@ -545,13 +592,23 @@ func (m *Memory) AccountDeletedAt(_ context.Context, uid string) (time.Time, err
 }
 
 // DeleteAccount implements Store.
-func (m *Memory) DeleteAccount(_ context.Context, uid string) error {
+func (m *Memory) DeleteAccount(ctx context.Context, uid string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if onlyResumeDeletion(ctx) {
+		return nil
+	}
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	if m.deleted == nil {
 		m.deleted = map[string]time.Time{}
 	}
-	m.deleted[uid] = m.opts.now().UTC()
+	at := m.opts.now().UTC()
+	if issued, ok := accountSessionTime(ctx, uid); ok && issued.After(at) {
+		at = issued
+	}
+	m.deleted[uid] = deletionFenceTime(at)
 	for id, s := range m.shared {
 		if s.uid == uid {
 			delete(m.shared, id)
@@ -569,12 +626,15 @@ func (m *Memory) WatchedEpisodes(_ context.Context, uid string, tvID int) (map[i
 }
 
 // MarkEpisodes implements Store.
-func (m *Memory) MarkEpisodes(_ context.Context, uid string, tvID, season int, episodes []int, watched bool) error {
+func (m *Memory) MarkEpisodes(ctx context.Context, uid string, tvID, season int, episodes []int, watched bool) error {
 	if err := checkEpisodes(tvID, season, episodes); err != nil {
 		return err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	all := m.user(uid).episodes
 	if all[tvID] == nil {
 		all[tvID] = seriesEpisodes{}
@@ -583,51 +643,40 @@ func (m *Memory) MarkEpisodes(_ context.Context, uid string, tvID, season int, e
 	return nil
 }
 
-// SetFeedback implements Store.
-func (m *Memory) SetFeedback(_ context.Context, uid string, f Feedback, ref TitleRef, on bool) error {
-	key, err := feedbackKey(f, ref)
-	if err != nil {
-		return err
+// watchedEpisodes are all the user's watched episodes, by series.
+func (u *memoryUser) watchedEpisodes() map[int]map[int][]int {
+	out := map[int]map[int][]int{}
+	for tvID, series := range u.episodes {
+		if seasons := series.bySeason(); len(seasons) > 0 {
+			out[tvID] = seasons
+		}
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	u := m.user(uid)
-	if u.feedback == nil {
-		u.feedback = map[string]feedbackEntry{}
+	return out
+}
+
+// checkAccountSession runs while mu is held, together with the mutation.
+func (m *Memory) checkAccountSession(ctx context.Context, uid string) error {
+	if issued, ok := accountSessionTime(ctx, uid); ok {
+		if at := m.deleted[uid]; !at.IsZero() && !issued.After(at) {
+			return ErrAccountDeleted
+		}
 	}
-	if on {
-		ref.At = m.opts.now().UTC()
-		u.feedback[key] = feedbackEntry{f, ref}
-	} else {
-		delete(u.feedback, key)
-	}
-	m.libraryChanged(uid)
 	return nil
 }
 
-// FeedbackOn implements Store.
-func (m *Memory) FeedbackOn(_ context.Context, uid string, f Feedback) ([]TitleRef, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return feedbackOn(m.user(uid).feedback, f), nil
-}
-
-// ResetFeedback implements Store.
-func (m *Memory) ResetFeedback(_ context.Context, uid string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.user(uid).feedback = nil
-	m.libraryChanged(uid)
-	return nil
-}
+// AccountDeletionPending implements Store; memory deletion is atomic.
+func (m *Memory) AccountDeletionPending(context.Context, string) (bool, error) { return false, nil }
 
 // Follow implements Store.
-func (m *Memory) Follow(_ context.Context, uid string, f FollowedSeries, on bool) error {
+func (m *Memory) Follow(ctx context.Context, uid string, f FollowedSeries, on bool) error {
 	if err := checkFollow(f); err != nil {
 		return err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	u := m.user(uid)
 	if u.follows == nil {
 		u.follows = map[int]FollowedSeries{}
@@ -668,23 +717,62 @@ func (m *Memory) AlertCheckpoints(_ context.Context, uid string) (AlertCheckpoin
 }
 
 // SaveAlertCheckpoints implements Store.
-func (m *Memory) SaveAlertCheckpoints(_ context.Context, uid string, c AlertCheckpoints) error {
+func (m *Memory) SaveAlertCheckpoints(ctx context.Context, uid string, c AlertCheckpoints) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	c.Feeds = maps.Clone(c.Feeds)
 	m.user(uid).checkpoints = c
 	return nil
 }
 
-// watchedEpisodes are all the user's watched episodes, by series.
-func (u *memoryUser) watchedEpisodes() map[int]map[int][]int {
-	out := map[int]map[int][]int{}
-	for tvID, series := range u.episodes {
-		if seasons := series.bySeason(); len(seasons) > 0 {
-			out[tvID] = seasons
-		}
+func (m *Memory) SetFeedback(ctx context.Context, uid string, f Feedback, ref TitleRef, on bool) error {
+	key, err := feedbackKey(f, ref)
+	if err != nil {
+		return err
 	}
-	return out
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
+	u := m.user(uid)
+	if u.feedback == nil {
+		u.feedback = map[string]feedbackEntry{}
+	}
+	if on {
+		ref.At = m.opts.now().UTC()
+		u.feedback[key] = feedbackEntry{f, ref}
+	} else {
+		delete(u.feedback, key)
+	}
+	m.libraryChanged(uid)
+	return nil
+}
+
+func (m *Memory) FeedbackOn(_ context.Context, uid string, f Feedback) ([]TitleRef, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return feedbackOn(m.user(uid).feedback, f), nil
+}
+
+func (m *Memory) ResetFeedback(ctx context.Context, uid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
+	m.user(uid).feedback = nil
+	m.libraryChanged(uid)
+	return nil
+}
+
+func (m *Memory) Reviews(_ context.Context, uid string) ([]Review, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Collect(maps.Values(m.user(uid).reviews)), nil
 }
 
 func (m *Memory) MuteAlerts(_ context.Context, uid string, t MutedTitle, on bool) error {
