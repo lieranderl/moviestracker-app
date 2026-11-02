@@ -133,10 +133,12 @@ func (a *app) airedEpisodes(ctx context.Context, uid string, last time.Time, cho
 	}
 	day := func(t time.Time) time.Time { return t.UTC().Truncate(24 * time.Hour) }
 	var found []store.Update
+	failed := false
 	for _, s := range follows {
 		tv, err := a.cfg.Sources.Details.TV(ctx, s.TMDBID)
 		if err != nil {
 			slog.Warn("looking up a followed series failed", "tv", s.TMDBID, "error", handlers.LogError(err))
+			failed = true
 			continue
 		}
 		ep := tv.LastEpisode
@@ -148,6 +150,11 @@ func (a *app) airedEpisodes(ctx context.Context, uid string, last time.Time, cho
 			Feed: store.EpisodesFeed, TMDBID: s.TMDBID, Episode: fmt.Sprintf("S%02dE%02d", ep.Season, ep.Number),
 			Title: cmp.Or(tv.Title, s.Title), Poster: cmp.Or(tv.PosterPath, s.Poster), FoundAt: now,
 		})
+	}
+	if failed {
+		// The check stays where it was, so a series TMDB did not answer for
+		// is looked at again; episodes found now are kept once either way.
+		return found, last, nil
 	}
 	return found, now, nil
 }
