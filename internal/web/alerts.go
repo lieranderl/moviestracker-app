@@ -131,7 +131,7 @@ func (a *app) keepFoundAlerts(ctx context.Context, uid string, newest []store.Up
 		}
 	}
 	// The checkpoints move only once the alerts before them are kept.
-	if err == nil && checkpoints.Library != "" {
+	if err == nil && checkpoints.Feeds != nil {
 		if err := a.cfg.Store.SaveAlertCheckpoints(ctx, uid, checkpoints); err != nil {
 			slog.Warn("keeping alert checkpoints failed", "error", handlers.LogError(err))
 		}

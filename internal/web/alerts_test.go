@@ -369,3 +369,28 @@ func TestAlertsCatchUpOnOneGenerationOfTheFeeds(t *testing.T) {
 		t.Errorf("Dune, newly on page 2, brought no alert (bell %q)", got)
 	}
 }
+
+// Legacy Firestore accounts can have followed titles but no library stamp.
+type unstampedLibrary struct{ *store.Memory }
+
+func (unstampedLibrary) LibraryStamp(context.Context, string) (string, error) { return "", nil }
+func TestAlertsKeepCheckpointsForAnUnstampedExistingLibrary(t *testing.T) {
+	g := newGoogle(t)
+	cfg := withTMDB(t, g.config())
+	users := unstampedLibrary{store.NewMemory()}
+	cfg.Store = users
+	cfg.Releases = releases.NewMemory(map[releases.Feed][]releases.Release{releases.DolbyVision: {{ID: 438631, Title: "Dune", FoundAt: now}}})
+	h := web.New(cfg)
+	session := signIn(t, h)
+	send(t, h, http.MethodPost, "/api/favorites?type=movie&id=438631", session)
+	if got := bellCount(t, h, session); got != "1" {
+		t.Fatalf("bell = %q; want Dune's alert", got)
+	}
+	checkpoints, err := users.AlertCheckpoints(context.Background(), "1098765")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(checkpoints.Feeds) == 0 {
+		t.Error("a successful scan was not checkpointed because its library stamp was empty")
+	}
+}
