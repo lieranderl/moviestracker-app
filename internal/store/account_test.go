@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -138,6 +139,135 @@ func TestADeletedAccountRemembersWhenItWasDeleted(t *testing.T) {
 		}
 		if at, _ := s.AccountDeletedAt(ctx, uid+"-other"); !at.IsZero() {
 			t.Error("another user's account is noted as deleted")
+		}
+	})
+}
+
+func TestADeletedSessionCannotRecreateAccountData(t *testing.T) {
+	eachStore(t, func(t *testing.T, s store.Store, uid string, clock *time.Time) {
+		ctx := store.WithAccountSession(context.Background(), uid, *clock)
+		keepEverything(t, s, uid)
+		*clock = clock.Add(time.Second)
+		if err := s.DeleteAccount(context.Background(), uid); err != nil {
+			t.Fatal(err)
+		}
+		writes := []struct {
+			name  string
+			write func() error
+		}{
+			{"preferences", func() error { return s.SavePreferences(ctx, uid, store.Preferences{Language: "ru"}) }},
+			{"favourites", func() error {
+				return s.AddFavorite(ctx, uid, store.Favorite{Kind: "movie", TMDBID: 438631, Title: "Dune"})
+			}},
+			{"servers", func() error {
+				_, err := s.SaveTorrServer(ctx, uid, store.TorrServer{Name: "Home", URL: "http://nas:8090"})
+				return err
+			}},
+			{"progress", func() error {
+				return s.SaveProgress(ctx, uid, store.Progress{Hash: "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111", Index: 1, Position: time.Minute, Duration: time.Hour})
+			}},
+			{"watch states", func() error {
+				return s.SetTitleState(ctx, uid, store.TitleState{Kind: "movie", TMDBID: 438631, State: store.WantToWatch})
+			}},
+			{"alerts", func() error { return s.AddUpdates(ctx, uid, []store.Update{duneInDV}) }},
+			{"release filters", func() error { return s.SaveReleaseFilters(ctx, uid, store.ReleaseFilters{HDR: true}) }},
+			{"lists", func() error { _, err := s.CreateCustomList(ctx, uid, "Sci-fi"); return err }},
+			{"reviews", func() error { return s.SaveReview(ctx, uid, store.Review{Kind: "movie", TMDBID: 438631, Rating: 9}) }},
+			{"episodes", func() error { return s.MarkEpisodes(ctx, uid, 95396, 1, []int{1}, true) }},
+			{"followed series", func() error { return s.Follow(ctx, uid, store.FollowedSeries{TMDBID: 95396, Title: "Severance"}, true) }},
+			{"alert checkpoints", func() error {
+				return s.SaveAlertCheckpoints(ctx, uid, store.AlertCheckpoints{Library: "legacy", Feeds: map[string]time.Time{"hdr10movies": *clock}})
+			}},
+		}
+		for _, w := range writes {
+			t.Run(w.name, func(t *testing.T) {
+				if err := w.write(); !errors.Is(err, store.ErrAccountDeleted) {
+					t.Errorf("revoked write = %v; want account-session rejection", err)
+				}
+			})
+		}
+	})
+}
+
+func TestARevokedSessionCannotMutateARecreatedAccount(t *testing.T) {
+	eachStore(t, func(t *testing.T, s store.Store, uid string, clock *time.Time) {
+		old := store.WithAccountSession(context.Background(), uid, *clock)
+		keepEverything(t, s, uid)
+		*clock = clock.Add(time.Second)
+		if err := s.DeleteAccount(context.Background(), uid); err != nil {
+			t.Fatal(err)
+		}
+		*clock = clock.Add(time.Second)
+		keepEverything(t, s, uid)
+		account, err := s.ExportAccount(context.Background(), uid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		list, server := account.Lists[0].ID, account.TorrServers[0].ID
+		writes := []struct {
+			name  string
+			write func() error
+		}{
+			{"remove favourite", func() error { return s.RemoveFavorite(old, uid, "movie", 438631) }},
+			{"remove server", func() error { return s.RemoveTorrServer(old, uid, server) }},
+			{"mark alert seen", func() error { return s.MarkUpdatesSeen(old, uid, []string{duneInDV.ID()}) }},
+			{"mark all alerts seen", func() error { return s.MarkAllUpdatesSeen(old, uid, *clock) }},
+			{"remove list", func() error { return s.RemoveCustomList(old, uid, list) }},
+			{"share list", func() error { _, err := s.ShareList(old, uid, list, false); return err }},
+			{"add list title", func() error {
+				return s.AddToList(old, uid, list, store.ListTitle{Kind: "movie", TMDBID: 329865, Title: "Arrival"})
+			}},
+			{"remove list title", func() error { return s.RemoveFromList(old, uid, list, "movie", 438631) }},
+		}
+		for _, w := range writes {
+			t.Run(w.name, func(t *testing.T) {
+				if err := w.write(); !errors.Is(err, store.ErrAccountDeleted) {
+					t.Errorf("revoked mutation = %v; want account-session rejection", err)
+				}
+			})
+		}
+	})
+}
+
+func TestAnOldDeletionCannotEraseARecreatedAccount(t *testing.T) {
+	eachStore(t, func(t *testing.T, s store.Store, uid string, clock *time.Time) {
+		old := store.WithAccountSession(context.Background(), uid, *clock)
+		keepEverything(t, s, uid)
+		*clock = clock.Add(time.Second)
+		if err := s.DeleteAccount(old, uid); err != nil {
+			t.Fatal(err)
+		}
+		*clock = clock.Add(time.Second)
+		keepEverything(t, s, uid)
+		if err := s.DeleteAccount(old, uid); !errors.Is(err, store.ErrAccountDeleted) {
+			t.Errorf("old deletion restarted = %v; want rejection", err)
+		}
+		fresh, err := s.ExportAccount(context.Background(), uid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(fresh.Favorites) != 1 || len(fresh.Lists) != 1 {
+			t.Error("a stale deletion erased the recreated account")
+		}
+	})
+}
+
+func TestDeletionRevokesAnIssuerAheadOfTheDeletingClock(t *testing.T) {
+	eachStore(t, func(t *testing.T, s store.Store, uid string, clock *time.Time) {
+		issued := clock.Add(123 * time.Nanosecond)
+		ctx := store.WithAccountSession(context.Background(), uid, issued)
+		if err := s.DeleteAccount(ctx, uid); err != nil {
+			t.Fatal(err)
+		}
+		fence, err := s.AccountDeletedAt(context.Background(), uid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fence.Before(issued) {
+			t.Errorf("stored cutoff %v predates the revoked session %v", fence, issued)
+		}
+		if err := s.SavePreferences(ctx, uid, store.Preferences{Language: "ru"}); !errors.Is(err, store.ErrAccountDeleted) {
+			t.Errorf("revoked write with skewed clocks = %v", err)
 		}
 	})
 }

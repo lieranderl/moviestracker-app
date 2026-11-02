@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
@@ -35,11 +36,53 @@ type AccountStore interface {
 	// sessions signed in before can end; zero when it never was, or longer
 	// ago than any session lasts (DeletedAccountKept).
 	AccountDeletedAt(ctx context.Context, uid string) (time.Time, error)
+	// AccountDeletionPending allows only deletion cleanup to resume after a partial failure.
+	AccountDeletionPending(ctx context.Context, uid string) (bool, error)
 }
 
 // DeletedAccountKept is how long a deleted account's ID and deletion time
 // are kept: as long as a session lasts.
 const DeletedAccountKept = 30 * 24 * time.Hour
+
+// ErrAccountDeleted refuses writes from a session issued before deletion.
+var ErrAccountDeleted = errors.New("store: this account session has ended")
+
+type accountSessionKey struct{}
+type accountSession struct {
+	uid    string
+	issued time.Time
+}
+
+// WithAccountSession carries the authenticated session to atomic store writes.
+func WithAccountSession(ctx context.Context, uid string, issued time.Time) context.Context {
+	return context.WithValue(ctx, accountSessionKey{}, accountSession{uid: uid, issued: issued})
+}
+func accountSessionTime(ctx context.Context, uid string) (time.Time, bool) {
+	s, ok := ctx.Value(accountSessionKey{}).(accountSession)
+	return s.issued, ok && s.uid == uid
+}
+
+// deletionFenceTime rounds upward to Firestore's microsecond precision so a
+// persisted cutoff never precedes the session it revokes.
+func deletionFenceTime(at time.Time) time.Time {
+	rounded := at.UTC().Truncate(time.Microsecond)
+	if rounded.Before(at) {
+		return rounded.Add(time.Microsecond)
+	}
+	return rounded
+}
+
+type deletionResumeKey struct{}
+
+// ResumeAccountDeletion permits finishing an existing deletion, never starting a
+// new deletion if another request already completed it.
+func ResumeAccountDeletion(ctx context.Context) context.Context {
+	return context.WithValue(ctx, deletionResumeKey{}, true)
+}
+func onlyResumeDeletion(ctx context.Context) bool {
+	on, _ := ctx.Value(deletionResumeKey{}).(bool)
+	return on
+}
 
 // accountFeedback is the user's recommendation feedback, by kind, for their
 // account's export.
