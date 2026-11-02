@@ -380,6 +380,17 @@ in focused PRs before the larger episode/discovery and collaboration work.
   ordering, labels and unfollowing; no browser check (series details need
   TMDB, unreachable from the local app over IPv6). Account export/deletion
   (R07) must add the follows collection once both are merged.
+- **R18 — implemented, deployment unverified (2 November 2026):** when a
+  series file finishes playing (the same rule that marks finished movies)
+  and its own name gives the episode exactly (`S01E02`, `S02E05-E06`,
+  `3x07`), that episode is marked watched for the series the torrent was
+  added from, in both apps; the series itself is never marked. A name that
+  leaves the season to its folder or gives no episode is uncertain, so
+  nothing is marked and the user's own tick is the confirmation. Episode
+  marks are kept by series, season and episode, so they survive switching
+  releases; file-based resume is unchanged and no seek position moves
+  between releases. Torrserver and handler tests cover exact and uncertain
+  names and that the series stays unmarked.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding

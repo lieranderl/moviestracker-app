@@ -32,3 +32,26 @@ func TestEpisodeFilesAreRecognisedByTheirCode(t *testing.T) {
 		}
 	}
 }
+
+// A file names its episodes exactly only with a season in its own name:
+// that is what may be marked watched without asking.
+func TestOnlyFilesNamingTheirSeasonGiveExactEpisodes(t *testing.T) {
+	cases := []struct {
+		path             string
+		season, from, to int
+		exact            bool
+	}{
+		{"Show.S01/Show.S01E02.1080p.mkv", 1, 2, 2, true},
+		{"Show.S02E05-E06.mkv", 2, 5, 6, true},
+		{"Show 3x07 HDTV.avi", 3, 7, 7, true},
+		{"Show/Season 2/Episode 5.mkv", 0, 0, 0, false}, // the season comes from a folder
+		{"Сериал/7 серия.mkv", 0, 0, 0, false},
+		{"Movie.2021.1080p.mkv", 0, 0, 0, false},
+	}
+	for _, c := range cases {
+		season, from, to, exact := torrserver.ExactEpisodes(c.path)
+		if season != c.season || from != c.from || to != c.to || exact != c.exact {
+			t.Errorf("ExactEpisodes(%q) = %d, %d, %d, %v; want %d, %d, %d, %v", c.path, season, from, to, exact, c.season, c.from, c.to, c.exact)
+		}
+	}
+}

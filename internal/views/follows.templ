@@ -30,7 +30,7 @@ templ FollowButton(id int, on bool) {
 		id="follow-button"
 		type="button"
 		aria-pressed={ boolAttr(on) }
-		class="btn sm:btn-lg btn-ghost text-white border-white/30 hover:bg-white/10 gap-2"
+		class="btn sm:btn-lg btn-ghost text-neutral-content border-neutral-content/30 hover:bg-neutral-content/10 gap-2"
 		if on {
 			data-on:click={ fmt.Sprintf("@delete('/api/follow?id=%d')", id) }
 		} else {

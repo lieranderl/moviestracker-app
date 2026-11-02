@@ -57,3 +57,25 @@ func TestFollowedSeriesShowTheirNextEpisodes(t *testing.T) {
 		t.Error("an unfollowed series is still listed")
 	}
 }
+
+// A series TMDB does not know is not followed, so the calendar never lists
+// a nameless row.
+func TestAnUnknownSeriesIsNotFollowed(t *testing.T) {
+	s := newMediaServer(t, &fakeTMDBDetails{series: map[int]*tmdb.TVDetails{}}, nil, "")
+	cookie := signedIn(t, s)
+	req := httptest.NewRequest(http.MethodPost, "/api/follow?id=424242", nil)
+	req.Header.Set("Datastar-Request", "true")
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	if rec.Code == http.StatusOK {
+		t.Errorf("following an unknown series = 200:\n%s", rec.Body)
+	}
+	req = httptest.NewRequest(http.MethodGet, "/calendar", nil)
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	if strings.Contains(rec.Body.String(), `href="/tv/424242"`) {
+		t.Error("the calendar lists the unknown series")
+	}
+}

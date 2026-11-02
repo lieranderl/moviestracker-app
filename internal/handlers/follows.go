@@ -3,6 +3,7 @@ package handlers
 import (
 	"cmp"
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -11,6 +12,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/starfederation/datastar-go/datastar"
 
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
 	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/views"
@@ -78,15 +80,23 @@ func (f *Follows) handleFollow(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx, cancel := f.catalog.detailsContext(r)
-	defer cancel()
 	series := store.FollowedSeries{TMDBID: id}
 	on := r.Method == http.MethodPost
-	if on {
-		if item, err := f.catalog.Title(ctx, "tv", id); err == nil {
-			series.Title, series.Poster = item.Title, item.PosterPath
+	if on { // a series is followed only as TMDB names it
+		item, err := f.catalog.Title(r.Context(), "tv", id)
+		if errors.Is(err, tmdb.ErrNotFound) {
+			http.NotFound(w, r)
+			return
 		}
+		if err != nil {
+			slog.Warn("looking up a series on TMDB failed", "error", logError(err))
+			http.Error(w, i18n.T(r.Context(), "TMDB is not responding right now. Please try again."), http.StatusBadGateway)
+			return
+		}
+		series.Title, series.Poster = item.Title, item.PosterPath
 	}
+	ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
+	defer cancel()
 	if err := f.store.Follow(ctx, uid, series, on); err != nil {
 		slog.Warn("following a series failed", "error", logError(err))
 		http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
@@ -138,8 +148,15 @@ func (f *Follows) upcoming(ctx context.Context, followed []store.FollowedSeries)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			slots <- struct{}{}
+			select { // queued lookups stop once the page is given up
+			case slots <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
 			defer func() { <-slots }()
+			if ctx.Err() != nil {
+				return
+			}
 			tv, err := details.TV(ctx, s.TMDBID)
 			if err != nil {
 				return
