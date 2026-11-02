@@ -85,10 +85,7 @@ templ ListsPage(user *auth.User, active string, items []tmdb.MediaItem, more str
 					@libraryControls(q)
 				}
 				if failed {
-					<div role="alert" class="alert alert-error alert-soft">
-						@Icon("circle-alert", "size-5")
-						<span>{ tr(ctx, tab.Failed) }</span>
-					</div>
+					@loadFailed(tr(ctx, tab.Failed))
 				} else if len(items) == 0 && q.Active() {
 					<p class="text-sm text-base-content/70">{ tr(ctx, "No titles match.") }</p>
 				} else if len(items) == 0 {

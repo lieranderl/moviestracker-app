@@ -1,0 +1,14 @@
+package views
+
+// loadFailed says a page's data could not be loaded and offers to load the
+// page again (an empty href is the page itself, query included).
+templ loadFailed(message string) {
+	<div role="alert" class="alert alert-error alert-soft">
+		@Icon("circle-alert", "size-5")
+		<span>{ message }</span>
+		<a href="" class="btn btn-sm gap-1.5">
+			@Icon("rotate-cw", "size-4")
+			{ tr(ctx, "Try again") }
+		</a>
+	</div>
+}
