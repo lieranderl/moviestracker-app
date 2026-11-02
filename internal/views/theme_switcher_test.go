@@ -194,7 +194,7 @@ func TestTorrServersStatusSitsOnItsLinkNotBesideIt(t *testing.T) {
 
 func TestControlsPinnedToTheBottomStayAboveThePhonesTabBar(t *testing.T) {
 	var buf bytes.Buffer
-	if err := views.FavoritesPage(&auth.User{Name: "Ann"}, nil, false).Render(context.Background(), &buf); err != nil {
+	if err := views.FavoritesPage(&auth.User{Name: "Ann"}, nil, "", false).Render(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	if !regexp.MustCompile(`class="[^"]*fixed bottom-6[^"]*max-md:bottom-22`).MatchString(buf.String()) {

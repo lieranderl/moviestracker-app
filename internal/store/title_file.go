@@ -61,6 +61,12 @@ func (f *TitleFile) TitleState(_ context.Context, uid, kind string, tmdbID int) 
 	return f.users[uid][id], nil
 }
 
+// TitleStatesPage implements TitleStateStore.
+func (f *TitleFile) TitleStatesPage(ctx context.Context, uid, state, after string) ([]TitleState, string, error) {
+	list, _ := f.TitleStates(ctx, uid, state)
+	return pageOf(list, titleAt, titleKey, after, libraryPageSize)
+}
+
 // TitleStates implements TitleStateStore.
 func (f *TitleFile) TitleStates(_ context.Context, uid, state string) ([]TitleState, error) {
 	f.mu.Lock()

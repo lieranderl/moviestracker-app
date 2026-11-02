@@ -3,8 +3,11 @@ package web_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"html"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -119,6 +122,10 @@ func (unreachableStore) Favorites(context.Context, string) ([]store.Favorite, er
 	return nil, errors.New("firestore: unavailable")
 }
 
+func (unreachableStore) FavoritesPage(context.Context, string, string) ([]store.Favorite, string, error) {
+	return nil, "", errors.New("firestore: unavailable")
+}
+
 func TestFavouritesThatCannotBeReadAreNotShownAsNone(t *testing.T) {
 	g := newGoogle(t)
 	cfg := withTMDB(t, g.config())
@@ -128,5 +135,31 @@ func TestFavouritesThatCannotBeReadAreNotShownAsNone(t *testing.T) {
 	body := page.Body.String()
 	if page.Code != http.StatusServiceUnavailable || strings.Contains(body, "No favourites yet") || !strings.Contains(body, "could not be loaded") {
 		t.Errorf("GET /favorites with the store down = %d, want 503 saying they could not be loaded, not that there are none", page.Code)
+	}
+}
+
+// Many favourites show 60 a page, with a link to the rest.
+func TestManyFavouritesComeAPageAtATime(t *testing.T) {
+	g := newGoogle(t)
+	cfg := withTMDB(t, g.config())
+	users := store.NewMemory()
+	cfg.Store = users
+	h := web.New(cfg)
+	session := signIn(t, h)
+	for id := 1; id <= 70; id++ {
+		if err := users.AddFavorite(context.Background(), "1098765", store.Favorite{Kind: "movie", TMDBID: id, Title: fmt.Sprint("Movie ", id)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	page := getWith(t, h, "/favorites", session).Body.String()
+	if got := strings.Count(page, `href="/movie/`); got != 60 {
+		t.Errorf("the first page shows %d favourites, want 60", got)
+	}
+	more := regexp.MustCompile(`href="(/favorites\?after=[^"]+)"`).FindStringSubmatch(html.UnescapeString(page))
+	if more == nil {
+		t.Fatal("no link to the other favourites")
+	}
+	if rest := getWith(t, h, more[1], session).Body.String(); strings.Count(rest, `href="/movie/`) != 10 {
+		t.Errorf("the second page shows %d favourites, want 10", strings.Count(rest, `href="/movie/`))
 	}
 }

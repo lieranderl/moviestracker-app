@@ -108,7 +108,11 @@ func (a *app) handleFavoritesPage(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
 	defer cancel()
-	favs, err := a.cfg.Store.Favorites(ctx, user.ID)
+	favs, next, err := a.cfg.Store.FavoritesPage(ctx, user.ID, r.URL.Query().Get("after"))
+	if errors.Is(err, store.ErrCursor) {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
 	if err != nil {
 		slog.Warn("reading favourites failed", "error", handlers.LogError(err))
 	}
@@ -121,7 +125,7 @@ func (a *app) handleFavoritesPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
-	if err := views.FavoritesPage(a.catalogUser(r), items, err != nil).Render(r.Context(), w); err != nil {
+	if err := views.FavoritesPage(a.catalogUser(r), items, handlers.MorePath(r, next), err != nil).Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "favourites", "error", err)
 	}
 }
