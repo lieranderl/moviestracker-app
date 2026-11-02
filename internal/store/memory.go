@@ -226,7 +226,7 @@ func (m *Memory) SetTitleState(_ context.Context, uid string, ts TitleState) err
 		delete(m.user(uid).titles, id)
 		return nil
 	}
-	ts.UpdatedAt = m.opts.now().UTC()
+	ts.UpdatedAt = markTime(m.opts.now())
 	m.user(uid).titles[id] = ts
 	return nil
 }

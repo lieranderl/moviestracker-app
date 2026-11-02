@@ -407,7 +407,7 @@ func (f *Firestore) SetTitleState(ctx context.Context, uid string, ts TitleState
 		}
 		return nil
 	}
-	ts.UpdatedAt = f.opts.now().UTC()
+	ts.UpdatedAt = markTime(f.opts.now())
 	err = f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error {
 		return tx.Set(f.titles(uid).Doc(id), newTitleStateRecord(ts))
 	})

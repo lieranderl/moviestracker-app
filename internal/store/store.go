@@ -416,8 +416,14 @@ func stampTitleState(ts TitleState, now time.Time) TitleState {
 	if ts.UpdatedAt.IsZero() || ts.UpdatedAt.After(now) {
 		ts.UpdatedAt = now
 	}
-	ts.UpdatedAt = ts.UpdatedAt.UTC().Truncate(time.Microsecond)
+	ts.UpdatedAt = markTime(ts.UpdatedAt)
 	return ts
+}
+
+// markTime is when a title was marked, to the microsecond as Firestore
+// keeps it, so marks compare equal in every store.
+func markTime(at time.Time) time.Time {
+	return at.UTC().Truncate(time.Microsecond)
 }
 
 // sameMark reports whether kept is still as from: the same state, marked at

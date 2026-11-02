@@ -41,7 +41,7 @@ func (f *TitleFile) SetTitleState(_ context.Context, uid string, ts TitleState) 
 	if ts.State == "" {
 		delete(titles, id)
 	} else {
-		ts.UpdatedAt = f.opts.now().UTC()
+		ts.UpdatedAt = markTime(f.opts.now())
 		titles[id] = ts
 	}
 	if err := writeJSONFile(f.path, f.users); err != nil {

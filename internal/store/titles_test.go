@@ -192,3 +192,24 @@ func TestATitlePutBackKeepsItsPlaceInItsList(t *testing.T) {
 		}
 	})
 }
+
+// A title marked at a time finer than a microsecond and put back returns to
+// exactly its mark.
+func TestAMarkIsKeptToTheMicrosecond(t *testing.T) {
+	eachTitleStore(t, func(t *testing.T, s store.TitleStateStore, uid string, clock *time.Time) {
+		ctx := context.Background()
+		*clock = now.Add(123 * time.Nanosecond)
+		want := severance
+		want.State = store.WantToWatch
+		if err := s.SetTitleState(ctx, uid, want); err != nil {
+			t.Fatal(err)
+		}
+		marked, _ := s.TitleState(ctx, uid, "tv", 95396)
+		if _, err := s.ChangeTitleState(ctx, uid, marked, marked); err != nil {
+			t.Fatalf("changing from the mark just read: %v", err)
+		}
+		if got, _ := s.TitleState(ctx, uid, "tv", 95396); !got.UpdatedAt.Equal(marked.UpdatedAt) {
+			t.Errorf("put back at %v, want %v", got.UpdatedAt, marked.UpdatedAt)
+		}
+	})
+}
