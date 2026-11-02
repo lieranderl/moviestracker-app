@@ -1,6 +1,9 @@
 package store
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Account is everything kept for one user, as they can take it away.
 type Account struct {
@@ -23,4 +26,12 @@ type AccountStore interface {
 	// lists' links included. Deleting what is gone already is no error,
 	// so a failed deletion can be tried again.
 	DeleteAccount(ctx context.Context, uid string) error
+	// AccountDeletedAt is when the user's account was last deleted, so
+	// sessions signed in before can end; zero when it never was, or longer
+	// ago than any session lasts (DeletedAccountKept).
+	AccountDeletedAt(ctx context.Context, uid string) (time.Time, error)
 }
+
+// DeletedAccountKept is how long a deleted account's ID and deletion time
+// are kept: as long as a session lasts.
+const DeletedAccountKept = 30 * 24 * time.Hour

@@ -79,6 +79,9 @@ func (a *app) handleAccountDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("an account was deleted")
+	if at, err := a.cfg.Store.AccountDeletedAt(ctx, user.ID); err == nil {
+		a.deletions.note(user.ID, at, a.now())
+	}
 	http.SetCookie(w, a.cookie(sessionCookie, "", "/", -1))
 	handlers.Navigate(w, r, "/")
 }

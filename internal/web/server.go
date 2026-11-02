@@ -52,7 +52,9 @@ type app struct {
 	signer   signer
 	catalog  *handlers.Catalog
 	progress *handlers.Progress
-	feeds    *cachedFeeds // the backend's release feeds, as the home rows read them
+	// deletions are when accounts were deleted, for ending their sessions.
+	deletions deletions
+	feeds     *cachedFeeds // the backend's release feeds, as the home rows read them
 }
 
 func (a *app) now() time.Time {

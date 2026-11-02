@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -927,6 +928,9 @@ func (f *Firestore) ExportAccount(ctx context.Context, uid string) (Account, err
 // pointing at a deleted list; the user's document goes last, so a retry
 // after a failure still finds what is left.
 func (f *Firestore) DeleteAccount(ctx context.Context, uid string) error {
+	if err := f.noteDeleted(ctx, uid); err != nil {
+		return err
+	}
 	links, err := f.sharedLists().Where("uid", "==", uid).Documents(ctx).GetAll()
 	if err != nil {
 		return fmt.Errorf("read shared links: %w", err)
@@ -951,6 +955,51 @@ func (f *Firestore) DeleteAccount(ctx context.Context, uid string) error {
 		return fmt.Errorf("delete the user: %w", err)
 	}
 	return nil
+}
+
+// deletedAccounts are deletedAccounts/{uid} documents: when each deleted
+// account was deleted, kept DeletedAccountKept.
+func (f *Firestore) deletedAccounts() *firestore.CollectionRef {
+	return f.client.Collection("deletedAccounts")
+}
+
+// noteDeleted notes the account deleted now, first, so its sessions end
+// even if deleting the rest has to be tried again; notes older than any
+// session are dropped on the way.
+func (f *Firestore) noteDeleted(ctx context.Context, uid string) error {
+	now := f.opts.now().UTC()
+	if _, err := f.deletedAccounts().Doc(uid).Set(ctx, map[string]any{"at": now}); err != nil {
+		return fmt.Errorf("note the deleted account: %w", err)
+	}
+	stale, err := f.deletedAccounts().Where("at", "<", now.Add(-DeletedAccountKept)).Limit(100).Documents(ctx).GetAll()
+	if err != nil {
+		slog.Warn("reading stale deleted-account notes failed", "error", err)
+		return nil
+	}
+	refs := make([]*firestore.DocumentRef, 0, len(stale))
+	for _, doc := range stale {
+		refs = append(refs, doc.Ref)
+	}
+	if err := f.deleteDocs(ctx, refs); err != nil {
+		slog.Warn("dropping stale deleted-account notes failed", "error", err)
+	}
+	return nil
+}
+
+// AccountDeletedAt implements Store.
+func (f *Firestore) AccountDeletedAt(ctx context.Context, uid string) (time.Time, error) {
+	snap, err := f.deletedAccounts().Doc(uid).Get(ctx)
+	if notFound(err) {
+		return time.Time{}, nil
+	}
+	if err != nil {
+		return time.Time{}, fmt.Errorf("read the deleted account: %w", err)
+	}
+	at, _ := snap.Data()["at"].(time.Time)
+	if f.opts.now().Sub(at) > DeletedAccountKept {
+		return time.Time{}, nil
+	}
+	return at, nil
 }
 
 // deleteDocs deletes these documents; deleting one gone already is no

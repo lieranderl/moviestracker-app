@@ -15,6 +15,8 @@ type Memory struct {
 	mu     sync.Mutex
 	users  map[string]*memoryUser
 	shared map[string]sharedList // by share ID
+	// deleted is when each deleted account was deleted.
+	deleted map[string]time.Time
 }
 
 // sharedList is whose list a link opens.
@@ -459,10 +461,25 @@ func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error)
 	}, nil
 }
 
+// AccountDeletedAt implements Store.
+func (m *Memory) AccountDeletedAt(_ context.Context, uid string) (time.Time, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	at := m.deleted[uid]
+	if m.opts.now().Sub(at) > DeletedAccountKept {
+		return time.Time{}, nil
+	}
+	return at, nil
+}
+
 // DeleteAccount implements Store.
 func (m *Memory) DeleteAccount(_ context.Context, uid string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.deleted == nil {
+		m.deleted = map[string]time.Time{}
+	}
+	m.deleted[uid] = m.opts.now().UTC()
 	for id, s := range m.shared {
 		if s.uid == uid {
 			delete(m.shared, id)

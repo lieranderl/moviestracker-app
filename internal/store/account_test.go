@@ -107,3 +107,24 @@ func TestDeletingAnAccountDeletesEverythingKeptForIt(t *testing.T) {
 		}
 	})
 }
+
+// Deleting an account notes when, so sessions signed in before can end.
+func TestADeletedAccountRemembersWhenItWasDeleted(t *testing.T) {
+	eachStore(t, func(t *testing.T, s store.Store, uid string, clock *time.Time) {
+		ctx := context.Background()
+		if at, err := s.AccountDeletedAt(ctx, uid); err != nil || !at.IsZero() {
+			t.Fatalf("a live account was deleted at %v (%v)", at, err)
+		}
+		keepEverything(t, s, uid)
+		*clock = now.Add(time.Hour)
+		if err := s.DeleteAccount(ctx, uid); err != nil {
+			t.Fatal(err)
+		}
+		if at, err := s.AccountDeletedAt(ctx, uid); err != nil || !at.Equal(now.Add(time.Hour)) {
+			t.Errorf("AccountDeletedAt() = %v, %v; want the deletion time", at, err)
+		}
+		if at, _ := s.AccountDeletedAt(ctx, uid+"-other"); !at.IsZero() {
+			t.Error("another user's account is noted as deleted")
+		}
+	})
+}

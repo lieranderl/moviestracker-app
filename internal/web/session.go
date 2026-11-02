@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -40,10 +41,14 @@ type User struct {
 type session struct {
 	User
 	Expires int64 `json:"exp"`
+	// Issued is when the user signed in (Unix seconds): a session issued
+	// before their account was deleted has ended.
+	Issued int64 `json:"iat"`
 }
 
 // currentUser is the visitor's user when they are signed in: a session
-// cookie this app signed that has not expired.
+// cookie this app signed that has not expired, issued after the account
+// was last deleted.
 func (a *app) currentUser(r *http.Request) (User, bool) {
 	c, err := r.Cookie(sessionCookie)
 	if err != nil || len(a.cfg.SessionKey) < 32 {
@@ -51,6 +56,9 @@ func (a *app) currentUser(r *http.Request) (User, bool) {
 	}
 	var s session
 	if err := a.signer.open(c.Value, &s); err != nil || s.ID == "" || a.now().Unix() >= s.Expires {
+		return User{}, false
+	}
+	if deleted := a.deletions.at(r.Context(), a.cfg.Store, s.ID, a.now()); !deleted.IsZero() && s.Issued <= deleted.Unix() {
 		return User{}, false
 	}
 	return s.User, true
@@ -89,7 +97,7 @@ func (a *app) handleSignInCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, i18n.T(r.Context(), "This Google account cannot sign in here."), http.StatusForbidden)
 		return
 	}
-	sealed, err := a.signer.seal(session{User: user, Expires: a.now().Add(sessionTTL).Unix()})
+	sealed, err := a.signer.seal(session{User: user, Expires: a.now().Add(sessionTTL).Unix(), Issued: a.now().Unix()})
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -179,4 +187,56 @@ func audienceHas(aud json.RawMessage, clientID string) bool {
 func (a *app) userID(r *http.Request) (string, bool) {
 	user, ok := a.currentUser(r)
 	return user.ID, ok
+}
+
+// deletionsChecked is how long an instance trusts what it read of an
+// account's deletion: another instance's deletion ends its sessions here
+// within that time.
+const deletionsChecked = time.Minute
+
+// deletions remembers when accounts were deleted, as the store says, for
+// deletionsChecked, so checking sessions costs no read per request.
+type deletions struct {
+	mu   sync.Mutex
+	seen map[string]deletionSeen // by user
+}
+
+type deletionSeen struct{ at, checked time.Time }
+
+// at is when the user's account was last deleted; zero when it was not,
+// or when the store cannot say (sessions are not ended on a read failure).
+func (d *deletions) at(ctx context.Context, s deletionStore, uid string, now time.Time) time.Time {
+	if s == nil {
+		return time.Time{}
+	}
+	d.mu.Lock()
+	seen, ok := d.seen[uid]
+	d.mu.Unlock()
+	if ok && now.Sub(seen.checked) < deletionsChecked {
+		return seen.at
+	}
+	ctx, cancel := context.WithTimeout(ctx, storeTimeout)
+	defer cancel()
+	at, err := s.AccountDeletedAt(ctx, uid)
+	if err != nil {
+		slog.Warn("reading account deletion failed", "error", handlers.LogError(err))
+		return seen.at
+	}
+	d.note(uid, at, now)
+	return at
+}
+
+// note remembers the user's account deleted at at, checked now.
+func (d *deletions) note(uid string, at, now time.Time) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.seen == nil || len(d.seen) >= 10000 {
+		d.seen = map[string]deletionSeen{}
+	}
+	d.seen[uid] = deletionSeen{at: at, checked: now}
+}
+
+// deletionStore says when accounts were deleted.
+type deletionStore interface {
+	AccountDeletedAt(ctx context.Context, uid string) (time.Time, error)
 }

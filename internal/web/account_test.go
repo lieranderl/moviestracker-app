@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/web"
@@ -91,5 +92,34 @@ func TestAUserDeletesTheirAccountAfterConfirmingIt(t *testing.T) {
 	}
 	if !signedOut {
 		t.Error("deleting the account did not sign the user out")
+	}
+}
+
+// Deleting an account signs it out everywhere: a session from another
+// browser stops working, and signing in again starts afresh.
+func TestDeletingAnAccountEndsItsOtherSessions(t *testing.T) {
+	clock := now
+	g := newGoogle(t)
+	cfg := withTMDB(t, g.config())
+	cfg.Now = func() time.Time { return clock }
+	users := store.NewMemory(store.WithClock(func() time.Time { return clock }))
+	cfg.Store = users
+	h := web.New(cfg)
+	session, other := signIn(t, h), signIn(t, h)
+	clock = clock.Add(time.Second)
+	postSignals(t, h, "/api/account/delete", `{"deleteConfirm":"delete"}`, session)
+	clock = clock.Add(time.Second)
+	if res := send(t, h, http.MethodGet, "/api/alerts/count", other); res.Code != http.StatusUnauthorized {
+		t.Errorf("another browser's session still works after deletion: %d", res.Code)
+	}
+	if res := send(t, h, http.MethodPost, "/api/favorites?type=movie&id=438631", other); res.Code == http.StatusOK {
+		t.Error("another browser's session recreated a favourite after deletion")
+	}
+	if favs, _ := users.Favorites(context.Background(), "1098765"); len(favs) != 0 {
+		t.Errorf("the deleted account has favourites again: %+v", favs)
+	}
+	again := signIn(t, h)
+	if res := send(t, h, http.MethodGet, "/api/alerts/count", again); res.Code != http.StatusOK {
+		t.Errorf("signing in again after deletion = %d", res.Code)
 	}
 }
