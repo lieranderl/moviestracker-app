@@ -775,12 +775,15 @@ func (m *Memory) Reviews(_ context.Context, uid string) ([]Review, error) {
 	return slices.Collect(maps.Values(m.user(uid).reviews)), nil
 }
 
-func (m *Memory) MuteAlerts(_ context.Context, uid string, t MutedTitle, on bool) error {
+func (m *Memory) MuteAlerts(ctx context.Context, uid string, t MutedTitle, on bool) error {
 	if t.TMDBID <= 0 {
 		return errors.New("mute alerts: no movie")
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	u := m.user(uid)
 	if !on {
 		delete(u.muted, t.TMDBID)
@@ -800,12 +803,15 @@ func (m *Memory) MutedAlerts(_ context.Context, uid string) ([]MutedTitle, error
 	return slices.SortedFunc(maps.Values(m.user(uid).muted), newestMuted), nil
 }
 
-func (m *Memory) SetAlertFeed(_ context.Context, uid, feed string, on bool) error {
+func (m *Memory) SetAlertFeed(ctx context.Context, uid, feed string, on bool) error {
 	if feed == "" {
 		return errors.New("alert feed: none named")
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
 	u := m.user(uid)
 	if u.feeds == nil {
 		u.feeds = map[string]AlertFeed{}

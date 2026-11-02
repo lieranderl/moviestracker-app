@@ -1636,7 +1636,7 @@ func (f *Firestore) MuteAlerts(ctx context.Context, uid string, t MutedTitle, on
 		entry = map[string]any{"title": t.Title, "at": f.opts.now().UTC()}
 	}
 	data := map[string]any{"mutedAlerts": map[string]any{strconv.Itoa(t.TMDBID): entry}}
-	if _, err := f.userDoc(uid).Set(ctx, data, firestore.MergeAll); err != nil {
+	if err := f.accountSet(ctx, uid, f.userDoc(uid), data, firestore.MergeAll); err != nil {
 		return fmt.Errorf("mute alerts: %w", err)
 	}
 	return nil
@@ -1677,7 +1677,7 @@ func (f *Firestore) SetAlertFeed(ctx context.Context, uid, feed string, on bool)
 	}
 	// Merging on the feed's field replaces its choice whole.
 	data := map[string]any{"alertFeeds": map[string]any{feed: choice}}
-	if _, err := f.userDoc(uid).Set(ctx, data, firestore.Merge([]string{"alertFeeds", feed})); err != nil {
+	if err := f.accountSet(ctx, uid, f.userDoc(uid), data, firestore.Merge([]string{"alertFeeds", feed})); err != nil {
 		return fmt.Errorf("set alert feed: %w", err)
 	}
 	return nil

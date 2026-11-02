@@ -174,6 +174,8 @@ func TestADeletedSessionCannotRecreateAccountData(t *testing.T) {
 				return s.SetTitleState(ctx, uid, store.TitleState{Kind: "movie", TMDBID: 438631, State: store.WantToWatch})
 			}},
 			{"alerts", func() error { return s.AddUpdates(ctx, uid, []store.Update{duneInDV}) }},
+			{"muted alerts", func() error { return s.MuteAlerts(ctx, uid, store.MutedTitle{TMDBID: 438631, Title: "Dune"}, true) }},
+			{"alert feeds", func() error { return s.SetAlertFeed(ctx, uid, "hdr10movies", false) }},
 			{"release filters", func() error { return s.SaveReleaseFilters(ctx, uid, store.ReleaseFilters{HDR: true}) }},
 			{"lists", func() error { _, err := s.CreateCustomList(ctx, uid, "Sci-fi"); return err }},
 			{"reviews", func() error { return s.SaveReview(ctx, uid, store.Review{Kind: "movie", TMDBID: 438631, Rating: 9}) }},
