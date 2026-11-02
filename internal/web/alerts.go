@@ -97,7 +97,7 @@ func (a *app) foundAlerts(ctx context.Context, uid string) ([]store.Update, stor
 			checkpoints.Feeds[string(feed)] = read // nothing new
 		}
 	}
-	episodes, checked, err := a.airedEpisodes(ctx, uid, since.Feeds[store.EpisodesFeed], off[store.EpisodesFeed])
+	episodes, checked, err := a.airedEpisodes(ctx, uid, since.Feeds[store.EpisodesFeed], choices[store.EpisodesFeed])
 	found = append(found, episodes...)
 	if err != nil {
 		return found, store.AlertCheckpoints{}, err
@@ -116,11 +116,10 @@ func (a *app) foundAlerts(ctx context.Context, uid string) ([]store.Update, stor
 const episodeCheckEvery = time.Hour
 
 // airedEpisodes are the latest episodes of the user's followed series that
-// aired since they followed each and since the last check (last), and when
-// this check was made. A recent check, or the feed turned off, looks
-// nothing up; turned off, the check still moves, so turned on again only
-// later episodes alert.
-func (a *app) airedEpisodes(ctx context.Context, uid string, last time.Time, off bool) ([]store.Update, time.Time, error) {
+// aired since they followed each, since the last check (last) and since the
+// feed was last turned back on, and when this check was made. A recent
+// check, or the feed turned off, looks nothing up.
+func (a *app) airedEpisodes(ctx context.Context, uid string, last time.Time, choice store.AlertFeed) ([]store.Update, time.Time, error) {
 	now := a.now()
 	if !last.IsZero() && now.Sub(last) < episodeCheckEvery {
 		return nil, last, nil
@@ -129,7 +128,7 @@ func (a *app) airedEpisodes(ctx context.Context, uid string, last time.Time, off
 	if err != nil || len(follows) == 0 || a.cfg.Sources.Details == nil {
 		return nil, time.Time{}, err
 	}
-	if off {
+	if choice.Off {
 		return nil, now, nil
 	}
 	day := func(t time.Time) time.Time { return t.UTC().Truncate(24 * time.Hour) }
@@ -142,7 +141,7 @@ func (a *app) airedEpisodes(ctx context.Context, uid string, last time.Time, off
 		}
 		ep := tv.LastEpisode
 		aired := day(ep.AirDate)
-		if ep.AirDate.IsZero() || aired.After(now) || aired.Before(day(s.At)) || (!last.IsZero() && aired.Before(day(last))) {
+		if ep.AirDate.IsZero() || aired.After(now) || aired.Before(day(s.At)) || aired.Before(day(choice.On)) || (!last.IsZero() && aired.Before(day(last))) {
 			continue
 		}
 		found = append(found, store.Update{
