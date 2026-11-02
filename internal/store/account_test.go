@@ -36,6 +36,9 @@ func keepEverything(t *testing.T, s store.Store, uid string) string {
 			return s.Follow(ctx, uid, store.FollowedSeries{TMDBID: 95396, Title: "Severance"}, true)
 		},
 		func() error {
+			return s.SetFeedback(ctx, uid, store.NotInterested, store.TitleRef{Kind: "movie", TMDBID: 329865, Title: "Arrival"}, true)
+		},
+		func() error {
 			return s.SaveReview(ctx, uid, store.Review{Kind: "movie", TMDBID: 438631, Title: "Dune", Rating: 9, Note: "Loud"})
 		},
 	}
@@ -77,7 +80,8 @@ func TestAUserExportsEverythingKeptAboutThem(t *testing.T) {
 			len(got.Lists) != 1 || got.Lists[0].Name != "Sci-fi" || len(got.Lists[0].Titles) != 1 || got.Lists[0].ShareID == "",
 			len(got.Reviews) != 1 || got.Reviews[0].Note != "Loud",
 			len(got.Episodes[95396][1]) != 2,
-			len(got.Follows) != 1 || got.Follows[0].Title != "Severance":
+			len(got.Follows) != 1 || got.Follows[0].Title != "Severance",
+			len(got.Feedback[store.NotInterested]) != 1 || got.Feedback[store.NotInterested][0].Title != "Arrival":
 			t.Errorf("export lacks something kept: %+v", got)
 		}
 	})
@@ -100,7 +104,7 @@ func TestDeletingAnAccountDeletesEverythingKeptForIt(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got.Preferences.Language != "" || len(got.Favorites)+len(got.TorrServers)+len(got.Progress)+len(got.TitleStates)+len(got.Updates)+len(got.Lists)+len(got.Reviews)+len(got.Follows) != 0 || got.ReleaseFilters.HDR {
+		if got.Preferences.Language != "" || len(got.Favorites)+len(got.TorrServers)+len(got.Progress)+len(got.TitleStates)+len(got.Updates)+len(got.Lists)+len(got.Reviews)+len(got.Follows)+len(got.Feedback) != 0 || got.ReleaseFilters.HDR {
 			t.Errorf("after deletion the account still holds %+v", got)
 		}
 		if _, ok, err := s.SharedList(ctx, shareID); ok || err != nil {

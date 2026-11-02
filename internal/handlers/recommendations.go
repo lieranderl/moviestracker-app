@@ -3,10 +3,12 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/lieranderl/moviestracker-app/internal/store"
 	"log/slog"
 	"maps"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/starfederation/datastar-go/datastar"
 
@@ -39,6 +41,8 @@ func NewRecommendations(library *Library, user func(*http.Request) (string, bool
 // Register adds the recommendations' route to mux.
 func (rc *Recommendations) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/recommendations", rc.handleRows)
+	mux.HandleFunc("POST /api/recommendations/feedback", rc.handleFeedback)
+	mux.HandleFunc("POST /api/recommendations/feedback/reset", rc.handleFeedback)
 }
 
 // seed is a title recommendations start from.
@@ -47,6 +51,7 @@ type seed struct {
 	id      int
 	title   string
 	watched bool
+	more    bool // the user asked for more like it
 }
 
 func titleKey(kind string, id int) string { return fmt.Sprintf("%s-%d", kind, id) }
@@ -85,7 +90,10 @@ func recommendationRowsFor(ctx context.Context, seeds []seed, related [][]tmdb.M
 			break
 		}
 		row := views.RecommendationRow{Title: i18n.Tf(ctx, "Because you saved %s", s.title)}
-		if s.watched {
+		switch {
+		case s.more:
+			row.Title = i18n.Tf(ctx, "More like %s", s.title)
+		case s.watched:
 			row.Title = i18n.Tf(ctx, "Because you watched %s", s.title)
 		}
 		for _, it := range related[i] {
@@ -164,6 +172,12 @@ func (rc *Recommendations) handleRows(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	rc.patchRows(w, r, uid, nil)
+}
+
+// patchRows patches the rows as the user's library and feedback make them
+// now; undone is a title just hidden, offered back.
+func (rc *Recommendations) patchRows(w http.ResponseWriter, r *http.Request, uid string, undone *tmdb.MediaItem) {
 	ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
 	library, err := rc.library.Summary(ctx, uid)
 	cancel()
@@ -171,10 +185,64 @@ func (rc *Recommendations) handleRows(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("reading what to recommend from failed", "error", logError(err))
 	}
 	rows := rc.rows(r.Context(), rc.localizeSeeds(r.Context(), library.Seeds), library.Marked)
+	feedback := views.RecommendationFeedback{Undone: undone, Hidden: library.Hidden, Given: library.Given, Allow: rc.library.feedback != nil}
 	w.Header().Set("Cache-Control", "no-store")
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.RecommendationRows(rows)); err != nil {
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.RecommendationRows(rows, feedback)); err != nil {
 		slog.Warn("patching recommendations failed", "error", err)
 	}
+}
+
+// handleFeedback gives or takes back the user's feedback on a recommended
+// title (?type=, ?id=, ?feedback=notInterested|moreLikeThis, ?on=1|0), or
+// forgets it all (/reset), and patches the rows.
+func (rc *Recommendations) handleFeedback(w http.ResponseWriter, r *http.Request) {
+	uid, ok := rc.user(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	feedback := rc.library.feedback
+	if feedback == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if strings.HasSuffix(r.URL.Path, "/reset") {
+		ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
+		defer cancel()
+		if err := feedback.ResetFeedback(ctx, uid); err != nil {
+			slog.Warn("resetting recommendation feedback failed", "error", logError(err))
+			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+			return
+		}
+		rc.patchRows(w, r, uid, nil)
+		return
+	}
+	q := r.URL.Query()
+	id, idOK := positiveInt(q.Get("id"))
+	kind, which, on := q.Get("type"), store.Feedback(q.Get("feedback")), q.Get("on") == "1"
+	if !idOK || (kind != "movie" && kind != "tv") || (which != store.NotInterested && which != store.MoreLikeThis) {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	item := tmdb.MediaItem{ID: id, MediaType: kind}
+	if on { // named for the undo notice; taking feedback back needs no name
+		if named, err := rc.catalog.Title(r.Context(), kind, id); err == nil {
+			item.Title = named.Title
+		}
+	}
+	// The write has its own deadline, whatever the lookup took.
+	ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
+	defer cancel()
+	if err := feedback.SetFeedback(ctx, uid, which, store.TitleRef{Kind: kind, TMDBID: id, Title: item.Title}, on); err != nil {
+		slog.Warn("saving recommendation feedback failed", "error", logError(err))
+		http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+		return
+	}
+	var undone *tmdb.MediaItem
+	if which == store.NotInterested && on {
+		undone = &item
+	}
+	rc.patchRows(w, r, uid, undone)
 }
 
 // localizeSeeds names the seeds rows can start from in the interface

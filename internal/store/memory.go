@@ -37,6 +37,7 @@ type memoryUser struct {
 	reviews     map[string]Review
 	episodes    map[int]seriesEpisodes // by series ID
 	checkpoints AlertCheckpoints
+	feedback    map[string]feedbackEntry
 	follows     map[int]FollowedSeries // by series ID
 }
 
@@ -531,6 +532,7 @@ func (m *Memory) SaveReview(ctx context.Context, uid string, r Review) error {
 	if err := m.checkAccountSession(ctx, uid); err != nil {
 		return err
 	}
+	m.libraryChanged(uid) // ratings shape recommendations
 	if empty {
 		delete(m.user(uid).reviews, id)
 		return nil
@@ -560,6 +562,7 @@ func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error)
 	filters, _ := m.ReleaseFilters(ctx, uid)
 	lists, _ := m.CustomLists(ctx, uid)
 	follows, _ := m.FollowedSeries(ctx, uid)
+	feedback, _ := accountFeedback(ctx, m, uid)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	u := m.user(uid)
@@ -569,7 +572,7 @@ func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error)
 		Progress:    slices.SortedFunc(maps.Values(u.progress), func(a, b Progress) int { return b.UpdatedAt.Compare(a.UpdatedAt) }),
 		TitleStates: append(watched, want...), Updates: updates, ReleaseFilters: filters, Lists: lists,
 		Reviews: slices.Collect(maps.Values(u.reviews)), Episodes: u.watchedEpisodes(),
-		Follows: follows,
+		Follows: follows, Feedback: feedback,
 	}, nil
 }
 
@@ -718,5 +721,46 @@ func (m *Memory) SaveAlertCheckpoints(ctx context.Context, uid string, c AlertCh
 	}
 	c.Feeds = maps.Clone(c.Feeds)
 	m.user(uid).checkpoints = c
+	return nil
+}
+
+func (m *Memory) SetFeedback(ctx context.Context, uid string, f Feedback, ref TitleRef, on bool) error {
+	key, err := feedbackKey(f, ref)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
+	u := m.user(uid)
+	if u.feedback == nil {
+		u.feedback = map[string]feedbackEntry{}
+	}
+	if on {
+		ref.At = m.opts.now().UTC()
+		u.feedback[key] = feedbackEntry{f, ref}
+	} else {
+		delete(u.feedback, key)
+	}
+	m.libraryChanged(uid)
+	return nil
+}
+
+func (m *Memory) FeedbackOn(_ context.Context, uid string, f Feedback) ([]TitleRef, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return feedbackOn(m.user(uid).feedback, f), nil
+}
+
+func (m *Memory) ResetFeedback(ctx context.Context, uid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
+	m.user(uid).feedback = nil
+	m.libraryChanged(uid)
 	return nil
 }

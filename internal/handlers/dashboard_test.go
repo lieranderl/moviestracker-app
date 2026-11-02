@@ -247,7 +247,7 @@ func section(t *testing.T, body, id string) string {
 func TestTheDashboardKeepsTheAppApartFromTheMachine(t *testing.T) {
 	engine := newFakeEngine(t, true) // an external TorrServer on this machine
 	l := newLocal(t, withAdmin(t), withEngineAt(engine.URL), quickDashboard)
-	body := openStreams(t, l, l.admin(t), 400*time.Millisecond, "/api/dashboard?stream=true")[0]
+	body := dashboardUntil(t, l, l.admin(t), "Goroutines", "Together", " cores", "free of")
 
 	app := section(t, body, "dash-app")
 	for _, want := range []string{
