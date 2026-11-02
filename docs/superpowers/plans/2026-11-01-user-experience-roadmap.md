@@ -320,6 +320,20 @@ in focused PRs before the larger episode/discovery and collaboration work.
   Handler, view and browser tests cover both apps; a local browser check
   confirmed the self-hosted message and search fallback. A wider audit of
   loading, retry, empty and stale-response states remains open.
+- **R17 — implemented, deployment unverified (2 November 2026):** series
+  pages in both apps let a signed-in user tick aired episodes watched, mark
+  a season's aired episodes watched or unwatched, and see Next unwatched (the
+  first aired episode not watched, in season order, Specials skipped) or "All
+  aired episodes watched". Episodes are kept per series by canonical
+  series/season/episode numbers (memory, Firestore
+  `users/{uid}/episodes/{tvID}` in a transaction, and the local
+  `episodes.json`); marking episodes never marks the series watched and
+  series marks do not backfill episodes. Store contract tests pass on all
+  three backends (Firestore emulator included); a handler test covers
+  toggles, season actions, unaired episodes and Next unwatched; a local
+  browser check on a real series confirmed a toggle moving Next to S01E02.
+  Account export/deletion (R07) must add the episodes collection once both
+  are merged.
 - **R05 — implemented in two PRs, deployment unverified (2 November
   2026):** (1) the store keeps a library stamp that changes with favourites
   and watch states, and a shared `Library` works out the summary alerts and
