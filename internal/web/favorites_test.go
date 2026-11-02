@@ -182,3 +182,20 @@ func TestFavouritesCanBeSearched(t *testing.T) {
 		t.Error("searching favourites for sev should show only Severance, and say so")
 	}
 }
+
+// unavailableReviews models the external user-store read failing.
+type unavailableReviews struct{ *store.Memory }
+
+func (unavailableReviews) Reviews(context.Context, string) ([]store.Review, error) {
+	return nil, errors.New("firestore: unavailable")
+}
+func TestRatingSortReportsAnUnreadableReviewStore(t *testing.T) {
+	g := newGoogle(t)
+	cfg := withTMDB(t, g.config())
+	cfg.Store = unavailableReviews{store.NewMemory()}
+	h := web.New(cfg)
+	page := getWith(t, h, "/favorites?sort=rating", signIn(t, h))
+	if page.Code != http.StatusServiceUnavailable || !strings.Contains(page.Body.String(), "could not be loaded") {
+		t.Errorf("rating sort with unreadable reviews = %d; want a visible 503 failure", page.Code)
+	}
+}

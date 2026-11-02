@@ -19,8 +19,8 @@ import (
 func ParseLibraryQuery(r *http.Request) views.LibraryQuery {
 	q := r.URL.Query()
 	out := views.LibraryQuery{Q: strings.TrimSpace(q.Get("q"))}
-	if len(out.Q) > 100 {
-		out.Q = out.Q[:100]
+	if runes := []rune(out.Q); len(runes) > maxSearchQuery {
+		out.Q = string(runes[:maxSearchQuery])
 	}
 	if k := q.Get("kind"); k == "movie" || k == "tv" {
 		out.Kind = k
@@ -35,6 +35,21 @@ func ParseLibraryQuery(r *http.Request) views.LibraryQuery {
 type LibraryEntry struct {
 	Item tmdb.MediaItem
 	At   time.Time
+}
+
+// LocalizeLibraryEntries names entries before searching and sorting, so the
+// query matches the same titles the user sees. Saved timestamps stay intact.
+func (c *Catalog) LocalizeLibraryEntries(ctx context.Context, entries []LibraryEntry) []LibraryEntry {
+	items := make([]tmdb.MediaItem, len(entries))
+	for i, e := range entries {
+		items[i] = e.Item
+	}
+	items = c.LocalizeTitles(ctx, items)
+	out := slices.Clone(entries)
+	for i := range out {
+		out[i].Item = items[i]
+	}
+	return out
 }
 
 // ApplyLibraryQuery is the entries q keeps, in its order, and q with their
@@ -68,19 +83,19 @@ func ApplyLibraryQuery(entries []LibraryEntry, q views.LibraryQuery, ratings map
 
 // Ratings are the user's ratings by "kind-id", for sorting by rating; none
 // without reviews.
-func Ratings(ctx context.Context, reviews store.ReviewStore, uid string) map[string]int {
+func Ratings(ctx context.Context, reviews store.ReviewStore, uid string) (map[string]int, error) {
 	out := map[string]int{}
 	if reviews == nil {
-		return out
+		return out, nil
 	}
 	all, err := reviews.Reviews(ctx, uid)
 	if err != nil {
-		return out
+		return nil, err
 	}
 	for _, r := range all {
 		if r.Rating > 0 {
 			out[titleKey(r.Kind, r.TMDBID)] = r.Rating
 		}
 	}
-	return out
+	return out, nil
 }
