@@ -174,10 +174,7 @@ templ AlertsPage(user *auth.User, v AlertsView) {
 				}
 				@alertFeedSwitches(v.MutedFailed)
 				if v.Failed {
-					<div role="alert" class="alert alert-error alert-soft">
-						@Icon("circle-alert", "size-5")
-						<span>{ tr(ctx, "Your release alerts could not be loaded right now. Please try again in a moment.") }</span>
-					</div>
+					@loadFailed(tr(ctx, "Your release alerts could not be loaded right now. Please try again in a moment."))
 				} else if len(v.Alerts) == 0 {
 					@emptyState("bell", tr(ctx, "No release alerts yet"), tr(ctx, "Follow movies with Add to favourites or Want to watch: you hear here when they turn up in HDR10, Dolby Vision or on the trackers.")) {
 						@browseTrendingLink()
