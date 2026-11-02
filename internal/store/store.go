@@ -59,6 +59,10 @@ type Store interface {
 	// next is the following page's cursor, "" when none is left.
 	FavoritesPage(ctx context.Context, uid, after string) (page []Favorite, next string, err error)
 
+	// LibraryStamp changes whenever the user's favourites or watch states
+	// change, so what is worked out from them can be kept until then.
+	LibraryStamp(ctx context.Context, uid string) (string, error)
+
 	// TorrServers are the user's TorrServers, in the order added.
 	TorrServers(ctx context.Context, uid string) ([]TorrServer, error)
 	// SaveTorrServer keeps t: a new one (no ID) gets an ID, one with an ID
