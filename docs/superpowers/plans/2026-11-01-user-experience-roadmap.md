@@ -320,6 +320,20 @@ in focused PRs before the larger episode/discovery and collaboration work.
   Handler, view and browser tests cover both apps; a local browser check
   confirmed the self-hosted message and search fallback. A wider audit of
   loading, retry, empty and stale-response states remains open.
+- **R09 — declined (2 November 2026):** moving Continue watching above the
+  billboard was built and checked in the browser, then rejected on review as
+  visually worse; it was not merged and the home page stays billboard-first.
+  Any later attempt should keep the billboard first and be shown before
+  merging.
+- **R11 — implemented, deployment unverified (2 November 2026):** on the
+  web app each release's send button reads "Add to <server name>" for the
+  TorrServer picked in the selector (truncated, with the full name in its
+  tooltip and accessible name); with no server it stays "TorrServer". The
+  label and the destination both follow `$tsSelected`, so switching servers
+  changes them together. The local app, with one TorrServer, keeps its label
+  and gains an accessible name. View tests cover the label, the selector's
+  names and the local button; no browser check, as web title pages need a
+  Google sign-in.
 - **R14 — implemented, deployment unverified (2 November 2026):** Want to
   watch, Watched, favourites, custom lists and the "Because you…" headings
   name titles in the interface language by their canonical TMDB IDs, through
