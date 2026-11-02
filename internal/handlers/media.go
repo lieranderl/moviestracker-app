@@ -3,7 +3,9 @@ package handlers
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -237,6 +239,7 @@ func (c *Catalog) handleTorrentSearch(w http.ResponseWriter, r *http.Request) {
 	if c.apiUser(w, r) == nil {
 		return
 	}
+	sourceChoices(r)
 	sse := datastar.NewSSE(w, r)
 	ctx, cancel := context.WithTimeout(r.Context(), torrentSearchTimeout)
 	defer cancel()
@@ -502,4 +505,33 @@ func (s *Server) handleTorrentStats(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+// sourceChoices puts a source search's choices, sent as Datastar signals
+// (sort, qual, hdr, sourceSeason), into its query, where the search reads
+// them; a search without signals keeps its query as it is.
+func sourceChoices(r *http.Request) {
+	q := r.URL.Query()
+	raw := q.Get("datastar")
+	if raw == "" {
+		return
+	}
+	var s struct {
+		Sort         string   `json:"sort"`
+		Qual         []string `json:"qual"`
+		HDR          bool     `json:"hdr"`
+		SourceSeason any      `json:"sourceSeason"`
+	}
+	if json.Unmarshal([]byte(raw), &s) != nil {
+		return
+	}
+	q.Set("sort", s.Sort)
+	q.Set("quality", strings.Join(slices.DeleteFunc(s.Qual, func(v string) bool { return v == "" }), ","))
+	if s.HDR {
+		q.Set("hdr", "1")
+	}
+	if s.SourceSeason != nil {
+		q.Set("season", fmt.Sprint(s.SourceSeason))
+	}
+	r.URL.RawQuery = q.Encode()
 }
