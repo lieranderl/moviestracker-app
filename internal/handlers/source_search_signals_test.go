@@ -28,3 +28,17 @@ func TestASourceSearchSendsItsChoicesAsSignals(t *testing.T) {
 		t.Errorf("query = %+v, want the signals' qualities [2160 1080] and HDR", q)
 	}
 }
+
+// A page opened before this change still sends its choices in the query,
+// with no signals: they are kept.
+func TestAnOlderPageKeepsItsQueryChoices(t *testing.T) {
+	jr := &fakeJacRed{}
+	server := newMediaServer(t, &fakeTMDBDetails{movies: map[int]*tmdb.MovieDetails{27205: inception}}, jr, "")
+	get(t, server, "/api/torrents?type=movie&id=27205&sort=size&quality=2160&hdr=1&datastar="+url.QueryEscape(`{}`), true)
+	if len(jr.queries) != 1 {
+		t.Fatalf("queries = %+v", jr.queries)
+	}
+	if q := jr.queries[0]; fmt.Sprint(q.Qualities) != "[2160]" || !q.HDR {
+		t.Errorf("query = %+v, want the URL's quality 2160 and HDR", q)
+	}
+}

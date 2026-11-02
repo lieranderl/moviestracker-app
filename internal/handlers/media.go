@@ -516,22 +516,38 @@ func sourceChoices(r *http.Request) {
 	if raw == "" {
 		return
 	}
-	var s struct {
-		Sort         string   `json:"sort"`
-		Qual         []string `json:"qual"`
-		HDR          bool     `json:"hdr"`
-		SourceSeason any      `json:"sourceSeason"`
-	}
+	// Only the choices sent are taken: a page from before sends none, and
+	// keeps those in its query.
+	var s map[string]json.RawMessage
 	if json.Unmarshal([]byte(raw), &s) != nil {
 		return
 	}
-	q.Set("sort", s.Sort)
-	q.Set("quality", strings.Join(slices.DeleteFunc(s.Qual, func(v string) bool { return v == "" }), ","))
-	if s.HDR {
-		q.Set("hdr", "1")
+	if v, ok := s["sort"]; ok {
+		var sort string
+		if json.Unmarshal(v, &sort) == nil {
+			q.Set("sort", sort)
+		}
 	}
-	if s.SourceSeason != nil {
-		q.Set("season", fmt.Sprint(s.SourceSeason))
+	if v, ok := s["qual"]; ok {
+		var qual []string
+		if json.Unmarshal(v, &qual) == nil {
+			q.Set("quality", strings.Join(slices.DeleteFunc(qual, func(v string) bool { return v == "" }), ","))
+		}
+	}
+	if v, ok := s["hdr"]; ok {
+		var hdr bool
+		if json.Unmarshal(v, &hdr) == nil {
+			q.Del("hdr")
+			if hdr {
+				q.Set("hdr", "1")
+			}
+		}
+	}
+	if v, ok := s["sourceSeason"]; ok {
+		var season any
+		if json.Unmarshal(v, &season) == nil && season != nil {
+			q.Set("season", fmt.Sprint(season))
+		}
 	}
 	r.URL.RawQuery = q.Encode()
 }
