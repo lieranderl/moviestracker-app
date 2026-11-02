@@ -309,6 +309,20 @@ in focused PRs before the larger episode/discovery and collaboration work.
   cover the categories and the contact route; a local browser check of
   `/privacy` confirmed the list, the mailto link and no horizontal overflow.
   This is not a legal compliance assessment.
+- **R07 — implemented, deployment unverified (2 November 2026):** a web
+  Your data page (user menu) downloads everything kept for the account as
+  JSON and deletes the account. Decisions: authentication is the signed-in
+  session plus typing a confirmation word in a native dialog; deletion is
+  immediate (shared-list links first, then every user collection, the user
+  document last) and idempotent, so a failed attempt is retried by trying
+  again; there is no recovery, and signing in again starts an empty account.
+  Copies in Google Cloud backups or logs follow Google Cloud's own retention,
+  which this change does not configure. The privacy page now points to Your
+  data, and the email route remains for questions and failed deletions.
+  Store contract tests (memory and Firestore emulator) cover the full export,
+  deletion of every category, revoked shared links, isolation and retries;
+  web tests cover the download, the page and confirmed deletion with sign-out.
+  No browser check: the web app signs in only through Google.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding

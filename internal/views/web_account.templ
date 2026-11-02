@@ -1,0 +1,93 @@
+package views
+
+import (
+	"context"
+
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+)
+
+// AccountPath is where a web app user downloads or deletes their data.
+const AccountPath = "/account"
+
+// accountDeleteReady holds when the user typed the confirmation word.
+func accountDeleteReady(ctx context.Context) string {
+	return "$deleteConfirm.trim().toLowerCase() === " + trJS(ctx, "delete")
+}
+
+// AccountPage is Your data: everything kept for the user, to download or
+// delete with their account.
+templ AccountPage(user *auth.User) {
+	@Layout(tr(ctx, "Your data")) {
+		@Navbar(user)
+		<main class="grow pb-20" data-signals="{deleteConfirm: '', _deleteOpen: false}">
+			<div class="max-w-3xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
+				<header class="space-y-1">
+					<h1 class="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
+						@Icon("database", "size-6 text-primary")
+						{ tr(ctx, "Your data") }
+					</h1>
+					<p class="text-sm text-base-content/70">
+						{ tr(ctx, "Everything Moviestracker keeps for your account, to take away or delete.") }
+						<a href={ templ.SafeURL(PrivacyPath) } class="link link-primary">{ tr(ctx, "Privacy policy") }</a>
+					</p>
+				</header>
+				<section class="card bg-base-200/60 border border-base-content/10">
+					<div class="card-body gap-3">
+						<h2 class="card-title">{ tr(ctx, "Download your data") }</h2>
+						<p class="text-sm">{ tr(ctx, "A JSON file of everything kept for your account: favourites, watch marks, where you stopped watching, release alerts, lists, ratings and notes, release filters, TorrServers and your language.") }</p>
+						<div class="card-actions">
+							<a href="/account/export" download class="btn btn-primary gap-1.5">
+								@Icon("download", "size-4")
+								{ tr(ctx, "Download") }
+							</a>
+						</div>
+					</div>
+				</section>
+				<section class="card bg-base-200/60 border border-error/30">
+					<div class="card-body gap-3">
+						<h2 class="card-title text-error">{ tr(ctx, "Delete your account") }</h2>
+						<p class="text-sm">{ tr(ctx, "This deletes everything kept for your account at once, and your shared lists' links stop working. It cannot be undone: signing in again starts an empty account.") }</p>
+						<div class="card-actions">
+							<button type="button" class="btn btn-error btn-outline gap-1.5" data-on:click="$_deleteOpen = true">
+								@Icon("trash-2", "size-4")
+								{ tr(ctx, "Delete my account") }
+							</button>
+						</div>
+					</div>
+				</section>
+				@modalDialog("account-delete", "_deleteOpen", "", "$deleteConfirm = ''", "max-w-md space-y-4", nil) {
+					<h3 id="account-delete-title" class="font-bold text-lg flex items-center gap-2">
+						@Icon("triangle-alert", "size-5 text-error")
+						{ tr(ctx, "Delete your account?") }
+					</h3>
+					<p class="text-sm">{ tr(ctx, "Everything kept for your account is deleted, and this cannot be undone.") }</p>
+					<label class="block space-y-1">
+						<span class="text-sm">{ trf(ctx, "Type %s to confirm", tr(ctx, "delete")) }</span>
+						<input type="text" class="input w-full" autocomplete="off" data-bind:delete-confirm/>
+					</label>
+					<p id="account-delete-problem"></p>
+					<div class="modal-action mt-0">
+						<form method="dialog">
+							<button class="btn btn-ghost">{ tr(ctx, "Cancel") }</button>
+						</form>
+						<button
+							type="button"
+							class="btn btn-error"
+							data-indicator:_deleting
+							data-attr:disabled={ "$_deleting || !(" + accountDeleteReady(ctx) + ")" }
+							data-on:click="@post('/api/account/delete')"
+						>
+							{ tr(ctx, "Delete my account") }
+						</button>
+					</div>
+				}
+			</div>
+		</main>
+		@siteFooter()
+	}
+}
+
+// AccountDeleteProblem says why the account was not deleted.
+templ AccountDeleteProblem(msg string) {
+	<p id="account-delete-problem" role="alert" class="text-sm text-error">{ msg }</p>
+}

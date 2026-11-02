@@ -15,6 +15,8 @@ type Memory struct {
 	mu     sync.Mutex
 	users  map[string]*memoryUser
 	shared map[string]sharedList // by share ID
+	// deleted is when each deleted account was deleted.
+	deleted map[string]time.Time
 }
 
 // sharedList is whose list a link opens.
@@ -437,4 +439,52 @@ func (m *Memory) Review(_ context.Context, uid, kind string, tmdbID int) (Review
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.user(uid).reviews[id], nil
+}
+
+// ExportAccount implements Store.
+func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error) {
+	favs, _ := m.Favorites(ctx, uid)
+	servers, _ := m.TorrServers(ctx, uid)
+	watched, _ := m.TitleStates(ctx, uid, Watched)
+	want, _ := m.TitleStates(ctx, uid, WantToWatch)
+	filters, _ := m.ReleaseFilters(ctx, uid)
+	lists, _ := m.CustomLists(ctx, uid)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u := m.user(uid)
+	updates := slices.SortedFunc(maps.Values(u.updates), newestFound)
+	return Account{
+		Preferences: u.prefs, Favorites: favs, TorrServers: servers,
+		Progress:    slices.SortedFunc(maps.Values(u.progress), func(a, b Progress) int { return b.UpdatedAt.Compare(a.UpdatedAt) }),
+		TitleStates: append(watched, want...), Updates: updates, ReleaseFilters: filters, Lists: lists,
+		Reviews: slices.Collect(maps.Values(u.reviews)),
+	}, nil
+}
+
+// AccountDeletedAt implements Store.
+func (m *Memory) AccountDeletedAt(_ context.Context, uid string) (time.Time, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	at := m.deleted[uid]
+	if m.opts.now().Sub(at) > DeletedAccountKept {
+		return time.Time{}, nil
+	}
+	return at, nil
+}
+
+// DeleteAccount implements Store.
+func (m *Memory) DeleteAccount(_ context.Context, uid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.deleted == nil {
+		m.deleted = map[string]time.Time{}
+	}
+	m.deleted[uid] = m.opts.now().UTC()
+	for id, s := range m.shared {
+		if s.uid == uid {
+			delete(m.shared, id)
+		}
+	}
+	delete(m.users, uid)
+	return nil
 }

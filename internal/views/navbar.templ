@@ -238,6 +238,14 @@ templ userMenu(user *auth.User) {
 				</a>
 			</li>
 		}
+		if siteOf(ctx).Cloud {
+			<li>
+				<a href={ templ.SafeURL(AccountPath) }>
+					@Icon("database", "size-4")
+					{ tr(ctx, "Your data") }
+				</a>
+			</li>
+		}
 		if user.IsAdmin() {
 			<li>
 				<a href="/settings/sources">

@@ -62,14 +62,14 @@ func TestDataRequestsGoToAPrivateAddress(t *testing.T) {
 }
 
 // The policy promises removal in the app only for what the app can remove:
-// playback progress and release alerts are deleted on request.
+// playback progress and release alerts go with the whole account.
 func TestThePrivacyPolicyPromisesOnlyTheRemovalTheAppOffers(t *testing.T) {
 	body := html.UnescapeString(get(t, web.New(web.Config{}), "/privacy").Body.String())
 	if strings.Contains(body, "change or remove any of this in the app") {
 		t.Error("the policy says everything can be removed in the app, though progress and alerts cannot")
 	}
-	if !strings.Contains(body, "Where you stopped watching and your release alerts cannot be removed in the app yet") {
-		t.Error("the policy does not say how to have progress and alerts removed")
+	if !strings.Contains(body, "delete your account with all of it") || !strings.Contains(body, `href="/account"`) {
+		t.Error("the policy does not point to deleting the account in the app")
 	}
 }
 
