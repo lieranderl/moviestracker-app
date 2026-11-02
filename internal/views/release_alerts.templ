@@ -46,17 +46,46 @@ type AlertsView struct {
 	Through time.Time // when the page was read: Mark all read covers up to it
 	Failed  bool      // the alerts could not be read
 	Muted   []store.MutedTitle
+	// FeedsOff are the release feeds the user turned alerts off for.
+	FeedsOff map[string]bool
 }
 
-// mutedSignals starts the page's $_muted: true for each muted movie, by
-// TMDB ID.
-func mutedSignals(muted []store.MutedTitle) string {
+// alertFeedOrder is the order the feeds' switches show in.
+var alertFeedOrder = []string{"latesttorrentsmovies", "hdr10movies", "dvmovies"}
+
+// alertSignals start the page's $_muted, true for each muted movie by TMDB
+// ID, and $_feedsOn, whether each release feed alerts.
+func alertSignals(v AlertsView) string {
 	ids := map[string]bool{}
-	for _, m := range muted {
+	for _, m := range v.Muted {
 		ids[strconv.Itoa(m.TMDBID)] = true
 	}
-	b, _ := json.Marshal(map[string]any{"_muted": ids})
+	on := map[string]bool{}
+	for _, feed := range alertFeedOrder {
+		on[feed] = !v.FeedsOff[feed]
+	}
+	b, _ := json.Marshal(map[string]any{"_muted": ids, "_feedsOn": on})
 	return string(b)
+}
+
+// alertFeedSwitches turn each release feed's alerts on or off.
+templ alertFeedSwitches() {
+	<fieldset class="fieldset">
+		<legend class="fieldset-legend">{ tr(ctx, "Alert me about") }</legend>
+		<div class="flex flex-wrap gap-x-6 gap-y-2">
+			for _, feed := range alertFeedOrder {
+				<label class="label cursor-pointer gap-2 text-sm">
+					<input
+						type="checkbox"
+						class="toggle toggle-sm toggle-primary"
+						data-bind={ "_feedsOn." + feed }
+						data-on:change={ fmt.Sprintf("@post('/api/alerts/feeds?feed=%s&on=' + ($_feedsOn.%s ? 1 : 0))", feed, feed) }
+					/>
+					{ tr(ctx, alertLabels[feed]) }
+				</label>
+			}
+		</div>
+	</fieldset>
 }
 
 // alertMuteToggle mutes a movie's alerts, or unmutes them once muted.
@@ -115,7 +144,7 @@ templ AlertsPage(user *auth.User, v AlertsView) {
 	@Layout(tr(ctx, "Release alerts")) {
 		@Navbar(user)
 		<main class="grow pb-20">
-			<div class="max-w-3xl mx-auto px-4 sm:px-8 mt-8 space-y-6" data-signals={ mutedSignals(v.Muted) }>
+			<div class="max-w-3xl mx-auto px-4 sm:px-8 mt-8 space-y-6" data-signals={ alertSignals(v) }>
 				<header class="space-y-1">
 					<h1 class="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
 						@Icon("bell", "size-6 text-primary")
@@ -127,6 +156,7 @@ templ AlertsPage(user *auth.User, v AlertsView) {
 						<a href={ templ.SafeURL(CalendarPath) } class="link link-primary">{ tr(ctx, "Upcoming episodes") }</a>.
 					</p>
 				</header>
+				@alertFeedSwitches()
 				if v.Failed {
 					<div role="alert" class="alert alert-error alert-soft">
 						@Icon("circle-alert", "size-5")

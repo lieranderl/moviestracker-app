@@ -42,6 +42,8 @@ var ru = map[string]string{
 	"Unmute alerts for %s":    "Включить оповещения о «%s»",
 	"These are sources turning up, not air dates. For when episodes of the series you follow air, see": "Здесь появляются источники, а не даты выхода. Когда выходят серии сериалов, на которые вы подписаны, смотрите в разделе",
 	"the movies you muted release alerts for;":                                                         "фильмы, оповещения о которых вы отключили;",
+	"Alert me about": "Оповещать о",
+	"the release feeds you turned alerts off for;": "ленты релизов, оповещения из которых вы отключили;",
 	"Muted movies": "Фильмы без оповещений",
 	"These movies bring no new release alerts until you unmute them.": "Об этих фильмах новых оповещений не будет, пока вы их снова не включите.",
 	"Undo":   "Отменить",

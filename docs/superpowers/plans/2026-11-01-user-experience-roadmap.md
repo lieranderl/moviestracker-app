@@ -415,6 +415,12 @@ in focused PRs before the larger episode/discovery and collaboration work.
   notifications and per-feed choices. App lifecycle: the self-hosted app
   has no background discovery; it shows nothing on its own when closed, and
   this slice promises nothing there.
+- **R27 — per-feed choices (2 November 2026):** the alerts page has a
+  switch per release feed (new on the trackers, HDR10, Dolby Vision). A feed
+  turned off brings no alerts; it is still read, so turned back on it alerts
+  only for releases found afterwards. Kept on the user's document (memory
+  and Firestore, emulator-tested); privacy page updated. Series air-date
+  notifications remain open.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding

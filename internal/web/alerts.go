@@ -52,6 +52,10 @@ func (a *app) foundAlerts(ctx context.Context, uid string) ([]store.Update, stor
 	if err != nil {
 		return nil, store.AlertCheckpoints{}, err
 	}
+	choices, err := a.cfg.Store.AlertFeeds(ctx, uid)
+	if err != nil {
+		return nil, store.AlertCheckpoints{}, err
+	}
 	followed := library.Followed
 	if len(muted) > 0 { // muted movies bring no alerts; the summary's map stays as kept
 		followed = maps.Clone(followed)
@@ -67,11 +71,14 @@ func (a *app) foundAlerts(ctx context.Context, uid string) ([]store.Update, stor
 		// keep it. A deeper look reads the backend afresh from the first
 		// page: kept pages may be of different ages, and a fresh first page
 		// before an older second would skip the releases between them.
-		scan, err := a.scanFeed(ctx, a.feeds.Page, feed, read, followed, 1)
+		choice := choices[string(feed)]
+		scan, err := a.scanFeed(ctx, a.feeds.Page, feed, read, followed, choice.On, 1)
 		if err == nil && !scan.done {
-			scan, err = a.scanFeed(ctx, a.feeds.src.Page, feed, read, followed, alertPages)
+			scan, err = a.scanFeed(ctx, a.feeds.src.Page, feed, read, followed, choice.On, alertPages)
 		}
-		found = append(found, scan.found...)
+		if !choice.Off { // a feed turned off is still read, so it alerts only for later releases once on
+			found = append(found, scan.found...)
+		}
 		if err != nil {
 			return found, store.AlertCheckpoints{}, err
 		}
@@ -95,8 +102,9 @@ type feedScan struct {
 }
 
 // scanFeed looks through up to pages pages of feed, read by page, for the
-// followed movies found after read.
-func (a *app) scanFeed(ctx context.Context, page func(context.Context, releases.Feed, int) (tmdb.Page, error), feed releases.Feed, read time.Time, followed map[int]bool, pages int) (feedScan, error) {
+// followed movies found after read; none found by quiet (when the feed was
+// turned back on) alerts.
+func (a *app) scanFeed(ctx context.Context, page func(context.Context, releases.Feed, int) (tmdb.Page, error), feed releases.Feed, read time.Time, followed map[int]bool, quiet time.Time, pages int) (feedScan, error) {
 	var scan feedScan
 	for n := 1; n <= pages; n++ {
 		p, err := page(ctx, feed, n)
@@ -111,7 +119,7 @@ func (a *app) scanFeed(ctx context.Context, page func(context.Context, releases.
 			if it.FoundAt.After(scan.newest) {
 				scan.newest = it.FoundAt
 			}
-			if followed[it.ID] {
+			if followed[it.ID] && it.FoundAt.After(quiet) {
 				scan.found = append(scan.found, store.Update{Feed: string(feed), TMDBID: it.ID, Title: it.Title, Poster: it.PosterPath, FoundAt: a.now()})
 			}
 		}
@@ -230,6 +238,14 @@ func (a *app) handleAlertsPage(w http.ResponseWriter, r *http.Request) {
 	if v.Muted, err = a.cfg.Store.MutedAlerts(ctx, user.ID); err != nil {
 		slog.Warn("reading muted alerts failed", "error", handlers.LogError(err))
 	}
+	choices, err := a.cfg.Store.AlertFeeds(ctx, user.ID)
+	if err != nil {
+		slog.Warn("reading alert feeds failed", "error", handlers.LogError(err))
+	}
+	v.FeedsOff = map[string]bool{}
+	for feed, c := range choices {
+		v.FeedsOff[feed] = c.Off
+	}
 	if err := views.AlertsPage(a.catalogUser(r), v).Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "alerts", "error", err)
 	}
@@ -307,5 +323,32 @@ func (a *app) handleMuteAlerts(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	if err := datastar.NewSSE(w, r).MarshalAndPatchSignals(map[string]any{"_muted": map[string]bool{strconv.Itoa(id): on}}); err != nil {
 		slog.Warn("patching muted alerts failed", "error", err)
+	}
+}
+
+// handleAlertFeed turns a release feed's alerts on (?on=1) or off (?on=0)
+// (?feed=), and tells the page which way it went.
+func (a *app) handleAlertFeed(w http.ResponseWriter, r *http.Request) {
+	uid, ok := a.userID(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	feed := r.URL.Query().Get("feed")
+	if !slices.Contains(alertFeeds, releases.Feed(feed)) {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	on := r.URL.Query().Get("on") == "1"
+	ctx, cancel := context.WithTimeout(r.Context(), storeTimeout)
+	defer cancel()
+	if err := a.cfg.Store.SetAlertFeed(ctx, uid, feed, on); err != nil {
+		slog.Warn("setting an alert feed failed", "error", handlers.LogError(err))
+		http.Error(w, i18n.T(r.Context(), "The change could not be saved. Please try again."), http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	if err := datastar.NewSSE(w, r).MarshalAndPatchSignals(map[string]any{"_feedsOn": map[string]bool{feed: on}}); err != nil {
+		slog.Warn("patching alert feeds failed", "error", err)
 	}
 }

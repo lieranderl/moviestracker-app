@@ -37,6 +37,7 @@ type memoryUser struct {
 	episodes    map[int]seriesEpisodes // by series ID
 	checkpoints AlertCheckpoints
 	muted       map[int]MutedTitle     // by TMDB ID
+	feeds       map[string]AlertFeed   // alert choices, by feed
 	follows     map[int]FollowedSeries // by series ID
 }
 
@@ -599,4 +600,30 @@ func (m *Memory) MutedAlerts(_ context.Context, uid string) ([]MutedTitle, error
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return slices.SortedFunc(maps.Values(m.user(uid).muted), newestMuted), nil
+}
+
+// SetAlertFeed implements Store.
+func (m *Memory) SetAlertFeed(_ context.Context, uid, feed string, on bool) error {
+	if feed == "" {
+		return errors.New("alert feed: none named")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u := m.user(uid)
+	if u.feeds == nil {
+		u.feeds = map[string]AlertFeed{}
+	}
+	choice := AlertFeed{Off: true}
+	if on {
+		choice = AlertFeed{On: m.opts.now().UTC()}
+	}
+	u.feeds[feed] = choice
+	return nil
+}
+
+// AlertFeeds implements Store.
+func (m *Memory) AlertFeeds(_ context.Context, uid string) (map[string]AlertFeed, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return maps.Clone(m.user(uid).feeds), nil
 }
