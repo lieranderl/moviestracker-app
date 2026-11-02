@@ -34,6 +34,7 @@ type memoryUser struct {
 	lists       shelf
 	reviews     map[string]Review
 	episodes    map[int]seriesEpisodes // by series ID
+	checkpoints AlertCheckpoints
 	follows     map[int]FollowedSeries // by series ID
 }
 
@@ -513,6 +514,24 @@ func (m *Memory) MarkEpisodes(_ context.Context, uid string, tvID, season int, e
 		all[tvID] = seriesEpisodes{}
 	}
 	all[tvID].mark(season, episodes, watched)
+	return nil
+}
+
+// AlertCheckpoints implements Store.
+func (m *Memory) AlertCheckpoints(_ context.Context, uid string) (AlertCheckpoints, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	c := m.user(uid).checkpoints
+	c.Feeds = maps.Clone(c.Feeds)
+	return c, nil
+}
+
+// SaveAlertCheckpoints implements Store.
+func (m *Memory) SaveAlertCheckpoints(_ context.Context, uid string, c AlertCheckpoints) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	c.Feeds = maps.Clone(c.Feeds)
+	m.user(uid).checkpoints = c
 	return nil
 }
 
