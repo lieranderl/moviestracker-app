@@ -216,7 +216,13 @@ func checkTitleState(ts TitleState) (string, error) {
 }
 
 // newestFirst orders title states most recently marked first.
-func newestFirst(a, b TitleState) int { return b.UpdatedAt.Compare(a.UpdatedAt) }
+func newestFirst(a, b TitleState) int {
+	if c := b.UpdatedAt.Compare(a.UpdatedAt); c != 0 {
+		return c
+	}
+	// Marked at the same moment (a coarse clock): one order every time.
+	return strings.Compare(fmt.Sprintf("%s-%d", b.Kind, b.TMDBID), fmt.Sprintf("%s-%d", a.Kind, a.TMDBID))
+}
 
 // ProgressStore keeps where each user stopped watching. The local app keeps
 // it in a file (OpenProgressFile), by account name.
