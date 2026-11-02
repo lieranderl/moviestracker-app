@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"slices"
@@ -125,11 +126,71 @@ func (f *Firestore) AddFavorite(ctx context.Context, uid string, fav Favorite) e
 		fav.AddedAt = f.opts.now()
 	}
 	fav.AddedAt = fav.AddedAt.UTC()
-	_, err = f.favorites(uid).Doc(id).Create(ctx, favoriteRecord(fav))
-	if err != nil && status.Code(err) != codes.AlreadyExists {
+	err = f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error {
+		return tx.Create(f.favorites(uid).Doc(id), favoriteRecord(fav))
+	})
+	if status.Code(err) == codes.AlreadyExists {
+		return nil
+	}
+	if err != nil {
 		return fmt.Errorf("add favourite: %w", err)
 	}
 	return nil
+}
+
+// changeLibrary makes a change to the user's library and gives the library
+// a new stamp in one transaction, so a change is never kept without its
+// stamp (which would leave summaries of the library stale).
+func (f *Firestore) changeLibrary(ctx context.Context, uid string, change func(*firestore.Transaction) error) error {
+	return f.client.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
+		if err := change(tx); err != nil {
+			return err
+		}
+		return tx.Set(f.userDoc(uid), map[string]any{"libraryStamp": rand.Text()}, firestore.MergeAll)
+	})
+}
+
+// LibraryStamp implements Store.
+func (f *Firestore) LibraryStamp(ctx context.Context, uid string) (string, error) {
+	snap, err := f.userDoc(uid).Get(ctx)
+	if notFound(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("read the library stamp: %w", err)
+	}
+	stamp, _ := snap.Data()["libraryStamp"].(string)
+	return stamp, nil
+}
+
+// FavoritesPage implements Store. Ordered by addedAt and then document ID,
+// both descending, it needs only the single-field index on addedAt.
+func (f *Firestore) FavoritesPage(ctx context.Context, uid, after string) ([]Favorite, string, error) {
+	q := f.favorites(uid).OrderBy("addedAt", firestore.Desc).OrderBy(firestore.DocumentID, firestore.Desc)
+	if after != "" {
+		at, id, err := parseCursor(after)
+		if err != nil {
+			return nil, "", err
+		}
+		q = q.StartAfter(at, id)
+	}
+	docs, err := q.Limit(libraryPageSize + 1).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, "", fmt.Errorf("read favourites: %w", err)
+	}
+	favs := make([]Favorite, 0, len(docs))
+	for _, doc := range docs {
+		var rec favoriteRecord
+		if err := doc.DataTo(&rec); err != nil {
+			return nil, "", fmt.Errorf("read favourite %s: %w", doc.Ref.ID, err)
+		}
+		favs = append(favs, Favorite(rec))
+	}
+	if len(favs) <= libraryPageSize {
+		return favs, "", nil
+	}
+	last := favs[libraryPageSize-1]
+	return favs[:libraryPageSize], pageCursor(last.AddedAt, favoriteKey(last)), nil
 }
 
 // RemoveFavorite implements Store.
@@ -138,7 +199,10 @@ func (f *Firestore) RemoveFavorite(ctx context.Context, uid, kind string, tmdbID
 	if err != nil {
 		return err
 	}
-	if _, err := f.favorites(uid).Doc(id).Delete(ctx); err != nil {
+	err = f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error {
+		return tx.Delete(f.favorites(uid).Doc(id))
+	})
+	if err != nil {
 		return fmt.Errorf("remove favourite: %w", err)
 	}
 	return nil
@@ -305,6 +369,23 @@ type titleStateRecord struct {
 	Poster    string    `firestore:"poster,omitempty"`
 	State     string    `firestore:"state"`
 	UpdatedAt time.Time `firestore:"updatedAt"`
+	// ListKey orders the title in its watch list (listKey): a list's pages
+	// are a range of it, which the single-field index serves.
+	ListKey string `firestore:"listKey"`
+}
+
+// listKey orders a title in its state's list: the state, then when it was
+// marked ("watched/01790000000000000000").
+func listKey(state string, at time.Time) string {
+	return fmt.Sprintf("%s/%020d", state, at.UnixNano())
+}
+
+func newTitleStateRecord(ts TitleState) titleStateRecord {
+	return titleStateRecord{ts.Kind, ts.TMDBID, ts.Title, ts.Poster, ts.State, ts.UpdatedAt, listKey(ts.State, ts.UpdatedAt)}
+}
+
+func (rec titleStateRecord) titleState() TitleState {
+	return TitleState{rec.Kind, rec.TMDBID, rec.Title, rec.Poster, rec.State, rec.UpdatedAt}
 }
 
 func (f *Firestore) titles(uid string) *firestore.CollectionRef {
@@ -318,13 +399,19 @@ func (f *Firestore) SetTitleState(ctx context.Context, uid string, ts TitleState
 		return err
 	}
 	if ts.State == "" {
-		if _, err := f.titles(uid).Doc(id).Delete(ctx); err != nil {
+		err := f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error {
+			return tx.Delete(f.titles(uid).Doc(id))
+		})
+		if err != nil {
 			return fmt.Errorf("clear watch state: %w", err)
 		}
 		return nil
 	}
 	ts.UpdatedAt = f.opts.now().UTC()
-	if _, err := f.titles(uid).Doc(id).Set(ctx, titleStateRecord(ts)); err != nil {
+	err = f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error {
+		return tx.Set(f.titles(uid).Doc(id), newTitleStateRecord(ts))
+	})
+	if err != nil {
 		return fmt.Errorf("save watch state: %w", err)
 	}
 	return nil
@@ -347,7 +434,7 @@ func (f *Firestore) TitleState(ctx context.Context, uid, kind string, tmdbID int
 	if err := snap.DataTo(&rec); err != nil {
 		return TitleState{}, fmt.Errorf("read watch state: %w", err)
 	}
-	return TitleState(rec), nil
+	return rec.titleState(), nil
 }
 
 // TitleStates implements Store. They are sorted here: ordering by updatedAt
@@ -363,10 +450,92 @@ func (f *Firestore) TitleStates(ctx context.Context, uid, state string) ([]Title
 		if err := doc.DataTo(&rec); err != nil {
 			return nil, fmt.Errorf("read watch state %s: %w", doc.Ref.ID, err)
 		}
-		out = append(out, TitleState(rec))
+		out = append(out, rec.titleState())
 	}
 	slices.SortFunc(out, newestFirst)
 	return out, nil
+}
+
+// TitleStatesPage implements Store. Its query is a range of listKey, which
+// the single-field index serves; ordering by updatedAt within a state
+// would need a composite index.
+func (f *Firestore) TitleStatesPage(ctx context.Context, uid, state, after string) ([]TitleState, string, error) {
+	if err := f.keyWatchLists(ctx, uid); err != nil {
+		return nil, "", err
+	}
+	q := f.titles(uid).Where("listKey", ">=", state+"/").Where("listKey", "<", state+"0").
+		OrderBy("listKey", firestore.Desc).OrderBy(firestore.DocumentID, firestore.Desc)
+	if after != "" {
+		at, id, err := parseCursor(after)
+		if err != nil {
+			return nil, "", err
+		}
+		q = q.StartAfter(listKey(state, at), id)
+	}
+	docs, err := q.Limit(libraryPageSize + 1).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, "", fmt.Errorf("read watch states: %w", err)
+	}
+	out := make([]TitleState, 0, len(docs))
+	for _, doc := range docs {
+		var rec titleStateRecord
+		if err := doc.DataTo(&rec); err != nil {
+			return nil, "", fmt.Errorf("read watch state %s: %w", doc.Ref.ID, err)
+		}
+		out = append(out, rec.titleState())
+	}
+	if len(out) <= libraryPageSize {
+		return out, "", nil
+	}
+	last := out[libraryPageSize-1]
+	return out[:libraryPageSize], pageCursor(last.UpdatedAt, titleKey(last)), nil
+}
+
+// keyWatchLists gives the user's watch states saved before listKey was
+// kept their key, once: the user's document then says it was done.
+func (f *Firestore) keyWatchLists(ctx context.Context, uid string) error {
+	snap, err := f.userDoc(uid).Get(ctx)
+	switch {
+	case err == nil:
+		if done, _ := snap.Data()["watchListsKeyed"].(bool); done {
+			return nil
+		}
+	case !notFound(err):
+		return fmt.Errorf("read the user: %w", err)
+	}
+	docs, err := f.titles(uid).Documents(ctx).GetAll()
+	if err != nil {
+		return fmt.Errorf("read watch states: %w", err)
+	}
+	bw := f.client.BulkWriter(ctx)
+	var jobs []*firestore.BulkWriterJob
+	for _, doc := range docs {
+		var rec titleStateRecord
+		if err := doc.DataTo(&rec); err != nil {
+			bw.End()
+			return fmt.Errorf("read watch state %s: %w", doc.Ref.ID, err)
+		}
+		if key := listKey(rec.State, rec.UpdatedAt); rec.ListKey != key {
+			// Only if unchanged since read: a state saved meanwhile wrote its
+			// own key, which this one must not overwrite.
+			job, err := bw.Update(doc.Ref, []firestore.Update{{Path: "listKey", Value: key}}, firestore.LastUpdateTime(doc.UpdateTime))
+			if err != nil {
+				bw.End()
+				return fmt.Errorf("key watch state %s: %w", doc.Ref.ID, err)
+			}
+			jobs = append(jobs, job)
+		}
+	}
+	bw.End()
+	for _, job := range jobs {
+		if _, err := job.Results(); err != nil && status.Code(err) != codes.NotFound && status.Code(err) != codes.FailedPrecondition {
+			return fmt.Errorf("key watch state: %w", err)
+		}
+	}
+	if _, err := f.userDoc(uid).Set(ctx, map[string]any{"watchListsKeyed": true}, firestore.MergeAll); err != nil {
+		return fmt.Errorf("note the watch lists keyed: %w", err)
+	}
+	return nil
 }
 
 // updateRecord is a users/{uid}/updates/{feed}-{id} document.
@@ -404,7 +573,7 @@ func (f *Firestore) AddUpdates(ctx context.Context, uid string, updates []Update
 func (f *Firestore) Updates(ctx context.Context, uid, after string) ([]Update, string, error) {
 	q := f.updates(uid).OrderBy("foundAt", firestore.Desc).OrderBy(firestore.DocumentID, firestore.Desc)
 	if after != "" {
-		at, id, err := parseUpdateCursor(after)
+		at, id, err := parseCursor(after)
 		if err != nil {
 			return nil, "", err
 		}

@@ -921,6 +921,7 @@ var ru = map[string]string{
 	"Mark season unwatched":      "Снять отметки с сезона",
 	"Watched %s":                 "Просмотрено: %s",
 	"Older alerts":               "Более старые оповещения",
+	"Show more":                  "Показать ещё",
 	"Your alerts could not be marked read. Please try again.":                                                                         "Не удалось отметить оповещения прочитанными. Попробуйте ещё раз.",
 	"HLS converts it as it plays, in any browser.":                                                                                    "HLS преобразует его на лету — работает в любом браузере.",
 	"This TorrServer cannot convert it to HLS: its GStreamer build can.":                                                              "Этот TorrServer не умеет преобразовывать его в HLS — это умеет его сборка с GStreamer.",
