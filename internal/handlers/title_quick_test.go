@@ -80,3 +80,16 @@ func TestACardActionOnATitleAlreadyInThatStateOffersNoUndo(t *testing.T) {
 		t.Errorf("a quick action changing nothing answered:\n%s", body)
 	}
 }
+
+func TestAnUndoLeavesATitleMarkedAgainElsewhereAlone(t *testing.T) {
+	s := titlesServer(t)
+	undo := undoFrom(sendAs(t, s, http.MethodPost, "/api/titles/quick?type=movie&id=438631&state=want"))
+	sendAs(t, s, http.MethodDelete, "/api/titles/state?type=movie&id=438631")
+	sendAs(t, s, http.MethodPost, "/api/titles/state?type=movie&id=438631&state=want")
+	if body := sendAs(t, s, http.MethodPost, undo); !strings.Contains(body, "changed elsewhere") {
+		t.Errorf("an undo after the title was marked again answered:\n%s", body)
+	}
+	if got := keptTitleState(t, s); got.State != store.WantToWatch {
+		t.Errorf("the undo took off a mark made elsewhere: Dune is %q", got.State)
+	}
+}

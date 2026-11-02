@@ -141,8 +141,10 @@ func cardAction(item tmdb.MediaItem, state, icon, label string) templ.Component 
 	})
 }
 
-// cardToastHide clears the card toast 5s after it last changed.
-const cardToastHide = `$_quickToast && ($_quickToast = '', $_quickError = false, $_quickUndo = '')`
+// cardToastHide clears the card toast 5s after a notice, unless a later
+// notice replaced it. Each notice sets its own timer (a delay, which later
+// signal patches cannot cancel as they would a debounce).
+const cardToastHide = `patch._quickID === $_quickID && ($_quickToast = '', $_quickError = false, $_quickUndo = '')`
 
 // cardToast tells what a card's quick action did, offering to undo it
 // while $_quickUndo holds the address that does.
@@ -185,20 +187,20 @@ func cardToast() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" data-signals=\"{ _quickToast: '', _quickError: false, _quickUndo: '' }\" data-effect=\"if ($_quickToast) { el.matches(':popover-open') ? (el.hidePopover(), el.showPopover()) : el.showPopover() } else if (el.matches(':popover-open')) { el.hidePopover() }\" data-on-signal-patch__debounce.5s=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" data-signals=\"{ _quickID: 0, _quickToast: '', _quickError: false, _quickUndo: '' }\" data-effect=\"if ($_quickToast) { el.matches(':popover-open') ? (el.hidePopover(), el.showPopover()) : el.showPopover() } else if (el.matches(':popover-open')) { el.hidePopover() }\" data-on-signal-patch__delay.5s=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(cardToastHide)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/card_actions.templ`, Line: 51, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/card_actions.templ`, Line: 53, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" data-on-signal-patch-filter=\"{ include: /^_quickToast$/ }\"><div class=\"alert shadow-xl text-sm\" data-class=\"{ 'alert-success': !$_quickError, 'alert-error': $_quickError }\"><span data-text=\"$_quickToast\"></span> <button type=\"button\" class=\"btn btn-sm btn-ghost\" data-show=\"$_quickUndo\" data-on:click=\"@post($_quickUndo)\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" data-on-signal-patch-filter=\"{ include: /^_quickID$/ }\"><div class=\"alert shadow-xl text-sm\" data-class=\"{ 'alert-success': !$_quickError, 'alert-error': $_quickError }\"><span data-text=\"$_quickToast\"></span> <button type=\"button\" class=\"btn btn-sm btn-ghost\" data-show=\"$_quickUndo\" data-on:click=\"@post($_quickUndo)\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -213,7 +215,7 @@ func cardToast() templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Undo"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/card_actions.templ`, Line: 58, Col: 21}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/card_actions.templ`, Line: 60, Col: 21}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {

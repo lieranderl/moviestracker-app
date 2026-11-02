@@ -19,8 +19,10 @@ import (
 
 // quickNotice is what a card's quick action shows in the card toast
 // (views.cardToast): a message, whether it is an error, and the address
-// that undoes the action ("" for none).
+// that undoes the action ("" for none). ID tells notices apart, so only the
+// latest one's timer hides the toast.
 type quickNotice struct {
+	ID    int64  `json:"_quickID"`
 	Toast string `json:"_quickToast"`
 	Error bool   `json:"_quickError"`
 	Undo  string `json:"_quickUndo"`
@@ -76,10 +78,15 @@ func (ts *TitleStates) handleQuick(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !ts.change(w, r, uid, rec, prior.State) {
+	kept, ok := ts.change(w, r, uid, rec, prior)
+	if !ok {
 		return
 	}
-	undo := url.Values{"type": {kind}, "id": {strconv.Itoa(id)}, "from": {state}, "to": {prior.State}}
+	undo := url.Values{
+		"type": {kind}, "id": {strconv.Itoa(id)},
+		"from": {state}, "fromAt": {strconv.FormatInt(kept.UpdatedAt.UnixNano(), 10)},
+		"to": {prior.State},
+	}
 	if !prior.UpdatedAt.IsZero() {
 		undo.Set("at", strconv.FormatInt(prior.UpdatedAt.UnixNano(), 10))
 	}
@@ -87,8 +94,8 @@ func (ts *TitleStates) handleQuick(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUndo puts back the state a quick action changed (?to=, marked at
-// ?at= in Unix nanoseconds), only while the title still has the one it gave
-// (?from=).
+// ?at= in Unix nanoseconds), only while the title is still as the action
+// left it (?from=, marked at ?fromAt=).
 func (ts *TitleStates) handleUndo(w http.ResponseWriter, r *http.Request) {
 	uid, kind, id, ok := ts.target(w, r)
 	if !ok {
@@ -109,27 +116,31 @@ func (ts *TitleStates) handleUndo(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if ts.change(w, r, uid, rec, from) {
+	left := store.TitleState{State: from}
+	if at, err := strconv.ParseInt(q.Get("fromAt"), 10, 64); err == nil && from != "" {
+		left.UpdatedAt = time.Unix(0, at)
+	}
+	if _, ok := ts.change(w, r, uid, rec, left); ok {
 		patchQuickNotice(w, r, quickNotice{Toast: i18n.T(r.Context(), "Undone")})
 	}
 }
 
-// change gives the title rec's state while it still has from, and says
-// whether it did; otherwise it tells the user why.
-func (ts *TitleStates) change(w http.ResponseWriter, r *http.Request, uid string, rec store.TitleState, from string) bool {
+// change gives the title rec's state while it is still as from, and
+// returns it as kept; otherwise it tells the user why.
+func (ts *TitleStates) change(w http.ResponseWriter, r *http.Request, uid string, rec, from store.TitleState) (store.TitleState, bool) {
 	ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
 	defer cancel()
-	err := ts.store.ChangeTitleState(ctx, uid, rec, from)
+	kept, err := ts.store.ChangeTitleState(ctx, uid, rec, from)
 	if errors.Is(err, store.ErrTitleStateChanged) {
 		patchQuickNotice(w, r, quickNotice{Toast: i18n.T(r.Context(), "This title changed elsewhere, so it was left as it is."), Error: true})
-		return false
+		return kept, false
 	}
 	if err != nil {
 		slog.Warn("saving a watch state failed", "error", logError(err))
 		patchQuickNotice(w, r, quickNotice{Toast: i18n.T(r.Context(), "The change could not be saved. Please try again."), Error: true})
-		return false
+		return kept, false
 	}
-	return true
+	return kept, true
 }
 
 func addedTo(ctx context.Context, state string) string {
@@ -147,6 +158,7 @@ func alreadyIn(ctx context.Context, state string) string {
 }
 
 func patchQuickNotice(w http.ResponseWriter, r *http.Request, n quickNotice) {
+	n.ID = time.Now().UnixNano()
 	w.Header().Set("Cache-Control", "no-store")
 	if err := datastar.NewSSE(w, r).MarshalAndPatchSignals(n); err != nil {
 		slog.Warn(fmt.Sprintf("patching the card toast failed: %v", err))

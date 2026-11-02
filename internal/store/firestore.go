@@ -419,10 +419,13 @@ func (f *Firestore) SetTitleState(ctx context.Context, uid string, ts TitleState
 
 // ChangeTitleState implements Store: the state is read and changed in one
 // transaction.
-func (f *Firestore) ChangeTitleState(ctx context.Context, uid string, ts TitleState, from string) error {
+func (f *Firestore) ChangeTitleState(ctx context.Context, uid string, ts, from TitleState) (TitleState, error) {
 	id, err := checkTitleState(ts)
 	if err != nil {
-		return err
+		return TitleState{}, err
+	}
+	if ts.State != "" {
+		ts = stampTitleState(ts, f.opts.now())
 	}
 	doc := f.titles(uid).Doc(id)
 	err = f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error {
@@ -437,21 +440,21 @@ func (f *Firestore) ChangeTitleState(ctx context.Context, uid string, ts TitleSt
 				return err
 			}
 		}
-		if kept.State != from {
+		if !sameMark(TitleState{State: kept.State, UpdatedAt: kept.UpdatedAt}, from) {
 			return ErrTitleStateChanged
 		}
 		if ts.State == "" {
 			return tx.Delete(doc)
 		}
-		return tx.Set(doc, newTitleStateRecord(stampTitleState(ts, f.opts.now())))
+		return tx.Set(doc, newTitleStateRecord(ts))
 	})
 	if errors.Is(err, ErrTitleStateChanged) {
-		return err
+		return TitleState{}, err
 	}
 	if err != nil {
-		return fmt.Errorf("change watch state: %w", err)
+		return TitleState{}, fmt.Errorf("change watch state: %w", err)
 	}
-	return nil
+	return ts, nil
 }
 
 // TitleState implements Store.

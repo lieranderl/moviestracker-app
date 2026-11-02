@@ -130,23 +130,48 @@ func TestAChangeFromAStateTheTitleNoLongerHasIsRefused(t *testing.T) {
 		ctx := context.Background()
 		want := severance
 		want.State = store.WantToWatch
-		if err := s.ChangeTitleState(ctx, uid, want, ""); err != nil {
-			t.Fatalf("marking an unmarked title from none: %v", err)
+		kept, err := s.ChangeTitleState(ctx, uid, want, store.TitleState{})
+		if err != nil || kept.State != store.WantToWatch || !kept.UpdatedAt.Equal(now) {
+			t.Fatalf("marking an unmarked title from none = %+v, %v", kept, err)
 		}
 		*clock = now.Add(time.Hour)
 		watched := severance
 		watched.State = store.Watched
-		if err := s.ChangeTitleState(ctx, uid, watched, ""); !errors.Is(err, store.ErrTitleStateChanged) {
+		if _, err := s.ChangeTitleState(ctx, uid, watched, store.TitleState{}); !errors.Is(err, store.ErrTitleStateChanged) {
 			t.Errorf("changing a title to watch from none = %v, want ErrTitleStateChanged", err)
 		}
 		if got, _ := s.TitleState(ctx, uid, "tv", 95396); got.State != store.WantToWatch {
 			t.Errorf("after a refused change the state is %q, want %q", got.State, store.WantToWatch)
 		}
-		if err := s.ChangeTitleState(ctx, uid, store.TitleState{Kind: "tv", TMDBID: 95396}, store.WantToWatch); err != nil {
+		if _, err := s.ChangeTitleState(ctx, uid, store.TitleState{Kind: "tv", TMDBID: 95396}, kept); err != nil {
 			t.Fatalf("clearing from want: %v", err)
 		}
 		if got, _ := s.TitleState(ctx, uid, "tv", 95396); got.State != "" {
 			t.Errorf("after clearing the state is %q, want none", got.State)
+		}
+	})
+}
+
+// A title taken off a list and put on it again has changed, though its
+// state is the same: a change made from the first mark is refused.
+func TestAChangeFromAnEarlierMarkOfTheSameStateIsRefused(t *testing.T) {
+	eachTitleStore(t, func(t *testing.T, s store.TitleStateStore, uid string, clock *time.Time) {
+		ctx := context.Background()
+		want := severance
+		want.State = store.WantToWatch
+		first, err := s.ChangeTitleState(ctx, uid, want, store.TitleState{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		*clock = now.Add(time.Minute)
+		if err := s.SetTitleState(ctx, uid, store.TitleState{Kind: "tv", TMDBID: 95396}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.SetTitleState(ctx, uid, want); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.ChangeTitleState(ctx, uid, store.TitleState{Kind: "tv", TMDBID: 95396}, first); !errors.Is(err, store.ErrTitleStateChanged) {
+			t.Errorf("undoing the first mark after a second = %v, want ErrTitleStateChanged", err)
 		}
 	})
 }
@@ -159,7 +184,7 @@ func TestATitlePutBackKeepsItsPlaceInItsList(t *testing.T) {
 		*clock = now.Add(time.Hour)
 		back := severance
 		back.State, back.UpdatedAt = store.WantToWatch, now
-		if err := s.ChangeTitleState(ctx, uid, back, ""); err != nil {
+		if _, err := s.ChangeTitleState(ctx, uid, back, store.TitleState{}); err != nil {
 			t.Fatal(err)
 		}
 		if got, _ := s.TitleState(ctx, uid, "tv", 95396); !got.UpdatedAt.Equal(now) {

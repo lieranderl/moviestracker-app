@@ -35,8 +35,10 @@ templ cardAction(item tmdb.MediaItem, state, icon, label string) {
 	</button>
 }
 
-// cardToastHide clears the card toast 5s after it last changed.
-const cardToastHide = `$_quickToast && ($_quickToast = '', $_quickError = false, $_quickUndo = '')`
+// cardToastHide clears the card toast 5s after a notice, unless a later
+// notice replaced it. Each notice sets its own timer (a delay, which later
+// signal patches cannot cancel as they would a debounce).
+const cardToastHide = `patch._quickID === $_quickID && ($_quickToast = '', $_quickError = false, $_quickUndo = '')`
 
 // cardToast tells what a card's quick action did, offering to undo it
 // while $_quickUndo holds the address that does.
@@ -46,10 +48,10 @@ templ cardToast() {
 		role="status"
 		aria-live="polite"
 		class={ toastClass }
-		data-signals="{ _quickToast: '', _quickError: false, _quickUndo: '' }"
+		data-signals="{ _quickID: 0, _quickToast: '', _quickError: false, _quickUndo: '' }"
 		data-effect="if ($_quickToast) { el.matches(':popover-open') ? (el.hidePopover(), el.showPopover()) : el.showPopover() } else if (el.matches(':popover-open')) { el.hidePopover() }"
-		data-on-signal-patch__debounce.5s={ cardToastHide }
-		data-on-signal-patch-filter="{ include: /^_quickToast$/ }"
+		data-on-signal-patch__delay.5s={ cardToastHide }
+		data-on-signal-patch-filter="{ include: /^_quickID$/ }"
 	>
 		<div class="alert shadow-xl text-sm" data-class="{ 'alert-success': !$_quickError, 'alert-error': $_quickError }">
 			<span data-text="$_quickToast"></span>

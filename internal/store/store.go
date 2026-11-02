@@ -249,11 +249,12 @@ type TitleStateStore interface {
 	// SetTitleState gives a title its state, stamped now; an empty state
 	// forgets it.
 	SetTitleState(ctx context.Context, uid string, ts TitleState) error
-	// ChangeTitleState is SetTitleState only while the title's state is
-	// still from ("" for none); otherwise it changes nothing and returns
-	// ErrTitleStateChanged. A ts.UpdatedAt no later than now is kept, so a
-	// title put back returns to its place in its list.
-	ChangeTitleState(ctx context.Context, uid string, ts TitleState, from string) error
+	// ChangeTitleState is SetTitleState only while the title is still as
+	// from: the same state, marked at the same time (the zero TitleState for
+	// none). Otherwise it changes nothing and returns ErrTitleStateChanged.
+	// A ts.UpdatedAt no later than now is kept, so a title put back returns
+	// to its place in its list. It returns the title as kept.
+	ChangeTitleState(ctx context.Context, uid string, ts, from TitleState) (TitleState, error)
 	// TitleState is the title's state; an empty State when it has none.
 	TitleState(ctx context.Context, uid, kind string, tmdbID int) (TitleState, error)
 	// TitleStates are the user's titles in state, most recently marked first.
@@ -409,11 +410,18 @@ func newOptions(opts []Option) options {
 var ErrTitleStateChanged = errors.New("store: the watch state changed meanwhile")
 
 // stampTitleState is ts marked at now, or when ts says it was marked if
-// that is no later.
+// that is no later; to the microsecond, as Firestore keeps times, so a mark
+// read back equals the one returned.
 func stampTitleState(ts TitleState, now time.Time) TitleState {
 	if ts.UpdatedAt.IsZero() || ts.UpdatedAt.After(now) {
 		ts.UpdatedAt = now
 	}
-	ts.UpdatedAt = ts.UpdatedAt.UTC()
+	ts.UpdatedAt = ts.UpdatedAt.UTC().Truncate(time.Microsecond)
 	return ts
+}
+
+// sameMark reports whether kept is still as from: the same state, marked at
+// the same time.
+func sameMark(kept, from TitleState) bool {
+	return kept.State == from.State && kept.UpdatedAt.Equal(from.UpdatedAt)
 }
