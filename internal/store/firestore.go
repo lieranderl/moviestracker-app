@@ -1147,7 +1147,7 @@ func (f *Firestore) ExportAccount(ctx context.Context, uid string) (Account, err
 	if a.Follows, err = f.FollowedSeries(ctx, uid); err != nil {
 		return Account{}, err
 	}
-	return a, nil
+	return withAlertChoices(ctx, f, uid, a)
 }
 
 // DeleteAccount implements Store. Shared links go first, so none is left
