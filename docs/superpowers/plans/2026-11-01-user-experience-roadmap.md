@@ -462,6 +462,16 @@ in focused PRs before the larger episode/discovery and collaboration work.
   working. Handler and view tests cover it; the rest of the R15 audit
   (loading, retry and empty states elsewhere) remains open.
 
+- **R19 — implemented, deployment unverified (2 November 2026):** series
+  pages in both apps offer Hide spoilers (an `mt_spoilers` cookie, listed in
+  the web privacy policy). With it on, the summaries and stills of episodes
+  the user has not watched, or that have not aired, are left out of the HTML
+  the server sends, not hidden by CSS; each such card has an accessible Show
+  button that fetches that one episode. Handler tests cover the cookie,
+  watched versus unwatched and unaired episodes, reveal, the toggle button
+  and turning protection off. The local browser check could not load series
+  pages (the app's TMDB connection failed over IPv6 on this machine), so the
+  rendering is covered by tests only.
 - **R20 — implemented, deployment unverified (2 November 2026):**
   recommendation cards in both apps offer More like this and Not interested.
   Feedback is kept per user (memory, Firestore, local file) and is part of
