@@ -29,7 +29,7 @@ func TestDiscoverFiltersTMDBsWholeCatalog(t *testing.T) {
 
 	body := html.UnescapeString(get(t, server, "/discover?type=movie&genre=878&year=2010&rating=7&sort=newest", true).Body.String())
 
-	if len(details.discover) != 1 || details.discover[0] != "{MediaType:movie Genre:878 Year:2010 MinRating:7 Sort:newest} 1" {
+	if len(details.discover) != 1 || details.discover[0] != "{MediaType:movie Genre:878 Year:2010 MinRating:7 Sort:newest MaxRuntime:0 Language:} 1" {
 		t.Errorf("TMDB was asked %v", details.discover)
 	}
 	for _, want := range []string{
@@ -47,7 +47,7 @@ func TestDiscoverIgnoresFiltersItDoesNotKnow(t *testing.T) {
 	details := discoverDetails()
 	server := newMediaServer(t, details, &fakeJacRed{}, "")
 	get(t, server, "/discover?type=bogus&genre=10765&year=1700&rating=99&sort=random", true)
-	if len(details.discover) != 1 || details.discover[0] != "{MediaType:movie Genre:0 Year:0 MinRating:0 Sort:popular} 1" {
+	if len(details.discover) != 1 || details.discover[0] != "{MediaType:movie Genre:0 Year:0 MinRating:0 Sort:popular MaxRuntime:0 Language:} 1" {
 		t.Errorf("TMDB was asked %v, want movies by popularity, unfiltered", details.discover)
 	}
 }
@@ -57,7 +57,7 @@ func TestDiscoverLoadsTheNextPageAsYouScroll(t *testing.T) {
 	details.discoverPages = map[int][]tmdb.MediaItem{3: {{ID: 27205, Title: "Inception", MediaType: "movie"}}, 2: {}}
 	server := newMediaServer(t, details, &fakeJacRed{}, "")
 	body := get(t, server, "/api/discover/page?type=tv&genre=10765&page=3", true).Body.String()
-	if len(details.discover) == 0 || details.discover[0] != "{MediaType:tv Genre:10765 Year:0 MinRating:0 Sort:popular} 3" {
+	if len(details.discover) == 0 || details.discover[0] != "{MediaType:tv Genre:10765 Year:0 MinRating:0 Sort:popular MaxRuntime:0 Language:} 3" {
 		t.Errorf("TMDB was asked %v", details.discover)
 	}
 	if !strings.Contains(body, "browse-grid") || !strings.Contains(body, `href="/movie/27205"`) || !strings.Contains(body, "That is the whole list.") {

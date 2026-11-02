@@ -247,7 +247,7 @@ func TestMoviePageShowsDetailsCreditsAndSources(t *testing.T) {
 		"Leonardo DiCaprio", "Cobb", `href="/person/6193"`,
 		`href="/movie/157336"`,
 		`data-video="YoHD9XEInc0"`,
-		`@get('/api/torrents?type=movie&id=27205&sort=' + $sort`,
+		`@get('/api/torrents?type=movie&id=27205', {filterSignals: {include: /^(sort|qual|hdr|sourceSeason)$/}})`,
 		`data-init="@get('/api/torrserver/status')"`,
 	} {
 		if !strings.Contains(body, want) {

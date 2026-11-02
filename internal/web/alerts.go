@@ -304,10 +304,18 @@ func (a *app) handleAlertsPage(w http.ResponseWriter, r *http.Request) {
 	}
 	if v.Muted, err = a.cfg.Store.MutedAlerts(ctx, user.ID); err != nil {
 		slog.Warn("reading muted alerts failed", "error", handlers.LogError(err))
+		v.MutedFailed = true
+		if !v.Failed {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
 	}
 	choices, err := a.cfg.Store.AlertFeeds(ctx, user.ID)
 	if err != nil {
 		slog.Warn("reading alert feeds failed", "error", handlers.LogError(err))
+		if !v.Failed && !v.MutedFailed {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+		v.MutedFailed = true
 	}
 	v.FeedsOff = map[string]bool{}
 	for feed, c := range choices {
