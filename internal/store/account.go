@@ -62,6 +62,16 @@ func accountSessionTime(ctx context.Context, uid string) (time.Time, bool) {
 	return s.issued, ok && s.uid == uid
 }
 
+// deletionFenceTime rounds upward to Firestore's microsecond precision so a
+// persisted cutoff never precedes the session it revokes.
+func deletionFenceTime(at time.Time) time.Time {
+	rounded := at.UTC().Truncate(time.Microsecond)
+	if rounded.Before(at) {
+		return rounded.Add(time.Microsecond)
+	}
+	return rounded
+}
+
 type deletionResumeKey struct{}
 
 // ResumeAccountDeletion permits finishing an existing deletion, never starting a

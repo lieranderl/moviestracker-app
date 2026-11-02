@@ -251,3 +251,23 @@ func TestAnOldDeletionCannotEraseARecreatedAccount(t *testing.T) {
 		}
 	})
 }
+
+func TestDeletionRevokesAnIssuerAheadOfTheDeletingClock(t *testing.T) {
+	eachStore(t, func(t *testing.T, s store.Store, uid string, clock *time.Time) {
+		issued := clock.Add(123 * time.Nanosecond)
+		ctx := store.WithAccountSession(context.Background(), uid, issued)
+		if err := s.DeleteAccount(ctx, uid); err != nil {
+			t.Fatal(err)
+		}
+		fence, err := s.AccountDeletedAt(context.Background(), uid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fence.Before(issued) {
+			t.Errorf("stored cutoff %v predates the revoked session %v", fence, issued)
+		}
+		if err := s.SavePreferences(ctx, uid, store.Preferences{Language: "ru"}); !errors.Is(err, store.ErrAccountDeleted) {
+			t.Errorf("revoked write with skewed clocks = %v", err)
+		}
+	})
+}

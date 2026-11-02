@@ -604,7 +604,7 @@ func (m *Memory) DeleteAccount(ctx context.Context, uid string) error {
 	if issued, ok := accountSessionTime(ctx, uid); ok && issued.After(at) {
 		at = issued
 	}
-	m.deleted[uid] = at
+	m.deleted[uid] = deletionFenceTime(at)
 	for id, s := range m.shared {
 		if s.uid == uid {
 			delete(m.shared, id)

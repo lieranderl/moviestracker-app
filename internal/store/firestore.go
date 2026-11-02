@@ -1229,7 +1229,7 @@ func (f *Firestore) beginAccountDeletion(ctx context.Context, uid string) (strin
 			}
 		}
 		if !pending {
-			at = now
+			at = deletionFenceTime(now)
 		}
 		claimed = true
 		return tx.Set(f.deletedAccounts().Doc(uid), map[string]any{"at": at, "pending": true, "owner": owner})
