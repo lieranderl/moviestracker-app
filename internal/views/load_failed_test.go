@@ -11,7 +11,7 @@ import (
 // so.
 func TestAPageThatCouldNotLoadOffersToTryAgain(t *testing.T) {
 	pages := map[string]string{
-		"lists":    render(t, views.ListsPage(nil, views.ListWant, nil, "", true)),
+		"lists":    render(t, views.ListsPage(nil, views.ListWant, nil, "", views.LibraryQuery{}, true)),
 		"alerts":   render(t, views.AlertsPage(nil, views.AlertsView{Failed: true})),
 		"calendar": render(t, views.CalendarPage(nil, nil, true)),
 	}
