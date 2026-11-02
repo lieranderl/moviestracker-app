@@ -29,7 +29,7 @@ func withTMDB(t *testing.T, cfg web.Config) web.Config {
 			_, _ = w.Write([]byte(`{"id":438631,"title":"Dune","original_title":"Dune","poster_path":"/d.jpg","release_date":"2021-09-15","recommendations":{"results":[{"id":329865,"title":"Arrival","poster_path":"/a.jpg","release_date":"2016-11-10"},{"id":335984,"title":"Blade Runner 2049","poster_path":"/b.jpg","release_date":"2017-10-04"}]}}`))
 			return
 		case "/3/tv/95396":
-			_, _ = w.Write([]byte(`{"id":95396,"name":"Severance","original_name":"Severance","poster_path":"/s.jpg","first_air_date":"2022-02-17","seasons":[{"season_number":1,"name":"Season 1","air_date":"2022-02-17","episode_count":9}]}`))
+			_, _ = w.Write([]byte(`{"id":95396,"name":"Severance","original_name":"Severance","poster_path":"/s.jpg","first_air_date":"2022-02-17","seasons":[{"season_number":1,"name":"Season 1","air_date":"2022-02-17","episode_count":9}],"last_episode_to_air":{"season_number":1,"episode_number":9,"name":"The We We Are","air_date":"2026-09-30"}}`))
 			return
 		case "/3/movie/1":
 			w.WriteHeader(http.StatusNotFound)

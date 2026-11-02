@@ -116,16 +116,20 @@ func CheckReleaseFilters(f ReleaseFilters) error {
 // Update tells a user a movie they follow turned up in one of the
 // backend's release feeds (internal/releases). They are told once per feed.
 type Update struct {
-	Feed    string // the feed's Firestore collection
-	TMDBID  int
+	Feed    string // the feed's Firestore collection, or EpisodesFeed
+	TMDBID  int    // the movie, or for EpisodesFeed the series
 	Title   string
 	Poster  string    // TMDB image path
 	FoundAt time.Time // when the backend found it, as the feed said then
 	Seen    bool
+	Episode string // for EpisodesFeed, the episode that aired ("S02E05")
 }
 
-// updateFeeds are the release feeds updates come from.
-var updateFeeds = []string{"latesttorrentsmovies", "hdr10movies", "dvmovies"}
+// EpisodesFeed is the feed of a followed series' episodes airing.
+const EpisodesFeed = "episodes"
+
+// updateFeeds are the feeds updates come from.
+var updateFeeds = []string{"latesttorrentsmovies", "hdr10movies", "dvmovies", EpisodesFeed}
 
 // updateLimit is how many updates a page of Updates holds.
 const updateLimit = 100
@@ -166,7 +170,12 @@ type UpdateStore interface {
 
 // ID names the update among the user's: its feed and TMDB ID
 // ("dvmovies-438631").
-func (u Update) ID() string { return fmt.Sprintf("%s-%d", u.Feed, u.TMDBID) }
+func (u Update) ID() string {
+	if u.Episode != "" {
+		return fmt.Sprintf("%s-%d-%s", u.Feed, u.TMDBID, u.Episode)
+	}
+	return fmt.Sprintf("%s-%d", u.Feed, u.TMDBID)
+}
 
 // updateCursor names the update a page ends with.
 func updateCursor(u Update) string { return pageCursor(u.FoundAt, u.ID()) }
@@ -233,7 +242,10 @@ func updateID(u Update) (string, error) {
 	if u.TMDBID <= 0 {
 		return "", fmt.Errorf("update TMDB ID %d is not positive", u.TMDBID)
 	}
-	return fmt.Sprintf("%s-%d", u.Feed, u.TMDBID), nil
+	if (u.Feed == EpisodesFeed) != (u.Episode != "") {
+		return "", fmt.Errorf("an update names an episode only for %s", EpisodesFeed)
+	}
+	return u.ID(), nil
 }
 
 // newestFound orders updates most recently found first, then by ID
