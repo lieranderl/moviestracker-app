@@ -152,12 +152,14 @@ func New(cfg Config) http.Handler {
 	a.library = handlers.NewLibrary(a.cfg.Store, a.cfg.Store.Favorites, a.cfg.Store.LibraryStamp)
 	handlers.NewRecommendations(a.library, a.userID, a.catalog).Register(mux)
 	titleStates.Register(mux)
-	handlers.NewEpisodes(a.cfg.Store, a.userID, a.catalog).Register(mux)
+	episodes := handlers.NewEpisodes(a.cfg.Store, a.userID, a.catalog)
+	episodes.Register(mux)
 	handlers.NewReviews(a.cfg.Store, a.cfg.Store, a.userID, a.catalog).Register(mux)
 	handlers.NewCustomLists(a.cfg.Store, a.cfg.Store, a.userID, a.catalog).Register(mux)
 	a.progress.MarkFinishedMoviesIn(titleStates)
+	a.progress.MarkFinishedEpisodesIn(episodes)
 	mux.HandleFunc("POST /api/language", handlers.SetLanguage(a.secure(), a.saveLanguage))
-	app := http.NewCrossOriginProtection().Handler(handlers.Language(webSite(mux, cfg.BaseURL)))
+	app := http.NewCrossOriginProtection().Handler(handlers.Language(webSite(handlers.SignedIn(a.userID, mux), cfg.BaseURL)))
 	return handlers.RecoveryMiddleware(handlers.SecurityHeadersMiddleware(true, handlers.LoggingMiddleware(app)))
 }
 
