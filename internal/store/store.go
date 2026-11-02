@@ -155,6 +155,10 @@ type UpdateStore interface {
 	// MutedAlerts are the movies whose alerts the user muted, most
 	// recently muted first.
 	MutedAlerts(ctx context.Context, uid string) ([]MutedTitle, error)
+	// SetAlertFeed turns a release feed's alerts on or off.
+	SetAlertFeed(ctx context.Context, uid, feed string, on bool) error
+	// AlertFeedsOff are the feeds the user turned alerts off for.
+	AlertFeedsOff(ctx context.Context, uid string) (map[string]bool, error)
 }
 
 // ID names the update among the user's: its feed and TMDB ID

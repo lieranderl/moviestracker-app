@@ -1265,3 +1265,38 @@ func (f *Firestore) MutedAlerts(ctx context.Context, uid string) ([]MutedTitle, 
 	slices.SortFunc(out, newestMuted)
 	return out, nil
 }
+
+// SetAlertFeed implements Store: an alertFeedsOff map on the user's
+// document.
+func (f *Firestore) SetAlertFeed(ctx context.Context, uid, feed string, on bool) error {
+	if feed == "" {
+		return errors.New("alert feed: none named")
+	}
+	var v any = true
+	if on {
+		v = firestore.Delete
+	}
+	if _, err := f.userDoc(uid).Set(ctx, map[string]any{"alertFeedsOff": map[string]any{feed: v}}, firestore.MergeAll); err != nil {
+		return fmt.Errorf("set alert feed: %w", err)
+	}
+	return nil
+}
+
+// AlertFeedsOff implements Store.
+func (f *Firestore) AlertFeedsOff(ctx context.Context, uid string) (map[string]bool, error) {
+	snap, err := f.userDoc(uid).Get(ctx)
+	if notFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read alert feeds: %w", err)
+	}
+	raw, _ := snap.Data()["alertFeedsOff"].(map[string]any)
+	out := make(map[string]bool, len(raw))
+	for feed, v := range raw {
+		if off, _ := v.(bool); off {
+			out[feed] = true
+		}
+	}
+	return out, nil
+}

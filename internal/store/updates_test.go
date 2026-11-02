@@ -206,3 +206,25 @@ func TestAUserMutesAMoviesAlerts(t *testing.T) {
 		}
 	})
 }
+
+// A user turns a release feed's alerts off and on again; the others stay on.
+func TestAUserChoosesWhichFeedsAlert(t *testing.T) {
+	eachStore(t, func(t *testing.T, s store.Store, uid string, _ *time.Time) {
+		ctx := context.Background()
+		for _, feed := range []string{"latesttorrentsmovies", "hdr10movies"} {
+			if err := s.SetAlertFeed(ctx, uid, feed, false); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := s.SetAlertFeed(ctx, uid, "hdr10movies", true); err != nil {
+			t.Fatal(err)
+		}
+		off, err := s.AlertFeedsOff(ctx, uid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(off) != 1 || !off["latesttorrentsmovies"] {
+			t.Errorf("feeds off = %v, want only latesttorrentsmovies", off)
+		}
+	})
+}
