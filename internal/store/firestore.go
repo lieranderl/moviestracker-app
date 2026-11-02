@@ -1611,3 +1611,19 @@ func (f *Firestore) ResetFeedback(ctx context.Context, uid string) error {
 // Following implements Store.
 
 // FollowedSeries implements Store.
+
+func (f *Firestore) Reviews(ctx context.Context, uid string) ([]Review, error) {
+	docs, err := f.reviews(uid).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("read reviews: %w", err)
+	}
+	out := make([]Review, 0, len(docs))
+	for _, doc := range docs {
+		var rec reviewRecord
+		if err := doc.DataTo(&rec); err != nil {
+			return nil, fmt.Errorf("read review %s: %w", doc.Ref.ID, err)
+		}
+		out = append(out, Review(rec))
+	}
+	return out, nil
+}

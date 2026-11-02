@@ -764,3 +764,9 @@ func (m *Memory) ResetFeedback(ctx context.Context, uid string) error {
 	m.libraryChanged(uid)
 	return nil
 }
+
+func (m *Memory) Reviews(_ context.Context, uid string) ([]Review, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Collect(maps.Values(m.user(uid).reviews)), nil
+}
