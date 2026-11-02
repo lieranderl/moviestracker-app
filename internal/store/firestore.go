@@ -1162,3 +1162,63 @@ func (f *Firestore) SaveAlertCheckpoints(ctx context.Context, uid string, c Aler
 	}
 	return nil
 }
+
+// followRecord is a users/{uid}/follows/{tvID} document.
+type followRecord struct {
+	TMDBID int       `firestore:"tmdbId"`
+	Title  string    `firestore:"title"`
+	Poster string    `firestore:"poster,omitempty"`
+	At     time.Time `firestore:"at"`
+}
+
+func (f *Firestore) follows(uid string) *firestore.CollectionRef {
+	return f.userDoc(uid).Collection("follows")
+}
+
+// Follow implements Store.
+func (f *Firestore) Follow(ctx context.Context, uid string, s FollowedSeries, on bool) error {
+	if err := checkFollow(s); err != nil {
+		return err
+	}
+	doc := f.follows(uid).Doc(strconv.Itoa(s.TMDBID))
+	var err error
+	if on {
+		_, err = doc.Set(ctx, followRecord{s.TMDBID, s.Title, s.Poster, f.opts.now().UTC()})
+	} else {
+		_, err = doc.Delete(ctx)
+	}
+	if err != nil {
+		return fmt.Errorf("follow a series: %w", err)
+	}
+	return nil
+}
+
+// Following implements Store.
+func (f *Firestore) Following(ctx context.Context, uid string, tvID int) (bool, error) {
+	_, err := f.follows(uid).Doc(strconv.Itoa(tvID)).Get(ctx)
+	if notFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read a followed series: %w", err)
+	}
+	return true, nil
+}
+
+// FollowedSeries implements Store.
+func (f *Firestore) FollowedSeries(ctx context.Context, uid string) ([]FollowedSeries, error) {
+	docs, err := f.follows(uid).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("read followed series: %w", err)
+	}
+	out := make([]FollowedSeries, 0, len(docs))
+	for _, doc := range docs {
+		var rec followRecord
+		if err := doc.DataTo(&rec); err != nil {
+			return nil, fmt.Errorf("read followed series %s: %w", doc.Ref.ID, err)
+		}
+		out = append(out, FollowedSeries(rec))
+	}
+	slices.SortFunc(out, newestFollowed)
+	return out, nil
+}

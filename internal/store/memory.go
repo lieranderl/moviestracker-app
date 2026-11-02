@@ -35,6 +35,7 @@ type memoryUser struct {
 	reviews     map[string]Review
 	episodes    map[int]seriesEpisodes // by series ID
 	checkpoints AlertCheckpoints
+	follows     map[int]FollowedSeries // by series ID
 }
 
 // NewMemory returns an empty in-memory store.
@@ -532,4 +533,41 @@ func (m *Memory) SaveAlertCheckpoints(_ context.Context, uid string, c AlertChec
 	c.Feeds = maps.Clone(c.Feeds)
 	m.user(uid).checkpoints = c
 	return nil
+}
+
+// Follow implements Store.
+func (m *Memory) Follow(_ context.Context, uid string, f FollowedSeries, on bool) error {
+	if err := checkFollow(f); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u := m.user(uid)
+	if u.follows == nil {
+		u.follows = map[int]FollowedSeries{}
+	}
+	if on {
+		f.At = m.opts.now().UTC()
+		u.follows[f.TMDBID] = f
+	} else {
+		delete(u.follows, f.TMDBID)
+	}
+	return nil
+}
+
+// Following implements Store.
+func (m *Memory) Following(_ context.Context, uid string, tvID int) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, ok := m.user(uid).follows[tvID]
+	return ok, nil
+}
+
+// FollowedSeries implements Store.
+func (m *Memory) FollowedSeries(_ context.Context, uid string) ([]FollowedSeries, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := slices.Collect(maps.Values(m.user(uid).follows))
+	slices.SortFunc(out, newestFollowed)
+	return out, nil
 }
