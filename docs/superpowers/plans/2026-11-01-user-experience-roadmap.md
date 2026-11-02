@@ -347,7 +347,6 @@ in focused PRs before the larger episode/discovery and collaboration work.
   Firestore emulator (including pre-paging records); web and handler tests
   cover read reuse, invalidation and paging. The full library is still read
   when a summary is rebuilt after a change.
-
 - **R23 — implemented in both apps, deployment unverified (2 November
   2026):** a signed-in visitor's title cards (home rows, Discover, search,
   lists, similar titles) carry Want to watch and Watched buttons, shown on
@@ -361,6 +360,7 @@ in focused PRs before the larger episode/discovery and collaboration work.
   tests cover undo, conflicts, no-op actions and signed-out cards. A local
   browser check showed the buttons and the toast; TMDB lookups fail on the
   local network, so a successful mark was covered by tests only.
+
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding
 implementation plans before code; they are not delegated silently to execution.
