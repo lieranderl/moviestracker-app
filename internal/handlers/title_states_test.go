@@ -207,3 +207,13 @@ func TestALongSearchIsCutByCharacters(t *testing.T) {
 		t.Error("the cut search splits a character")
 	}
 }
+
+func TestLibrarySearchKeepsUnicodeCharactersWithinTheInputLimit(t *testing.T) {
+	title := strings.Repeat("Ж", 49) + "星"
+	s := newMediaServer(t, &fakeTMDBDetails{movies: map[int]*tmdb.MovieDetails{1: {MediaItem: tmdb.MediaItem{ID: 1, Title: title, MediaType: "movie"}}}}, nil, "")
+	sendAs(t, s, http.MethodPost, "/api/titles/state?type=movie&id=1&state=watched")
+	page := html.UnescapeString(sendAs(t, s, http.MethodGet, "/lists/watched?q="+url.QueryEscape(title)))
+	if !strings.Contains(page, `name="q" value="`+title+`"`) || !strings.Contains(page, `href="/movie/1"`) {
+		t.Error("a query within 100 characters was corrupted or excluded its matching title")
+	}
+}

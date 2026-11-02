@@ -79,14 +79,14 @@ func (ts *TitleStates) handleList(w http.ResponseWriter, r *http.Request) {
 		entries = append(entries, LibraryEntry{Item: tmdb.MediaItem{ID: t.TMDBID, Title: t.Title, PosterPath: t.Poster, MediaType: t.Kind}, At: t.UpdatedAt})
 	}
 	var ratings map[string]int
-	if err == nil && query.Sort == "rating" {
-		// A rating sort without the ratings would only look sorted.
-		if ratings, err = Ratings(ctx, ts.reviews, uid); err != nil {
+	if query.Sort == "rating" && err == nil {
+		ratings, err = Ratings(ctx, ts.reviews, uid)
+		if err != nil {
 			slog.Warn("reading ratings failed", "error", logError(err))
 		}
 	}
+	entries = ts.catalog.LocalizeLibraryEntries(r.Context(), entries)
 	items, query := ApplyLibraryQuery(entries, query, ratings)
-	items = ts.catalog.LocalizeTitles(r.Context(), items)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err != nil {
