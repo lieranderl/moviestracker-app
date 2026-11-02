@@ -102,3 +102,22 @@ func TestAUserClearsATitlesState(t *testing.T) {
 		}
 	})
 }
+
+// Titles marked at the same moment (a coarse clock) still come in one
+// order every time: by key, descending.
+func TestTitlesMarkedAtTheSameMomentKeepOneOrder(t *testing.T) {
+	eachTitleStore(t, func(t *testing.T, s store.TitleStateStore, uid string, _ *time.Time) {
+		ctx := context.Background()
+		for _, id := range []int{2, 3, 1} {
+			if err := s.SetTitleState(ctx, uid, store.TitleState{Kind: "movie", TMDBID: id, Title: "Movie", State: store.Watched}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for range 5 {
+			got, err := s.TitleStates(ctx, uid, store.Watched)
+			if err != nil || len(got) != 3 || got[0].TMDBID != 3 || got[1].TMDBID != 2 || got[2].TMDBID != 1 {
+				t.Fatalf("TitleStates() = %+v, %v; want movies 3, 2, 1", got, err)
+			}
+		}
+	})
+}
