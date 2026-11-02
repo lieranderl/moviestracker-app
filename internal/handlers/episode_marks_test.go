@@ -26,8 +26,10 @@ func severanceServer(t *testing.T) (*Server, *http.Cookie) {
 			MediaItem: tmdb.MediaItem{ID: 95396, Title: "Severance", MediaType: "tv"},
 			Seasons: []tmdb.SeasonSummary{
 				{Number: 1, EpisodeCount: 3, AirDate: "2022-02-18"},
-				{Number: 2, EpisodeCount: 4, AirDate: "2025-01-17", Aired: 2},
+				{Number: 2, EpisodeCount: 4, AirDate: "2025-01-17"},
 			},
+			// As TMDB gives it: no aired count, the last episode out.
+			LastEpisode: tmdb.Airing{Season: 2, Number: 2},
 		}},
 		seasons: map[string]*tmdb.Season{
 			"95396/1": {ShowID: 95396, Number: 1, Episodes: episodes(1, "2022-02-18", "2022-02-18", "2022-02-25")},

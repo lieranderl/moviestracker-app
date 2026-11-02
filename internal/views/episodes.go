@@ -52,9 +52,10 @@ func seasonAired(s tmdb.SeasonSummary) int {
 // nextUnwatched is the first aired episode, in season order, the user has
 // not marked watched; Specials are left out. any says whether any aired.
 func nextUnwatched(t *tmdb.TVDetails, m EpisodeMarks) (season, episode int, ok, any bool) {
-	for _, s := range t.Seasons {
-		if s.Number == 0 {
-			continue
+	last := t.LastEpisode
+	for _, s := range t.SeasonsSoFar() { // the airing season counts only what is out
+		if s.Number == 0 || (last.Number > 0 && s.Number > last.Season) {
+			continue // Specials, and seasons after the last episode out
 		}
 		for e := 1; e <= seasonAired(s); e++ {
 			any = true
