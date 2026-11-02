@@ -622,9 +622,9 @@ func WebPrivacy() templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var41 string
-				templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "When you delete your account, we keep only its Google account ID and the time of deletion, for 30 days, to sign it out on your other devices."))
+				templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "To sign out your other devices, we keep a deletion record with your Google account ID, deletion time and whether cleanup is pending. Pending cleanup is retained until completed; completed deletion records are kept for 30 days."))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_privacy.templ`, Line: 96, Col: 162}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_privacy.templ`, Line: 96, Col: 247}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 				if templ_7745c5c3_Err != nil {
