@@ -19,8 +19,8 @@ import (
 func ParseLibraryQuery(r *http.Request) views.LibraryQuery {
 	q := r.URL.Query()
 	out := views.LibraryQuery{Q: strings.TrimSpace(q.Get("q"))}
-	if len(out.Q) > 100 {
-		out.Q = out.Q[:100]
+	if q := []rune(out.Q); len(q) > 100 { // by characters, never splitting one
+		out.Q = string(q[:100])
 	}
 	if k := q.Get("kind"); k == "movie" || k == "tv" {
 		out.Kind = k
@@ -67,20 +67,20 @@ func ApplyLibraryQuery(entries []LibraryEntry, q views.LibraryQuery, ratings map
 }
 
 // Ratings are the user's ratings by "kind-id", for sorting by rating; none
-// without reviews.
-func Ratings(ctx context.Context, reviews store.ReviewStore, uid string) map[string]int {
+// without reviews. An error says they could not be read.
+func Ratings(ctx context.Context, reviews store.ReviewStore, uid string) (map[string]int, error) {
 	out := map[string]int{}
 	if reviews == nil {
-		return out
+		return out, nil
 	}
 	all, err := reviews.Reviews(ctx, uid)
 	if err != nil {
-		return out
+		return nil, err
 	}
 	for _, r := range all {
 		if r.Rating > 0 {
 			out[titleKey(r.Kind, r.TMDBID)] = r.Rating
 		}
 	}
-	return out
+	return out, nil
 }

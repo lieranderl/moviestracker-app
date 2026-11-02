@@ -53,10 +53,12 @@ func recommendationsSlot() templ.Component {
 }
 
 // RecommendationFeedback is what the rows say about the user's feedback:
-// the title just hidden (offered back) and how many are hidden.
+// the title just hidden (offered back), how many are hidden and how many
+// titles have feedback at all.
 type RecommendationFeedback struct {
 	Undone *tmdb.MediaItem // the title just hidden, nil when none
 	Hidden int
+	Given  int
 	Allow  bool // the user can give feedback here
 }
 
@@ -114,7 +116,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(trf(ctx, "%s is hidden from your recommendations.", f.Undone.Title))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 48, Col: 79}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 50, Col: 79}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -127,7 +129,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("@post('%s')", FeedbackURL(*f.Undone, "notInterested", false)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 49, Col: 135}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 51, Col: 135}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 			if templ_7745c5c3_Err != nil {
@@ -140,7 +142,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Undo"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 49, Col: 155}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 51, Col: 155}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -159,7 +161,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("recommended-%d-title", i))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 53, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 55, Col: 95}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 			if templ_7745c5c3_Err != nil {
@@ -172,7 +174,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("recommended-%d-title", i))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 54, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 56, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 			if templ_7745c5c3_Err != nil {
@@ -193,7 +195,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(row.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 56, Col: 16}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 58, Col: 16}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -232,7 +234,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 						var templ_7745c5c3_Var10 string
 						templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(trf(ctx, "Feedback on %s", item.Title))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 63, Col: 111}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 65, Col: 111}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 						if templ_7745c5c3_Err != nil {
@@ -245,7 +247,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 						var templ_7745c5c3_Var11 string
 						templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Recommend more like this"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 64, Col: 109}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 66, Col: 109}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 						if templ_7745c5c3_Err != nil {
@@ -258,7 +260,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 						var templ_7745c5c3_Var12 string
 						templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("@post('%s')", FeedbackURL(item, "moreLikeThis", true)))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 64, Col: 195}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 66, Col: 195}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 						if templ_7745c5c3_Err != nil {
@@ -279,7 +281,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 						var templ_7745c5c3_Var13 string
 						templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "More like this"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 66, Col: 37}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 68, Col: 37}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 						if templ_7745c5c3_Err != nil {
@@ -292,7 +294,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 						var templ_7745c5c3_Var14 string
 						templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(trf(ctx, "Not interested in %s", item.Title))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 68, Col: 128}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 70, Col: 128}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 						if templ_7745c5c3_Err != nil {
@@ -305,7 +307,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 						var templ_7745c5c3_Var15 string
 						templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Not interested"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 68, Col: 164}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 70, Col: 164}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 						if templ_7745c5c3_Err != nil {
@@ -318,7 +320,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 						var templ_7745c5c3_Var16 string
 						templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("@post('%s')", FeedbackURL(item, "notInterested", true)))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 68, Col: 251}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 70, Col: 251}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 						if templ_7745c5c3_Err != nil {
@@ -353,7 +355,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 				return templ_7745c5c3_Err
 			}
 		}
-		if f.Allow && f.Hidden > 0 {
+		if f.Allow && f.Given > 0 {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<button type=\"button\" class=\"btn btn-sm btn-ghost\" data-on:click=\"@post('/api/recommendations/feedback/reset')\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -362,25 +364,33 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, " ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
+			if f.Hidden > 0 {
+				var templ_7745c5c3_Var17 string
+				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(trn(ctx, f.Hidden, "Show %d hidden title again and forget your feedback", "Show %d hidden titles again and forget your feedback"))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 84, Col: 136}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			} else {
+				var templ_7745c5c3_Var18 string
+				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Forget your feedback"))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 86, Col: 38}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 			}
-			var templ_7745c5c3_Var17 string
-			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(trn(ctx, f.Hidden, "Show %d hidden title again and forget your feedback", "Show %d hidden titles again and forget your feedback"))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 81, Col: 135}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</button>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</button>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

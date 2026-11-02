@@ -184,7 +184,7 @@ func NewServer(cfg Config) (*Server, error) {
 	// Rejects cross-origin POSTs (Sec-Fetch-Site / Origin), so no other site
 	// can submit forms or Datastar actions with a visitor's cookies.
 	s.presence = newPresence()
-	s.handler = http.NewCrossOriginProtection().Handler(language(localSite(s.setupGate(s.presenceMiddleware(s.updateNotice(s.mux))))))
+	s.handler = http.NewCrossOriginProtection().Handler(language(localSite(SignedIn(s.username, s.setupGate(s.presenceMiddleware(s.updateNotice(s.mux)))))))
 	return s, nil
 }
 
@@ -232,6 +232,16 @@ func tryAcquire(slots chan struct{}) bool {
 var appSite = views.Site{
 	TorrServerCheck: templ.OrderedAttributes{{Key: "data-init", Value: "@get('/api/torrserver/state')"}},
 	RecentTorrents:  templ.OrderedAttributes{{Key: "data-init", Value: "@get('/api/torrserver/recent')"}},
+}
+
+// SignedIn marks the pages of visitors user signs in (views.WithSignedIn).
+func SignedIn(user func(*http.Request) (string, bool), next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := user(r); ok {
+			r = r.WithContext(views.WithSignedIn(r.Context()))
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // localSite marks every page as the app's.

@@ -24,8 +24,9 @@ type LibrarySummary struct {
 	// Followed are the movies release alerts follow, by TMDB ID: favourites
 	// and Want to watch, but none watched.
 	Followed map[int]bool
-	// Hidden is how many titles the user is not interested in.
-	Hidden int
+	// Hidden is how many titles the user is not interested in; Given, how
+	// many have feedback of any kind.
+	Hidden, Given int
 }
 
 // Library works out users' library summaries. With a stamp (the store's
@@ -121,12 +122,16 @@ func (l *Library) summarise(ctx context.Context, uid string) (LibrarySummary, er
 		for _, t := range more {
 			add(seed{kind: t.Kind, id: t.TMDBID, title: t.Title, more: true})
 		}
+		s.Given = len(hidden) + len(more)
 	}
 	watched, err := l.titles.TitleStates(ctx, uid, store.Watched)
 	if err != nil {
 		return LibrarySummary{}, err
 	}
-	ratings := l.ratings(ctx, uid)
+	ratings, err := l.ratings(ctx, uid)
+	if err != nil { // a summary without them would be kept as if complete
+		return LibrarySummary{}, err
+	}
 	liked := slices.Clone(watched)
 	// Rated titles lead, best first; one rated 4 or less starts no row.
 	liked = slices.DeleteFunc(liked, func(t store.TitleState) bool {
@@ -174,9 +179,9 @@ func (l *Library) summarise(ctx context.Context, uid string) (LibrarySummary, er
 }
 
 // ratings are the user's ratings by titleKey; none without reviews.
-func (l *Library) ratings(ctx context.Context, uid string) map[string]int {
+func (l *Library) ratings(ctx context.Context, uid string) (map[string]int, error) {
 	if l.reviews == nil {
-		return nil
+		return nil, nil
 	}
 	return Ratings(ctx, l.reviews, uid) // from the library list controls
 }

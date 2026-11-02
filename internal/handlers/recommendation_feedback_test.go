@@ -70,3 +70,26 @@ func TestRecommendationsFollowTheUsersFeedback(t *testing.T) {
 		t.Errorf("a reset should bring movie 12 back and drop the extra row:\n%s", reset)
 	}
 }
+
+// Feedback that hides nothing can still be forgotten.
+func TestMoreLikeThisAloneCanBeForgotten(t *testing.T) {
+	s := newMediaServer(t, &fakeTMDBDetails{movies: map[int]*tmdb.MovieDetails{
+		2:  {MediaItem: tmdb.MediaItem{ID: 2, Title: "Movie 2", MediaType: "movie"}, Recommendations: []tmdb.MediaItem{{ID: 13, Title: "Movie 13", MediaType: "movie"}}},
+		13: {MediaItem: tmdb.MediaItem{ID: 13, Title: "Movie 13", MediaType: "movie"}},
+	}}, nil, "")
+	cookie := signedIn(t, s)
+	post := func(path string) string {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, path, nil)
+		req.Header.Set("Datastar-Request", "true")
+		req.AddCookie(cookie)
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		return html.UnescapeString(rec.Body.String())
+	}
+	post("/api/titles/state?type=movie&id=2&state=watched")
+	more := post("/api/recommendations/feedback?type=movie&id=13&feedback=moreLikeThis&on=1")
+	if !strings.Contains(more, "@post('/api/recommendations/feedback/reset')") || !strings.Contains(more, "Forget your feedback") {
+		t.Errorf("with only More like this given, the rows offer no reset:\n%s", more)
+	}
+}

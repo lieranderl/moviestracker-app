@@ -39,6 +39,8 @@ func (ts *TitleStates) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/titles/state", ts.handleState)
 	mux.HandleFunc("POST /api/titles/state", ts.handleSet)
 	mux.HandleFunc("DELETE /api/titles/state", ts.handleSet)
+	mux.HandleFunc("POST /api/titles/quick", ts.handleQuick)
+	mux.HandleFunc("POST /api/titles/undo", ts.handleUndo)
 	mux.HandleFunc("GET /lists/{list}", ts.handleList)
 }
 
@@ -77,10 +79,14 @@ func (ts *TitleStates) handleList(w http.ResponseWriter, r *http.Request) {
 		entries = append(entries, LibraryEntry{Item: tmdb.MediaItem{ID: t.TMDBID, Title: t.Title, PosterPath: t.Poster, MediaType: t.Kind}, At: t.UpdatedAt})
 	}
 	var ratings map[string]int
-	if query.Sort == "rating" {
-		ratings = Ratings(ctx, ts.reviews, uid)
+	if err == nil && query.Sort == "rating" {
+		// A rating sort without the ratings would only look sorted.
+		if ratings, err = Ratings(ctx, ts.reviews, uid); err != nil {
+			slog.Warn("reading ratings failed", "error", logError(err))
+		}
 	}
 	items, query := ApplyLibraryQuery(entries, query, ratings)
+	items = ts.catalog.LocalizeTitles(r.Context(), items)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err != nil {
