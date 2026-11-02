@@ -105,7 +105,10 @@ templ seasonsSection(t *tmdb.TVDetails, season *tmdb.Season, selected int) {
 				for _, s := range t.Seasons {
 					<a
 						href={ templ.SafeURL(fmt.Sprintf("/tv/%d?season=%d#seasons", t.ID, s.Number)) }
-						role="tab"
+						if s.Number == selected {
+							aria-current="page"
+						}
+						data-attr:aria-current={ fmt.Sprintf("$season === %d ? 'page' : null", s.Number) }
 						data-season={ fmt.Sprint(s.Number) }
 						class={ "tab shrink-0 whitespace-nowrap", templ.KV("tab-active", s.Number == selected) }
 						data-class={ fmt.Sprintf("{ 'tab-active': $season === %d }", s.Number) }

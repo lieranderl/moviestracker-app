@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -23,6 +24,14 @@ const feedTTL = 5 * time.Minute
 type releaseLists struct {
 	tmdb.DetailsProvider
 	feeds *cachedFeeds
+}
+
+// Title preserves optional lightweight naming through the release-feed adapter.
+func (l releaseLists) Title(ctx context.Context, kind string, id int) (tmdb.MediaItem, error) {
+	if names, ok := l.DetailsProvider.(tmdb.TitleProvider); ok {
+		return names.Title(ctx, kind, id)
+	}
+	return tmdb.MediaItem{}, errors.New("title naming is not available")
 }
 
 // List implements tmdb.DetailsProvider.
