@@ -154,7 +154,7 @@ func New(cfg Config) http.Handler {
 	a.progress.MarkFinishedMoviesIn(titleStates)
 	a.progress.MarkFinishedEpisodesIn(episodes)
 	mux.HandleFunc("POST /api/language", handlers.SetLanguage(a.secure(), a.saveLanguage))
-	app := http.NewCrossOriginProtection().Handler(handlers.Language(webSite(mux, cfg.BaseURL)))
+	app := http.NewCrossOriginProtection().Handler(handlers.Language(webSite(handlers.SignedIn(a.userID, mux), cfg.BaseURL)))
 	return handlers.RecoveryMiddleware(handlers.SecurityHeadersMiddleware(true, handlers.LoggingMiddleware(app)))
 }
 
