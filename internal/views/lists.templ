@@ -39,17 +39,58 @@ func listTabs(ctx context.Context) []listTab {
 	return tabs
 }
 
-// ListsPage is My lists on the tab named active, its titles newest first;
-// failed says they could not be read.
-templ ListsPage(user *auth.User, active string, items []tmdb.MediaItem, more string, failed bool) {
+// LibraryQuery is how a library list is searched (Q), narrowed to movies or
+// series (Kind) and sorted (Sort: "" for most recent, "title" or "rating"),
+// from its address; Count is how many titles match it.
+type LibraryQuery struct {
+	Q, Kind, Sort string
+	Count         int
+}
+
+// Active says whether the list is searched, narrowed or sorted.
+func (q LibraryQuery) Active() bool { return q.Q != "" || q.Kind != "" || q.Sort != "" }
+
+// libraryControls search, narrow and sort a library list with a GET form,
+// so each view has its own address to share.
+templ libraryControls(q LibraryQuery) {
+	<form method="get" class="flex flex-wrap items-end gap-2" role="search">
+		<label class="input input-sm w-full sm:w-64">
+			@Icon("search", "size-4 opacity-60")
+			<input type="search" name="q" value={ q.Q } maxlength="100" placeholder={ tr(ctx, "Search this list") } aria-label={ tr(ctx, "Search this list") }/>
+		</label>
+		<select name="kind" class="select select-sm w-auto" aria-label={ tr(ctx, "Movies or series") }>
+			<option value="" selected?={ q.Kind == "" }>{ tr(ctx, "Movies and series") }</option>
+			<option value="movie" selected?={ q.Kind == "movie" }>{ tr(ctx, "Movies") }</option>
+			<option value="tv" selected?={ q.Kind == "tv" }>{ tr(ctx, "Series") }</option>
+		</select>
+		<select name="sort" class="select select-sm w-auto" aria-label={ tr(ctx, "Sort by") }>
+			<option value="" selected?={ q.Sort == "" }>{ tr(ctx, "Most recent") }</option>
+			<option value="title" selected?={ q.Sort == "title" }>{ tr(ctx, "Title") }</option>
+			<option value="rating" selected?={ q.Sort == "rating" }>{ tr(ctx, "My rating") }</option>
+		</select>
+		<button type="submit" class="btn btn-sm btn-primary">{ tr(ctx, "Apply") }</button>
+		if q.Active() {
+			<span class="text-sm text-base-content/70 self-center">{ trn(ctx, q.Count, "%d title", "%d titles") }</span>
+		}
+	</form>
+}
+
+// ListsPage is My lists on the tab named active, its titles newest first
+// unless q says otherwise; failed says they could not be read.
+templ ListsPage(user *auth.User, active string, items []tmdb.MediaItem, more string, q LibraryQuery, failed bool) {
 	@listsLayout(user, active) {
 		for _, tab := range listTabs(ctx) {
 			if tab.ID == active {
+				if !failed && (len(items) > 0 || q.Active()) {
+					@libraryControls(q)
+				}
 				if failed {
 					<div role="alert" class="alert alert-error alert-soft">
 						@Icon("circle-alert", "size-5")
 						<span>{ tr(ctx, tab.Failed) }</span>
 					</div>
+				} else if len(items) == 0 && q.Active() {
+					<p class="text-sm text-base-content/70">{ tr(ctx, "No titles match.") }</p>
 				} else if len(items) == 0 {
 					@emptyState(tab.Icon, tr(ctx, tab.Empty), tr(ctx, tab.EmptyHelp)) {
 						@browseTrendingLink()

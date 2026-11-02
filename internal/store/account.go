@@ -19,6 +19,8 @@ type Account struct {
 	// Episodes are the watched episodes, by series and then season.
 	Episodes map[int]map[int][]int `json:"watchedEpisodes"`
 	Follows  []FollowedSeries      `json:"followedSeries"`
+	// Feedback is the recommendation feedback given, by kind.
+	Feedback map[Feedback][]TitleRef `json:"recommendationFeedback"`
 }
 
 // AccountStore hands users everything kept for them, and deletes it.
@@ -38,3 +40,19 @@ type AccountStore interface {
 // DeletedAccountKept is how long a deleted account's ID and deletion time
 // are kept: as long as a session lasts.
 const DeletedAccountKept = 30 * 24 * time.Hour
+
+// accountFeedback is the user's recommendation feedback, by kind, for their
+// account's export.
+func accountFeedback(ctx context.Context, s FeedbackStore, uid string) (map[Feedback][]TitleRef, error) {
+	out := map[Feedback][]TitleRef{}
+	for _, kind := range []Feedback{NotInterested, MoreLikeThis} {
+		refs, err := s.FeedbackOn(ctx, uid, kind)
+		if err != nil {
+			return nil, err
+		}
+		if len(refs) > 0 {
+			out[kind] = refs
+		}
+	}
+	return out, nil
+}

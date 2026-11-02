@@ -80,6 +80,7 @@ type Store interface {
 	ReviewStore
 	AccountStore
 	EpisodeStore
+	FeedbackStore
 	FollowStore
 }
 
