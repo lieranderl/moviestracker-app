@@ -69,3 +69,23 @@ func atoi(s string) int {
 	n, _ := strconv.Atoi(s)
 	return n
 }
+
+// ExactEpisodes are the season and episodes (from to to) a file's own name
+// gives, with exact true; a name that leaves the season to a folder, or
+// names no episode, is not exact, and its episodes are for the user to mark.
+func ExactEpisodes(filePath string) (season, from, to int, exact bool) {
+	file := path.Base(filePath)
+	name := strings.TrimSuffix(file, path.Ext(file))
+	if m := seasonEpisode.FindStringSubmatch(name); m != nil {
+		season, from = atoi(m[1]), atoi(m[2])
+		to = from
+		if m[3] != "" && atoi(m[3]) > from {
+			to = atoi(m[3])
+		}
+		return season, from, to, true
+	}
+	if m := crossEpisode.FindStringSubmatch(name); m != nil {
+		return atoi(m[1]), atoi(m[2]), atoi(m[2]), true
+	}
+	return 0, 0, 0, false
+}
