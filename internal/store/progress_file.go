@@ -48,6 +48,29 @@ func (f *ProgressFile) SaveProgress(_ context.Context, uid string, p Progress) e
 	return f.write()
 }
 
+// ResetProgress implements ProgressStore.
+func (f *ProgressFile) ResetProgress(_ context.Context, uid, hash string, index int) error {
+	id, err := progressID(hash, index)
+	if err != nil {
+		return err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	p, ok := f.users[uid][id]
+	if !ok {
+		return nil
+	}
+	p.Position = 0
+	users := maps.Clone(f.users)
+	users[uid] = maps.Clone(f.users[uid])
+	users[uid][id] = p
+	if err := writeJSONFile(f.path, users); err != nil {
+		return fmt.Errorf("reset progress: %w", err)
+	}
+	f.users = users
+	return nil
+}
+
 // write replaces the file with f's progress. f.mu must be held.
 func (f *ProgressFile) write() error {
 	if err := writeJSONFile(f.path, f.users); err != nil {

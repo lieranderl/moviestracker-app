@@ -318,6 +318,10 @@ func newestFirst(a, b TitleState) int {
 type ProgressStore interface {
 	// SaveProgress keeps where the user is in one file, stamped now.
 	SaveProgress(ctx context.Context, uid string, p Progress) error
+	// ResetProgress resets one file's position, preserving a zero-position
+	// record so another player's timecode does not restore its resume offer.
+	// Missing files are harmless; other progress and watch history stay intact.
+	ResetProgress(ctx context.Context, uid, hash string, index int) error
 	// Progress is where the user stopped in a torrent's file, if anywhere.
 	Progress(ctx context.Context, uid, hash string, index int) (Progress, bool, error)
 	// RecentProgress is up to limit files the user has not finished,
@@ -409,7 +413,7 @@ func unfinished(ps []Progress, limit int) []Progress {
 		if len(out) == limit {
 			break
 		}
-		if !p.Finished() {
+		if p.Position > 0 && !p.Finished() {
 			out = append(out, p)
 		}
 	}
