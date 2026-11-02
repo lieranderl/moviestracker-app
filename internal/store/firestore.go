@@ -1276,3 +1276,39 @@ func (f *Firestore) FollowedSeries(ctx context.Context, uid string) ([]FollowedS
 	slices.SortFunc(out, newestFollowed)
 	return out, nil
 }
+
+// AlertCheckpoints implements Store: the alertCheckpoints map of the user's
+// document.
+func (f *Firestore) AlertCheckpoints(ctx context.Context, uid string) (AlertCheckpoints, error) {
+	snap, err := f.userDoc(uid).Get(ctx)
+	if notFound(err) {
+		return AlertCheckpoints{}, nil
+	}
+	if err != nil {
+		return AlertCheckpoints{}, fmt.Errorf("read alert checkpoints: %w", err)
+	}
+	raw, _ := snap.Data()["alertCheckpoints"].(map[string]any)
+	c := AlertCheckpoints{Feeds: map[string]time.Time{}}
+	c.Library, _ = raw["library"].(string)
+	feeds, _ := raw["feeds"].(map[string]any)
+	for feed, v := range feeds {
+		if at, ok := v.(time.Time); ok {
+			c.Feeds[feed] = at
+		}
+	}
+	return c, nil
+}
+
+// SaveAlertCheckpoints implements Store.
+func (f *Firestore) SaveAlertCheckpoints(ctx context.Context, uid string, c AlertCheckpoints) error {
+	feeds := make(map[string]any, len(c.Feeds))
+	for feed, at := range c.Feeds {
+		feeds[feed] = at.UTC()
+	}
+	// Merging on the field replaces it whole, dropping feeds no longer kept.
+	data := map[string]any{"alertCheckpoints": map[string]any{"library": c.Library, "feeds": feeds}}
+	if _, err := f.userDoc(uid).Set(ctx, data, firestore.Merge([]string{"alertCheckpoints"})); err != nil {
+		return fmt.Errorf("save alert checkpoints: %w", err)
+	}
+	return nil
+}

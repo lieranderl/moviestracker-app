@@ -36,6 +36,7 @@ type memoryUser struct {
 	episodes    map[int]seriesEpisodes   // by series ID
 	feedback    map[string]feedbackEntry // by feedbackKey
 	follows     map[int]FollowedSeries   // by series ID
+	checkpoints AlertCheckpoints
 }
 
 // NewMemory returns an empty in-memory store.
@@ -598,4 +599,22 @@ func (m *Memory) FollowedSeries(_ context.Context, uid string) ([]FollowedSeries
 	out := slices.Collect(maps.Values(m.user(uid).follows))
 	slices.SortFunc(out, newestFollowed)
 	return out, nil
+}
+
+// AlertCheckpoints implements Store.
+func (m *Memory) AlertCheckpoints(_ context.Context, uid string) (AlertCheckpoints, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	c := m.user(uid).checkpoints
+	c.Feeds = maps.Clone(c.Feeds)
+	return c, nil
+}
+
+// SaveAlertCheckpoints implements Store.
+func (m *Memory) SaveAlertCheckpoints(_ context.Context, uid string, c AlertCheckpoints) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	c.Feeds = maps.Clone(c.Feeds)
+	m.user(uid).checkpoints = c
+	return nil
 }

@@ -157,3 +157,29 @@ func TestMarkAllReadLeavesLaterUpdatesUnseen(t *testing.T) {
 		}
 	})
 }
+
+// Alerts remember how far they looked through each feed, for the library
+// they looked for; saving replaces what was kept.
+func TestAlertsRememberHowFarTheyLookedThroughTheFeeds(t *testing.T) {
+	eachStore(t, func(t *testing.T, s store.Store, uid string, _ *time.Time) {
+		ctx := context.Background()
+		if c, err := s.AlertCheckpoints(ctx, uid); err != nil || c.Library != "" || len(c.Feeds) != 0 {
+			t.Fatalf("a new user's checkpoints = %+v, %v; want none", c, err)
+		}
+		first := store.AlertCheckpoints{Library: "a", Feeds: map[string]time.Time{"dvmovies": now, "hdr10movies": now.Add(-time.Hour)}}
+		if err := s.SaveAlertCheckpoints(ctx, uid, first); err != nil {
+			t.Fatal(err)
+		}
+		next := store.AlertCheckpoints{Library: "b", Feeds: map[string]time.Time{"dvmovies": now.Add(time.Minute)}}
+		if err := s.SaveAlertCheckpoints(ctx, uid, next); err != nil {
+			t.Fatal(err)
+		}
+		got, err := s.AlertCheckpoints(ctx, uid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Library != "b" || len(got.Feeds) != 1 || !got.Feeds["dvmovies"].Equal(now.Add(time.Minute)) {
+			t.Errorf("checkpoints = %+v, want library b with dvmovies at %v only", got, now.Add(time.Minute))
+		}
+	})
+}
