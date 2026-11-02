@@ -70,6 +70,7 @@ type Server struct {
 	customLists        *CustomLists                      // the lists each account makes
 	reviews            *Reviews                          // each account's ratings and notes
 	episodes           *Episodes                         // each account's watched episodes
+	feedback           store.FeedbackStore               // each account's recommendation feedback
 	releaseFilterPrefs *ReleaseFilterPrefs               // how each account last searched releases
 	plays              *playback.Tracker                 // what plays through the proxy
 	sampler            *stats.Sampler                    // this machine, for the dashboard
@@ -166,6 +167,9 @@ func NewServer(cfg Config) (*Server, error) {
 	}
 	s.reviews = NewReviews(reviews, titles, s.username, s.Catalog)
 	s.titleStates.RateFrom(reviews)
+	if s.feedback, err = store.OpenFeedbackFile(filepath.Join(cfg.Store.Dir(), "feedback.json")); err != nil {
+		return nil, err
+	}
 	filters, err := store.OpenFilterFile(filepath.Join(cfg.Store.Dir(), "filters.json"))
 	if err != nil {
 		return nil, err
@@ -329,7 +333,9 @@ func (s *Server) routes() {
 	s.customLists.Register(s.mux)
 	s.reviews.Register(s.mux)
 	s.episodes.Register(s.mux)
-	NewRecommendations(NewLibrary(s.titleStates.store, nil, nil), s.username, s.Catalog).Register(s.mux)
+	library := NewLibrary(s.titleStates.store, nil, nil)
+	library.Consider(s.feedback, s.reviews.store)
+	NewRecommendations(library, s.username, s.Catalog).Register(s.mux)
 	s.releaseFilterPrefs.Register(s.mux)
 	s.mux.HandleFunc("GET /api/torrserver/stream/", s.handleTorrServerStreamProxy)
 

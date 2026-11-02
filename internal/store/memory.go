@@ -33,7 +33,8 @@ type memoryUser struct {
 	filters     ReleaseFilters
 	lists       shelf
 	reviews     map[string]Review
-	episodes    map[int]seriesEpisodes // by series ID
+	episodes    map[int]seriesEpisodes   // by series ID
+	feedback    map[string]feedbackEntry // by feedbackKey
 }
 
 // NewMemory returns an empty in-memory store.
@@ -473,6 +474,7 @@ func (m *Memory) SaveReview(_ context.Context, uid string, r Review) error {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.libraryChanged(uid) // ratings shape recommendations
 	if empty {
 		delete(m.user(uid).reviews, id)
 		return nil
@@ -519,5 +521,43 @@ func (m *Memory) MarkEpisodes(_ context.Context, uid string, tvID, season int, e
 		all[tvID] = seriesEpisodes{}
 	}
 	all[tvID].mark(season, episodes, watched)
+	return nil
+}
+
+// SetFeedback implements Store.
+func (m *Memory) SetFeedback(_ context.Context, uid string, f Feedback, ref TitleRef, on bool) error {
+	key, err := feedbackKey(f, ref)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u := m.user(uid)
+	if u.feedback == nil {
+		u.feedback = map[string]feedbackEntry{}
+	}
+	if on {
+		ref.At = m.opts.now().UTC()
+		u.feedback[key] = feedbackEntry{f, ref}
+	} else {
+		delete(u.feedback, key)
+	}
+	m.libraryChanged(uid)
+	return nil
+}
+
+// FeedbackOn implements Store.
+func (m *Memory) FeedbackOn(_ context.Context, uid string, f Feedback) ([]TitleRef, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return feedbackOn(m.user(uid).feedback, f), nil
+}
+
+// ResetFeedback implements Store.
+func (m *Memory) ResetFeedback(_ context.Context, uid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.user(uid).feedback = nil
+	m.libraryChanged(uid)
 	return nil
 }
