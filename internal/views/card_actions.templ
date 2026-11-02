@@ -1,0 +1,64 @@
+package views
+
+import (
+	"fmt"
+
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+)
+
+func mediaKind(item tmdb.MediaItem) string {
+	if item.MediaType == "tv" {
+		return "tv"
+	}
+	return "movie"
+}
+
+// cardActions mark a card's title Want to watch or Watched without leaving
+// the page; the card toast (cardToast) offers to undo it. They show on
+// hover or focus, and always on touch screens.
+templ cardActions(item tmdb.MediaItem) {
+	<div class="join absolute bottom-2 right-2 z-10 shadow-md opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity">
+		@cardAction(item, "want", "bookmark", trf(ctx, "Add %s to Want to watch", item.Title))
+		@cardAction(item, "watched", "eye", trf(ctx, "Mark %s as watched", item.Title))
+	</div>
+}
+
+templ cardAction(item tmdb.MediaItem, state, icon, label string) {
+	<button
+		type="button"
+		class="btn btn-sm btn-square join-item"
+		aria-label={ label }
+		title={ label }
+		data-on:click={ fmt.Sprintf("@post('/api/titles/quick?type=%s&id=%d&state=%s')", mediaKind(item), item.ID, state) }
+	>
+		@Icon(icon, "size-4")
+	</button>
+}
+
+// cardToastHide clears the card toast 5s after a notice, unless a later
+// notice replaced it. Each notice sets its own timer (a delay, which later
+// signal patches cannot cancel as they would a debounce).
+const cardToastHide = `patch._quickID === $_quickID && ($_quickToast = '', $_quickError = false, $_quickUndo = '')`
+
+// cardToast tells what a card's quick action did, offering to undo it
+// while $_quickUndo holds the address that does.
+templ cardToast() {
+	<div
+		popover="manual"
+		role="status"
+		aria-live="polite"
+		class={ toastClass }
+		data-signals="{ _quickID: 0, _quickToast: '', _quickError: false, _quickUndo: '' }"
+		data-effect="if ($_quickToast) { el.matches(':popover-open') ? (el.hidePopover(), el.showPopover()) : el.showPopover() } else if (el.matches(':popover-open')) { el.hidePopover() }"
+		data-on-signal-patch__delay.5s={ cardToastHide }
+		data-on-signal-patch-filter="{ include: /^_quickID$/ }"
+	>
+		<div class="alert shadow-xl text-sm" data-class="{ 'alert-success': !$_quickError, 'alert-error': $_quickError }">
+			<span data-text="$_quickToast"></span>
+			<button type="button" class="btn btn-sm btn-ghost" data-show="$_quickUndo" data-on:click="@post($_quickUndo)">
+				@Icon("undo-2", "size-4")
+				{ tr(ctx, "Undo") }
+			</button>
+		</div>
+	</div>
+}

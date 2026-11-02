@@ -322,9 +322,11 @@ templ MediaCard(item tmdb.MediaItem) {
 	@mediaCard(item, "w-40 sm:w-48 shrink-0")
 }
 
-// mediaCard is a title's poster card; size sets its width.
+// mediaCard is a title's poster card; size sets its width. Its title links
+// to the title's page across the whole card; a signed-in visitor's card
+// also has quick actions (cardActions) above the link.
 templ mediaCard(item tmdb.MediaItem, size string) {
-	<a href={ mediaHref(item) } class={ "card bg-base-200/60 hover:bg-base-200 border border-base-content/5 shadow-md hover:shadow-lg transition duration-300 hover:-translate-y-1.5 group focus-visible:outline-2 focus-visible:outline-primary", size }>
+	<div class={ "card relative bg-base-200/60 hover:bg-base-200 border border-base-content/5 shadow-md hover:shadow-lg transition duration-300 hover:-translate-y-1.5 group has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-primary", size }>
 		<figure class="aspect-[2/3] relative bg-base-300">
 			if item.PosterURL() != "" {
 				<img
@@ -348,15 +350,18 @@ templ mediaCard(item tmdb.MediaItem, size string) {
 					{ item.FormattedRating() }
 				</span>
 			}
+			if signedIn(ctx) {
+				@cardActions(item)
+			}
 		</figure>
 		<div class="card-body p-3.5 gap-1.5">
 			<h3 class="card-title text-sm line-clamp-1 group-hover:text-primary transition-colors leading-tight" title={ item.Title }>
-				{ item.Title }
+				<a href={ mediaHref(item) } class="after:absolute after:inset-0 focus-visible:outline-none">{ item.Title }</a>
 			</h3>
 			<div class="flex items-center justify-between text-xs text-base-content/70">
 				<span class="font-mono">{ item.ReleaseYear() }</span>
 				<span class="badge badge-neutral badge-xs font-mono uppercase">{ mediaTypeLabel(ctx, item.MediaType, tr(ctx, "TV")) }</span>
 			</div>
 		</div>
-	</a>
+	</div>
 }
