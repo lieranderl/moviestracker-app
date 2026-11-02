@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"sync"
 )
 
@@ -55,6 +57,13 @@ func (f *ReviewFile) SaveReview(_ context.Context, uid string, r Review) error {
 		return fmt.Errorf("save reviews: %w", err)
 	}
 	return nil
+}
+
+// Reviews implements ReviewStore.
+func (f *ReviewFile) Reviews(_ context.Context, uid string) ([]Review, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Collect(maps.Values(f.users[uid])), nil
 }
 
 // Review implements ReviewStore.

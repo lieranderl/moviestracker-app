@@ -22,6 +22,8 @@ type Account struct {
 	// MutedAlerts and AlertFeeds are the user's release alert choices.
 	MutedAlerts []MutedTitle         `json:"mutedAlerts"`
 	AlertFeeds  map[string]AlertFeed `json:"alertFeeds"`
+	// Feedback is the recommendation feedback given, by kind.
+	Feedback map[Feedback][]TitleRef `json:"recommendationFeedback"`
 }
 
 // AccountStore hands users everything kept for them, and deletes it.
@@ -52,4 +54,20 @@ func withAlertChoices(ctx context.Context, s UpdateStore, uid string, a Account)
 		return Account{}, err
 	}
 	return a, nil
+}
+
+// accountFeedback is the user's recommendation feedback, by kind, for their
+// account's export.
+func accountFeedback(ctx context.Context, s FeedbackStore, uid string) (map[Feedback][]TitleRef, error) {
+	out := map[Feedback][]TitleRef{}
+	for _, kind := range []Feedback{NotInterested, MoreLikeThis} {
+		refs, err := s.FeedbackOn(ctx, uid, kind)
+		if err != nil {
+			return nil, err
+		}
+		if len(refs) > 0 {
+			out[kind] = refs
+		}
+	}
+	return out, nil
 }

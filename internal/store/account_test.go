@@ -37,6 +37,9 @@ func keepEverything(t *testing.T, s store.Store, uid string) string {
 		func() error { return s.MuteAlerts(ctx, uid, store.MutedTitle{TMDBID: 329865, Title: "Arrival"}, true) },
 		func() error { return s.SetAlertFeed(ctx, uid, "hdr10movies", false) },
 		func() error {
+			return s.SetFeedback(ctx, uid, store.NotInterested, store.TitleRef{Kind: "movie", TMDBID: 329865, Title: "Arrival"}, true)
+		},
+		func() error {
 			return s.SaveReview(ctx, uid, store.Review{Kind: "movie", TMDBID: 438631, Title: "Dune", Rating: 9, Note: "Loud"})
 		},
 	}
@@ -80,7 +83,8 @@ func TestAUserExportsEverythingKeptAboutThem(t *testing.T) {
 			len(got.Episodes[95396][1]) != 2,
 			len(got.Follows) != 1 || got.Follows[0].Title != "Severance",
 			len(got.MutedAlerts) != 1 || got.MutedAlerts[0].Title != "Arrival",
-			!got.AlertFeeds["hdr10movies"].Off:
+			!got.AlertFeeds["hdr10movies"].Off,
+			len(got.Feedback[store.NotInterested]) != 1 || got.Feedback[store.NotInterested][0].Title != "Arrival":
 			t.Errorf("export lacks something kept: %+v", got)
 		}
 	})
@@ -103,7 +107,7 @@ func TestDeletingAnAccountDeletesEverythingKeptForIt(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got.Preferences.Language != "" || len(got.Favorites)+len(got.TorrServers)+len(got.Progress)+len(got.TitleStates)+len(got.Updates)+len(got.Lists)+len(got.Reviews)+len(got.Follows)+len(got.MutedAlerts)+len(got.AlertFeeds) != 0 || got.ReleaseFilters.HDR {
+		if got.Preferences.Language != "" || len(got.Favorites)+len(got.TorrServers)+len(got.Progress)+len(got.TitleStates)+len(got.Updates)+len(got.Lists)+len(got.Reviews)+len(got.Follows)+len(got.MutedAlerts)+len(got.AlertFeeds)+len(got.Feedback) != 0 || got.ReleaseFilters.HDR {
 			t.Errorf("after deletion the account still holds %+v", got)
 		}
 		if _, ok, err := s.SharedList(ctx, shareID); ok || err != nil {

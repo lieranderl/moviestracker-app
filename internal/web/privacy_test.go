@@ -45,6 +45,7 @@ func TestThePrivacyPolicyListsEverythingKeptAboutAUser(t *testing.T) {
 		"release filters",
 		"interface language",
 		"TorrServers you add",
+		"Not interested or More like this",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("privacy policy does not mention %q", want)
