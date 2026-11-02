@@ -93,3 +93,20 @@ func TestMoreLikeThisAloneCanBeForgotten(t *testing.T) {
 		t.Errorf("with only More like this given, the rows offer no reset:\n%s", more)
 	}
 }
+
+func TestRecommendationFeedbackControlsPreventOverlappingActions(t *testing.T) {
+	s := newMediaServer(t, &fakeTMDBDetails{movies: map[int]*tmdb.MovieDetails{2: {MediaItem: tmdb.MediaItem{ID: 2, Title: "Seed", MediaType: "movie"}, Recommendations: []tmdb.MediaItem{{ID: 12, Title: "First", MediaType: "movie"}, {ID: 13, Title: "Second", MediaType: "movie"}}}}}, nil, "")
+	sendAs(t, s, http.MethodPost, "/api/titles/state?type=movie&id=2&state=watched")
+	body := html.UnescapeString(sendAs(t, s, http.MethodGet, "/api/recommendations"))
+	controls := regexp.MustCompile(`<button[^>]*data-on:click="[^"]*/api/recommendations/feedback[^"]*"[^>]*>`).FindAllString(body, -1)
+	if len(controls) < 4 {
+		t.Fatalf("only %d feedback controls were rendered", len(controls))
+	}
+	for _, control := range controls {
+		for _, want := range []string{`data-indicator:rec-busy`, `data-attr:disabled="$recBusy"`, `!$recBusy && @post`} {
+			if !strings.Contains(control, want) {
+				t.Errorf("feedback control lacks shared in-flight guard %q", want)
+			}
+		}
+	}
+}

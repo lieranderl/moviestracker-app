@@ -96,7 +96,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 			templ_7745c5c3_Var2 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div id=\"recommendations\" class=\"space-y-10\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div id=\"recommendations\" class=\"space-y-10\" data-signals=\"{ recBusy: false }\" data-attr:aria-busy=\"$recBusy\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -122,14 +122,14 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</span> <button type=\"button\" class=\"btn btn-sm\" data-on:click=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</span> <button type=\"button\" class=\"btn btn-sm\" data-indicator:rec-busy data-attr:disabled=\"$recBusy\" data-on:click=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var4 string
-			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("@post('%s')", FeedbackURL(*f.Undone, "notInterested", false)))
+			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("!$recBusy && @post('%s')", FeedbackURL(*f.Undone, "notInterested", false)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 51, Col: 135}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 51, Col: 202}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 			if templ_7745c5c3_Err != nil {
@@ -142,7 +142,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Undo"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 51, Col: 155}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 51, Col: 222}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -253,14 +253,14 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" data-on:click=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" data-indicator:rec-busy data-attr:disabled=\"$recBusy\" data-on:click=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 						var templ_7745c5c3_Var12 string
-						templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("@post('%s')", FeedbackURL(item, "moreLikeThis", true)))
+						templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("!$recBusy && @post('%s')", FeedbackURL(item, "moreLikeThis", true)))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 66, Col: 195}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 66, Col: 262}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 						if templ_7745c5c3_Err != nil {
@@ -313,14 +313,14 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" data-on:click=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" data-indicator:rec-busy data-attr:disabled=\"$recBusy\" data-on:click=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 						var templ_7745c5c3_Var16 string
-						templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("@post('%s')", FeedbackURL(item, "notInterested", true)))
+						templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("!$recBusy && @post('%s')", FeedbackURL(item, "notInterested", true)))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 70, Col: 251}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/recommendations.templ`, Line: 70, Col: 318}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 						if templ_7745c5c3_Err != nil {
@@ -356,7 +356,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 			}
 		}
 		if f.Allow && f.Given > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<button type=\"button\" class=\"btn btn-sm btn-ghost\" data-on:click=\"@post('/api/recommendations/feedback/reset')\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<button type=\"button\" class=\"btn btn-sm btn-ghost\" data-indicator:rec-busy data-attr:disabled=\"$recBusy\" data-on:click=\"!$recBusy && @post('/api/recommendations/feedback/reset')\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
