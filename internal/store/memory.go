@@ -227,9 +227,31 @@ func (m *Memory) SetTitleState(_ context.Context, uid string, ts TitleState) err
 		delete(m.user(uid).titles, id)
 		return nil
 	}
-	ts.UpdatedAt = m.opts.now().UTC()
+	ts.UpdatedAt = markTime(m.opts.now())
 	m.user(uid).titles[id] = ts
 	return nil
+}
+
+// ChangeTitleState implements Store.
+func (m *Memory) ChangeTitleState(_ context.Context, uid string, ts, from TitleState) (TitleState, error) {
+	id, err := checkTitleState(ts)
+	if err != nil {
+		return TitleState{}, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	titles := m.user(uid).titles
+	if !sameMark(titles[id], from) {
+		return TitleState{}, ErrTitleStateChanged
+	}
+	m.libraryChanged(uid)
+	if ts.State == "" {
+		delete(titles, id)
+		return ts, nil
+	}
+	ts = stampTitleState(ts, m.opts.now())
+	titles[id] = ts
+	return ts, nil
 }
 
 // TitleState implements Store.

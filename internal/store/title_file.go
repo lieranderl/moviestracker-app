@@ -41,13 +41,41 @@ func (f *TitleFile) SetTitleState(_ context.Context, uid string, ts TitleState) 
 	if ts.State == "" {
 		delete(titles, id)
 	} else {
-		ts.UpdatedAt = f.opts.now().UTC()
+		ts.UpdatedAt = markTime(f.opts.now())
 		titles[id] = ts
 	}
 	if err := writeJSONFile(f.path, f.users); err != nil {
 		return fmt.Errorf("save watch states: %w", err)
 	}
 	return nil
+}
+
+// ChangeTitleState implements TitleStateStore.
+func (f *TitleFile) ChangeTitleState(_ context.Context, uid string, ts, from TitleState) (TitleState, error) {
+	id, err := checkTitleState(ts)
+	if err != nil {
+		return TitleState{}, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	titles := f.users[uid]
+	if !sameMark(titles[id], from) {
+		return TitleState{}, ErrTitleStateChanged
+	}
+	if titles == nil {
+		titles = map[string]TitleState{}
+		f.users[uid] = titles
+	}
+	if ts.State == "" {
+		delete(titles, id)
+	} else {
+		ts = stampTitleState(ts, f.opts.now())
+		titles[id] = ts
+	}
+	if err := writeJSONFile(f.path, f.users); err != nil {
+		return TitleState{}, fmt.Errorf("save watch states: %w", err)
+	}
+	return ts, nil
 }
 
 // TitleState implements TitleStateStore.
