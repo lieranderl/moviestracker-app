@@ -119,6 +119,18 @@ func (m *Memory) LibraryStamp(_ context.Context, uid string) (string, error) {
 	return strconv.Itoa(m.user(uid).stamp), nil
 }
 
+// FavoritesPage implements Store.
+func (m *Memory) FavoritesPage(ctx context.Context, uid, after string) ([]Favorite, string, error) {
+	favs, _ := m.Favorites(ctx, uid)
+	return pageOf(favs, favoriteAt, favoriteKey, after, libraryPageSize)
+}
+
+// TitleStatesPage implements Store.
+func (m *Memory) TitleStatesPage(ctx context.Context, uid, state, after string) ([]TitleState, string, error) {
+	list, _ := m.TitleStates(ctx, uid, state)
+	return pageOf(list, titleAt, titleKey, after, libraryPageSize)
+}
+
 // RemoveFavorite implements Store.
 func (m *Memory) RemoveFavorite(_ context.Context, uid, kind string, tmdbID int) error {
 	id, err := titleID(kind, tmdbID)
@@ -272,7 +284,7 @@ func (m *Memory) Updates(_ context.Context, uid, after string) ([]Update, string
 	out := slices.Collect(maps.Values(m.user(uid).updates))
 	slices.SortFunc(out, newestFound)
 	if after != "" {
-		at, id, err := parseUpdateCursor(after)
+		at, id, err := parseCursor(after)
 		if err != nil {
 			return nil, "", err
 		}

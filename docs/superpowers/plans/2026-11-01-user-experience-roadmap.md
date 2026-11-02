@@ -212,7 +212,7 @@ pending, implemented, and deployed status separate in future updates here.
 
 ## Next implementation slice
 
-Continue with **R05**, then **R07** (which builds on R06). They address observed and
+Continue with **R07**, then the Phase 2 items (R08 onward). They address observed and
 source-derived Phase 1 risks without introducing new product concepts. Continue Phase 1
 in focused PRs before the larger episode/discovery and collaboration work.
 
@@ -309,6 +309,20 @@ in focused PRs before the larger episode/discovery and collaboration work.
   cover the categories and the contact route; a local browser check of
   `/privacy` confirmed the list, the mailto link and no horizontal overflow.
   This is not a legal compliance assessment.
+- **R05 — implemented in two PRs, deployment unverified (2 November
+  2026):** (1) the store keeps a library stamp that changes with favourites
+  and watch states, and a shared `Library` works out the summary alerts and
+  recommendations need (first six seeds, marked titles, followed movies); the
+  web app keeps it per user until the stamp changes, so an unchanged library
+  costs one document read per alert count or recommendation request. (2)
+  Favourites and the Want to watch / Watched lists are read and shown 60 at a
+  time by cursor with Show more, in both apps. Firestore pages favourites by
+  `addedAt` and watch lists by a new `listKey` range, so no composite index
+  is needed; watch states saved earlier are keyed once per user on first
+  paging. Store contract tests pass on memory, the local file and the
+  Firestore emulator (including pre-paging records); web and handler tests
+  cover read reuse, invalidation and paging. The full library is still read
+  when a summary is rebuilt after a change.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding

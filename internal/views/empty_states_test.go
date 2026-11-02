@@ -35,7 +35,7 @@ func emptyState(t *testing.T, out, title string) string {
 
 func TestNoFavouritesYetLeadsToSomethingToKeep(t *testing.T) {
 	ctx := views.WithSite(context.Background(), views.Site{Cloud: true})
-	out := renderIn(t, ctx, views.FavoritesPage(&auth.User{Name: "Ann"}, nil, false))
+	out := renderIn(t, ctx, views.FavoritesPage(&auth.User{Name: "Ann"}, nil, "", false))
 	card := emptyState(t, out, "No favourites yet")
 	if !regexp.MustCompile(`<a href="/" class="btn btn-primary[^"]*"[^>]*>[\s\S]*?Browse trending`).MatchString(card) {
 		t.Error("the empty favourites do not lead to trending titles")
