@@ -441,6 +441,19 @@ in focused PRs before the larger episode/discovery and collaboration work.
   all of it; no browser check (recommendations need TMDB, which the local
   app could not reach over IPv6). Account export/deletion (R07) must add the
   feedback collection once both are merged.
+- **R16 — partly implemented, deployment unverified (2 November 2026):** a
+  browser audit (self-hosted app: home, TorrServer and list pages) found no
+  unnamed controls or unlabeled fields; only inline text links were under 24
+  px, which WCAG 2.5.8 exempts. Title pages could not load locally (TMDB over
+  IPv6 failed on this machine), so a view test now renders the home, movie,
+  series and TorrServer pages and fails on any button or link without an
+  accessible name. The demonstrated failure was motion: the billboard
+  advanced and played trailers on its own and animations looped regardless
+  of the viewer's setting. With prefers-reduced-motion the billboard now
+  changes slides and plays trailers only on request, and the stylesheet stops
+  looping animations and transitions. Not yet verified: screen-reader
+  announcements and a full keyboard walk-through of every page, which remain
+  open.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding
