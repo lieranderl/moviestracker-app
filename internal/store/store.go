@@ -78,6 +78,7 @@ type Store interface {
 	CustomListStore
 	ListSharing
 	ReviewStore
+	AccountStore
 	EpisodeStore
 	FollowStore
 }
