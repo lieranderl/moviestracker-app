@@ -56,14 +56,14 @@ templ MoviePage(user *auth.User, m *tmdb.MovieDetails) {
 		@Navbar(user)
 		<main class="grow pb-16" data-signals={ mediaPageSignals(ctx) } data-on:click={ videoClick(ctx) }>
 			@detailHero(m.MediaItem, movieFacts(ctx, m), m.Certification, genreNames(m.Genres)) {
-				@trailerButton(m.TrailerKey, trf(ctx, "%s trailer", m.Title))
 				@progressSlot("movie", m.ID)
+				@findSourcesLink()
+				@trailerButton(m.TrailerKey, trf(ctx, "%s trailer", m.Title))
 				@watchStateSlot("movie", m.ID)
 				@listPickerSlot("movie", m.ID)
 				if siteOf(ctx).Cloud {
 					@favoriteSlot("movie", m.ID)
 				}
-				@heroLink("#sources", "magnet", tr(ctx, "Find sources"))
 			}
 			@reviewSlot("movie", m.ID)
 			@aboutSection(m.MediaItem, m.Tagline, movieAbout(ctx, m), officialLinks("title", m.Links, m.Homepage))
