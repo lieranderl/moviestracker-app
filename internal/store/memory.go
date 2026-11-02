@@ -42,6 +42,7 @@ type memoryUser struct {
 	checkpoints AlertCheckpoints
 	feedback    map[string]feedbackEntry
 	follows     map[int]FollowedSeries // by series ID
+	presets     map[string]DiscoveryPreset
 }
 
 // NewMemory returns an empty in-memory store.
@@ -596,6 +597,7 @@ func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error)
 		TitleStates: append(watched, want...), Updates: updates, ReleaseFilters: filters, Lists: lists,
 		Reviews: slices.Collect(maps.Values(u.reviews)), Episodes: u.watchedEpisodes(),
 		Follows: follows, Feedback: feedback, MutedAlerts: choices.MutedAlerts, AlertFeeds: choices.AlertFeeds,
+		DiscoveryPresets: discoveryPresetList(u.presets),
 	}, nil
 }
 

@@ -24,7 +24,8 @@ type Account struct {
 	MutedAlerts []MutedTitle         `json:"mutedAlerts"`
 	AlertFeeds  map[string]AlertFeed `json:"alertFeeds"`
 	// Feedback is the recommendation feedback given, by kind.
-	Feedback map[Feedback][]TitleRef `json:"recommendationFeedback"`
+	Feedback         map[Feedback][]TitleRef `json:"recommendationFeedback"`
+	DiscoveryPresets []DiscoveryPreset       `json:"discoveryPresets"`
 }
 
 // AccountStore hands users everything kept for them, and deletes it.
