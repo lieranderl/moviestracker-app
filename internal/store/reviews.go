@@ -28,6 +28,8 @@ type ReviewStore interface {
 	SaveReview(ctx context.Context, uid string, r Review) error
 	// Review is the user's review of a title; the zero Review when none.
 	Review(ctx context.Context, uid, kind string, tmdbID int) (Review, error)
+	// Reviews are all the user's reviews, in no particular order.
+	Reviews(ctx context.Context, uid string) ([]Review, error)
 }
 
 // maxNote is how many characters a note may have.

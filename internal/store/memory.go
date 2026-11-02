@@ -35,9 +35,10 @@ type memoryUser struct {
 	filters     ReleaseFilters
 	lists       shelf
 	reviews     map[string]Review
-	episodes    map[int]seriesEpisodes // by series ID
+	episodes    map[int]seriesEpisodes   // by series ID
+	feedback    map[string]feedbackEntry // by feedbackKey
+	follows     map[int]FollowedSeries   // by series ID
 	checkpoints AlertCheckpoints
-	follows     map[int]FollowedSeries // by series ID
 }
 
 // NewMemory returns an empty in-memory store.
@@ -477,6 +478,7 @@ func (m *Memory) SaveReview(_ context.Context, uid string, r Review) error {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.libraryChanged(uid) // ratings shape recommendations
 	if empty {
 		delete(m.user(uid).reviews, id)
 		return nil
@@ -484,6 +486,13 @@ func (m *Memory) SaveReview(_ context.Context, uid string, r Review) error {
 	r.UpdatedAt = m.opts.now().UTC()
 	m.user(uid).reviews[id] = r
 	return nil
+}
+
+// Reviews implements Store.
+func (m *Memory) Reviews(_ context.Context, uid string) ([]Review, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Collect(maps.Values(m.user(uid).reviews)), nil
 }
 
 // Review implements Store.
@@ -506,6 +515,7 @@ func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error)
 	filters, _ := m.ReleaseFilters(ctx, uid)
 	lists, _ := m.CustomLists(ctx, uid)
 	follows, _ := m.FollowedSeries(ctx, uid)
+	feedback, _ := accountFeedback(ctx, m, uid)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	u := m.user(uid)
@@ -515,7 +525,7 @@ func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error)
 		Progress:    slices.SortedFunc(maps.Values(u.progress), func(a, b Progress) int { return b.UpdatedAt.Compare(a.UpdatedAt) }),
 		TitleStates: append(watched, want...), Updates: updates, ReleaseFilters: filters, Lists: lists,
 		Reviews: slices.Collect(maps.Values(u.reviews)), Episodes: u.watchedEpisodes(),
-		Follows: follows,
+		Follows: follows, Feedback: feedback,
 	}, nil
 }
 
@@ -569,32 +579,41 @@ func (m *Memory) MarkEpisodes(_ context.Context, uid string, tvID, season int, e
 	return nil
 }
 
-// watchedEpisodes are all the user's watched episodes, by series.
-func (u *memoryUser) watchedEpisodes() map[int]map[int][]int {
-	out := map[int]map[int][]int{}
-	for tvID, series := range u.episodes {
-		if seasons := series.bySeason(); len(seasons) > 0 {
-			out[tvID] = seasons
-		}
+// SetFeedback implements Store.
+func (m *Memory) SetFeedback(_ context.Context, uid string, f Feedback, ref TitleRef, on bool) error {
+	key, err := feedbackKey(f, ref)
+	if err != nil {
+		return err
 	}
-	return out
-}
-
-// AlertCheckpoints implements Store.
-func (m *Memory) AlertCheckpoints(_ context.Context, uid string) (AlertCheckpoints, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	c := m.user(uid).checkpoints
-	c.Feeds = maps.Clone(c.Feeds)
-	return c, nil
+	u := m.user(uid)
+	if u.feedback == nil {
+		u.feedback = map[string]feedbackEntry{}
+	}
+	if on {
+		ref.At = m.opts.now().UTC()
+		u.feedback[key] = feedbackEntry{f, ref}
+	} else {
+		delete(u.feedback, key)
+	}
+	m.libraryChanged(uid)
+	return nil
 }
 
-// SaveAlertCheckpoints implements Store.
-func (m *Memory) SaveAlertCheckpoints(_ context.Context, uid string, c AlertCheckpoints) error {
+// FeedbackOn implements Store.
+func (m *Memory) FeedbackOn(_ context.Context, uid string, f Feedback) ([]TitleRef, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	c.Feeds = maps.Clone(c.Feeds)
-	m.user(uid).checkpoints = c
+	return feedbackOn(m.user(uid).feedback, f), nil
+}
+
+// ResetFeedback implements Store.
+func (m *Memory) ResetFeedback(_ context.Context, uid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.user(uid).feedback = nil
+	m.libraryChanged(uid)
 	return nil
 }
 
@@ -633,4 +652,33 @@ func (m *Memory) FollowedSeries(_ context.Context, uid string) ([]FollowedSeries
 	out := slices.Collect(maps.Values(m.user(uid).follows))
 	slices.SortFunc(out, newestFollowed)
 	return out, nil
+}
+
+// AlertCheckpoints implements Store.
+func (m *Memory) AlertCheckpoints(_ context.Context, uid string) (AlertCheckpoints, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	c := m.user(uid).checkpoints
+	c.Feeds = maps.Clone(c.Feeds)
+	return c, nil
+}
+
+// SaveAlertCheckpoints implements Store.
+func (m *Memory) SaveAlertCheckpoints(_ context.Context, uid string, c AlertCheckpoints) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	c.Feeds = maps.Clone(c.Feeds)
+	m.user(uid).checkpoints = c
+	return nil
+}
+
+// watchedEpisodes are all the user's watched episodes, by series.
+func (u *memoryUser) watchedEpisodes() map[int]map[int][]int {
+	out := map[int]map[int][]int{}
+	for tvID, series := range u.episodes {
+		if seasons := series.bySeason(); len(seasons) > 0 {
+			out[tvID] = seasons
+		}
+	}
+	return out
 }

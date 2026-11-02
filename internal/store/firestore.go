@@ -1036,17 +1036,36 @@ func (f *Firestore) SaveReview(ctx context.Context, uid string, r Review) error 
 	if err != nil {
 		return err
 	}
+	// Ratings shape recommendations: a change gives the library a new stamp.
+	doc := f.reviews(uid).Doc(id)
 	if empty {
-		if _, err := f.reviews(uid).Doc(id).Delete(ctx); err != nil {
+		if err := f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error { return tx.Delete(doc) }); err != nil {
 			return fmt.Errorf("clear review: %w", err)
 		}
 		return nil
 	}
 	r.UpdatedAt = f.opts.now().UTC()
-	if _, err := f.reviews(uid).Doc(id).Set(ctx, reviewRecord(r)); err != nil {
+	if err := f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error { return tx.Set(doc, reviewRecord(r)) }); err != nil {
 		return fmt.Errorf("save review: %w", err)
 	}
 	return nil
+}
+
+// Reviews implements Store.
+func (f *Firestore) Reviews(ctx context.Context, uid string) ([]Review, error) {
+	docs, err := f.reviews(uid).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("read reviews: %w", err)
+	}
+	out := make([]Review, 0, len(docs))
+	for _, doc := range docs {
+		var rec reviewRecord
+		if err := doc.DataTo(&rec); err != nil {
+			return nil, fmt.Errorf("read review %s: %w", doc.Ref.ID, err)
+		}
+		out = append(out, Review(rec))
+	}
+	return out, nil
 }
 
 // Review implements Store.
@@ -1070,7 +1089,7 @@ func (f *Firestore) Review(ctx context.Context, uid, kind string, tmdbID int) (R
 }
 
 // userCollections are the collections under users/{uid}.
-var userCollections = []string{"favorites", "torrservers", "progress", "titles", "updates", "lists", "reviews", "episodes", "follows"}
+var userCollections = []string{"favorites", "torrservers", "progress", "titles", "updates", "lists", "reviews", "episodes", "follows", "feedback"}
 
 // ExportAccount implements Store.
 func (f *Firestore) ExportAccount(ctx context.Context, uid string) (Account, error) {
@@ -1143,6 +1162,9 @@ func (f *Firestore) ExportAccount(ctx context.Context, uid string) (Account, err
 			return Account{}, fmt.Errorf("read watched episodes %s", doc.Ref.ID)
 		}
 		a.Episodes[tvID] = rec.Seasons.bySeason()
+	}
+	if a.Feedback, err = accountFeedback(ctx, f, uid); err != nil {
+		return Account{}, err
 	}
 	if a.Follows, err = f.FollowedSeries(ctx, uid); err != nil {
 		return Account{}, err
@@ -1312,38 +1334,73 @@ func (f *Firestore) MarkEpisodes(ctx context.Context, uid string, tvID, season i
 	return nil
 }
 
-// AlertCheckpoints implements Store: the alertCheckpoints map of the user's
-// document.
-func (f *Firestore) AlertCheckpoints(ctx context.Context, uid string) (AlertCheckpoints, error) {
-	snap, err := f.userDoc(uid).Get(ctx)
-	if notFound(err) {
-		return AlertCheckpoints{}, nil
-	}
-	if err != nil {
-		return AlertCheckpoints{}, fmt.Errorf("read alert checkpoints: %w", err)
-	}
-	raw, _ := snap.Data()["alertCheckpoints"].(map[string]any)
-	c := AlertCheckpoints{Feeds: map[string]time.Time{}}
-	c.Library, _ = raw["library"].(string)
-	feeds, _ := raw["feeds"].(map[string]any)
-	for feed, v := range feeds {
-		if at, ok := v.(time.Time); ok {
-			c.Feeds[feed] = at
-		}
-	}
-	return c, nil
+// feedbackRecord is a users/{uid}/feedback/{feedbackKey} document.
+type feedbackRecord struct {
+	Feedback string    `firestore:"feedback"`
+	Kind     string    `firestore:"kind"`
+	TMDBID   int       `firestore:"tmdbId"`
+	Title    string    `firestore:"title"`
+	At       time.Time `firestore:"at"`
 }
 
-// SaveAlertCheckpoints implements Store.
-func (f *Firestore) SaveAlertCheckpoints(ctx context.Context, uid string, c AlertCheckpoints) error {
-	feeds := make(map[string]any, len(c.Feeds))
-	for feed, at := range c.Feeds {
-		feeds[feed] = at.UTC()
+func (f *Firestore) feedback(uid string) *firestore.CollectionRef {
+	return f.userDoc(uid).Collection("feedback")
+}
+
+// SetFeedback implements Store, with a new library stamp in the same
+// transaction: recommendations worked out before must be again.
+func (f *Firestore) SetFeedback(ctx context.Context, uid string, fb Feedback, ref TitleRef, on bool) error {
+	key, err := feedbackKey(fb, ref)
+	if err != nil {
+		return err
 	}
-	// Merging on the field replaces it whole, dropping feeds no longer kept.
-	data := map[string]any{"alertCheckpoints": map[string]any{"library": c.Library, "feeds": feeds}}
-	if _, err := f.userDoc(uid).Set(ctx, data, firestore.Merge([]string{"alertCheckpoints"})); err != nil {
-		return fmt.Errorf("save alert checkpoints: %w", err)
+	doc := f.feedback(uid).Doc(key)
+	err = f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error {
+		if !on {
+			return tx.Delete(doc)
+		}
+		return tx.Set(doc, feedbackRecord{string(fb), ref.Kind, ref.TMDBID, ref.Title, f.opts.now().UTC()})
+	})
+	if err != nil {
+		return fmt.Errorf("save recommendation feedback: %w", err)
+	}
+	return nil
+}
+
+// FeedbackOn implements Store. Filtering by feedback alone needs only its
+// single-field index; the order is made here.
+func (f *Firestore) FeedbackOn(ctx context.Context, uid string, fb Feedback) ([]TitleRef, error) {
+	docs, err := f.feedback(uid).Where("feedback", "==", string(fb)).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("read recommendation feedback: %w", err)
+	}
+	entries := map[string]feedbackEntry{}
+	for _, doc := range docs {
+		var rec feedbackRecord
+		if err := doc.DataTo(&rec); err != nil {
+			return nil, fmt.Errorf("read recommendation feedback %s: %w", doc.Ref.ID, err)
+		}
+		entries[doc.Ref.ID] = feedbackEntry{Feedback(rec.Feedback), TitleRef{rec.Kind, rec.TMDBID, rec.Title, rec.At}}
+	}
+	return feedbackOn(entries, fb), nil
+}
+
+// ResetFeedback implements Store.
+func (f *Firestore) ResetFeedback(ctx context.Context, uid string) error {
+	docs, err := f.feedback(uid).DocumentRefs(ctx).GetAll()
+	if err != nil {
+		return fmt.Errorf("read recommendation feedback: %w", err)
+	}
+	err = f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error {
+		for _, doc := range docs {
+			if err := tx.Delete(doc); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("reset recommendation feedback: %w", err)
 	}
 	return nil
 }
@@ -1406,4 +1463,40 @@ func (f *Firestore) FollowedSeries(ctx context.Context, uid string) ([]FollowedS
 	}
 	slices.SortFunc(out, newestFollowed)
 	return out, nil
+}
+
+// AlertCheckpoints implements Store: the alertCheckpoints map of the user's
+// document.
+func (f *Firestore) AlertCheckpoints(ctx context.Context, uid string) (AlertCheckpoints, error) {
+	snap, err := f.userDoc(uid).Get(ctx)
+	if notFound(err) {
+		return AlertCheckpoints{}, nil
+	}
+	if err != nil {
+		return AlertCheckpoints{}, fmt.Errorf("read alert checkpoints: %w", err)
+	}
+	raw, _ := snap.Data()["alertCheckpoints"].(map[string]any)
+	c := AlertCheckpoints{Feeds: map[string]time.Time{}}
+	c.Library, _ = raw["library"].(string)
+	feeds, _ := raw["feeds"].(map[string]any)
+	for feed, v := range feeds {
+		if at, ok := v.(time.Time); ok {
+			c.Feeds[feed] = at
+		}
+	}
+	return c, nil
+}
+
+// SaveAlertCheckpoints implements Store.
+func (f *Firestore) SaveAlertCheckpoints(ctx context.Context, uid string, c AlertCheckpoints) error {
+	feeds := make(map[string]any, len(c.Feeds))
+	for feed, at := range c.Feeds {
+		feeds[feed] = at.UTC()
+	}
+	// Merging on the field replaces it whole, dropping feeds no longer kept.
+	data := map[string]any{"alertCheckpoints": map[string]any{"library": c.Library, "feeds": feeds}}
+	if _, err := f.userDoc(uid).Set(ctx, data, firestore.Merge([]string{"alertCheckpoints"})); err != nil {
+		return fmt.Errorf("save alert checkpoints: %w", err)
+	}
+	return nil
 }
