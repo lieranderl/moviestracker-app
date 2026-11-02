@@ -930,6 +930,7 @@ var ru = map[string]string{
 	"Your account could not be deleted completely. Please try again: what is left is deleted then.": "Аккаунт не удалось удалить полностью. Попробуйте ещё раз — тогда будет удалено оставшееся.",
 	"Your data could not be read right now. Please try again in a moment.":                          "Сейчас не удалось прочитать ваши данные. Попробуйте ещё раз чуть позже.",
 	"Older alerts": "Более старые оповещения",
+	"Show more":    "Показать ещё",
 	"Your alerts could not be marked read. Please try again.":                                                                         "Не удалось отметить оповещения прочитанными. Попробуйте ещё раз.",
 	"HLS converts it as it plays, in any browser.":                                                                                    "HLS преобразует его на лету — работает в любом браузере.",
 	"This TorrServer cannot convert it to HLS: its GStreamer build can.":                                                              "Этот TorrServer не умеет преобразовывать его в HLS — это умеет его сборка с GStreamer.",
