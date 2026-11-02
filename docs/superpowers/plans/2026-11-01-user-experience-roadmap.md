@@ -464,6 +464,17 @@ in focused PRs before the larger episode/discovery and collaboration work.
   releases; file-based resume is unchanged and no seek position moves
   between releases. Torrserver and handler tests cover exact and uncertain
   names and that the series stays unmarked.
+- **R24 — implemented in both apps, deployment unverified (2 November
+  2026):** each release row has a Compare pick (up to four); Compare
+  releases opens a dialog with the picked releases side by side: quality,
+  HDR, source, video codec and bit depth, audio, voices, subtitles, size,
+  estimated bitrate, seeders and tracker. Values a tracker does not report
+  read Unknown (subtitles always, since trackers do not report them), and
+  the table says playback is not checked. Datastar signals only; a view test
+  covers picks, columns, unknown values and the limit. A browser fixture
+  using the shared components and bundled Datastar verified the four-pick
+  limit, dialog focus and Escape, and a horizontally scrolling comparison
+  at 375px. Real provider searches and production remain unverified.
 - **R27 — first slice on the web, deployment unverified (2 November
   2026):** a user mutes or unmutes a movie's release alerts from the alerts
   page; a muted movie brings no new alerts, the alerts it already has stay

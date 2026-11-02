@@ -69,6 +69,8 @@ func iconPath(name string) string {
 		return "<path d=\"m12.296 3.464 3.02 3.956\"/><path d=\"M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z\"/><path d=\"M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/><path d=\"m6.18 5.276 3.1 3.899\"/>"
 	case "cloud-off":
 		return "<path d=\"M10.94 5.274A7 7 0 0 1 15.71 10h1.79a4.5 4.5 0 0 1 4.222 6.057\"/><path d=\"M18.796 18.81A4.5 4.5 0 0 1 17.5 19H9A7 7 0 0 1 5.79 5.78\"/><path d=\"m2 2 20 20\"/>"
+	case "columns-3":
+		return "<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M9 3v18\"/><path d=\"M15 3v18\"/>"
 	case "contact":
 		return "<path d=\"M16 2v2\"/><path d=\"M7 21v-2a2 2 0 012-2h6a2 2 0 012 2v2\"/><path d=\"M8 2v2\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/>"
 	case "copy":
