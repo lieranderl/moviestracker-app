@@ -5,6 +5,7 @@ import (
 	"context"
 	"maps"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -15,6 +16,7 @@ type Memory struct {
 	mu     sync.Mutex
 	users  map[string]*memoryUser
 	shared map[string]sharedList // by share ID
+	stamps int                   // library changes, of every user
 }
 
 // sharedList is whose list a link opens.
@@ -22,6 +24,7 @@ type sharedList struct{ uid, id string }
 
 type memoryUser struct {
 	prefs       Preferences
+	stamp       int // the library change last made
 	favorites   map[string]Favorite
 	torrServers []TorrServer // in the order added
 	progress    map[string]Progress
@@ -98,8 +101,34 @@ func (m *Memory) AddFavorite(_ context.Context, uid string, f Favorite) error {
 	if _, ok := favs[id]; !ok {
 		f.AddedAt = cmp.Or(f.AddedAt, m.opts.now()).UTC()
 		favs[id] = f
+		m.libraryChanged(uid)
 	}
 	return nil
+}
+
+// libraryChanged gives the user's library a new stamp; m.mu is held.
+func (m *Memory) libraryChanged(uid string) {
+	m.stamps++
+	m.user(uid).stamp = m.stamps
+}
+
+// LibraryStamp implements Store.
+func (m *Memory) LibraryStamp(_ context.Context, uid string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return strconv.Itoa(m.user(uid).stamp), nil
+}
+
+// FavoritesPage implements Store.
+func (m *Memory) FavoritesPage(ctx context.Context, uid, after string) ([]Favorite, string, error) {
+	favs, _ := m.Favorites(ctx, uid)
+	return pageOf(favs, favoriteAt, favoriteKey, after, libraryPageSize)
+}
+
+// TitleStatesPage implements Store.
+func (m *Memory) TitleStatesPage(ctx context.Context, uid, state, after string) ([]TitleState, string, error) {
+	list, _ := m.TitleStates(ctx, uid, state)
+	return pageOf(list, titleAt, titleKey, after, libraryPageSize)
 }
 
 // RemoveFavorite implements Store.
@@ -111,6 +140,7 @@ func (m *Memory) RemoveFavorite(_ context.Context, uid, kind string, tmdbID int)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.user(uid).favorites, id)
+	m.libraryChanged(uid)
 	return nil
 }
 
@@ -190,6 +220,7 @@ func (m *Memory) SetTitleState(_ context.Context, uid string, ts TitleState) err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.libraryChanged(uid)
 	if ts.State == "" {
 		delete(m.user(uid).titles, id)
 		return nil
@@ -253,7 +284,7 @@ func (m *Memory) Updates(_ context.Context, uid, after string) ([]Update, string
 	out := slices.Collect(maps.Values(m.user(uid).updates))
 	slices.SortFunc(out, newestFound)
 	if after != "" {
-		at, id, err := parseUpdateCursor(after)
+		at, id, err := parseCursor(after)
 		if err != nil {
 			return nil, "", err
 		}
