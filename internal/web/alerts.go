@@ -24,46 +24,13 @@ const alertPages = 5
 // alertFeeds are the feeds a followed movie brings an update from.
 var alertFeeds = []releases.Feed{releases.Latest, releases.HDR10, releases.DolbyVision}
 
-// followed are the movies the user follows, by TMDB ID: their favourites
-// and those they want to watch, but none they watched.
-func (a *app) followed(ctx context.Context, uid string) (map[int]bool, error) {
-	out := map[int]bool{}
-	favs, err := a.cfg.Store.Favorites(ctx, uid)
-	if err != nil {
-		return nil, err
-	}
-	for _, f := range favs {
-		if f.Kind == "movie" {
-			out[f.TMDBID] = true
-		}
-	}
-	want, err := a.cfg.Store.TitleStates(ctx, uid, store.WantToWatch)
-	if err != nil {
-		return nil, err
-	}
-	for _, t := range want {
-		if t.Kind == "movie" {
-			out[t.TMDBID] = true
-		}
-	}
-	watched, err := a.cfg.Store.TitleStates(ctx, uid, store.Watched)
-	if err != nil {
-		return nil, err
-	}
-	for _, t := range watched {
-		if t.Kind == "movie" {
-			delete(out, t.TMDBID)
-		}
-	}
-	return out, nil
-}
-
 // foundAlerts are the followed movies among the feeds' newest releases.
 func (a *app) foundAlerts(ctx context.Context, uid string) ([]store.Update, error) {
-	followed, err := a.followed(ctx, uid)
-	if err != nil || len(followed) == 0 {
+	library, err := a.library.Summary(ctx, uid)
+	if err != nil || len(library.Followed) == 0 {
 		return nil, err
 	}
+	followed := library.Followed
 	var found []store.Update
 	for _, feed := range alertFeeds {
 		for page := 1; page <= alertPages; page++ {
