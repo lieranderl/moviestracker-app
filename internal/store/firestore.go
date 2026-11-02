@@ -317,6 +317,26 @@ func (f *Firestore) SaveProgress(ctx context.Context, uid string, p Progress) er
 	return nil
 }
 
+// ResetProgress implements Store.
+func (f *Firestore) ResetProgress(ctx context.Context, uid, hash string, index int) error {
+	id, err := progressID(hash, index)
+	if err != nil {
+		return err
+	}
+	doc := f.progress(uid).Doc(id)
+	if err := f.accountTransaction(ctx, uid, func(_ context.Context, tx *firestore.Transaction) error {
+		if _, err := tx.Get(doc); notFound(err) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		return tx.Update(doc, []firestore.Update{{Path: "position", Value: int64(0)}})
+	}); err != nil {
+		return fmt.Errorf("reset progress: %w", err)
+	}
+	return nil
+}
+
 // Progress implements Store.
 func (f *Firestore) Progress(ctx context.Context, uid, hash string, index int) (Progress, bool, error) {
 	id, err := progressID(hash, index)

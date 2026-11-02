@@ -52,7 +52,7 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 			@categoryBar(homeLists(ctx, discover), "")
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 space-y-10 mt-10">
 				if len(watching) > 0 {
-					@continueWatching(watching)
+					@ContinueWatching(watching)
 				}
 				@recommendationsSlot()
 				if load := siteOf(ctx).RecentTorrents; load != nil {

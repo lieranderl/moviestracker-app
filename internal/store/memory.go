@@ -218,6 +218,25 @@ func (m *Memory) SaveProgress(ctx context.Context, uid string, p Progress) error
 	return nil
 }
 
+// ResetProgress implements Store.
+func (m *Memory) ResetProgress(ctx context.Context, uid, hash string, index int) error {
+	id, err := progressID(hash, index)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
+	files := m.user(uid).progress
+	if p, ok := files[id]; ok {
+		p.Position = 0
+		files[id] = p
+	}
+	return nil
+}
+
 // Progress implements Store.
 func (m *Memory) Progress(_ context.Context, uid, hash string, index int) (Progress, bool, error) {
 	id, err := progressID(hash, index)
