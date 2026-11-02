@@ -129,10 +129,14 @@ func (a *app) handleFavoritesPage(w http.ResponseWriter, r *http.Request) {
 		entries = append(entries, handlers.LibraryEntry{Item: tmdb.MediaItem{ID: f.TMDBID, Title: f.Title, PosterPath: f.Poster, MediaType: f.Kind}, At: f.AddedAt})
 	}
 	var ratings map[string]int
-	if query.Sort == "rating" {
-		ratings = handlers.Ratings(ctx, a.cfg.Store, user.ID)
+	if err == nil && query.Sort == "rating" {
+		// A rating sort without the ratings would only look sorted.
+		if ratings, err = handlers.Ratings(ctx, a.cfg.Store, user.ID); err != nil {
+			slog.Warn("reading ratings failed", "error", handlers.LogError(err))
+		}
 	}
 	items, query := handlers.ApplyLibraryQuery(entries, query, ratings)
+	items = a.catalog.LocalizeTitles(r.Context(), items)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err != nil {
