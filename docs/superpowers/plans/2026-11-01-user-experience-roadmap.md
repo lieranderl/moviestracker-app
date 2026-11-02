@@ -370,28 +370,17 @@ in focused PRs before the larger episode/discovery and collaboration work.
   browser check showed the buttons and the toast; TMDB lookups fail on the
   local network, so a successful mark was covered by tests only.
 
-- **R13 — implemented, deployment unverified (2 November 2026):** Want to
-  watch, Watched (both apps) and favourites (web) have a GET form to search by
-  title, narrow to movies or series, and sort by most recent, title or the
-  user's rating, so every view is a shareable address. Decisions: with any
-  control set the whole list is read, filtered and sorted (the default view
-  keeps R05's 60-title pages); the count is of matching titles; by rating,
-  higher first, unrated titles last, ties most recent first. Stores gained a
-  Reviews list (memory, file, Firestore emulator tested). Handler and web
-  tests cover search, narrowing, both sorts, counts and kept controls; a local
-  browser check confirmed the controls at desktop and 375 px.
-
-- **R20 — implemented, deployment unverified (2 November 2026):**
-  recommendation cards in both apps offer More like this and Not interested.
-  Feedback is kept per user (memory, Firestore, local file) and is part of
-  the library summary, so changes refresh cached recommendations. Hidden
-  titles leave every row at once, with an Undo, and stay hidden; titles asked
-  for more like start the first rows; a reset brings everything back.
-  Ranking is rule-based: watched titles rated highest lead the seeds, and
-  one rated 4 or less starts no row. Store contract and handler tests cover
-  all of it; no browser check (recommendations need TMDB, which the local
-  app could not reach over IPv6). Account export/deletion (R07) must add the
-  feedback collection once both are merged.
+- **R18 — implemented, deployment unverified (2 November 2026):** when a
+  series file finishes playing (the same rule that marks finished movies)
+  and its own name gives the episode exactly (`S01E02`, `S02E05-E06`,
+  `3x07`), that episode is marked watched for the series the torrent was
+  added from, in both apps; the series itself is never marked. A name that
+  leaves the season to its folder or gives no episode is uncertain, so
+  nothing is marked and the user's own tick is the confirmation. Episode
+  marks are kept by series, season and episode, so they survive switching
+  releases; file-based resume is unchanged and no seek position moves
+  between releases. Torrserver and handler tests cover exact and uncertain
+  names and that the series stays unmarked.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding

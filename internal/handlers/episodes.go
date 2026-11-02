@@ -10,6 +10,7 @@ import (
 
 	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+	"github.com/lieranderl/moviestracker-app/internal/torrserver"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 )
 
@@ -118,4 +119,20 @@ func airedEpisodes(s *tmdb.Season) []int {
 		}
 	}
 	return out
+}
+
+// markFinished marks the episodes a finished file's name gives exactly
+// watched in series tvID; a file whose episode is uncertain marks nothing.
+func (e *Episodes) markFinished(ctx context.Context, uid string, tvID int, file string) {
+	season, from, to, exact := torrserver.ExactEpisodes(file)
+	if !exact || tvID <= 0 {
+		return
+	}
+	episodes := make([]int, 0, to-from+1)
+	for n := from; n <= to; n++ {
+		episodes = append(episodes, n)
+	}
+	if err := e.store.MarkEpisodes(ctx, uid, tvID, season, episodes, true); err != nil {
+		slog.Warn("marking a finished episode watched failed", "error", logError(err))
+	}
 }
