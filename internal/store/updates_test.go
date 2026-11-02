@@ -228,3 +228,25 @@ func TestAUserChoosesWhichFeedsAlert(t *testing.T) {
 		}
 	})
 }
+
+// Each aired episode of a followed series is its own alert, kept once.
+func TestEachAiredEpisodeIsItsOwnAlert(t *testing.T) {
+	eachStore(t, func(t *testing.T, s store.Store, uid string, _ *time.Time) {
+		ctx := context.Background()
+		e4 := store.Update{Feed: store.EpisodesFeed, TMDBID: 95396, Episode: "S02E04", Title: "Severance", FoundAt: now.Add(-time.Hour)}
+		e5 := e4
+		e5.Episode, e5.FoundAt = "S02E05", now
+		for range 2 {
+			if err := s.AddUpdates(ctx, uid, []store.Update{e4, e5}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		got, _, err := s.Updates(ctx, uid, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != 2 || got[0].Episode != "S02E05" || got[1].Episode != "S02E04" {
+			t.Errorf("episode alerts = %+v, want S02E05 then S02E04, once each", got)
+		}
+	})
+}

@@ -435,6 +435,14 @@ in focused PRs before the larger episode/discovery and collaboration work.
   only for releases found afterwards. Kept on the user's document (memory
   and Firestore, emulator-tested); privacy page updated. Series air-date
   notifications remain open.
+- **R27 — episode alerts (2 November 2026):** a followed series' latest
+  episode alerts once it has aired, if it aired on or after the day the user
+  followed the series (date-only, as TMDB gives air dates). Followed series
+  are looked up on TMDB at most hourly per user; the alert leads to the
+  series and names the episode (S01E09); episodes have their own feed switch,
+  and turned off they move the check on, so only later episodes alert once
+  on. Store and web tests cover it (memory and Firestore emulator). The
+  self-hosted app still has no background discovery.
 
 - **R16 — partly implemented, deployment unverified (2 November 2026):** a
   browser audit (self-hosted app: home, TorrServer and list pages) found no

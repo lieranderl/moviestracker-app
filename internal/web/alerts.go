@@ -1,8 +1,10 @@
 package web
 
 import (
+	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"maps"
 	"net/http"
@@ -38,7 +40,7 @@ func (a *app) foundAlerts(ctx context.Context, uid string) ([]store.Update, stor
 		return nil, store.AlertCheckpoints{}, err
 	}
 	library, err := a.library.Summary(ctx, uid)
-	if err != nil || len(library.Followed) == 0 {
+	if err != nil {
 		return nil, store.AlertCheckpoints{}, err
 	}
 	since, err := a.cfg.Store.AlertCheckpoints(ctx, uid)
@@ -67,6 +69,12 @@ func (a *app) foundAlerts(ctx context.Context, uid string) ([]store.Update, stor
 	var found []store.Update
 	for _, feed := range alertFeeds {
 		read := since.Feeds[string(feed)]
+		if len(followed) == 0 { // nothing to look for; the feed is read once there is
+			if !read.IsZero() {
+				checkpoints.Feeds[string(feed)] = read
+			}
+			continue
+		}
 		// The newest page usually holds all that is new, and the home rows
 		// keep it. A deeper look reads the backend afresh from the first
 		// page: kept pages may be of different ages, and a fresh first page
@@ -89,7 +97,60 @@ func (a *app) foundAlerts(ctx context.Context, uid string) ([]store.Update, stor
 			checkpoints.Feeds[string(feed)] = read // nothing new
 		}
 	}
+	episodes, checked, err := a.airedEpisodes(ctx, uid, since.Feeds[store.EpisodesFeed], off[store.EpisodesFeed])
+	found = append(found, episodes...)
+	if err != nil {
+		return found, store.AlertCheckpoints{}, err
+	}
+	if !checked.IsZero() {
+		checkpoints.Feeds[store.EpisodesFeed] = checked
+	}
+	if len(checkpoints.Feeds) == 0 {
+		checkpoints.Library = "" // nothing read: nothing to keep
+	}
 	return found, checkpoints, nil
+}
+
+// episodeCheckEvery is how often a user's followed series are looked up on
+// TMDB for episodes that aired.
+const episodeCheckEvery = time.Hour
+
+// airedEpisodes are the latest episodes of the user's followed series that
+// aired since they followed each and since the last check (last), and when
+// this check was made. A recent check, or the feed turned off, looks
+// nothing up; turned off, the check still moves, so turned on again only
+// later episodes alert.
+func (a *app) airedEpisodes(ctx context.Context, uid string, last time.Time, off bool) ([]store.Update, time.Time, error) {
+	now := a.now()
+	if !last.IsZero() && now.Sub(last) < episodeCheckEvery {
+		return nil, last, nil
+	}
+	follows, err := a.cfg.Store.FollowedSeries(ctx, uid)
+	if err != nil || len(follows) == 0 || a.cfg.Sources.Details == nil {
+		return nil, time.Time{}, err
+	}
+	if off {
+		return nil, now, nil
+	}
+	day := func(t time.Time) time.Time { return t.UTC().Truncate(24 * time.Hour) }
+	var found []store.Update
+	for _, s := range follows {
+		tv, err := a.cfg.Sources.Details.TV(ctx, s.TMDBID)
+		if err != nil {
+			slog.Warn("looking up a followed series failed", "tv", s.TMDBID, "error", handlers.LogError(err))
+			continue
+		}
+		ep := tv.LastEpisode
+		aired := day(ep.AirDate)
+		if ep.AirDate.IsZero() || aired.After(now) || aired.Before(day(s.At)) || (!last.IsZero() && aired.Before(day(last))) {
+			continue
+		}
+		found = append(found, store.Update{
+			Feed: store.EpisodesFeed, TMDBID: s.TMDBID, Episode: fmt.Sprintf("S%02dE%02d", ep.Season, ep.Number),
+			Title: cmp.Or(tv.Title, s.Title), Poster: cmp.Or(tv.PosterPath, s.Poster), FoundAt: now,
+		})
+	}
+	return found, now, nil
 }
 
 // feedScan is what a look through a feed found: the followed movies, the
@@ -335,7 +396,7 @@ func (a *app) handleAlertFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	feed := r.URL.Query().Get("feed")
-	if !slices.Contains(alertFeeds, releases.Feed(feed)) {
+	if !slices.Contains(alertFeeds, releases.Feed(feed)) && feed != store.EpisodesFeed {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}

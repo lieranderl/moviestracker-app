@@ -586,6 +586,7 @@ type updateRecord struct {
 	Poster  string    `firestore:"poster,omitempty"`
 	FoundAt time.Time `firestore:"foundAt"`
 	Seen    bool      `firestore:"seen"`
+	Episode string    `firestore:"episode,omitempty"`
 }
 
 func (f *Firestore) updates(uid string) *firestore.CollectionRef {

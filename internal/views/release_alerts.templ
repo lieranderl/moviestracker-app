@@ -18,6 +18,19 @@ var alertLabels = map[string]string{
 	"latesttorrentsmovies": "New release on the trackers",
 	"hdr10movies":          "Now in HDR10",
 	"dvmovies":             "Now in Dolby Vision",
+	store.EpisodesFeed:     "Episode aired",
+}
+
+// alertFeedNames name the feeds' switches where their alerts' labels do
+// not.
+var alertFeedNames = map[string]string{store.EpisodesFeed: "Episodes of series you follow"}
+
+// alertHref is where an alert leads: a movie's sources, or a series.
+func alertHref(u store.Update) templ.SafeURL {
+	if u.Feed == store.EpisodesFeed {
+		return templ.SafeURL(fmt.Sprintf("/tv/%d", u.TMDBID))
+	}
+	return templ.SafeURL(fmt.Sprintf("/movie/%d#sources", u.TMDBID))
 }
 
 // alertsSlot is where the web app's navbar bell goes; it asks for the
@@ -51,7 +64,7 @@ type AlertsView struct {
 }
 
 // alertFeedOrder is the order the feeds' switches show in.
-var alertFeedOrder = []string{"latesttorrentsmovies", "hdr10movies", "dvmovies"}
+var alertFeedOrder = []string{"latesttorrentsmovies", "hdr10movies", "dvmovies", store.EpisodesFeed}
 
 // alertSignals start the page's $_muted, true for each muted movie by TMDB
 // ID, and $_feedsOn, whether each release feed alerts.
@@ -81,7 +94,7 @@ templ alertFeedSwitches() {
 						data-bind={ "_feedsOn." + feed }
 						data-on:change={ fmt.Sprintf("@post('/api/alerts/feeds?feed=%s&on=' + ($_feedsOn.%s ? 1 : 0))", feed, feed) }
 					/>
-					{ tr(ctx, alertLabels[feed]) }
+					{ tr(ctx, cmp.Or(alertFeedNames[feed], alertLabels[feed])) }
 				</label>
 			}
 		</div>
@@ -152,7 +165,7 @@ templ AlertsPage(user *auth.User, v AlertsView) {
 					</h1>
 					<p class="text-sm text-base-content/70">{ tr(ctx, "Releases found for the movies in your favourites and Want to watch.") }</p>
 					<p class="text-sm text-base-content/70">
-						{ tr(ctx, "These are sources turning up, not air dates. For when episodes of the series you follow air, see") }
+						{ tr(ctx, "Movies alert when sources turn up, series when an episode has aired. For episodes still to come, see") }
 						<a href={ templ.SafeURL(CalendarPath) } class="link link-primary">{ tr(ctx, "Upcoming episodes") }</a>.
 					</p>
 				</header>
@@ -177,14 +190,21 @@ templ AlertsPage(user *auth.User, v AlertsView) {
 									@Icon("film", "size-8 opacity-40")
 								}
 								<div class="min-w-0">
-									<a href={ templ.SafeURL(fmt.Sprintf("/movie/%d#sources", u.TMDBID)) } class="font-semibold link link-hover line-clamp-1">{ u.Title }</a>
-									<p class="text-sm text-base-content/70">{ tr(ctx, alertLabels[u.Feed]) }</p>
+									<a href={ alertHref(u) } class="font-semibold link link-hover line-clamp-1">{ u.Title }</a>
+									<p class="text-sm text-base-content/70">
+										{ tr(ctx, alertLabels[u.Feed]) }
+										if u.Episode != "" {
+											· <span class="font-mono">{ u.Episode }</span>
+										}
+									</p>
 								</div>
 								<div class="flex items-center gap-1">
 									if !u.Seen {
 										<span class="badge badge-primary badge-sm">{ tr(ctx, "New") }</span>
 									}
-									@alertMuteToggle(u.TMDBID, u.Title)
+									if u.Feed != store.EpisodesFeed {
+										@alertMuteToggle(u.TMDBID, u.Title)
+									}
 								</div>
 							</li>
 						}
