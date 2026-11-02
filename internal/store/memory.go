@@ -231,6 +231,27 @@ func (m *Memory) SetTitleState(_ context.Context, uid string, ts TitleState) err
 	return nil
 }
 
+// ChangeTitleState implements Store.
+func (m *Memory) ChangeTitleState(_ context.Context, uid string, ts TitleState, from string) error {
+	id, err := checkTitleState(ts)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	titles := m.user(uid).titles
+	if titles[id].State != from {
+		return ErrTitleStateChanged
+	}
+	m.libraryChanged(uid)
+	if ts.State == "" {
+		delete(titles, id)
+		return nil
+	}
+	titles[id] = stampTitleState(ts, m.opts.now())
+	return nil
+}
+
 // TitleState implements Store.
 func (m *Memory) TitleState(_ context.Context, uid, kind string, tmdbID int) (TitleState, error) {
 	id, err := titleID(kind, tmdbID)

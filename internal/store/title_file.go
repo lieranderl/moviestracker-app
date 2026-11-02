@@ -50,6 +50,33 @@ func (f *TitleFile) SetTitleState(_ context.Context, uid string, ts TitleState) 
 	return nil
 }
 
+// ChangeTitleState implements TitleStateStore.
+func (f *TitleFile) ChangeTitleState(_ context.Context, uid string, ts TitleState, from string) error {
+	id, err := checkTitleState(ts)
+	if err != nil {
+		return err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	titles := f.users[uid]
+	if titles[id].State != from {
+		return ErrTitleStateChanged
+	}
+	if titles == nil {
+		titles = map[string]TitleState{}
+		f.users[uid] = titles
+	}
+	if ts.State == "" {
+		delete(titles, id)
+	} else {
+		titles[id] = stampTitleState(ts, f.opts.now())
+	}
+	if err := writeJSONFile(f.path, f.users); err != nil {
+		return fmt.Errorf("save watch states: %w", err)
+	}
+	return nil
+}
+
 // TitleState implements TitleStateStore.
 func (f *TitleFile) TitleState(_ context.Context, uid, kind string, tmdbID int) (TitleState, error) {
 	id, err := titleID(kind, tmdbID)

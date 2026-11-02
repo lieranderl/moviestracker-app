@@ -3,6 +3,7 @@ package store_test
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -118,6 +119,51 @@ func TestTitlesMarkedAtTheSameMomentKeepOneOrder(t *testing.T) {
 			if err != nil || len(got) != 3 || got[0].TMDBID != 3 || got[1].TMDBID != 2 || got[2].TMDBID != 1 {
 				t.Fatalf("TitleStates() = %+v, %v; want movies 3, 2, 1", got, err)
 			}
+		}
+	})
+}
+
+// A change made from a state the title no longer has is refused, so an undo
+// never overwrites a change made meanwhile elsewhere.
+func TestAChangeFromAStateTheTitleNoLongerHasIsRefused(t *testing.T) {
+	eachTitleStore(t, func(t *testing.T, s store.TitleStateStore, uid string, clock *time.Time) {
+		ctx := context.Background()
+		want := severance
+		want.State = store.WantToWatch
+		if err := s.ChangeTitleState(ctx, uid, want, ""); err != nil {
+			t.Fatalf("marking an unmarked title from none: %v", err)
+		}
+		*clock = now.Add(time.Hour)
+		watched := severance
+		watched.State = store.Watched
+		if err := s.ChangeTitleState(ctx, uid, watched, ""); !errors.Is(err, store.ErrTitleStateChanged) {
+			t.Errorf("changing a title to watch from none = %v, want ErrTitleStateChanged", err)
+		}
+		if got, _ := s.TitleState(ctx, uid, "tv", 95396); got.State != store.WantToWatch {
+			t.Errorf("after a refused change the state is %q, want %q", got.State, store.WantToWatch)
+		}
+		if err := s.ChangeTitleState(ctx, uid, store.TitleState{Kind: "tv", TMDBID: 95396}, store.WantToWatch); err != nil {
+			t.Fatalf("clearing from want: %v", err)
+		}
+		if got, _ := s.TitleState(ctx, uid, "tv", 95396); got.State != "" {
+			t.Errorf("after clearing the state is %q, want none", got.State)
+		}
+	})
+}
+
+// Putting a title back keeps the time it was first marked, so it returns to
+// its place in its list.
+func TestATitlePutBackKeepsItsPlaceInItsList(t *testing.T) {
+	eachTitleStore(t, func(t *testing.T, s store.TitleStateStore, uid string, clock *time.Time) {
+		ctx := context.Background()
+		*clock = now.Add(time.Hour)
+		back := severance
+		back.State, back.UpdatedAt = store.WantToWatch, now
+		if err := s.ChangeTitleState(ctx, uid, back, ""); err != nil {
+			t.Fatal(err)
+		}
+		if got, _ := s.TitleState(ctx, uid, "tv", 95396); !got.UpdatedAt.Equal(now) {
+			t.Errorf("put back at %v, want its first mark %v", got.UpdatedAt, now)
 		}
 	})
 }
