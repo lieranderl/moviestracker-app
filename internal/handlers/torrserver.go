@@ -42,19 +42,29 @@ func (s *Server) handleTorrServerPage(w http.ResponseWriter, r *http.Request) {
 
 	client := s.torrServer.Client()
 	echo, _ := client.Echo(ctx)
-	torrents, _ := client.ListTorrents(ctx)
+	torrents, listErr := client.ListTorrents(ctx)
 	s.matchTitles(torrents)
 
 	page := r.Context()
 	if play, ok := s.progress.PlayRequest(r); ok {
+		// The file is gone when TorrServer answered without its torrent, or
+		// listed the torrent's files without it; a torrent listed without
+		// file metadata may still have it.
+		gone := listErr == nil && echo.Version != ""
 		for _, t := range torrents {
+			if !strings.EqualFold(t.Hash, play.Hash) {
+				continue
+			}
+			gone = gone && len(t.FileStats) > 0
 			for _, f := range t.FileStats {
-				if strings.EqualFold(t.Hash, play.Hash) && f.ID == play.Index {
+				if f.ID == play.Index {
 					play.Clean, play.HLS = s.shareLink(t.Hash, f), s.hlsShareLink(t.Hash, f)
 					play.Title = cmp.Or(play.Title, t.DisplayName())
+					gone = false
 				}
 			}
 		}
+		play.Missing = gone
 		page = views.WithPlayRequest(page, play)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
