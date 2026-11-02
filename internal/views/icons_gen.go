@@ -27,10 +27,16 @@ func iconPath(name string) string {
 		return "<path d=\"M10.268 21a2 2 0 0 0 3.464 0\"/><path d=\"M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326\"/>"
 	case "bell-dot":
 		return "<path d=\"M10.268 21a2 2 0 0 0 3.464 0\"/><path d=\"M11.68 2.009A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673c-.824-.85-1.678-1.731-2.21-3.348\"/><circle cx=\"18\" cy=\"5\" r=\"3\"/>"
+	case "bell-plus":
+		return "<path d=\"M10.268 21a2 2 0 0 0 3.464 0\"/><path d=\"M15 8h6\"/><path d=\"M18 5v6\"/><path d=\"M20.002 14.464a9 9 0 0 0 .738.863A1 1 0 0 1 20 17H4a1 1 0 0 1-.74-1.673C4.59 13.956 6 12.499 6 8a6 6 0 0 1 8.75-5.332\"/>"
+	case "bell-ring":
+		return "<path d=\"M10.268 21a2 2 0 0 0 3.464 0\"/><path d=\"M22 8c0-2.3-.8-4.3-2-6\"/><path d=\"M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326\"/><path d=\"M4 2C2.8 3.7 2 5.7 2 8\"/>"
 	case "bookmark":
 		return "<path d=\"M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z\"/>"
 	case "calendar":
 		return "<path d=\"M8 2v3\"/><path d=\"M16 2v3\"/><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M3 9h18\"/>"
+	case "calendar-days":
+		return "<path d=\"M8 2v3\"/><path d=\"M16 2v3\"/><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M3 9h18\"/><path d=\"M8 13h.01\"/><path d=\"M12 13h.01\"/><path d=\"M16 13h.01\"/><path d=\"M8 17h.01\"/><path d=\"M12 17h.01\"/><path d=\"M16 17h.01\"/>"
 	case "captions":
 		return "<rect width=\"18\" height=\"14\" x=\"3\" y=\"5\" rx=\"2\" ry=\"2\"/><path d=\"M7 15h4M15 15h2M7 11h2M13 11h4\"/>"
 	case "cast":
