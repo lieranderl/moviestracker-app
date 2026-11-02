@@ -79,6 +79,7 @@ type Store interface {
 	ListSharing
 	ReviewStore
 	EpisodeStore
+	FollowStore
 }
 
 // ReleaseFilters are how a user last searched a title's releases.

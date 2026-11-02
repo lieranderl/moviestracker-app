@@ -166,6 +166,10 @@ func TVPage(user *auth.User, t *tmdb.TVDetails, season *tmdb.Season, selected in
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
+				templ_7745c5c3_Err = followSlot(t.ID).Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 				if siteOf(ctx).Cloud {
 					templ_7745c5c3_Err = favoriteSlot("tv", t.ID).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
@@ -265,7 +269,7 @@ func seasonsSection(t *tmdb.TVDetails, season *tmdb.Season, selected int) templ.
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("{ season: %d, seasonLoading: false }", selected))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 93, Col: 79}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 94, Col: 79}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 			if templ_7745c5c3_Err != nil {
@@ -304,7 +308,7 @@ func seasonsSection(t *tmdb.TVDetails, season *tmdb.Season, selected int) templ.
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Seasons"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 100, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 101, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 			if templ_7745c5c3_Err != nil {
@@ -317,7 +321,7 @@ func seasonsSection(t *tmdb.TVDetails, season *tmdb.Season, selected int) templ.
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(seasonClick(t.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 101, Col: 37}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 102, Col: 37}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 			if templ_7745c5c3_Err != nil {
@@ -340,7 +344,7 @@ func seasonsSection(t *tmdb.TVDetails, season *tmdb.Season, selected int) templ.
 				var templ_7745c5c3_Var12 templ.SafeURL
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/tv/%d?season=%d#seasons", t.ID, s.Number)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 106, Col: 83}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 107, Col: 83}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -353,7 +357,7 @@ func seasonsSection(t *tmdb.TVDetails, season *tmdb.Season, selected int) templ.
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprint(s.Number))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 108, Col: 40}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 109, Col: 40}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 				if templ_7745c5c3_Err != nil {
@@ -379,7 +383,7 @@ func seasonsSection(t *tmdb.TVDetails, season *tmdb.Season, selected int) templ.
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("{ 'tab-active': $season === %d }", s.Number))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 110, Col: 76}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 111, Col: 76}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 				if templ_7745c5c3_Err != nil {
@@ -392,7 +396,7 @@ func seasonsSection(t *tmdb.TVDetails, season *tmdb.Season, selected int) templ.
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(seasonLabel(ctx, s))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 112, Col: 27}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 113, Col: 27}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 				if templ_7745c5c3_Err != nil {
@@ -478,7 +482,7 @@ func NextUnwatched(t *tmdb.TVDetails, m EpisodeMarks) templ.Component {
 				var templ_7745c5c3_Var18 templ.SafeURL
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/tv/%d?season=%d#seasons", t.ID, season)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 148, Col: 82}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 149, Col: 82}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -499,7 +503,7 @@ func NextUnwatched(t *tmdb.TVDetails, m EpisodeMarks) templ.Component {
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(trf(ctx, "Next: %s", fmt.Sprintf("S%02dE%02d", season, episode)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 150, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 151, Col: 71}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
@@ -525,7 +529,7 @@ func NextUnwatched(t *tmdb.TVDetails, m EpisodeMarks) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "All aired episodes watched"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 155, Col: 44}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 156, Col: 44}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -580,7 +584,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 			var templ_7745c5c3_Var22 string
 			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Mark the season"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 167, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 168, Col: 89}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 			if templ_7745c5c3_Err != nil {
@@ -593,7 +597,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("@post('%s')", SeasonMarkURL(s.ShowID, s.Number, true)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 168, Col: 146}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 169, Col: 146}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 			if templ_7745c5c3_Err != nil {
@@ -614,7 +618,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Mark season watched"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 170, Col: 37}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 171, Col: 37}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
@@ -627,7 +631,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 			var templ_7745c5c3_Var25 string
 			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("@post('%s')", SeasonMarkURL(s.ShowID, s.Number, false)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 172, Col: 147}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 173, Col: 147}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var25)
 			if templ_7745c5c3_Err != nil {
@@ -648,7 +652,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 			var templ_7745c5c3_Var26 string
 			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Mark season unwatched"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 174, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 175, Col: 39}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 			if templ_7745c5c3_Err != nil {
@@ -667,7 +671,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 			var templ_7745c5c3_Var27 string
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(s.Overview)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 179, Col: 81}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 180, Col: 81}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 			if templ_7745c5c3_Err != nil {
@@ -686,7 +690,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 			var templ_7745c5c3_Var28 string
 			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "No episodes announced yet."))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 182, Col: 82}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 183, Col: 82}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 			if templ_7745c5c3_Err != nil {
@@ -714,7 +718,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 				var templ_7745c5c3_Var29 string
 				templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.ResolveAttributeValue(e.StillURL())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 189, Col: 30}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 190, Col: 30}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 				if templ_7745c5c3_Err != nil {
@@ -737,7 +741,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 			var templ_7745c5c3_Var30 string
 			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(e.Code())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 196, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 197, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
@@ -755,7 +759,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 				var templ_7745c5c3_Var31 string
 				templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(r)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 198, Col: 17}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 199, Col: 17}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 				if templ_7745c5c3_Err != nil {
@@ -774,7 +778,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 				var templ_7745c5c3_Var32 string
 				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(e.AirDate)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 201, Col: 25}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 202, Col: 25}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 				if templ_7745c5c3_Err != nil {
@@ -792,7 +796,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 			var templ_7745c5c3_Var33 string
 			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(e.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 205, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 206, Col: 67}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 			if templ_7745c5c3_Err != nil {
@@ -816,7 +820,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 				var templ_7745c5c3_Var35 string
 				templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("episode-%d-%d", s.Number, e.Number))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 210, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 211, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
 				if templ_7745c5c3_Err != nil {
@@ -829,7 +833,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 				var templ_7745c5c3_Var36 string
 				templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.ResolveAttributeValue(boolAttr(on))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 211, Col: 36}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 212, Col: 36}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var36)
 				if templ_7745c5c3_Err != nil {
@@ -842,7 +846,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 				var templ_7745c5c3_Var37 string
 				templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.ResolveAttributeValue(trf(ctx, "Watched %s", e.Code()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 212, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 213, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
 				if templ_7745c5c3_Err != nil {
@@ -855,7 +859,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 				var templ_7745c5c3_Var38 string
 				templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.ResolveAttributeValue(tr(ctx, "Watched"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 213, Col: 35}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 214, Col: 35}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var38)
 				if templ_7745c5c3_Err != nil {
@@ -881,7 +885,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 				var templ_7745c5c3_Var40 string
 				templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("@post('%s')", EpisodeURL(s.ShowID, s.Number, e.Number, !on)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 215, Col: 98}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 216, Col: 98}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var40)
 				if templ_7745c5c3_Err != nil {
@@ -912,7 +916,7 @@ func SeasonEpisodes(s *tmdb.Season, m EpisodeMarks) templ.Component {
 				var templ_7745c5c3_Var41 string
 				templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(e.Overview)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 222, Col: 83}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 223, Col: 83}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 				if templ_7745c5c3_Err != nil {
@@ -972,7 +976,7 @@ func SeasonError() templ.Component {
 		var templ_7745c5c3_Var43 string
 		templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "This season could not be loaded from TMDB. Please try again."))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 234, Col: 81}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/tv.templ`, Line: 235, Col: 81}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 		if templ_7745c5c3_Err != nil {
