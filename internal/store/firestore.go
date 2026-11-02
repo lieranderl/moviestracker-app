@@ -1086,3 +1086,74 @@ func (f *Firestore) MarkEpisodes(ctx context.Context, uid string, tvID, season i
 	}
 	return nil
 }
+
+// feedbackRecord is a users/{uid}/feedback/{feedbackKey} document.
+type feedbackRecord struct {
+	Feedback string    `firestore:"feedback"`
+	Kind     string    `firestore:"kind"`
+	TMDBID   int       `firestore:"tmdbId"`
+	Title    string    `firestore:"title"`
+	At       time.Time `firestore:"at"`
+}
+
+func (f *Firestore) feedback(uid string) *firestore.CollectionRef {
+	return f.userDoc(uid).Collection("feedback")
+}
+
+// SetFeedback implements Store, with a new library stamp in the same
+// transaction: recommendations worked out before must be again.
+func (f *Firestore) SetFeedback(ctx context.Context, uid string, fb Feedback, ref TitleRef, on bool) error {
+	key, err := feedbackKey(fb, ref)
+	if err != nil {
+		return err
+	}
+	doc := f.feedback(uid).Doc(key)
+	err = f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error {
+		if !on {
+			return tx.Delete(doc)
+		}
+		return tx.Set(doc, feedbackRecord{string(fb), ref.Kind, ref.TMDBID, ref.Title, f.opts.now().UTC()})
+	})
+	if err != nil {
+		return fmt.Errorf("save recommendation feedback: %w", err)
+	}
+	return nil
+}
+
+// FeedbackOn implements Store. Filtering by feedback alone needs only its
+// single-field index; the order is made here.
+func (f *Firestore) FeedbackOn(ctx context.Context, uid string, fb Feedback) ([]TitleRef, error) {
+	docs, err := f.feedback(uid).Where("feedback", "==", string(fb)).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("read recommendation feedback: %w", err)
+	}
+	entries := map[string]feedbackEntry{}
+	for _, doc := range docs {
+		var rec feedbackRecord
+		if err := doc.DataTo(&rec); err != nil {
+			return nil, fmt.Errorf("read recommendation feedback %s: %w", doc.Ref.ID, err)
+		}
+		entries[doc.Ref.ID] = feedbackEntry{Feedback(rec.Feedback), TitleRef{rec.Kind, rec.TMDBID, rec.Title, rec.At}}
+	}
+	return feedbackOn(entries, fb), nil
+}
+
+// ResetFeedback implements Store.
+func (f *Firestore) ResetFeedback(ctx context.Context, uid string) error {
+	docs, err := f.feedback(uid).DocumentRefs(ctx).GetAll()
+	if err != nil {
+		return fmt.Errorf("read recommendation feedback: %w", err)
+	}
+	err = f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error {
+		for _, doc := range docs {
+			if err := tx.Delete(doc); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("reset recommendation feedback: %w", err)
+	}
+	return nil
+}
