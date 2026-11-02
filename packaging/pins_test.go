@@ -34,17 +34,17 @@ type upstream struct {
 }
 
 // current is upstream as scripts/torrserver.lock and install-gstreamer.sh
-// pin it: MatriX.146 and GStreamer 1.28.8.
+// pin it: MatriX.148 and GStreamer 1.28.8.
 func current() upstream {
 	return upstream{
-		tsTag:       "MatriX.146",
-		tsPublished: time.Date(2026, 10, 8, 22, 31, 17, 0, time.UTC),
+		tsTag:       "MatriX.148",
+		tsPublished: time.Date(2026, 10, 31, 11, 28, 48, 0, time.UTC),
 		tsAssets: map[string]string{
-			"TorrServer-gst-darwin-amd64":      "sha256:0e20a2ceaf0ac66930e934106fbed0993478ce703d021665ed3995a98658f60c",
-			"TorrServer-gst-darwin-arm64":      "sha256:416bb92436dae906c108f4b355820059fbf4b679ab634a261305a322ea6cf5e9",
-			"TorrServer-gst-linux-amd64":       "sha256:ebac3457763ed7b8c39b799231065717d0c45ba95e56917b5dd810de09da48b4",
-			"TorrServer-gst-linux-arm64":       "sha256:66569ed8fb469ec8fd82d63331c90f4bbe7a15ab5626ff9349658ae13ce23f9d",
-			"TorrServer-gst-windows-amd64.exe": "sha256:4f867732f56bfeff532e6fd9ef9562c42cf0761be109bd340d9602ce0390df74",
+			"TorrServer-gst-darwin-amd64":      "sha256:16dd1349cc6da05cf5803c6d6074641698c2889378fe24f32fdc34757c9a4fab",
+			"TorrServer-gst-darwin-arm64":      "sha256:c2a027085ca3c0e50bd6f87701024293d5c306b676fdcea0f4d169688d36cda0",
+			"TorrServer-gst-linux-amd64":       "sha256:8d389986ee54508cc69a0dc91cfd41f8df73e0f2777fdc18464cd07082e0eddc",
+			"TorrServer-gst-linux-arm64":       "sha256:40563b627fe91c59af67c1e385115f4baf6271ba719ad0a08c1770f81c4f767e",
+			"TorrServer-gst-windows-amd64.exe": "sha256:6344cb5896d6d1dfe54aaf879157de8c5c8ed6eb847dbb80d87b0ea193dcb2a5",
 		},
 		gstVersions:  []string{"1.26.9", "1.28.7", "1.28.8"},
 		gstPublished: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC),
@@ -158,34 +158,34 @@ func read(t *testing.T, path string) string {
 
 func TestANewerTorrServerIsPinnedWithGitHubsChecksums(t *testing.T) {
 	up := current()
-	up.tsTag = "MatriX.147"
-	up.tsPublished = time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
+	up.tsTag = "MatriX.149"
+	up.tsPublished = time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
 	up.tsLicense = "GNU GENERAL PUBLIC LICENSE\nVersion 3\n"
 	for name := range up.tsAssets {
-		up.tsAssets[name] = "sha256:" + sha(name+" 147")
+		up.tsAssets[name] = "sha256:" + sha(name+" 149")
 	}
 	root := pinnedRepo(t)
 
-	out, err := updatePins(t, root, up.serve(t), time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC))
+	out, err := updatePins(t, root, up.serve(t), time.Date(2026, 11, 13, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("update-pins.sh: %v\n%s", err, out)
 	}
 
 	want := `# TorrServer release Moviestracker is tested with, and the SHA-256 GitHub
 # publishes for each file. Update all lines together.
-version MatriX.147
-TorrServer-gst-darwin-amd64 ` + sha("TorrServer-gst-darwin-amd64 147") + `
-TorrServer-gst-darwin-arm64 ` + sha("TorrServer-gst-darwin-arm64 147") + `
-TorrServer-gst-linux-amd64 ` + sha("TorrServer-gst-linux-amd64 147") + `
-TorrServer-gst-linux-arm64 ` + sha("TorrServer-gst-linux-arm64 147") + `
-TorrServer-gst-windows-amd64.exe ` + sha("TorrServer-gst-windows-amd64.exe 147") + `
+version MatriX.149
+TorrServer-gst-darwin-amd64 ` + sha("TorrServer-gst-darwin-amd64 149") + `
+TorrServer-gst-darwin-arm64 ` + sha("TorrServer-gst-darwin-arm64 149") + `
+TorrServer-gst-linux-amd64 ` + sha("TorrServer-gst-linux-amd64 149") + `
+TorrServer-gst-linux-arm64 ` + sha("TorrServer-gst-linux-arm64 149") + `
+TorrServer-gst-windows-amd64.exe ` + sha("TorrServer-gst-windows-amd64.exe 149") + `
 # TorrServer's licence (GPL-3.0) at that tag, shipped next to its binary.
 LICENSE ` + sha("GNU GENERAL PUBLIC LICENSE\nVersion 3\n") + `
 `
 	if got := read(t, filepath.Join(root, "scripts", "torrserver.lock")); got != want {
 		t.Errorf("torrserver.lock =\n%s\nwant\n%s", got, want)
 	}
-	if !strings.Contains(out, "TorrServer MatriX.146 → MatriX.147") {
+	if !strings.Contains(out, "TorrServer MatriX.148 → MatriX.149") {
 		t.Errorf("the summary does not name the TorrServer update:\n%s", out)
 	}
 }
@@ -203,7 +203,7 @@ func unchanged(t *testing.T, root string) {
 func TestNothingChangesWhenThePinsAreCurrent(t *testing.T) {
 	root := pinnedRepo(t)
 
-	out, err := updatePins(t, root, current().serve(t), time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC))
+	out, err := updatePins(t, root, current().serve(t), time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("update-pins.sh: %v\n%s", err, out)
 	}
@@ -216,11 +216,11 @@ func TestNothingChangesWhenThePinsAreCurrent(t *testing.T) {
 
 func TestAReleaseYoungerThanAWeekWaits(t *testing.T) {
 	up := current()
-	up.tsTag = "MatriX.147"
-	up.tsPublished = time.Date(2026, 10, 16, 0, 0, 0, 0, time.UTC)
+	up.tsTag = "MatriX.149"
+	up.tsPublished = time.Date(2026, 11, 9, 0, 0, 0, 0, time.UTC)
 	root := pinnedRepo(t)
 
-	out, err := updatePins(t, root, up.serve(t), time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC))
+	out, err := updatePins(t, root, up.serve(t), time.Date(2026, 11, 13, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("update-pins.sh: %v\n%s", err, out)
 	}
@@ -230,12 +230,12 @@ func TestAReleaseYoungerThanAWeekWaits(t *testing.T) {
 
 func TestATorrServerReleaseMissingAPlatformIsRefused(t *testing.T) {
 	up := current()
-	up.tsTag = "MatriX.147"
-	up.tsPublished = time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
+	up.tsTag = "MatriX.149"
+	up.tsPublished = time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
 	delete(up.tsAssets, "TorrServer-gst-windows-amd64.exe")
 	root := pinnedRepo(t)
 
-	out, err := updatePins(t, root, up.serve(t), time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC))
+	out, err := updatePins(t, root, up.serve(t), time.Date(2026, 11, 13, 0, 0, 0, 0, time.UTC))
 
 	if err == nil || !strings.Contains(out, "TorrServer-gst-windows-amd64.exe") {
 		t.Errorf("update-pins.sh = %v, want a failure naming the missing file:\n%s", err, out)
