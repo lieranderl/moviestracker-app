@@ -12,7 +12,7 @@
 #   --secret id=tmdb_key,env=MT_SHARED_TMDB_KEY --secret id=jacred_key,env=MT_SHARED_JACRED_KEY
 
 # The build stages run on the build machine and cross-compile for the target.
-FROM --platform=$BUILDPLATFORM oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 AS assets
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.4@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS assets
 WORKDIR /src
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
