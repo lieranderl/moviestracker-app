@@ -41,7 +41,8 @@ func TestServiceHealthFollowsTheOutcomeOfRealCalls(t *testing.T) {
 	_, _ = clients.Details.Movie(ctx, 603)
 	_, _ = clients.Torrents.Search(ctx, jacred.Query{OriginalTitle: "The Matrix"})
 	snap := health.Snapshot()
-	if tm := snap["TMDB"]; !tm.OK || tm.LastCall.IsZero() || tm.Latency <= 0 || tm.Latency > time.Minute {
+	// Fast calls can measure zero on clocks with coarse resolution (Windows).
+	if tm := snap["TMDB"]; !tm.OK || tm.LastCall.IsZero() || tm.Latency < 0 || tm.Latency > time.Minute {
 		t.Errorf("TMDB after a good call = %+v", tm)
 	}
 	if jr := snap["JacRed"]; !jr.OK {

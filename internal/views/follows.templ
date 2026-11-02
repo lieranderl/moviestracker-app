@@ -61,10 +61,7 @@ templ CalendarPage(user *auth.User, upcoming []UpcomingSeries, failed bool) {
 					<p class="text-sm text-base-content/70">{ tr(ctx, "The next episode of each series you follow. Dates are the day TMDB lists, without a time.") }</p>
 				</header>
 				if failed {
-					<div role="alert" class="alert alert-error alert-soft">
-						@Icon("circle-alert", "size-5")
-						<span>{ tr(ctx, "The series you follow could not be loaded right now. Please try again in a moment.") }</span>
-					</div>
+					@loadFailed(tr(ctx, "The series you follow could not be loaded right now. Please try again in a moment."))
 				} else if len(upcoming) == 0 {
 					@emptyState("calendar-days", tr(ctx, "You follow no series yet"), tr(ctx, "Press Follow on a series' page to see its next episodes here.")) {
 						@browseTrendingLink()
