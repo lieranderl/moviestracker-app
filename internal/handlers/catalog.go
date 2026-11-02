@@ -21,6 +21,7 @@ type Catalog struct {
 	catalogTimeout  time.Duration                  // bounds each TMDB lookup of a request
 	progress        *Progress                      // where users stopped watching; nil keeps none
 	releaseFilters  *ReleaseFilterPrefs            // users' last release filters; nil keeps none
+	episodes        *Episodes                      // users' watched episodes; nil keeps none
 }
 
 // RememberReleaseFilters starts title pages with each user's last release
