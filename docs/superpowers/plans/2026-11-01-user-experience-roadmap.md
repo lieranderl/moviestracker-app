@@ -444,6 +444,13 @@ in focused PRs before the larger episode/discovery and collaboration work.
   releases; file-based resume is unchanged and no seek position moves
   between releases. Torrserver and handler tests cover exact and uncertain
   names and that the series stays unmarked.
+- **R15 — stale source searches (2 November 2026):** a source search
+  started by sort, quality, HDR or season now sends those choices as
+  signals to one address instead of in its query, so Datastar cancels a
+  search still running when a newer one starts and a late answer can no
+  longer replace the newer results. Requests with the old query keep
+  working. Handler and view tests cover it; the rest of the R15 audit
+  (loading, retry and empty states elsewhere) remains open.
 
 - **R16 — partly implemented, deployment unverified (2 November 2026):** a
   browser audit (self-hosted app: home, TorrServer and list pages) found no
