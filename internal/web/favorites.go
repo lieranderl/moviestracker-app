@@ -133,6 +133,7 @@ func (a *app) handleFavoritesPage(w http.ResponseWriter, r *http.Request) {
 		ratings = handlers.Ratings(ctx, a.cfg.Store, user.ID)
 	}
 	items, query := handlers.ApplyLibraryQuery(entries, query, ratings)
+	items = a.catalog.LocalizeTitles(r.Context(), items)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err != nil {

@@ -81,6 +81,7 @@ func (ts *TitleStates) handleList(w http.ResponseWriter, r *http.Request) {
 		ratings = Ratings(ctx, ts.reviews, uid)
 	}
 	items, query := ApplyLibraryQuery(entries, query, ratings)
+	items = ts.catalog.LocalizeTitles(r.Context(), items)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err != nil {
