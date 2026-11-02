@@ -458,6 +458,12 @@ in focused PRs before the larger episode/discovery and collaboration work.
   looping animations and transitions. Not yet verified: screen-reader
   announcements and a full keyboard walk-through of every page, which remain
   open.
+- **R15 — failed loads offer a retry (2 November 2026):** an audit of the
+  views' error and empty states found every empty state already offers a
+  next step, but the pages that could not load their data (My lists,
+  favourites, release alerts, Upcoming episodes) only said to try again.
+  They now share one error block with a Try again button that reloads the
+  page as it was. A view test covers each page.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding
