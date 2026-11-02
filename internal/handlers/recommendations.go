@@ -218,9 +218,10 @@ func (rc *Recommendations) handleRows(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// localizeSeeds names the seeds in the interface language for their rows'
-// headings.
+// localizeSeeds names the seeds rows can start from in the interface
+// language, for their rows' headings.
 func (rc *Recommendations) localizeSeeds(ctx context.Context, seeds []seed) []seed {
+	seeds = seeds[:min(len(seeds), recommendationSeeds)] // only these make rows
 	items := make([]tmdb.MediaItem, len(seeds))
 	for i, s := range seeds {
 		items[i] = tmdb.MediaItem{ID: s.id, MediaType: s.kind, Title: s.title}

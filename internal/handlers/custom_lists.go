@@ -115,16 +115,16 @@ func (cl *CustomLists) handlePage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	v := cl.view(l)
-	v.Items = cl.catalog.LocalizeTitles(r.Context(), v.Items)
-	if err := views.CustomListPage(cl.catalog.userFromRequest(r), v).Render(r.Context(), w); err != nil {
+	if err := views.CustomListPage(cl.catalog.userFromRequest(r), cl.view(r.Context(), l)).Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "custom list", "error", err)
 	}
 }
 
 // view is l as its page shows it.
-func (cl *CustomLists) view(l store.CustomList) views.CustomListView {
-	return views.CustomListView{ID: l.ID, Name: l.Name, Items: listItems(l), Sharing: cl.sharing != nil, ShareID: l.ShareID}
+// view is the list as its page and patches show it, its titles named in
+// ctx's language.
+func (cl *CustomLists) view(ctx context.Context, l store.CustomList) views.CustomListView {
+	return views.CustomListView{ID: l.ID, Name: l.Name, Items: cl.catalog.LocalizeTitles(ctx, listItems(l)), Sharing: cl.sharing != nil, ShareID: l.ShareID}
 }
 
 // listItems are l's titles as cards show them.
@@ -340,7 +340,7 @@ func (cl *CustomLists) patchSection(w http.ResponseWriter, r *http.Request, uid,
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.CustomListSection(cl.view(l))); err != nil {
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.CustomListSection(cl.view(r.Context(), l))); err != nil {
 		slog.Warn("patching a list failed", "error", err)
 	}
 }

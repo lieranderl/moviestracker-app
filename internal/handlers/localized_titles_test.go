@@ -5,6 +5,7 @@ import (
 	"html"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -17,7 +18,7 @@ import (
 func localizedServer(t *testing.T, titleErr error) *Server {
 	t.Helper()
 	details := &fakeTMDBDetails{
-		movies: map[int]*tmdb.MovieDetails{438631: {
+		movies: map[int]*tmdb.MovieDetails{693134: {MediaItem: tmdb.MediaItem{ID: 693134, Title: "Dune: Part Two", MediaType: "movie"}}, 438631: {
 			MediaItem:       tmdb.MediaItem{ID: 438631, Title: "Dune", MediaType: "movie", PosterPath: "/d.jpg"},
 			Recommendations: []tmdb.MediaItem{{ID: 693134, Title: "Dune: Part Two", MediaType: "movie"}},
 		}},
@@ -62,5 +63,36 @@ func TestASavedNameStaysWhenTMDBCannotGiveAnother(t *testing.T) {
 	s := localizedServer(t, errors.New("tmdb is down"))
 	if page := getIn(t, s, "ru", "/lists/watched"); !strings.Contains(page, `href="/movie/438631"`) || !strings.Contains(page, "Dune") {
 		t.Error("with TMDB down the Watched list lost Dune")
+	}
+}
+
+// Taking a title out of a custom list keeps the others named in the
+// interface language.
+func TestACustomListStaysLocalizedAfterAChange(t *testing.T) {
+	s := localizedServer(t, nil)
+	cookie := signedIn(t, s)
+	send := func(method, path, body string) string {
+		t.Helper()
+		req := httptest.NewRequest(method, path, strings.NewReader(body))
+		req.Header.Set("Accept-Language", "ru")
+		req.Header.Set("Datastar-Request", "true")
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(cookie)
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s %s = %d %s", method, path, rec.Code, rec.Body)
+		}
+		return html.UnescapeString(rec.Body.String())
+	}
+	send(http.MethodPost, "/api/lists?type=movie&id=438631", `{"listName":"Sci-fi"}`)
+	id := regexp.MustCompile(`/lists/c/([^"]+)"`).FindStringSubmatch(send(http.MethodGet, "/api/lists/tabs", ""))
+	if id == nil {
+		t.Fatal("no list was made")
+	}
+	send(http.MethodPost, "/api/lists/"+id[1]+"/titles?type=movie&id=693134", "")
+	patched := send(http.MethodDelete, "/api/lists/"+id[1]+"/titles?type=movie&id=693134&from=list", "")
+	if !strings.Contains(patched, "Дюна") {
+		t.Errorf("after taking a title out the list is not in Russian:\n%s", patched)
 	}
 }
