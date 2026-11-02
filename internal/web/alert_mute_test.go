@@ -90,3 +90,20 @@ func TestUnknownAlertPreferencesAreExplainedAndCannotBeChanged(t *testing.T) {
 		t.Error("unknown mute preferences were rendered as active Mute controls")
 	}
 }
+
+type unreadableFeedPreferences struct{ *store.Memory }
+
+func (unreadableFeedPreferences) AlertFeeds(context.Context, string) (map[string]store.AlertFeed, error) {
+	return nil, errors.New("feed preferences unavailable")
+}
+func TestUnknownFeedPreferencesAreExplainedAndDisabled(t *testing.T) {
+	g := newGoogle(t)
+	cfg := g.config()
+	cfg.Store = unreadableFeedPreferences{store.NewMemory()}
+	h := web.New(cfg)
+	res := getWith(t, h, "/alerts", signIn(t, h))
+	body := html.UnescapeString(res.Body.String())
+	if res.Code != http.StatusServiceUnavailable || !strings.Contains(body, "Your alert preferences could not be loaded.") || !strings.Contains(body, `<fieldset class="fieldset" disabled>`) {
+		t.Errorf("unreadable feed preferences = %d without disabled, explained controls", res.Code)
+	}
+}

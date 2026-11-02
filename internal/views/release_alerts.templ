@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
- "strings"
+	"strings"
 	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/auth"
@@ -41,13 +41,13 @@ templ AlertsBell(unseen int) {
 
 // AlertsView is a page of the user's release alerts.
 type AlertsView struct {
-	Alerts  []store.Update
-	Next    string    // cursor of the older page, "" when none is left
-	Unread  int       // alerts still unread after this page was shown
-	Through time.Time // when the page was read: Mark all read covers up to it
-	Failed  bool      // the alerts could not be read
-	Muted   []store.MutedTitle
- MutedFailed bool
+	Alerts      []store.Update
+	Next        string    // cursor of the older page, "" when none is left
+	Unread      int       // alerts still unread after this page was shown
+	Through     time.Time // when the page was read: Mark all read covers up to it
+	Failed      bool      // the alerts could not be read
+	Muted       []store.MutedTitle
+	MutedFailed bool
 	// FeedsOff are the release feeds the user turned alerts off for.
 	FeedsOff map[string]bool
 }
@@ -72,14 +72,14 @@ func alertSignals(v AlertsView) string {
 
 // alertFeedSwitches turn each release feed's alerts on or off.
 templ alertFeedSwitches(failed bool) {
-	<fieldset class="fieldset">
+	<fieldset class="fieldset" disabled?={ failed }>
 		<legend class="fieldset-legend">{ tr(ctx, "Alert me about") }</legend>
 		<div class="flex flex-wrap gap-x-6 gap-y-2">
 			for _, feed := range alertFeedOrder {
 				<label class="label cursor-pointer gap-2 text-sm">
 					<input
 						type="checkbox"
- disabled?={failed}
+						disabled?={ failed }
 						class="toggle toggle-sm toggle-primary"
 						data-bind={ "_feedsOn." + feed }
 						data-on:change={ fmt.Sprintf("@post('/api/alerts/feeds?feed=%s&on=' + ($_feedsOn.%s ? 1 : 0))", feed, feed) }
@@ -93,32 +93,32 @@ templ alertFeedSwitches(failed bool) {
 
 // alertMuteToggle mutes a movie's alerts, or unmutes them once muted.
 templ alertMuteToggle(id int, title string, failed bool) {
- if failed {
-  <button type="button" class="btn btn-ghost btn-sm btn-square" disabled aria-label={tr(ctx,"Alert preferences unavailable")} title={tr(ctx,"Alert preferences unavailable")}>
-   @Icon("bell-off","size-4")
-  </button>
- } else {
-	<button
-		type="button"
-		class="btn btn-ghost btn-sm btn-square"
-		data-show={ fmt.Sprintf("!$_muted['%d']", id) }
-		aria-label={ trf(ctx, "Mute alerts for %s", title) }
-		title={ trf(ctx, "Mute alerts for %s", title) }
-		data-on:click={ fmt.Sprintf("@post('/api/alerts/mute?id=%d&on=1')", id) }
-	>
-		@Icon("bell-off", "size-4")
-	</button>
-	<button
-		type="button"
-		class="btn btn-ghost btn-sm btn-square text-primary"
-		data-show={ fmt.Sprintf("$_muted['%d']", id) }
-		aria-label={ trf(ctx, "Unmute alerts for %s", title) }
-		title={ trf(ctx, "Unmute alerts for %s", title) }
-		data-on:click={ fmt.Sprintf("@post('/api/alerts/mute?id=%d&on=0')", id) }
-	>
-		@Icon("bell-ring", "size-4")
-	</button>
-}
+	if failed {
+		<button type="button" class="btn btn-ghost btn-sm btn-square" disabled aria-label={ tr(ctx, "Alert preferences unavailable") } title={ tr(ctx, "Alert preferences unavailable") }>
+			@Icon("bell-off", "size-4")
+		</button>
+	} else {
+		<button
+			type="button"
+			class="btn btn-ghost btn-sm btn-square"
+			data-show={ fmt.Sprintf("!$_muted['%d']", id) }
+			aria-label={ trf(ctx, "Mute alerts for %s", title) }
+			title={ trf(ctx, "Mute alerts for %s", title) }
+			data-on:click={ fmt.Sprintf("@post('/api/alerts/mute?id=%d&on=1')", id) }
+		>
+			@Icon("bell-off", "size-4")
+		</button>
+		<button
+			type="button"
+			class="btn btn-ghost btn-sm btn-square text-primary"
+			data-show={ fmt.Sprintf("$_muted['%d']", id) }
+			aria-label={ trf(ctx, "Unmute alerts for %s", title) }
+			title={ trf(ctx, "Unmute alerts for %s", title) }
+			data-on:click={ fmt.Sprintf("@post('/api/alerts/mute?id=%d&on=0')", id) }
+		>
+			@Icon("bell-ring", "size-4")
+		</button>
+	}
 }
 
 // AlertsMarkAll offers to mark read the unread alerts this page did not
@@ -165,13 +165,13 @@ templ AlertsPage(user *auth.User, v AlertsView) {
 						<a href={ templ.SafeURL(CalendarPath) } class="link link-primary">{ tr(ctx, "Upcoming episodes") }</a>.
 					</p>
 				</header>
-    if v.MutedFailed {
-     <div role="alert" class="alert alert-warning alert-soft">
-      @Icon("circle-alert","size-5")
-      <span>{tr(ctx,"Your alert preferences could not be loaded. Please try again.")}</span>
-      <a href="/alerts" class="btn btn-sm">{tr(ctx,"Retry")}</a>
-     </div>
-    }
+				if v.MutedFailed {
+					<div role="alert" class="alert alert-warning alert-soft">
+						@Icon("circle-alert", "size-5")
+						<span>{ tr(ctx,"Your alert preferences could not be loaded. Please try again.") }</span>
+						<a href="/alerts" class="btn btn-sm">{ tr(ctx,"Retry") }</a>
+					</div>
+				}
 				@alertFeedSwitches(v.MutedFailed)
 				if v.Failed {
 					<div role="alert" class="alert alert-error alert-soft">
@@ -221,7 +221,7 @@ templ AlertsPage(user *auth.User, v AlertsView) {
 						<p class="text-sm text-base-content/70">{ tr(ctx, "These movies bring no new release alerts until you unmute them.") }</p>
 						<ul class="list bg-base-200/60 rounded-box border border-base-content/10">
 							for _, m := range v.Muted {
-								<li class="list-row items-center" data-muted-id={strconv.Itoa(m.TMDBID)} data-show="$_muted[el.dataset.mutedId]">
+								<li class="list-row items-center" data-muted-id={ strconv.Itoa(m.TMDBID) } data-show="$_muted[el.dataset.mutedId]">
 									<a href={ templ.SafeURL(fmt.Sprintf("/movie/%d", m.TMDBID)) } class="link link-hover line-clamp-1">{ cmp.Or(m.Title, tr(ctx, "Movie")) }</a>
 									@alertMuteToggle(m.TMDBID, cmp.Or(m.Title, tr(ctx, "Movie")), v.MutedFailed)
 								</li>
@@ -236,8 +236,10 @@ templ AlertsPage(user *auth.User, v AlertsView) {
 	}
 }
 
-func mutedIDs(muted []store.MutedTitle)string {
- ids:=make([]string,len(muted))
- for i,m:=range muted {ids[i]=strconv.Itoa(m.TMDBID)}
- return strings.Join(ids,",")
+func mutedIDs(muted []store.MutedTitle) string {
+	ids := make([]string, len(muted))
+	for i, m := range muted {
+		ids[i] = strconv.Itoa(m.TMDBID)
+	}
+	return strings.Join(ids, ",")
 }

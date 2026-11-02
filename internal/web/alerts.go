@@ -245,6 +245,10 @@ func (a *app) handleAlertsPage(w http.ResponseWriter, r *http.Request) {
 	choices, err := a.cfg.Store.AlertFeeds(ctx, user.ID)
 	if err != nil {
 		slog.Warn("reading alert feeds failed", "error", handlers.LogError(err))
+		if !v.Failed && !v.MutedFailed {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+		v.MutedFailed = true
 	}
 	v.FeedsOff = map[string]bool{}
 	for feed, c := range choices {
