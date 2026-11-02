@@ -41,7 +41,7 @@ func listTabs(ctx context.Context) []listTab {
 
 // ListsPage is My lists on the tab named active, its titles newest first;
 // failed says they could not be read.
-templ ListsPage(user *auth.User, active string, items []tmdb.MediaItem, failed bool) {
+templ ListsPage(user *auth.User, active string, items []tmdb.MediaItem, more string, failed bool) {
 	@listsLayout(user, active) {
 		for _, tab := range listTabs(ctx) {
 			if tab.ID == active {
@@ -58,6 +58,14 @@ templ ListsPage(user *auth.User, active string, items []tmdb.MediaItem, failed b
 					<ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
 						@BrowseItems(items)
 					</ul>
+					if more != "" {
+						<div class="flex justify-center">
+							<a href={ templ.SafeURL(more) } class="btn btn-outline btn-primary gap-1.5">
+								{ tr(ctx, "Show more") }
+								@Icon("chevron-down", "size-4")
+							</a>
+						</div>
+					}
 				}
 			}
 		}
