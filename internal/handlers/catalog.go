@@ -22,7 +22,14 @@ type Catalog struct {
 	progress        *Progress                      // where users stopped watching; nil keeps none
 	releaseFilters  *ReleaseFilterPrefs            // users' last release filters; nil keeps none
 	episodes        *Episodes                      // users' watched episodes; nil keeps none
+	// marked are the titles the request's user marked (watched, saved,
+	// hidden), kept out of picks for tonight; nil keeps none out.
+	marked func(*http.Request) map[string]bool
 }
+
+// ExcludeFromPicks keeps the titles marked says the user marked out of
+// their picks for tonight.
+func (c *Catalog) ExcludeFromPicks(marked func(*http.Request) map[string]bool) { c.marked = marked }
 
 // RememberReleaseFilters starts title pages with each user's last release
 // filters.

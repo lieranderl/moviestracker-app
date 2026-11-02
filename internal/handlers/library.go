@@ -3,6 +3,7 @@ package handlers
 import (
 	"cmp"
 	"context"
+	"net/http"
 	"slices"
 	"sync"
 
@@ -176,6 +177,22 @@ func (l *Library) summarise(ctx context.Context, uid string) (LibrarySummary, er
 		}
 	}
 	return s, nil
+}
+
+// MarkedFor is the request's user's marked titles (Summary's Marked),
+// for keeping them out of picks; none when signed out or unreadable.
+func (l *Library) MarkedFor(user func(*http.Request) (string, bool)) func(*http.Request) map[string]bool {
+	return func(r *http.Request) map[string]bool {
+		uid, ok := user(r)
+		if !ok {
+			return nil
+		}
+		s, err := l.Summary(r.Context(), uid)
+		if err != nil {
+			return nil
+		}
+		return s.Marked
+	}
 }
 
 // ratings are the user's ratings by titleKey; none without reviews.

@@ -423,6 +423,16 @@ in focused PRs before the larger episode/discovery and collaboration work.
   browser check showed the buttons and the toast; TMDB lookups fail on the
   local network, so a successful mark was covered by tests only.
 
+- **R21 — implemented, deployment unverified (2 November 2026):** Discover
+  (both apps) gains runtime and original-language filters next to genre,
+  year and rating, and a Pick for tonight button: a shortlist of five
+  matching titles the user has not marked (watched, saved or hidden), drawn
+  from Discover's first three pages, with Pick again for another draw. Every
+  chosen filter is sent to TMDB; when nothing is left the page says so and
+  offers to drop each filter in turn. Reuses the Discover form instead of a
+  new screen. TMDB client and handler tests cover the filters, exclusions,
+  reroll and relax links; no browser check (TMDB unreachable from the local
+  app over IPv6).
 - **R13 — implemented, deployment unverified (2 November 2026):** Want to
   watch, Watched (both apps) and favourites (web) have a GET form to search by
   title, narrow to movies or series, and sort by most recent, title or the
