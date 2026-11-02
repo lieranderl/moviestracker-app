@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"maps"
 	"net/http"
+	"slices"
 
 	"github.com/starfederation/datastar-go/datastar"
 
@@ -169,9 +170,25 @@ func (rc *Recommendations) handleRows(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Warn("reading what to recommend from failed", "error", logError(err))
 	}
-	rows := rc.rows(r.Context(), library.Seeds, library.Marked)
+	rows := rc.rows(r.Context(), rc.localizeSeeds(r.Context(), library.Seeds), library.Marked)
 	w.Header().Set("Cache-Control", "no-store")
 	if err := datastar.NewSSE(w, r).PatchElementTempl(views.RecommendationRows(rows)); err != nil {
 		slog.Warn("patching recommendations failed", "error", err)
 	}
+}
+
+// localizeSeeds names the seeds rows can start from in the interface
+// language, for their rows' headings.
+func (rc *Recommendations) localizeSeeds(ctx context.Context, seeds []seed) []seed {
+	seeds = seeds[:min(len(seeds), recommendationSeeds)] // only these make rows
+	items := make([]tmdb.MediaItem, len(seeds))
+	for i, s := range seeds {
+		items[i] = tmdb.MediaItem{ID: s.id, MediaType: s.kind, Title: s.title}
+	}
+	named := rc.catalog.LocalizeTitles(ctx, items)
+	out := slices.Clone(seeds)
+	for i := range out {
+		out[i].title = named[i].Title
+	}
+	return out
 }
