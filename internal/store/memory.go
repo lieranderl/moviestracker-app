@@ -461,6 +461,13 @@ func (m *Memory) SaveReview(_ context.Context, uid string, r Review) error {
 	return nil
 }
 
+// Reviews implements Store.
+func (m *Memory) Reviews(_ context.Context, uid string) ([]Review, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Collect(maps.Values(m.user(uid).reviews)), nil
+}
+
 // Review implements Store.
 func (m *Memory) Review(_ context.Context, uid, kind string, tmdbID int) (Review, error) {
 	id, err := titleID(kind, tmdbID)

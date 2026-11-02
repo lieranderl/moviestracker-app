@@ -21,8 +21,12 @@ import (
 type TitleStates struct {
 	store   store.TitleStateStore
 	user    func(*http.Request) (uid string, ok bool)
-	catalog *Catalog // names titles as TMDB does
+	catalog *Catalog          // names titles as TMDB does
+	reviews store.ReviewStore // the users' ratings, for sorting by them; nil sorts none
 }
+
+// RateFrom sorts the lists by the users' ratings in reviews.
+func (ts *TitleStates) RateFrom(reviews store.ReviewStore) { ts.reviews = reviews }
 
 // NewTitleStates keeps watch states in s for the users user names; catalog
 // names the titles.
@@ -52,7 +56,15 @@ func (ts *TitleStates) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
 	defer cancel()
-	kept, next, err := ts.store.TitleStatesPage(ctx, uid, list, r.URL.Query().Get("after"))
+	query := ParseLibraryQuery(r)
+	var kept []store.TitleState
+	var next string
+	var err error
+	if query.Active() { // searching or sorting reads the whole list
+		kept, err = ts.store.TitleStates(ctx, uid, list)
+	} else {
+		kept, next, err = ts.store.TitleStatesPage(ctx, uid, list, r.URL.Query().Get("after"))
+	}
 	if errors.Is(err, store.ErrCursor) {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
@@ -60,16 +72,21 @@ func (ts *TitleStates) handleList(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Warn("reading watch states failed", "error", logError(err))
 	}
-	items := make([]tmdb.MediaItem, 0, len(kept))
+	entries := make([]LibraryEntry, 0, len(kept))
 	for _, t := range kept {
-		items = append(items, tmdb.MediaItem{ID: t.TMDBID, Title: t.Title, PosterPath: t.Poster, MediaType: t.Kind})
+		entries = append(entries, LibraryEntry{Item: tmdb.MediaItem{ID: t.TMDBID, Title: t.Title, PosterPath: t.Poster, MediaType: t.Kind}, At: t.UpdatedAt})
 	}
+	var ratings map[string]int
+	if query.Sort == "rating" {
+		ratings = Ratings(ctx, ts.reviews, uid)
+	}
+	items, query := ApplyLibraryQuery(entries, query, ratings)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
-	if err := views.ListsPage(ts.catalog.userFromRequest(r), list, items, MorePath(r, next), err != nil).Render(r.Context(), w); err != nil {
+	if err := views.ListsPage(ts.catalog.userFromRequest(r), list, items, MorePath(r, next), query, err != nil).Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "lists", "error", err)
 	}
 }

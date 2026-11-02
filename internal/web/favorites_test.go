@@ -163,3 +163,22 @@ func TestManyFavouritesComeAPageAtATime(t *testing.T) {
 		t.Errorf("the second page shows %d favourites, want 10", strings.Count(rest, `href="/movie/`))
 	}
 }
+
+// Favourites can be searched and narrowed like the other lists.
+func TestFavouritesCanBeSearched(t *testing.T) {
+	g := newGoogle(t)
+	cfg := withTMDB(t, g.config())
+	users := store.NewMemory()
+	cfg.Store = users
+	h := web.New(cfg)
+	session := signIn(t, h)
+	for _, f := range []store.Favorite{{Kind: "movie", TMDBID: 1, Title: "Dune"}, {Kind: "tv", TMDBID: 3, Title: "Severance"}} {
+		if err := users.AddFavorite(context.Background(), "1098765", f); err != nil {
+			t.Fatal(err)
+		}
+	}
+	page := html.UnescapeString(getWith(t, h, "/favorites?q=sev", session).Body.String())
+	if !strings.Contains(page, `href="/tv/3"`) || strings.Contains(page, `href="/movie/1"`) || !strings.Contains(page, "1 title") {
+		t.Error("searching favourites for sev should show only Severance, and say so")
+	}
+}
