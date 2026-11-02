@@ -581,13 +581,13 @@ func (f *Firestore) keyWatchLists(ctx context.Context, uid string) error {
 
 // updateRecord is a users/{uid}/updates/{feed}-{id} document.
 type updateRecord struct {
-	Episode string    `firestore:"episode,omitempty"`
 	Feed    string    `firestore:"feed"`
 	TMDBID  int       `firestore:"tmdbId"`
 	Title   string    `firestore:"title"`
 	Poster  string    `firestore:"poster,omitempty"`
 	FoundAt time.Time `firestore:"foundAt"`
 	Seen    bool      `firestore:"seen"`
+	Episode string    `firestore:"episode,omitempty"`
 }
 
 func (f *Firestore) updates(uid string) *firestore.CollectionRef {

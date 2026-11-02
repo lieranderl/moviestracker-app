@@ -1,9 +1,13 @@
 package web_test
 
 import (
+	"context"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"html"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -49,5 +53,44 @@ func TestAnEpisodeThatAiredBeforeFollowingBringsNoAlert(t *testing.T) {
 	send(t, h, http.MethodPost, "/api/follow?id=95396", session)
 	if got := bellCount(t, h, session); got != "" {
 		t.Errorf("an episode aired before following alerted (bell %q)", got)
+	}
+}
+
+// A failed lookup cannot consume an episode that aired after the last successful check.
+func TestEpisodeAlertsCatchUpAfterAProviderFailure(t *testing.T) {
+	g := newGoogle(t)
+	cfg := g.config()
+	clock := now.Add(-72 * time.Hour)
+	users := store.NewMemory(store.WithClock(func() time.Time { return clock }))
+	cfg.Store = users
+	cfg.Now = func() time.Time { return clock }
+	var down atomic.Bool
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if down.Load() {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		_, _ = w.Write([]byte(`{"id":95396,"name":"Severance","last_episode_to_air":{"season_number":1,"episode_number":9,"air_date":"2026-09-29"}}`))
+	}))
+	t.Cleanup(fake.Close)
+	cfg.Sources.Details = tmdb.NewClient("key", tmdb.WithBaseURL(fake.URL), tmdb.WithClock(func() time.Time { return clock }))
+	h := web.New(cfg)
+	session := signIn(t, h)
+	if err := users.Follow(context.Background(), "1098765", store.FollowedSeries{TMDBID: 95396, Title: "Severance"}, true); err != nil {
+		t.Fatal(err)
+	}
+	clock = now.Add(-48 * time.Hour)
+	if got := bellCount(t, h, session); got != "" {
+		t.Fatalf("before airing bell = %q", got)
+	}
+	clock = now
+	down.Store(true)
+	if got := bellCount(t, h, session); got != "" {
+		t.Fatalf("during failure bell = %q", got)
+	}
+	clock = now.Add(24 * time.Hour)
+	down.Store(false)
+	if got := bellCount(t, h, session); got != "1" {
+		t.Fatalf("after recovery bell = %q, want the missed episode", got)
 	}
 }

@@ -31,7 +31,7 @@ func alertHref(u store.Update) templ.SafeURL {
 	if u.Feed == store.EpisodesFeed {
 		return templ.SafeURL(fmt.Sprintf("/tv/%d", u.TMDBID))
 	}
-	return alertHref(u)
+	return templ.SafeURL(fmt.Sprintf("/movie/%d#sources", u.TMDBID))
 }
 
 // alertsSlot is where the web app's navbar bell goes; it asks for the
