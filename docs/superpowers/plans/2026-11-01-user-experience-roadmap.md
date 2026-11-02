@@ -320,6 +320,16 @@ in focused PRs before the larger episode/discovery and collaboration work.
   Handler, view and browser tests cover both apps; a local browser check
   confirmed the self-hosted message and search fallback. A wider audit of
   loading, retry, empty and stale-response states remains open.
+- **R08 — implemented, deployment unverified (2 November 2026):** title
+  pages in both apps lead with Continue (now primary) when there is a file to
+  resume, then Find sources, which is primary until Continue appears: the
+  progress slot sets `$_resumable` when it arrives and Find sources drops to
+  the secondary style through `data-class`. Trailer, Episodes, watch state,
+  Add to list and favourites follow in one secondary style. View tests cover
+  order and emphasis for movies and series and the progress button's signal;
+  a local browser check of a movie page (desktop and 375 px) confirmed Find
+  sources first and primary with the rest secondary and no overflow. The
+  Continue state was covered by view tests only.
 - **R17 — implemented, deployment unverified (2 November 2026):** series
   pages in both apps let a signed-in user tick aired episodes watched, mark
   a season's aired episodes watched or unwatched, and see Next unwatched (the
