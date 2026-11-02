@@ -54,8 +54,6 @@ type app struct {
 	progress *handlers.Progress
 	library  *handlers.Library // users' library summaries, kept until their library changes
 	feeds    *cachedFeeds      // the backend's release feeds, as the home rows read them
-	// deletions are when accounts were deleted, for ending their sessions.
-	deletions deletions
 }
 
 func (a *app) now() time.Time {
@@ -124,6 +122,8 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("GET /alerts", a.handleAlertsPage)
 	mux.HandleFunc("GET /api/alerts/count", a.handleAlertsCount)
 	mux.HandleFunc("POST /api/alerts/seen", a.handleMarkAllAlertsSeen)
+	mux.HandleFunc("POST /api/alerts/mute", a.handleMuteAlerts)
+	mux.HandleFunc("POST /api/alerts/feeds", a.handleAlertFeed)
 	mux.HandleFunc("GET /api/favorites/state", a.handleFavoriteState)
 	mux.HandleFunc("POST /api/favorites", a.handleAddFavorite)
 	mux.HandleFunc("DELETE /api/favorites", a.handleRemoveFavorite)
@@ -149,8 +149,11 @@ func New(cfg Config) http.Handler {
 	filters.Register(mux)
 	a.catalog.RememberReleaseFilters(filters)
 	titleStates := handlers.NewTitleStates(a.cfg.Store, a.userID, a.catalog)
+	titleStates.RateFrom(a.cfg.Store)
 	a.library = handlers.NewLibrary(a.cfg.Store, a.cfg.Store.Favorites, a.cfg.Store.LibraryStamp)
+	a.library.Consider(a.cfg.Store, a.cfg.Store)
 	handlers.NewRecommendations(a.library, a.userID, a.catalog).Register(mux)
+	a.catalog.ExcludeFromPicks(a.library.MarkedFor(a.userID))
 	titleStates.Register(mux)
 	episodes := handlers.NewEpisodes(a.cfg.Store, a.userID, a.catalog)
 	episodes.Register(mux)
@@ -161,7 +164,7 @@ func New(cfg Config) http.Handler {
 	a.progress.MarkFinishedEpisodesIn(episodes)
 	mux.HandleFunc("POST /api/language", handlers.SetLanguage(a.secure(), a.saveLanguage))
 	app := http.NewCrossOriginProtection().Handler(handlers.Language(webSite(handlers.SignedIn(a.userID, mux), cfg.BaseURL)))
-	return handlers.RecoveryMiddleware(handlers.SecurityHeadersMiddleware(true, handlers.LoggingMiddleware(app)))
+	return handlers.RecoveryMiddleware(handlers.SecurityHeadersMiddleware(true, handlers.LoggingMiddleware(a.sessionContext(app))))
 }
 
 // handleHome is the catalog's home page for a signed-in visitor, and the

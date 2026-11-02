@@ -110,3 +110,33 @@ func TestARatingTheFileCouldNotSaveIsSavedWhenTriedAgain(t *testing.T) {
 		t.Errorf("after trying again the file rates Dune %d, want 8", got.Rating)
 	}
 }
+
+// A user's ratings and notes can all be read at once, for sorting their
+// library by rating.
+func TestAUsersReviewsCanAllBeRead(t *testing.T) {
+	eachReviewStore(t, func(t *testing.T, s store.ReviewStore, uid string, _ *time.Time) {
+		ctx := context.Background()
+		for _, r := range []store.Review{
+			{Kind: "movie", TMDBID: 438631, Title: "Dune", Rating: 9},
+			{Kind: "tv", TMDBID: 95396, Title: "Severance", Note: "Strange"},
+		} {
+			if err := s.SaveReview(ctx, uid, r); err != nil {
+				t.Fatal(err)
+			}
+		}
+		got, err := s.Reviews(ctx, uid)
+		if err != nil || len(got) != 2 {
+			t.Fatalf("Reviews() = %+v, %v; want both", got, err)
+		}
+		ratings := map[string]int{}
+		for _, r := range got {
+			ratings[r.Title] = r.Rating
+		}
+		if ratings["Dune"] != 9 || ratings["Severance"] != 0 {
+			t.Errorf("Reviews() ratings = %v", ratings)
+		}
+		if other, _ := s.Reviews(ctx, uid+"-other"); len(other) != 0 {
+			t.Errorf("another user has reviews: %+v", other)
+		}
+	})
+}

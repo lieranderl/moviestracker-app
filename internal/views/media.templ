@@ -420,12 +420,11 @@ if (b.dataset.action === 'send') {
 // for a title with the current $sort, the qualities ($qual) and HDR ($hdr)
 // picked, and $sourceSeason for series. It is built only from server ints,
 // never from upstream text.
+// The choices go as signals to one address: Datastar cancels a search
+// still running when the next starts, so a late answer never replaces a
+// newer one.
 func SourcesSearch(mediaType string, id int) string {
-	season := ""
-	if mediaType == "tv" {
-		season = " + '&season=' + $sourceSeason"
-	}
-	return fmt.Sprintf("$sourcesRequested = true; @get('/api/torrents?type=%s&id=%d&sort=' + $sort%s + '&quality=' + $qual.filter(Boolean).join(',') + ($hdr ? '&hdr=1' : ''), {filterSignals: {include: /^$/}})", mediaType, id, season)
+	return fmt.Sprintf("$sourcesRequested = true; @get('/api/torrents?type=%s&id=%d', {filterSignals: {include: /^(sort|qual|hdr|sourceSeason)$/}})", mediaType, id)
 }
 
 // researchSources searches again with search (see SourcesSearch) once

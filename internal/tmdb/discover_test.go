@@ -71,3 +71,20 @@ func TestEachKindOfTitleHasItsGenres(t *testing.T) {
 		t.Errorf("requests = %d, want 2: each kind's genres are kept", hits.Load())
 	}
 }
+
+// Discover narrows titles to a longest runtime and an original language.
+func TestDiscoverNarrowsToRuntimeAndLanguage(t *testing.T) {
+	var asked url.Values
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked = r.URL.Query()
+		_, _ = w.Write([]byte(`{"page":1,"total_pages":1,"results":[]}`))
+	}))
+	t.Cleanup(server.Close)
+	client := NewClient("k", WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	if _, err := client.Discover(context.Background(), DiscoverQuery{MediaType: "movie", MaxRuntime: 120, Language: "ko"}, 1); err != nil {
+		t.Fatal(err)
+	}
+	if asked.Get("with_runtime.lte") != "120" || asked.Get("with_original_language") != "ko" {
+		t.Errorf("asked %v", asked)
+	}
+}

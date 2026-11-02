@@ -13,6 +13,14 @@ import (
 type EpisodeMarks struct {
 	Track   bool          // the user can mark episodes here
 	Watched map[int][]int // by season
+	// HideSpoilers keeps the summaries and stills of episodes not watched
+	// (or not aired) out of the page.
+	HideSpoilers bool
+}
+
+// hides says whether e's summary and still stay out of the page.
+func (m EpisodeMarks) hides(e tmdb.Episode) bool {
+	return m.HideSpoilers && (!EpisodeAired(e) || !m.watched(e.SeasonNumber, e.Number))
 }
 
 func (m EpisodeMarks) watched(season, episode int) bool {
@@ -82,4 +90,14 @@ func boolInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+// SpoilersURL turns spoiler protection on or off, patching the season.
+func SpoilersURL(tvID, season int, on bool) string {
+	return fmt.Sprintf("/api/episodes/spoilers?on=%d&tv=%d&season=%d", boolInt(on), tvID, season)
+}
+
+// RevealURL shows one hidden episode's summary and still.
+func RevealURL(tvID, season, episode int) string {
+	return fmt.Sprintf("/api/episodes/reveal?tv=%d&season=%d&episode=%d", tvID, season, episode)
 }

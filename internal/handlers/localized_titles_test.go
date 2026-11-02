@@ -96,3 +96,11 @@ func TestACustomListStaysLocalizedAfterAChange(t *testing.T) {
 		t.Errorf("after taking a title out the list is not in Russian:\n%s", patched)
 	}
 }
+
+func TestLibrarySearchMatchesTheDisplayedLanguage(t *testing.T) {
+	s := localizedServer(t, nil)
+	page := getIn(t, s, "ru", "/lists/watched?q=%D0%94%D1%8E%D0%BD%D0%B0")
+	if !strings.Contains(page, `href="/movie/438631"`) || !strings.Contains(page, "Дюна") {
+		t.Error("searching for the displayed Russian title excluded Dune")
+	}
+}

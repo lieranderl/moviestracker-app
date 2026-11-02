@@ -19,10 +19,38 @@ templ recommendationsSlot() {
 	<div id="recommendations" class="contents" data-init="@get('/api/recommendations')"></div>
 }
 
+// RecommendationFeedback is what the rows say about the user's feedback:
+// the title just hidden (offered back), how many are hidden and how many
+// titles have feedback at all.
+type RecommendationFeedback struct {
+	Undone *tmdb.MediaItem // the title just hidden, nil when none
+	Hidden int
+	Given  int
+	Allow  bool // the user can give feedback here
+}
+
+// FeedbackURL gives (on) or takes back feedback ("notInterested",
+// "moreLikeThis") on a recommended title.
+func FeedbackURL(it tmdb.MediaItem, feedback string, on bool) string {
+	n := 0
+	if on {
+		n = 1
+	}
+	return fmt.Sprintf("/api/recommendations/feedback?type=%s&id=%d&feedback=%s&on=%d", it.MediaType, it.ID, feedback, n)
+}
+
 // RecommendationRows are the home page's recommendation rows; with none
-// the slot stays empty.
-templ RecommendationRows(rows []RecommendationRow) {
-	<div id="recommendations" class="space-y-10">
+// the slot stays empty. With f.Allow each card can be hidden or asked for
+// more like it.
+templ RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) {
+	<div id="recommendations" class="space-y-10" data-signals="{ recBusy: false }" data-attr:aria-busy="$recBusy">
+		if f.Undone != nil {
+			<div role="status" class="alert alert-soft">
+				@Icon("eye-off", "size-5")
+				<span>{ trf(ctx, "%s is hidden from your recommendations.", f.Undone.Title) }</span>
+				<button type="button" class="btn btn-sm" data-indicator:rec-busy data-attr:disabled="$recBusy" data-on:click={ fmt.Sprintf("!$recBusy && @post('%s')", FeedbackURL(*f.Undone, "notInterested", false)) }>{ tr(ctx, "Undo") }</button>
+			</div>
+		}
 		for i, row := range rows {
 			<section class="relative space-y-4" aria-labelledby={ fmt.Sprintf("recommended-%d-title", i) }>
 				<h2 id={ fmt.Sprintf("recommended-%d-title", i) } class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
@@ -31,12 +59,33 @@ templ RecommendationRows(rows []RecommendationRow) {
 				</h2>
 				@carousel() {
 					for _, item := range row.Items {
-						<li class="carousel-item">
+						<li class="carousel-item flex-col gap-1">
 							@MediaCard(item)
+							if f.Allow {
+								<div class="flex justify-center gap-1" role="group" aria-label={ trf(ctx, "Feedback on %s", item.Title) }>
+									<button type="button" class="btn btn-xs btn-ghost gap-1" title={ tr(ctx, "Recommend more like this") } data-indicator:rec-busy data-attr:disabled="$recBusy" data-on:click={ fmt.Sprintf("!$recBusy && @post('%s')", FeedbackURL(item, "moreLikeThis", true)) }>
+										@Icon("thumbs-up", "size-3.5")
+										{ tr(ctx, "More like this") }
+									</button>
+									<button type="button" class="btn btn-xs btn-ghost btn-square" aria-label={ trf(ctx, "Not interested in %s", item.Title) } title={ tr(ctx, "Not interested") } data-indicator:rec-busy data-attr:disabled="$recBusy" data-on:click={ fmt.Sprintf("!$recBusy && @post('%s')", FeedbackURL(item, "notInterested", true)) }>
+										@Icon("eye-off", "size-3.5")
+									</button>
+								</div>
+							}
 						</li>
 					}
 				}
 			</section>
+		}
+		if f.Allow && f.Given > 0 {
+			<button type="button" class="btn btn-sm btn-ghost" data-indicator:rec-busy data-attr:disabled="$recBusy" data-on:click="!$recBusy && @post('/api/recommendations/feedback/reset')">
+				@Icon("rotate-ccw", "size-4")
+				if f.Hidden > 0 {
+					{ trn(ctx, f.Hidden, "Show %d hidden title again and forget your feedback", "Show %d hidden titles again and forget your feedback") }
+				} else {
+					{ tr(ctx, "Forget your feedback") }
+				}
+			</button>
 		}
 	</div>
 }

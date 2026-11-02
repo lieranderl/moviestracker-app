@@ -51,7 +51,7 @@ func TestSeriesPageShowsSeasonsWithFirstSeasonEpisodes(t *testing.T) {
 		"Bryan Cranston", "Walter White",
 		`href="/tv/1396?season=2#seasons"`,
 		"S01E01", "Pilot", "58m",
-		`@get('/api/torrents?type=tv&id=1396&sort=' + $sort + '&season=' + $sourceSeason`,
+		`@get('/api/torrents?type=tv&id=1396', {filterSignals: {include: /^(sort|qual|hdr|sourceSeason)$/}})`,
 		`data-bind:source-season`, `<option value="2">Season 2</option>`,
 	} {
 		if !strings.Contains(body, want) {
