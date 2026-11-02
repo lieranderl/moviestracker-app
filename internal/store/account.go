@@ -19,6 +19,9 @@ type Account struct {
 	// Episodes are the watched episodes, by series and then season.
 	Episodes map[int]map[int][]int `json:"watchedEpisodes"`
 	Follows  []FollowedSeries      `json:"followedSeries"`
+	// MutedAlerts and AlertFeeds are the user's release alert choices.
+	MutedAlerts []MutedTitle         `json:"mutedAlerts"`
+	AlertFeeds  map[string]AlertFeed `json:"alertFeeds"`
 }
 
 // AccountStore hands users everything kept for them, and deletes it.
@@ -38,3 +41,15 @@ type AccountStore interface {
 // DeletedAccountKept is how long a deleted account's ID and deletion time
 // are kept: as long as a session lasts.
 const DeletedAccountKept = 30 * 24 * time.Hour
+
+// withAlertChoices is a with the user's release alert choices.
+func withAlertChoices(ctx context.Context, s UpdateStore, uid string, a Account) (Account, error) {
+	var err error
+	if a.MutedAlerts, err = s.MutedAlerts(ctx, uid); err != nil {
+		return Account{}, err
+	}
+	if a.AlertFeeds, err = s.AlertFeeds(ctx, uid); err != nil {
+		return Account{}, err
+	}
+	return a, nil
+}

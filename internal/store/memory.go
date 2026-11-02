@@ -509,6 +509,7 @@ func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error)
 	filters, _ := m.ReleaseFilters(ctx, uid)
 	lists, _ := m.CustomLists(ctx, uid)
 	follows, _ := m.FollowedSeries(ctx, uid)
+	choices, _ := withAlertChoices(ctx, m, uid, Account{}) // read before the lock below
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	u := m.user(uid)
@@ -518,7 +519,7 @@ func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error)
 		Progress:    slices.SortedFunc(maps.Values(u.progress), func(a, b Progress) int { return b.UpdatedAt.Compare(a.UpdatedAt) }),
 		TitleStates: append(watched, want...), Updates: updates, ReleaseFilters: filters, Lists: lists,
 		Reviews: slices.Collect(maps.Values(u.reviews)), Episodes: u.watchedEpisodes(),
-		Follows: follows,
+		Follows: follows, MutedAlerts: choices.MutedAlerts, AlertFeeds: choices.AlertFeeds,
 	}, nil
 }
 
