@@ -2,6 +2,7 @@ package web_test
 
 import (
 	"context"
+	"errors"
 	"html"
 	"net/http"
 	"strings"
@@ -62,5 +63,30 @@ func TestAUserMutesAMoviesReleaseAlerts(t *testing.T) {
 	}))
 	if got := bellCount(t, h, session); got != "1" {
 		t.Errorf("Dune's later release after unmuting shows the bell %q, want 1", got)
+	}
+}
+
+// unreadableMutePreferences models the external preferences read failing.
+type unreadableMutePreferences struct{ *store.Memory }
+
+func (unreadableMutePreferences) MutedAlerts(context.Context, string) ([]store.MutedTitle, error) {
+	return nil, errors.New("preferences unavailable")
+}
+func TestUnknownAlertPreferencesAreExplainedAndCannotBeChanged(t *testing.T) {
+	g := newGoogle(t)
+	cfg := g.config()
+	users := unreadableMutePreferences{store.NewMemory()}
+	cfg.Store = users
+	if err := users.AddUpdates(context.Background(), "1098765", []store.Update{{Feed: "hdr10movies", TMDBID: 438631, Title: "Dune", FoundAt: now}}); err != nil {
+		t.Fatal(err)
+	}
+	h := web.New(cfg)
+	page := getWith(t, h, "/alerts", signIn(t, h))
+	body := html.UnescapeString(page.Body.String())
+	if page.Code != http.StatusServiceUnavailable || !strings.Contains(body, "Your alert preferences could not be loaded.") || !strings.Contains(body, "Retry") {
+		t.Errorf("unknown preference state = %d without a retryable error", page.Code)
+	}
+	if strings.Contains(body, "@post('/api/alerts/mute") {
+		t.Error("unknown mute preferences were rendered as active Mute controls")
 	}
 }

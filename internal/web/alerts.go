@@ -229,6 +229,10 @@ func (a *app) handleAlertsPage(w http.ResponseWriter, r *http.Request) {
 	}
 	if v.Muted, err = a.cfg.Store.MutedAlerts(ctx, user.ID); err != nil {
 		slog.Warn("reading muted alerts failed", "error", handlers.LogError(err))
+		v.MutedFailed = true
+		if !v.Failed {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
 	}
 	if err := views.AlertsPage(a.catalogUser(r), v).Render(r.Context(), w); err != nil {
 		slog.Warn("render failed", "page", "alerts", "error", err)

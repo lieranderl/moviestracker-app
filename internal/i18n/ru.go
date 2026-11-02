@@ -2,6 +2,8 @@ package i18n
 
 // ru translates the interface into Russian, by English text.
 var ru = map[string]string{
+	"Alert preferences unavailable":                                 "Настройки уведомлений недоступны",
+	"Your alert preferences could not be loaded. Please try again.": "Не удалось загрузить настройки уведомлений. Попробуйте ещё раз.",
 	"Refresh":             "Обновить",
 	"TorrServer settings": "Настройки TorrServer",
 	"Settings section":    "Раздел настроек",
