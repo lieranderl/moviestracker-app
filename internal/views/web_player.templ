@@ -69,13 +69,8 @@ templ webPlayerTransport() {
 }
 
 templ webPlayerProblems() {
-	<div class="alert alert-warning alert-soft mt-3" role="alert" data-show="$_tsPlayerProblem === 'missing'">
-		@Icon("file-question", "size-5")
-		<span>
-			{ tr(ctx, "This file is no longer on your TorrServer.") }
-			{ tr(ctx, "Add a release again to keep watching.") }
-		</span>
-		<a href="/search" class="btn btn-sm btn-primary" data-attr:href="$_resumeHref">{ tr(ctx, "Find it again") }</a>
+	<div class="mt-3" data-show="$_tsPlayerProblem === 'missing'">
+		@missingFileAlert("", "/search", nil, templ.Attributes{"data-attr:href": "$_resumeHref"})
 	</div>
 	<div class="alert alert-warning alert-soft mt-3" role="alert" data-show="($_tsPlayerProblem && $_tsPlayerProblem !== 'missing') || $_tsProbeProblem">
 		<span>{ tr(ctx,"TorrServer could not load playback information. Check the connection or login, then retry.") }</span>

@@ -46,7 +46,7 @@ func TestContinuingAFileTorrServerNoLongerHasLeadsBackToItsSources(t *testing.T)
 	if strings.Contains(page, `id="torr-autoplay"`) {
 		t.Error("the player opens on a file TorrServer does not have")
 	}
-	for _, want := range []string{`id="resume-missing"`, "is no longer on your TorrServer", `href="/movie/438631#sources"`, "Dune"} {
+	for _, want := range []string{`id="resume-missing"`, "is no longer on your TorrServer", `href="/movie/438631#sources"`, "Dune", "Find it again"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the TorrServer page lacks %q", want)
 		}
@@ -60,5 +60,28 @@ func TestContinuingAnUnknownMissingFileSearchesForIt(t *testing.T) {
 	page := html.UnescapeString(get(t, s, "/torrserver?play="+duneHash+"&file=5", true).Body.String())
 	if strings.Contains(page, `id="torr-autoplay"`) || !strings.Contains(page, `id="resume-missing"`) || !strings.Contains(page, `href="/search"`) {
 		t.Error("a missing file with no title should offer search, not the player")
+	}
+}
+
+// A torrent TorrServer lists without its file metadata may still hold the
+// file: Continue watching plays it rather than calling it gone.
+func TestContinuingATorrentListedWithoutFilesStillPlays(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/echo":
+			_, _ = w.Write([]byte("MatriX.146"))
+		case "/torrents":
+			_, _ = w.Write([]byte(`[{"hash":"` + duneHash + `","title":"Dune"}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(ts.Close)
+	cfg := validTestConfig(t)
+	cfg.TorrServer = torrserver.NewManager(ts.URL)
+	s := newTestServerWithConfig(t, cfg)
+	page := html.UnescapeString(get(t, s, "/torrserver?play="+duneHash+"&file=2", true).Body.String())
+	if strings.Contains(page, `id="resume-missing"`) || !strings.Contains(page, `id="torr-autoplay"`) {
+		t.Error("a torrent listed without file metadata was called gone")
 	}
 }

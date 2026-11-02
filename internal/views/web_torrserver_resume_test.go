@@ -20,6 +20,8 @@ func TestTheWebPlayerLeadsBackToSourcesForAMissingFile(t *testing.T) {
 		`data-attr:href="$_resumeHref"`,
 		`$_resumeHref = '/movie/438631#sources'`,
 		`data-show="($_tsPlayerProblem && $_tsPlayerProblem !== 'missing') || $_tsProbeProblem"`,
+		"Find it again", // the same alert as the local app's
+		"$streamTitle = d.title; $_resumeHref = '/search';", // another torrent's play resets the link
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("web player lacks %q", want)

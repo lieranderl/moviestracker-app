@@ -187,28 +187,31 @@ func resumeRecovery(p PlayRequest) (href string, byTitle bool) {
 // longer has, and leads to finding it again.
 templ resumeMissing() {
 	if p, ok := ctx.Value(playRequestKey{}).(PlayRequest); ok && p.Missing {
-		{{ href, byTitle := resumeRecovery(p) }}
-		<div id="resume-missing" role="alert" class="alert alert-warning alert-soft">
-			@Icon("file-question", "size-5")
-			<span>
-				if p.Title != "" {
-					{ trf(ctx, "%s is no longer on your TorrServer.", p.Title) }
-				} else {
-					{ tr(ctx, "This file is no longer on your TorrServer.") }
-				}
-				{ tr(ctx, "Add a release again to keep watching.") }
-			</span>
-			<a href={ templ.SafeURL(href) } class="btn btn-sm btn-primary gap-1.5">
-				if byTitle {
-					@Icon("magnet", "size-4")
-					{ tr(ctx, "Find sources") }
-				} else {
-					@Icon("search", "size-4")
-					{ tr(ctx, "Search") }
-				}
-			</a>
-		</div>
+		{{ href, _ := resumeRecovery(p) }}
+		@missingFileAlert(p.Title, href, templ.Attributes{"id": "resume-missing"}, nil)
 	}
+}
+
+// missingFileAlert says a file is no longer on the user's TorrServer and
+// leads to finding it again, in both apps: the local app renders it with
+// the file's title and link, the web player binds its visibility (attrs)
+// and link (linkAttrs) to signals.
+templ missingFileAlert(title, href string, attrs, linkAttrs templ.Attributes) {
+	<div role="alert" class="alert alert-warning alert-soft" { attrs... }>
+		@Icon("file-question", "size-5")
+		<span>
+			if title != "" {
+				{ trf(ctx, "%s is no longer on your TorrServer.", title) }
+			} else {
+				{ tr(ctx, "This file is no longer on your TorrServer.") }
+			}
+			{ tr(ctx, "Add a release again to keep watching.") }
+		</span>
+		<a href={ templ.SafeURL(href) } class="btn btn-sm btn-primary gap-1.5" { linkAttrs... }>
+			@Icon("magnet", "size-4")
+			{ tr(ctx, "Find it again") }
+		</a>
+	</div>
 }
 
 // torrAutoplay opens the player on the file the page's link asks for.
