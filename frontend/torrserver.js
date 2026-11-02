@@ -396,8 +396,14 @@ window.tsPlayerLoad = async (el, url, hash, index, kind, nonce) => {
   playerLoads.set(el, ctl);
   await Promise.resolve();
   if (ctl.signal.aborted) return;
-  const result = await getTorrent(url, hash, ctl.signal);
+  let result = await getTorrent(url, hash, ctl.signal);
   if (ctl.signal.aborted) return;
+  // TorrServer answered without the torrent, or listed the torrent's files
+  // without this one (a torrent still fetching its metadata lists none):
+  // the page leads back to its sources instead of a broken player.
+  if ((result.problem === "status" && result.status === 404) || (result.value?.file_stats?.length && !result.value.file_stats.some((f) => f.id === index))) {
+    result = { problem: "missing", status: 404 };
+  }
   let probe = {value: null};
   if (!result.problem && kind === "hls") {
     probe = await call(url, `gst/${hash}/probe?index=${index}`, {signal:ctl.signal, read:res=>res.json(),timeout:30000});
