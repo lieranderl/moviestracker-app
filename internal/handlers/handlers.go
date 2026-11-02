@@ -344,6 +344,7 @@ func (s *Server) routes() {
 	library.Consider(s.feedback, s.reviews.store)
 	NewRecommendations(library, s.username, s.Catalog).Register(s.mux)
 	s.follows.Register(s.mux)
+	s.ExcludeFromPicks(library.MarkedFor(s.username))
 	s.releaseFilterPrefs.Register(s.mux)
 	s.mux.HandleFunc("GET /api/torrserver/stream/", s.handleTorrServerStreamProxy)
 
