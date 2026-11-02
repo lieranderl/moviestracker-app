@@ -54,8 +54,6 @@ type app struct {
 	progress *handlers.Progress
 	library  *handlers.Library // users' library summaries, kept until their library changes
 	feeds    *cachedFeeds      // the backend's release feeds, as the home rows read them
-	// deletions are when accounts were deleted, for ending their sessions.
-	deletions deletions
 }
 
 func (a *app) now() time.Time {
@@ -163,7 +161,7 @@ func New(cfg Config) http.Handler {
 	a.progress.MarkFinishedEpisodesIn(episodes)
 	mux.HandleFunc("POST /api/language", handlers.SetLanguage(a.secure(), a.saveLanguage))
 	app := http.NewCrossOriginProtection().Handler(handlers.Language(webSite(handlers.SignedIn(a.userID, mux), cfg.BaseURL)))
-	return handlers.RecoveryMiddleware(handlers.SecurityHeadersMiddleware(true, handlers.LoggingMiddleware(app)))
+	return handlers.RecoveryMiddleware(handlers.SecurityHeadersMiddleware(true, handlers.LoggingMiddleware(a.sessionContext(app))))
 }
 
 // handleHome is the catalog's home page for a signed-in visitor, and the

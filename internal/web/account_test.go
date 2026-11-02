@@ -3,6 +3,7 @@ package web_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"html"
 	"net/http"
 	"net/http/httptest"
@@ -121,5 +122,181 @@ func TestDeletingAnAccountEndsItsOtherSessions(t *testing.T) {
 	again := signIn(t, h)
 	if res := send(t, h, http.MethodGet, "/api/alerts/count", again); res.Code != http.StatusOK {
 		t.Errorf("signing in again after deletion = %d", res.Code)
+	}
+}
+
+func TestAccountDeletionEndsCachedSessionsOnAnotherInstanceBeforeWrites(t *testing.T) {
+	clock := now
+	g := newGoogle(t)
+	cfg := withTMDB(t, g.config())
+	cfg.Now = func() time.Time { return clock }
+	users := store.NewMemory(store.WithClock(func() time.Time { return clock }))
+	cfg.Store = users
+	first, second := web.New(cfg), web.New(cfg)
+	session := signIn(t, first)
+	if res := getWith(t, second, "/account", session); res.Code != http.StatusOK {
+		t.Fatal("second instance did not cache the signed-in session")
+	}
+	clock = clock.Add(time.Second)
+	postSignals(t, first, "/api/account/delete", `{"deleteConfirm":"delete"}`, session)
+	if page := getWith(t, second, "/account", session); page.Code != http.StatusSeeOther {
+		t.Errorf("another instance still reads the deleted account: %d", page.Code)
+	}
+	res := send(t, second, http.MethodPost, "/api/favorites?type=movie&id=438631", session)
+	if res.Code != http.StatusUnauthorized {
+		t.Errorf("write through another instance after deletion = %d, want 401", res.Code)
+	}
+	if favs, _ := users.Favorites(context.Background(), "1098765"); len(favs) != 0 {
+		t.Error("a cached session recreated deleted favourites")
+	}
+}
+
+// heldProgress holds one external store call after request authentication.
+type heldProgress struct {
+	*store.Memory
+	entered, release chan struct{}
+}
+
+func (s heldProgress) SaveProgress(ctx context.Context, uid string, p store.Progress) error {
+	close(s.entered)
+	select {
+	case <-s.release:
+		return s.Memory.SaveProgress(ctx, uid, p)
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+func TestAnInflightProgressWriteCannotRecreateADeletedAccount(t *testing.T) {
+	g := newGoogle(t)
+	cfg := g.config()
+	cfg.Now = func() time.Time { return now }
+	users := heldProgress{Memory: store.NewMemory(store.WithClock(func() time.Time { return now })), entered: make(chan struct{}), release: make(chan struct{})}
+	cfg.Store = users
+	first, second := web.New(cfg), web.New(cfg)
+	session := signIn(t, first)
+	result := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		result <- postSignals(t, second, "/api/progress", `{"hash":"aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111","index":1,"position":60,"duration":3600,"torrent":{"hash":"aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111","title":"Dune"}}`, session)
+	}()
+	select {
+	case <-users.entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("progress request did not reach the store")
+	}
+	postSignals(t, first, "/api/account/delete", `{"deleteConfirm":"delete"}`, session)
+	close(users.release)
+	select {
+	case res := <-result:
+		if res.Code == http.StatusNoContent {
+			t.Error("the in-flight write succeeded after account deletion")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("progress write did not end")
+	}
+	exported, err := users.ExportAccount(context.Background(), "1098765")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(exported.Progress) != 0 {
+		t.Error("the in-flight request recreated deleted progress")
+	}
+}
+
+// partialDeletion is an external store interrupted after recording revocation.
+type partialDeletion struct {
+	*store.Memory
+	pending bool
+	failed  bool
+}
+
+func (s *partialDeletion) DeleteAccount(ctx context.Context, uid string) error {
+	if !s.failed {
+		s.failed = true
+		s.pending = true
+		return errors.New("interrupted deletion")
+	}
+	if err := s.Memory.DeleteAccount(context.Background(), uid); err != nil {
+		return err
+	}
+	s.pending = false
+	return nil
+}
+func (s *partialDeletion) AccountDeletedAt(ctx context.Context, uid string) (time.Time, error) {
+	if s.pending {
+		return now, nil
+	}
+	return s.Memory.AccountDeletedAt(ctx, uid)
+}
+func (s *partialDeletion) AccountDeletionPending(context.Context, string) (bool, error) {
+	return s.pending, nil
+}
+func TestAnInterruptedDeletionCanBeRetriedWithoutReauthorizingACompletedDeletion(t *testing.T) {
+	g := newGoogle(t)
+	cfg := g.config()
+	cfg.Now = func() time.Time { return now }
+	users := &partialDeletion{Memory: store.NewMemory(store.WithClock(func() time.Time { return now }))}
+	cfg.Store = users
+	h := web.New(cfg)
+	session := signIn(t, h)
+	if err := users.AddFavorite(context.Background(), "1098765", store.Favorite{Kind: "movie", TMDBID: 438631, Title: "Dune"}); err != nil {
+		t.Fatal(err)
+	}
+	failed := postSignals(t, h, "/api/account/delete", `{"deleteConfirm":"delete"}`, session)
+	if !strings.Contains(failed.Body.String(), "could not be deleted completely") {
+		t.Fatal("the external deletion failure was not reported")
+	}
+	retry := postSignals(t, h, "/api/account/delete", `{"deleteConfirm":"delete"}`, session)
+	if retry.Code == http.StatusUnauthorized {
+		t.Error("the still-pending deletion cannot be retried with its original session")
+	}
+	if favs, _ := users.Favorites(context.Background(), "1098765"); len(favs) != 0 {
+		t.Error("retry left account data behind")
+	}
+	if users.pending {
+		return
+	}
+	again := postSignals(t, h, "/api/account/delete", `{"deleteConfirm":"delete"}`, session)
+	if again.Code != http.StatusUnauthorized {
+		t.Error("a completed deletion reauthorized the old session")
+	}
+}
+
+func TestSigningInWithinTheDeletionSecondStartsAFreshSession(t *testing.T) {
+	clock := now
+	g := newGoogle(t)
+	cfg := g.config()
+	cfg.Now = func() time.Time { return clock }
+	cfg.Store = store.NewMemory(store.WithClock(func() time.Time { return clock }))
+	h := web.New(cfg)
+	session := signIn(t, h)
+	clock = clock.Add(time.Millisecond)
+	postSignals(t, h, "/api/account/delete", `{"deleteConfirm":"delete"}`, session)
+	clock = clock.Add(time.Millisecond)
+	again := signIn(t, h)
+	if res := getWith(t, h, "/account", again); res.Code != http.StatusOK {
+		t.Errorf("fresh sign-in within the deletion second = %d, want 200", res.Code)
+	}
+}
+
+func TestSigningInAgainCompletesAPendingDeletionBeforeStartingFresh(t *testing.T) {
+	g := newGoogle(t)
+	cfg := g.config()
+	users := &partialDeletion{Memory: store.NewMemory()}
+	cfg.Store = users
+	h := web.New(cfg)
+	session := signIn(t, h)
+	if err := users.AddFavorite(context.Background(), "1098765", store.Favorite{Kind: "movie", TMDBID: 438631, Title: "Dune"}); err != nil {
+		t.Fatal(err)
+	}
+	postSignals(t, h, "/api/account/delete", `{"deleteConfirm":"delete"}`, session)
+	again := signIn(t, h)
+	if users.pending {
+		t.Error("a new sign-in left the requested account deletion pending")
+	}
+	if favs, _ := users.Favorites(context.Background(), "1098765"); len(favs) != 0 {
+		t.Error("the new account retained data from its interrupted deletion")
+	}
+	if res := getWith(t, h, "/account", again); res.Code != http.StatusOK {
+		t.Errorf("the new session = %d, want 200", res.Code)
 	}
 }
