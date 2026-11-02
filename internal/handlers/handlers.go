@@ -71,6 +71,7 @@ type Server struct {
 	reviews            *Reviews                          // each account's ratings and notes
 	episodes           *Episodes                         // each account's watched episodes
 	feedback           store.FeedbackStore               // each account's recommendation feedback
+	follows            *Follows                          // each account's followed series
 	releaseFilterPrefs *ReleaseFilterPrefs               // how each account last searched releases
 	plays              *playback.Tracker                 // what plays through the proxy
 	sampler            *stats.Sampler                    // this machine, for the dashboard
@@ -161,6 +162,11 @@ func NewServer(cfg Config) (*Server, error) {
 		return nil, err
 	}
 	s.episodes = NewEpisodes(episodes, s.username, s.Catalog)
+	follows, err := store.OpenFollowFile(filepath.Join(cfg.Store.Dir(), "follows.json"))
+	if err != nil {
+		return nil, err
+	}
+	s.follows = NewFollows(follows, s.username, s.Catalog)
 	reviews, err := store.OpenReviewFile(filepath.Join(cfg.Store.Dir(), "reviews.json"))
 	if err != nil {
 		return nil, err
@@ -337,6 +343,7 @@ func (s *Server) routes() {
 	library := NewLibrary(s.titleStates.store, nil, nil)
 	library.Consider(s.feedback, s.reviews.store)
 	NewRecommendations(library, s.username, s.Catalog).Register(s.mux)
+	s.follows.Register(s.mux)
 	s.releaseFilterPrefs.Register(s.mux)
 	s.mux.HandleFunc("GET /api/torrserver/stream/", s.handleTorrServerStreamProxy)
 
