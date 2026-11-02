@@ -12,31 +12,44 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"strconv"
 	"strings"
 
 	"github.com/lieranderl/moviestracker-app/internal/jacred"
 )
 
-// comparePicked counts the releases picked for comparison ($_cmp).
-const comparePicked = "Object.values($_cmp).filter(Boolean).length"
+// compareGen names one set of results' picks under $_cmp: Datastar merges
+// signals, so a newer search keeps older picks unless they are apart.
+func compareGen(results []jacred.Result) string {
+	h := fnv.New64a()
+	for _, r := range results {
+		_, _ = h.Write([]byte(r.Magnet + "\x00" + r.Title + "\x00"))
+	}
+	return fmt.Sprintf("g%x", h.Sum64())
+}
+
+// comparePicked counts the releases picked among one set of results.
+func comparePicked(gen string) string {
+	return fmt.Sprintf("Object.values($_cmp.%s).filter(Boolean).length", gen)
+}
 
 // compareMax is how many releases are compared at once.
 const compareMax = 4
 
-// compareSignals starts $_cmp with every release unpicked, by row (r0, r1,
-// …), and the comparison closed.
-func compareSignals(n int) string {
+// compareSignals start this set of results' picks, every release unpicked
+// by row (r0, r1, …), and the comparison closed.
+func compareSignals(gen string, n int) string {
 	picks := make(map[string]bool, n)
 	for i := range n {
 		picks[fmt.Sprintf("r%d", i)] = false
 	}
-	b, _ := json.Marshal(map[string]any{"_cmp": picks, "_cmpOpen": false})
+	b, _ := json.Marshal(map[string]any{"_cmp": map[string]any{gen: picks}, "_cmpOpen": false})
 	return string(b)
 }
 
 // comparePick picks a release for comparison, up to compareMax.
-func comparePick(i int, r jacred.Result) templ.Component {
+func comparePick(gen string, i int, r jacred.Result) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -62,9 +75,9 @@ func comparePick(i int, r jacred.Result) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("_cmp.r%d", i))
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("_cmp.%s.r%d", gen, i))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 36, Col: 41}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 49, Col: 49}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
@@ -75,9 +88,9 @@ func comparePick(i int, r jacred.Result) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
-		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("!$_cmp.r%d && %s >= %d", i, comparePicked, compareMax))
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("!$_cmp.%s.r%d && %s >= %d", gen, i, comparePicked(gen), compareMax))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 37, Col: 91}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 50, Col: 104}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 		if templ_7745c5c3_Err != nil {
@@ -90,7 +103,7 @@ func comparePick(i int, r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(trf(ctx, "Compare %s", r.Title))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 38, Col: 47}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 51, Col: 47}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {
@@ -103,7 +116,7 @@ func comparePick(i int, r jacred.Result) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Compare"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 40, Col: 22}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 53, Col: 22}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -118,7 +131,7 @@ func comparePick(i int, r jacred.Result) templ.Component {
 }
 
 // compareButton opens the comparison once two releases are picked.
-func compareButton() templ.Component {
+func compareButton(gen string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -144,9 +157,9 @@ func compareButton() templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var7 string
-		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(comparePicked + " >= 2")
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(comparePicked(gen) + " >= 2")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 46, Col: 99}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 59, Col: 104}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 		if templ_7745c5c3_Err != nil {
@@ -167,7 +180,7 @@ func compareButton() templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Compare releases"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 48, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 61, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -178,9 +191,9 @@ func compareButton() templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 string
-		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(comparePicked)
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(comparePicked(gen))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 49, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 62, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 		if templ_7745c5c3_Err != nil {
@@ -241,7 +254,7 @@ type compareFact struct {
 }
 
 // compareDialog shows the picked releases side by side, a column each.
-func compareDialog(results []jacred.Result) templ.Component {
+func compareDialog(gen string, results []jacred.Result) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -288,9 +301,9 @@ func compareDialog(results []jacred.Result) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var12 string
-				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("$_cmp.r%d", i))
+				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("$_cmp.%s.r%d", gen, i))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 109, Col: 101}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 122, Col: 109}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 				if templ_7745c5c3_Err != nil {
@@ -303,7 +316,7 @@ func compareDialog(results []jacred.Result) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(r.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 109, Col: 113}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 122, Col: 121}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -326,7 +339,7 @@ func compareDialog(results []jacred.Result) templ.Component {
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(f.label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 116, Col: 46}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 129, Col: 46}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -342,9 +355,9 @@ func compareDialog(results []jacred.Result) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var15 string
-					templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("$_cmp.r%d", i))
+					templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("$_cmp.%s.r%d", gen, i))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 118, Col: 51}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 131, Col: 59}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 					if templ_7745c5c3_Err != nil {
@@ -357,7 +370,7 @@ func compareDialog(results []jacred.Result) templ.Component {
 					var templ_7745c5c3_Var16 string
 					templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(orUnknown(ctx, f.value(r)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 118, Col: 82}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 131, Col: 90}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 					if templ_7745c5c3_Err != nil {
@@ -380,7 +393,7 @@ func compareDialog(results []jacred.Result) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "As the trackers report them. Playback is not checked: whether a release plays depends on your browser and TorrServer."))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 125, Col: 177}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/source_compare.templ`, Line: 138, Col: 177}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {

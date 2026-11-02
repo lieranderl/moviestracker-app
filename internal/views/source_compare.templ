@@ -2,6 +2,7 @@ package views
 
 import (
 	"context"
+	"hash/fnv"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -10,31 +11,43 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/jacred"
 )
 
-// comparePicked counts the releases picked for comparison ($_cmp).
-const comparePicked = "Object.values($_cmp).filter(Boolean).length"
+// compareGen names one set of results' picks under $_cmp: Datastar merges
+// signals, so a newer search keeps older picks unless they are apart.
+func compareGen(results []jacred.Result) string {
+	h := fnv.New64a()
+	for _, r := range results {
+		_, _ = h.Write([]byte(r.Magnet + "\x00" + r.Title + "\x00"))
+	}
+	return fmt.Sprintf("g%x", h.Sum64())
+}
+
+// comparePicked counts the releases picked among one set of results.
+func comparePicked(gen string) string {
+	return fmt.Sprintf("Object.values($_cmp.%s).filter(Boolean).length", gen)
+}
 
 // compareMax is how many releases are compared at once.
 const compareMax = 4
 
-// compareSignals starts $_cmp with every release unpicked, by row (r0, r1,
-// …), and the comparison closed.
-func compareSignals(n int) string {
+// compareSignals start this set of results' picks, every release unpicked
+// by row (r0, r1, …), and the comparison closed.
+func compareSignals(gen string, n int) string {
 	picks := make(map[string]bool, n)
 	for i := range n {
 		picks[fmt.Sprintf("r%d", i)] = false
 	}
-	b, _ := json.Marshal(map[string]any{"_cmp": picks, "_cmpOpen": false})
+	b, _ := json.Marshal(map[string]any{"_cmp": map[string]any{gen: picks}, "_cmpOpen": false})
 	return string(b)
 }
 
 // comparePick picks a release for comparison, up to compareMax.
-templ comparePick(i int, r jacred.Result) {
+templ comparePick(gen string, i int, r jacred.Result) {
 	<label class="label cursor-pointer gap-1 text-xs">
 		<input
 			type="checkbox"
 			class="checkbox checkbox-xs"
-			data-bind={ fmt.Sprintf("_cmp.r%d", i) }
-			data-attr:disabled={ fmt.Sprintf("!$_cmp.r%d && %s >= %d", i, comparePicked, compareMax) }
+			data-bind={ fmt.Sprintf("_cmp.%s.r%d", gen, i) }
+			data-attr:disabled={ fmt.Sprintf("!$_cmp.%s.r%d && %s >= %d", gen, i, comparePicked(gen), compareMax) }
 			aria-label={ trf(ctx, "Compare %s", r.Title) }
 		/>
 		{ tr(ctx, "Compare") }
@@ -42,11 +55,11 @@ templ comparePick(i int, r jacred.Result) {
 }
 
 // compareButton opens the comparison once two releases are picked.
-templ compareButton() {
-	<button type="button" class="btn btn-sm btn-secondary gap-1.5" data-show={ comparePicked + " >= 2" } data-on:click="$_cmpOpen = true">
+templ compareButton(gen string) {
+	<button type="button" class="btn btn-sm btn-secondary gap-1.5" data-show={ comparePicked(gen) + " >= 2" } data-on:click="$_cmpOpen = true">
 		@Icon("columns-3", "size-4")
 		{ tr(ctx, "Compare releases") }
-		<span class="badge badge-sm" data-text={ comparePicked }></span>
+		<span class="badge badge-sm" data-text={ comparePicked(gen) }></span>
 	</button>
 }
 
@@ -97,7 +110,7 @@ type compareFact struct {
 }
 
 // compareDialog shows the picked releases side by side, a column each.
-templ compareDialog(results []jacred.Result) {
+templ compareDialog(gen string, results []jacred.Result) {
 	@modalDialog("compare-releases", "_cmpOpen", "", "", "max-w-5xl", nil) {
 		@modalHeader("compare-releases", tr(ctx, "Compare releases"), "columns-3", "text-secondary")
 		<div class="overflow-x-auto mt-3">
@@ -106,7 +119,7 @@ templ compareDialog(results []jacred.Result) {
 					<tr>
 						<th></th>
 						for i, r := range results {
-							<th class="align-top min-w-40 font-medium normal-case" data-show={ fmt.Sprintf("$_cmp.r%d", i) }>{ r.Title }</th>
+							<th class="align-top min-w-40 font-medium normal-case" data-show={ fmt.Sprintf("$_cmp.%s.r%d", gen, i) }>{ r.Title }</th>
 						}
 					</tr>
 				</thead>
@@ -115,7 +128,7 @@ templ compareDialog(results []jacred.Result) {
 						<tr>
 							<th class="whitespace-nowrap">{ f.label }</th>
 							for i, r := range results {
-								<td data-show={ fmt.Sprintf("$_cmp.r%d", i) }>{ orUnknown(ctx, f.value(r)) }</td>
+								<td data-show={ fmt.Sprintf("$_cmp.%s.r%d", gen, i) }>{ orUnknown(ctx, f.value(r)) }</td>
 							}
 						</tr>
 					}
