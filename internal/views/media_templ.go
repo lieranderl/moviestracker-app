@@ -4267,6 +4267,10 @@ func TorrActivityStats(t *torrserver.Torrent) templ.Component {
 	})
 }
 
+// toastClass places a popover toast at the screen's bottom end, above the
+// dock on phones.
+const toastClass = "toast toast-end toast-bottom m-0 inset-auto bottom-0 max-md:bottom-16 right-0 bg-transparent border-0 overflow-visible [&:not(:popover-open)]:hidden"
+
 // appToast shows $toast for 3s; $toastError switches it to the error tone.
 func appToast() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -4289,20 +4293,38 @@ func appToast() templ.Component {
 			templ_7745c5c3_Var196 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 311, "<div popover=\"manual\" role=\"status\" aria-live=\"polite\" class=\"toast toast-end toast-bottom m-0 inset-auto bottom-0 max-md:bottom-16 right-0 bg-transparent border-0 overflow-visible [&:not(:popover-open)]:hidden\" data-effect=\"if ($toast) { el.matches(':popover-open') ? (el.hidePopover(), el.showPopover()) : el.showPopover() } else if (el.matches(':popover-open')) { el.hidePopover() }\" data-on-signal-patch__debounce.3s=\"")
+		var templ_7745c5c3_Var197 = []any{toastClass}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var197...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var197 string
-		templ_7745c5c3_Var197, templ_7745c5c3_Err = templ.ResolveAttributeValue(toastAutoHide)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 1033, Col: 51}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var197)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 311, "<div popover=\"manual\" role=\"status\" aria-live=\"polite\" class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 312, "\" data-on-signal-patch-filter=\"{ include: /^toast$/ }\"><div class=\"alert alert-success shadow-xl text-sm\" data-class=\"{ 'alert-success': !$toastError, 'alert-error': $toastError }\"><span data-text=\"$toast\"></span></div></div>")
+		var templ_7745c5c3_Var198 string
+		templ_7745c5c3_Var198, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var197).String())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 1, Col: 0}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var198)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 312, "\" data-effect=\"if ($toast) { el.matches(':popover-open') ? (el.hidePopover(), el.showPopover()) : el.showPopover() } else if (el.matches(':popover-open')) { el.hidePopover() }\" data-on-signal-patch__debounce.3s=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var199 string
+		templ_7745c5c3_Var199, templ_7745c5c3_Err = templ.ResolveAttributeValue(toastAutoHide)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/media.templ`, Line: 1037, Col: 51}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var199)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 313, "\" data-on-signal-patch-filter=\"{ include: /^toast$/ }\"><div class=\"alert alert-success shadow-xl text-sm\" data-class=\"{ 'alert-success': !$toastError, 'alert-error': $toastError }\"><span data-text=\"$toast\"></span></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

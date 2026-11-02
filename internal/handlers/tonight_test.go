@@ -86,3 +86,22 @@ func TestNoPickForTonightOffersToRelaxEachFilter(t *testing.T) {
 		}
 	}
 }
+
+// A title Discover lists on more than one page is picked once.
+func TestAShortlistNamesEachTitleOnce(t *testing.T) {
+	_, details, get := tonightServer(t, 6)
+	details.discovered.TotalPages = 3 // the fake answers every page alike
+	for draw := 1; draw <= 5; draw++ {
+		got := picks(get(fmt.Sprintf("/discover?type=movie&pick=%d", draw)))
+		seen := map[string]bool{}
+		for _, p := range got {
+			if seen[p] {
+				t.Errorf("draw %d picks %s twice: %v", draw, p, got)
+			}
+			seen[p] = true
+		}
+		if len(got) != 5 {
+			t.Errorf("draw %d picks %v, want the 5 unwatched titles", draw, got)
+		}
+	}
+}

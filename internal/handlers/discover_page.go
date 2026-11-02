@@ -167,10 +167,12 @@ func (c *Catalog) pickForTonight(ctx context.Context, r *http.Request, q tmdb.Di
 		marked = c.marked(r)
 	}
 	var pool []tmdb.MediaItem
+	seen := map[string]bool{} // rankings shift between pages, repeating titles
 	page := first
 	for n := 1; ; n++ {
 		for _, it := range page.Items {
-			if !marked[titleKey(it.MediaType, it.ID)] {
+			if k := titleKey(it.MediaType, it.ID); !marked[k] && !seen[k] {
+				seen[k] = true
 				pool = append(pool, it)
 			}
 		}
