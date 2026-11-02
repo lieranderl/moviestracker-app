@@ -12,8 +12,8 @@
   "devDependencies": {
     "@tailwindcss/cli": "4.3.3",
     "daisyui": "5.7.50",
-    "lucide": "1.59.0",
-    "simple-icons": "16.35.0",
+    "lucide": "1.61.0",
+    "simple-icons": "16.36.0",
     "tailwindcss": "4.3.3"
   },
   "dependencies": {

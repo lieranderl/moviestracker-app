@@ -10,8 +10,8 @@
       "devDependencies": {
         "@tailwindcss/cli": "4.3.3",
         "daisyui": "5.7.50",
-        "lucide": "1.59.0",
-        "simple-icons": "16.35.0",
+        "lucide": "1.61.0",
+        "simple-icons": "16.36.0",
         "tailwindcss": "4.3.3",
       },
     },
@@ -131,7 +131,7 @@
 
     "lightningcss-win32-x64-msvc": ["lightningcss-win32-x64-msvc@1.32.0", "", { "os": "win32", "cpu": "x64" }, "sha512-Amq9B/SoZYdDi1kFrojnoqPLxYhQ4Wo5XiL8EVJrVsB8ARoC1PWW6VGtT0WKCemjy8aC+louJnjS7U18x3b06Q=="],
 
-    "lucide": ["lucide@1.59.0", "", {}, "sha512-0KTOAFYlTuLHdJOqnRCuPhscU29xtx/QnlHyrOfK0FynDhuPm50O3BH/e4wRnOS67ph0z7uovveCVcXUPLTPBw=="],
+    "lucide": ["lucide@1.61.0", "", {}, "sha512-RPNMBgej6WjPKuCNEODg83CF8lnraCeDOsZ3HZ7KvUYf0O5hdJBzer/Ax/meBHl3xvrp5NmKX0IDA5myyzlvGw=="],
 
     "magic-string": ["magic-string@0.30.21", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.5" } }, "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ=="],
 
@@ -145,7 +145,7 @@
 
     "picomatch": ["picomatch@2.3.2", "", {}, "sha512-V7+vQEJ06Z+c5tSye8S+nHUfI51xoXIXjHQ99cQtKUkQqqO1kO/KCJUfZXuB47h/YBlDhah2H3hdUGXn8ie0oA=="],
 
-    "simple-icons": ["simple-icons@16.35.0", "", {}, "sha512-TCfl/2+GTrx0nCo4pEWGvxhOb8c6NsqOU1OpwjtF4lwJAthB8IYVD0fuIMjLMg6JFuG1YBO0t1iETQqJLqkoJA=="],
+    "simple-icons": ["simple-icons@16.36.0", "", {}, "sha512-+VNPPkqSOLidFeSgBKUWX4n50WPpDC09hav+BgS26anIF1oQOlGBb8LvwGR+6fYRjo+B6CiKzNBceMPkSVXANQ=="],
 
     "source-map-js": ["source-map-js@1.2.1", "", {}, "sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA=="],
 
