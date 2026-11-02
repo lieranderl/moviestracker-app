@@ -16,6 +16,25 @@ import (
 // controlTag is an opening button or link tag and its content up to its close.
 var controlTag = regexp.MustCompile(`(?s)<(button|a)\b([^>]*)>(.*?)</(?:button|a)>`)
 
+func TestSeasonNavigationExposesTheCurrentPageAsALink(t *testing.T) {
+	series := &tmdb.TVDetails{
+		MediaItem: tmdb.MediaItem{ID: 95396, Title: "Severance", MediaType: "tv"},
+		Seasons:   []tmdb.SeasonSummary{{Number: 1}, {Number: 2}},
+	}
+	out := html.UnescapeString(render(t, views.TVPage(testUser, series, &tmdb.Season{ShowID: 95396, Number: 2}, 2)))
+	nav := regexp.MustCompile(`(?s)<nav[^>]*aria-label="Seasons".*?</nav>`).FindString(out)
+	if nav == "" {
+		t.Fatal("the series has no named season navigation")
+	}
+	if strings.Contains(nav, `role="tab"`) || strings.Count(nav, `aria-current="page"`) != 1 {
+		t.Errorf("season navigation must expose one current page using native links: %s", nav)
+	}
+	current := regexp.MustCompile(`<a[^>]*href="/tv/95396\?season=2#seasons"[^>]*aria-current="page"`).FindString(nav)
+	if current == "" {
+		t.Error("Season 2 is not identified as the current season")
+	}
+}
+
 // accessibleName says whether a control has a name assistive technology
 // can read: a label attribute, a title, or visible text.
 func accessibleName(attrs, content string) bool {
