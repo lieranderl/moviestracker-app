@@ -72,6 +72,7 @@ func item(ctx context.Context, r Release) tmdb.MediaItem {
 	return tmdb.MediaItem{
 		ID: r.ID, Title: title, PosterPath: r.PosterPath, BackdropPath: r.BackdropPath,
 		ReleaseDate: r.ReleaseDate, VoteAverage: r.VoteAverage, VoteCount: r.VoteCount, MediaType: "movie",
+		FoundAt: r.FoundAt,
 	}
 }
 

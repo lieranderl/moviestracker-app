@@ -370,6 +370,20 @@ in focused PRs before the larger episode/discovery and collaboration work.
   Firestore emulator (including pre-paging records); web and handler tests
   cover read reuse, invalidation and paging. The full library is still read
   when a summary is rebuilt after a change.
+- **R26 — implemented on the web, deployment unverified (2 November
+  2026):** release feed items keep their found time, and each user keeps
+  alert checkpoints: per feed, the newest release already looked through,
+  for the library stamp it was looked through for. A check reads each feed
+  only until its checkpoint, so an unchanged state costs one page per feed;
+  a first check, a long absence or a library change (newly followed movies)
+  looks up to 20 pages (400 releases) deep. Checkpoints move only after the
+  alerts found are kept, and alert IDs stay feed-plus-title, so a release
+  found twice never alerts twice. History limit: the backend feeds hold at
+  most 50 pages of 20 releases each, and alerts look 20 pages deep; a
+  release that has dropped further, or out of the backend, brings no alert.
+  The App still has no background discovery (R27). Store contract tests
+  pass on memory and the Firestore emulator; a web test covers a catch-up
+  150 releases deep and a recheck reading at most three pages.
 - **R23 — implemented in both apps, deployment unverified (2 November
   2026):** a signed-in visitor's title cards (home rows, Discover, search,
   lists, similar titles) carry Want to watch and Watched buttons, shown on

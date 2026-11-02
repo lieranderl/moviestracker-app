@@ -43,6 +43,9 @@ type MediaItem struct {
 	VoteAverage  float64 `json:"vote_average"`
 	VoteCount    int     `json:"vote_count"`
 	MediaType    string  `json:"media_type"`
+	// FoundAt is when a release feed's backend last found the title; zero
+	// for TMDB's own lists.
+	FoundAt time.Time `json:"-"`
 }
 
 // PosterURL returns the TMDB w500 image URL or empty string.
