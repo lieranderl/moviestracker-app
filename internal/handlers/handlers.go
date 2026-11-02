@@ -165,6 +165,7 @@ func NewServer(cfg Config) (*Server, error) {
 		return nil, err
 	}
 	s.reviews = NewReviews(reviews, titles, s.username, s.Catalog)
+	s.titleStates.RateFrom(reviews)
 	filters, err := store.OpenFilterFile(filepath.Join(cfg.Store.Dir(), "filters.json"))
 	if err != nil {
 		return nil, err

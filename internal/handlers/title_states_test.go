@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -126,5 +127,68 @@ func TestALongWatchListComesAPageAtATime(t *testing.T) {
 	}
 	if rec := send(http.MethodGet, "/lists/watched?after=nonsense"); rec.Code != http.StatusBadRequest {
 		t.Errorf("a malformed page link = %d, want 400", rec.Code)
+	}
+}
+
+// A watch list can be searched, narrowed to movies or series, and sorted by
+// title or by the user's rating (unrated last), in a shareable address.
+func TestAWatchListIsSearchedFilteredAndSorted(t *testing.T) {
+	movies := map[int]*tmdb.MovieDetails{
+		1: {MediaItem: tmdb.MediaItem{ID: 1, Title: "Dune", MediaType: "movie"}},
+		2: {MediaItem: tmdb.MediaItem{ID: 2, Title: "Arrival", MediaType: "movie"}},
+	}
+	series := map[int]*tmdb.TVDetails{3: {MediaItem: tmdb.MediaItem{ID: 3, Title: "Severance", MediaType: "tv"}}}
+	s := newMediaServer(t, &fakeTMDBDetails{movies: movies, series: series}, nil, "")
+	cookie := signedIn(t, s)
+	send := func(method, path, body string) string {
+		t.Helper()
+		req := httptest.NewRequest(method, path, strings.NewReader(body))
+		req.Header.Set("Datastar-Request", "true")
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(cookie)
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s %s = %d %s", method, path, rec.Code, rec.Body)
+		}
+		return html.UnescapeString(rec.Body.String())
+	}
+	for _, p := range []string{"/api/titles/state?type=movie&id=1&state=watched", "/api/titles/state?type=movie&id=2&state=watched", "/api/titles/state?type=tv&id=3&state=watched"} {
+		send(http.MethodPost, p, "")
+	}
+	send(http.MethodPost, "/api/titles/review?type=movie&id=2", `{"reviewRating":8}`)
+	send(http.MethodPost, "/api/titles/review?type=tv&id=3", `{"reviewRating":9}`)
+	order := func(page string) []string {
+		var out []string
+		for _, m := range regexp.MustCompile(`href="/(movie|tv)/(\d+)"`).FindAllStringSubmatch(page, -1) {
+			out = append(out, m[1]+"/"+m[2])
+		}
+		return out
+	}
+	cases := []struct {
+		query string
+		want  []string
+		count string
+	}{
+		{"?sort=title", []string{"movie/2", "movie/1", "tv/3"}, "3 titles"},
+		{"?sort=rating", []string{"tv/3", "movie/2", "movie/1"}, "3 titles"},
+		{"?q=dun", []string{"movie/1"}, "1 title"},
+		{"?kind=tv", []string{"tv/3"}, "1 title"},
+		{"?kind=movie&sort=title", []string{"movie/2", "movie/1"}, "2 titles"},
+	}
+	for _, c := range cases {
+		page := send(http.MethodGet, "/lists/watched"+c.query, "")
+		if got := order(page); !slices.Equal(got, c.want) {
+			t.Errorf("%s shows %v, want %v", c.query, got, c.want)
+		}
+		if !strings.Contains(page, c.count) {
+			t.Errorf("%s does not say %q", c.query, c.count)
+		}
+	}
+	page := send(http.MethodGet, "/lists/watched?q=dun&kind=movie&sort=rating", "")
+	for _, want := range []string{`name="q" value="dun"`, `<option value="movie" selected>`, `<option value="rating" selected>`, `method="get"`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the controls do not keep the query: lack %q", want)
+		}
 	}
 }

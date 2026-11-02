@@ -1008,6 +1008,23 @@ func (f *Firestore) SaveReview(ctx context.Context, uid string, r Review) error 
 	return nil
 }
 
+// Reviews implements Store.
+func (f *Firestore) Reviews(ctx context.Context, uid string) ([]Review, error) {
+	docs, err := f.reviews(uid).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("read reviews: %w", err)
+	}
+	out := make([]Review, 0, len(docs))
+	for _, doc := range docs {
+		var rec reviewRecord
+		if err := doc.DataTo(&rec); err != nil {
+			return nil, fmt.Errorf("read review %s: %w", doc.Ref.ID, err)
+		}
+		out = append(out, Review(rec))
+	}
+	return out, nil
+}
+
 // Review implements Store.
 func (f *Firestore) Review(ctx context.Context, uid, kind string, tmdbID int) (Review, error) {
 	id, err := titleID(kind, tmdbID)

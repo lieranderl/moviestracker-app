@@ -348,6 +348,17 @@ in focused PRs before the larger episode/discovery and collaboration work.
   cover read reuse, invalidation and paging. The full library is still read
   when a summary is rebuilt after a change.
 
+- **R13 — implemented, deployment unverified (2 November 2026):** Want to
+  watch, Watched (both apps) and favourites (web) have a GET form to search by
+  title, narrow to movies or series, and sort by most recent, title or the
+  user's rating, so every view is a shareable address. Decisions: with any
+  control set the whole list is read, filtered and sorted (the default view
+  keeps R05's 60-title pages); the count is of matching titles; by rating,
+  higher first, unrated titles last, ties most recent first. Stores gained a
+  Reviews list (memory, file, Firestore emulator tested). Handler and web
+  tests cover search, narrowing, both sorts, counts and kept controls; a local
+  browser check confirmed the controls at desktop and 375 px.
+
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding
 implementation plans before code; they are not delegated silently to execution.
