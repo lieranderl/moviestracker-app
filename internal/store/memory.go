@@ -3,6 +3,7 @@ package store
 import (
 	"cmp"
 	"context"
+	"errors"
 	"maps"
 	"slices"
 	"strconv"
