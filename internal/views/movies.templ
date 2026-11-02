@@ -12,7 +12,11 @@ import (
 // heroTick advances the billboard once per second:
 //   - hovered or paused: after 3s start the trailer of the current slide
 //   - otherwise: rotate to the next slide every 5s
+//
+// For a viewer who asked for reduced motion it does nothing: slides change
+// and trailers play only when they choose.
 const heroTick = `
+if ($heroReduced) return
 $heroElapsed++
 if ($heroPaused || $heroHovered) {
 	if ($heroElapsed >= 3) { $heroPlayTrailer = true }
@@ -106,7 +110,7 @@ templ HeroBillboard(items []tmdb.MediaItem) {
 		<section
 			aria-roledescription="carousel"
 			aria-label={ tr(ctx, "Trending highlights") }
-			data-signals={ fmt.Sprintf("{ heroSlide: 0, heroTotal: %d, heroPaused: false, heroHovered: false, heroElapsed: 0, heroPlayTrailer: false, heroMuted: true }", len(items)) }
+			data-signals={ fmt.Sprintf("{ heroSlide: 0, heroTotal: %d, heroPaused: false, heroHovered: false, heroElapsed: 0, heroPlayTrailer: false, heroMuted: true, heroReduced: matchMedia('(prefers-reduced-motion: reduce)').matches }", len(items)) }
 			data-on-interval__duration.1s={ heroTick }
 			data-on:mouseenter="$heroHovered = true; if (!$heroPlayTrailer) { $heroElapsed = 0 }"
 			data-on:mouseleave="$heroHovered = false; if (!$heroPaused) { $heroPlayTrailer = false; $heroElapsed = 0 }"
