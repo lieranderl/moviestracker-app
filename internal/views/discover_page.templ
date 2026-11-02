@@ -1,6 +1,7 @@
 package views
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -24,6 +25,59 @@ type DiscoverView struct {
 	Items    []tmdb.MediaItem
 	Next     int  // the page to load next; 0 at the end
 	Failed   bool // TMDB did not send the page
+	// Pick is the shortlist's draw when the user asked to pick for tonight
+	// (0: they did not); Picks are its titles, none the user has marked.
+	Pick  int
+	Picks []tmdb.MediaItem
+}
+
+// DiscoverRuntimes are the longest runtimes, in minutes, Discover offers.
+var DiscoverRuntimes = []int{90, 120, 150}
+
+// DiscoverLanguages are the original languages Discover offers.
+var DiscoverLanguages = []struct{ Code, Name string }{
+	{"en", "English"}, {"ru", "Russian"}, {"fr", "French"}, {"es", "Spanish"}, {"de", "German"},
+	{"it", "Italian"}, {"ja", "Japanese"}, {"ko", "Korean"}, {"zh", "Chinese"}, {"hi", "Hindi"},
+}
+
+// PickSize is how many titles a shortlist for tonight holds.
+const PickSize = 5
+
+// pickURL is Discover with the same filters and the given draw; without
+// is a filter left out ("genre", "runtime", …).
+func (v DiscoverView) pickURL(draw int, without string) string {
+	q, _ := url.ParseQuery(v.discoverParams(0))
+	q.Del(without)
+	q.Set("pick", strconv.Itoa(draw))
+	return "/discover?" + q.Encode()
+}
+
+// activeFilters are the filters that narrow the titles, with their labels,
+// for offering to drop each when nothing matches.
+func (v DiscoverView) activeFilters(ctx context.Context) []struct{ Param, Label string } {
+	var out []struct{ Param, Label string }
+	if v.Query.Genre > 0 {
+		for _, g := range v.Genres {
+			if g.ID == v.Query.Genre {
+				out = append(out, struct{ Param, Label string }{"genre", g.Name})
+			}
+		}
+	}
+	if v.Query.Year > 0 {
+		out = append(out, struct{ Param, Label string }{"year", strconv.Itoa(v.Query.Year)})
+	}
+	if v.Query.MinRating > 0 {
+		out = append(out, struct{ Param, Label string }{"rating", fmt.Sprintf("%g+", v.Query.MinRating)})
+	}
+	if v.Query.MaxRuntime > 0 {
+		out = append(out, struct{ Param, Label string }{"runtime", trf(ctx, "Up to %d min", v.Query.MaxRuntime)})
+	}
+	for _, l := range DiscoverLanguages {
+		if l.Code == v.Query.Language {
+			out = append(out, struct{ Param, Label string }{"lang", tr(ctx, l.Name)})
+		}
+	}
+	return out
 }
 
 // discoverParams are the filters as query parameters, page among them
@@ -38,6 +92,12 @@ func (v DiscoverView) discoverParams(page int) string {
 	}
 	if v.Query.MinRating > 0 {
 		q.Set("rating", strconv.FormatFloat(v.Query.MinRating, 'f', -1, 64))
+	}
+	if v.Query.MaxRuntime > 0 {
+		q.Set("runtime", strconv.Itoa(v.Query.MaxRuntime))
+	}
+	if v.Query.Language != "" {
+		q.Set("lang", v.Query.Language)
 	}
 	if page > 0 {
 		q.Set("page", strconv.Itoa(page))
@@ -126,6 +186,24 @@ templ DiscoverPage(user *auth.User, v DiscoverView) {
 						</select>
 					</label>
 					<label class="select select-sm w-auto">
+						<span class="label">{ tr(ctx, "Length") }</span>
+						<select name="runtime">
+							<option value="">{ tr(ctx, "Any") }</option>
+							for _, m := range DiscoverRuntimes {
+								<option value={ strconv.Itoa(m) } selected?={ m == v.Query.MaxRuntime }>{ trf(ctx, "Up to %d min", m) }</option>
+							}
+						</select>
+					</label>
+					<label class="select select-sm w-auto">
+						<span class="label">{ tr(ctx, "Language") }</span>
+						<select name="lang">
+							<option value="">{ tr(ctx, "Any") }</option>
+							for _, l := range DiscoverLanguages {
+								<option value={ l.Code } selected?={ l.Code == v.Query.Language }>{ tr(ctx, l.Name) }</option>
+							}
+						</select>
+					</label>
+					<label class="select select-sm w-auto">
 						<span class="label">{ tr(ctx, "Sort") }</span>
 						<select name="sort">
 							for _, o := range discoverSorts {
@@ -134,7 +212,14 @@ templ DiscoverPage(user *auth.User, v DiscoverView) {
 						</select>
 					</label>
 					<button type="submit" class="btn btn-sm btn-ghost">{ tr(ctx, "Apply") }</button>
+					<button type="submit" name="pick" value="1" class="btn btn-sm btn-primary gap-1.5">
+						@Icon("dices", "size-4")
+						{ tr(ctx, "Pick for tonight") }
+					</button>
 				</form>
+				if v.Pick > 0 && !v.Failed {
+					@tonightPicks(v)
+				}
 				if !v.Failed && len(v.Items) == 0 {
 					@emptyState("search-x", tr(ctx, "Nothing matches these filters"), tr(ctx, "Try another genre or year, or a lower rating.")) {
 						<a href="/discover" class="btn btn-primary btn-sm">{ tr(ctx, "Clear filters") }</a>
@@ -151,6 +236,42 @@ templ DiscoverPage(user *auth.User, v DiscoverView) {
 		</main>
 		@siteFooter()
 	}
+}
+
+// tonightPicks is the shortlist for tonight, with a reroll; with nothing
+// to pick it says so and offers to drop each filter in turn.
+templ tonightPicks(v DiscoverView) {
+	<section id="tonight-picks" class="card bg-base-200/60 border border-primary/30" aria-labelledby="tonight-picks-title">
+		<div class="card-body gap-4">
+			<header class="flex flex-wrap items-center justify-between gap-2">
+				<h2 id="tonight-picks-title" class="card-title">
+					@Icon("dices", "size-5 text-primary")
+					{ tr(ctx, "Tonight's picks") }
+				</h2>
+				if len(v.Picks) > 0 {
+					<a href={ templ.SafeURL(v.pickURL(v.Pick+1, "")) } class="btn btn-sm btn-ghost gap-1.5">
+						@Icon("refresh-cw", "size-4")
+						{ tr(ctx, "Pick again") }
+					</a>
+				}
+			</header>
+			if len(v.Picks) > 0 {
+				<ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+					@BrowseItems(v.Picks)
+				</ul>
+			} else {
+				<p>{ tr(ctx, "Nothing matches all of that among titles you have not seen or saved. Drop one filter:") }</p>
+				<div class="flex flex-wrap gap-2">
+					for _, f := range v.activeFilters(ctx) {
+						<a href={ templ.SafeURL(v.pickURL(1, f.Param)) } class="btn btn-sm btn-outline gap-1.5">
+							@Icon("x", "size-3.5")
+							{ f.Label }
+						</a>
+					}
+				</div>
+			}
+		</div>
+	</section>
 }
 
 // DiscoverMore is the loader under Discover's grid.

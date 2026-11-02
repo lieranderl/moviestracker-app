@@ -37,12 +37,15 @@ func TestThePrivacyPolicyListsEverythingKeptAboutAUser(t *testing.T) {
 		"episodes of series you marked watched",
 		"where you stopped watching",
 		"release alerts",
+		"muted release alerts",
+		"turned alerts off for",
 		"your lists",
 		"anyone with its link",
 		"ratings and private notes",
 		"release filters",
 		"interface language",
 		"TorrServers you add",
+		"Not interested or More like this",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("privacy policy does not mention %q", want)

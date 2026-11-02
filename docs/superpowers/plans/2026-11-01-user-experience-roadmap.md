@@ -423,6 +423,26 @@ in focused PRs before the larger episode/discovery and collaboration work.
   browser check showed the buttons and the toast; TMDB lookups fail on the
   local network, so a successful mark was covered by tests only.
 
+- **R21 — implemented, deployment unverified (2 November 2026):** Discover
+  (both apps) gains runtime and original-language filters next to genre,
+  year and rating, and a Pick for tonight button: a shortlist of five
+  matching titles the user has not marked (watched, saved or hidden), drawn
+  from Discover's first three pages, with Pick again for another draw. Every
+  chosen filter is sent to TMDB; when nothing is left the page says so and
+  offers to drop each filter in turn. Reuses the Discover form instead of a
+  new screen. TMDB client and handler tests cover the filters, exclusions,
+  reroll and relax links; no browser check (TMDB unreachable from the local
+  app over IPv6).
+- **R13 — implemented, deployment unverified (2 November 2026):** Want to
+  watch, Watched (both apps) and favourites (web) have a GET form to search by
+  title, narrow to movies or series, and sort by most recent, title or the
+  user's rating, so every view is a shareable address. Decisions: with any
+  control set the whole list is read, filtered and sorted (the default view
+  keeps R05's 60-title pages); the count is of matching titles; by rating,
+  higher first, unrated titles last, ties most recent first. Stores gained a
+  Reviews list (memory, file, Firestore emulator tested). Handler and web
+  tests cover search, narrowing, both sorts, counts and kept controls; a local
+  browser check confirmed the controls at desktop and 375 px.
 - **R25 — implemented, deployment unverified (2 November 2026):** series
   pages in both apps have Follow, kept per user (memory, Firestore, local
   file), and a new Upcoming episodes page (user menu) lists each followed
@@ -444,14 +464,44 @@ in focused PRs before the larger episode/discovery and collaboration work.
   releases; file-based resume is unchanged and no seek position moves
   between releases. Torrserver and handler tests cover exact and uncertain
   names and that the series stays unmarked.
-- **R15 — stale source searches (2 November 2026):** a source search
-  started by sort, quality, HDR or season now sends those choices as
-  signals to one address instead of in its query, so Datastar cancels a
-  search still running when a newer one starts and a late answer can no
-  longer replace the newer results. Requests with the old query keep
-  working. Handler and view tests cover it; the rest of the R15 audit
-  (loading, retry and empty states elsewhere) remains open.
+- **R27 — first slice on the web, deployment unverified (2 November
+  2026):** a user mutes or unmutes a movie's release alerts from the alerts
+  page; a muted movie brings no new alerts, the alerts it already has stay
+  (read counts follow R03), and muted movies are listed with a way back. The
+  alerts page says it shows sources turning up, not air dates, and links to
+  Upcoming episodes. Muting is kept on the user's document (memory and
+  Firestore, contract-tested on the emulator). Not yet: series air-date
+  notifications and per-feed choices. App lifecycle: the self-hosted app
+  has no background discovery; it shows nothing on its own when closed, and
+  this slice promises nothing there.
+- **R27 — per-feed choices (2 November 2026):** the alerts page has a
+  switch per release feed (new on the trackers, HDR10, Dolby Vision). A feed
+  turned off brings no alerts; it is still read, so turned back on it alerts
+  only for releases found afterwards. Kept on the user's document (memory
+  and Firestore, emulator-tested); privacy page updated. Series air-date
+  notifications remain open.
 
+- **R19 — implemented, deployment unverified (2 November 2026):** series
+  pages in both apps offer Hide spoilers (an `mt_spoilers` cookie, listed in
+  the web privacy policy). With it on, the summaries and stills of episodes
+  the user has not watched, or that have not aired, are left out of the HTML
+  the server sends, not hidden by CSS; each such card has an accessible Show
+  button that fetches that one episode. Handler tests cover the cookie,
+  watched versus unwatched and unaired episodes, reveal, the toggle button
+  and turning protection off. The local browser check could not load series
+  pages (the app's TMDB connection failed over IPv6 on this machine), so the
+  rendering is covered by tests only.
+- **R20 — implemented, deployment unverified (2 November 2026):**
+  recommendation cards in both apps offer More like this and Not interested.
+  Feedback is kept per user (memory, Firestore, local file) and is part of
+  the library summary, so changes refresh cached recommendations. Hidden
+  titles leave every row at once, with an Undo, and stay hidden; titles asked
+  for more like start the first rows; a reset brings everything back.
+  Ranking is rule-based: watched titles rated highest lead the seeds, and
+  one rated 4 or less starts no row. Store contract and handler tests cover
+  all of it; no browser check (recommendations need TMDB, which the local
+  app could not reach over IPv6). Account export/deletion (R07) must add the
+  feedback collection once both are merged.
 - **R16 — partly implemented, deployment unverified (2 November 2026):** a
   browser audit (self-hosted app: home, TorrServer and list pages) found no
   unnamed controls or unlabeled fields; only inline text links were under 24

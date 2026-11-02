@@ -133,14 +133,28 @@ func TestJacRedFailureDoesNotSendCloudUsersToLocalSettings(t *testing.T) {
 	}
 }
 
-// This stand-in rejects requests at Firestore's external gRPC boundary.
+// selectorReadFailure permits revocation reads but rejects TorrServer queries.
+type selectorReadFailure struct {
+	firestorepb.UnimplementedFirestoreServer
+}
+
+func (*selectorReadFailure) BatchGetDocuments(req *firestorepb.BatchGetDocumentsRequest, stream firestorepb.Firestore_BatchGetDocumentsServer) error {
+	for _, doc := range req.Documents {
+		if err := stream.Send(&firestorepb.BatchGetDocumentsResponse{Result: &firestorepb.BatchGetDocumentsResponse_Missing{Missing: doc}}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// This stand-in rejects list requests at Firestore's external gRPC boundary.
 func TestAUserSeesAndCanRetryAFailedTorrServerSelector(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	server := grpc.NewServer()
-	firestorepb.RegisterFirestoreServer(server, &firestorepb.UnimplementedFirestoreServer{})
+	firestorepb.RegisterFirestoreServer(server, &selectorReadFailure{})
 	go func() { _ = server.Serve(listener) }()
 	t.Cleanup(server.Stop)
 	t.Setenv("FIRESTORE_EMULATOR_HOST", listener.Addr().String())

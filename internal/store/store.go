@@ -17,6 +17,7 @@
 package store
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"errors"
@@ -80,6 +81,7 @@ type Store interface {
 	ReviewStore
 	AccountStore
 	EpisodeStore
+	FeedbackStore
 	FollowStore
 }
 
@@ -150,6 +152,16 @@ type UpdateStore interface {
 	AlertCheckpoints(ctx context.Context, uid string) (AlertCheckpoints, error)
 	// SaveAlertCheckpoints replaces the user's checkpoints.
 	SaveAlertCheckpoints(ctx context.Context, uid string, c AlertCheckpoints) error
+	// MuteAlerts stops (on) or resumes release alerts for a movie.
+	MuteAlerts(ctx context.Context, uid string, m MutedTitle, on bool) error
+	// MutedAlerts are the movies whose alerts the user muted, most
+	// recently muted first.
+	MutedAlerts(ctx context.Context, uid string) ([]MutedTitle, error)
+	// SetAlertFeed turns a release feed's alerts on or off.
+	SetAlertFeed(ctx context.Context, uid, feed string, on bool) error
+	// AlertFeeds are the user's choices by feed; a feed never chosen has
+	// none, and alerts.
+	AlertFeeds(ctx context.Context, uid string) (map[string]AlertFeed, error)
 }
 
 // ID names the update among the user's: its feed and TMDB ID
@@ -446,4 +458,22 @@ func markTime(at time.Time) time.Time {
 // the same time.
 func sameMark(kept, from TitleState) bool {
 	return kept.State == from.State && kept.UpdatedAt.Equal(from.UpdatedAt)
+}
+
+// MutedTitle is a movie whose release alerts the user muted, and when.
+type MutedTitle struct {
+	TMDBID int
+	Title  string
+	At     time.Time
+}
+
+func newestMuted(a, b MutedTitle) int {
+	return cmp.Or(b.At.Compare(a.At), cmp.Compare(b.TMDBID, a.TMDBID))
+}
+
+// AlertFeed is a user's choice for a feed: off, or on again since On.
+// Releases found before On never alert: they were held while it was off.
+type AlertFeed struct {
+	Off bool
+	On  time.Time
 }

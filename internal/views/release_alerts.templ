@@ -1,9 +1,12 @@
 package views
 
 import (
+	"cmp"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/lieranderl/moviestracker-app/internal/auth"
@@ -38,11 +41,84 @@ templ AlertsBell(unseen int) {
 
 // AlertsView is a page of the user's release alerts.
 type AlertsView struct {
-	Alerts  []store.Update
-	Next    string    // cursor of the older page, "" when none is left
-	Unread  int       // alerts still unread after this page was shown
-	Through time.Time // when the page was read: Mark all read covers up to it
-	Failed  bool      // the alerts could not be read
+	Alerts      []store.Update
+	Next        string    // cursor of the older page, "" when none is left
+	Unread      int       // alerts still unread after this page was shown
+	Through     time.Time // when the page was read: Mark all read covers up to it
+	Failed      bool      // the alerts could not be read
+	Muted       []store.MutedTitle
+	MutedFailed bool
+	// FeedsOff are the release feeds the user turned alerts off for.
+	FeedsOff map[string]bool
+}
+
+// alertFeedOrder is the order the feeds' switches show in.
+var alertFeedOrder = []string{"latesttorrentsmovies", "hdr10movies", "dvmovies"}
+
+// alertSignals start the page's $_muted, true for each muted movie by TMDB
+// ID, and $_feedsOn, whether each release feed alerts.
+func alertSignals(v AlertsView) string {
+	ids := map[string]bool{}
+	for _, m := range v.Muted {
+		ids[strconv.Itoa(m.TMDBID)] = true
+	}
+	on := map[string]bool{}
+	for _, feed := range alertFeedOrder {
+		on[feed] = !v.FeedsOff[feed]
+	}
+	b, _ := json.Marshal(map[string]any{"_muted": ids, "_feedsOn": on})
+	return string(b)
+}
+
+// alertFeedSwitches turn each release feed's alerts on or off.
+templ alertFeedSwitches(failed bool) {
+	<fieldset class="fieldset" disabled?={ failed }>
+		<legend class="fieldset-legend">{ tr(ctx, "Alert me about") }</legend>
+		<div class="flex flex-wrap gap-x-6 gap-y-2">
+			for _, feed := range alertFeedOrder {
+				<label class="label cursor-pointer gap-2 text-sm">
+					<input
+						type="checkbox"
+						disabled?={ failed }
+						class="toggle toggle-sm toggle-primary"
+						data-bind={ "_feedsOn." + feed }
+						data-on:change={ fmt.Sprintf("@post('/api/alerts/feeds?feed=%s&on=' + ($_feedsOn.%s ? 1 : 0))", feed, feed) }
+					/>
+					{ tr(ctx, alertLabels[feed]) }
+				</label>
+			}
+		</div>
+	</fieldset>
+}
+
+// alertMuteToggle mutes a movie's alerts, or unmutes them once muted.
+templ alertMuteToggle(id int, title string, failed bool) {
+	if failed {
+		<button type="button" class="btn btn-ghost btn-sm btn-square" disabled aria-label={ tr(ctx, "Alert preferences unavailable") } title={ tr(ctx, "Alert preferences unavailable") }>
+			@Icon("bell-off", "size-4")
+		</button>
+	} else {
+		<button
+			type="button"
+			class="btn btn-ghost btn-sm btn-square"
+			data-show={ fmt.Sprintf("!$_muted['%d']", id) }
+			aria-label={ trf(ctx, "Mute alerts for %s", title) }
+			title={ trf(ctx, "Mute alerts for %s", title) }
+			data-on:click={ fmt.Sprintf("@post('/api/alerts/mute?id=%d&on=1')", id) }
+		>
+			@Icon("bell-off", "size-4")
+		</button>
+		<button
+			type="button"
+			class="btn btn-ghost btn-sm btn-square text-primary"
+			data-show={ fmt.Sprintf("$_muted['%d']", id) }
+			aria-label={ trf(ctx, "Unmute alerts for %s", title) }
+			title={ trf(ctx, "Unmute alerts for %s", title) }
+			data-on:click={ fmt.Sprintf("@post('/api/alerts/mute?id=%d&on=0')", id) }
+		>
+			@Icon("bell-ring", "size-4")
+		</button>
+	}
 }
 
 // AlertsMarkAll offers to mark read the unread alerts this page did not
@@ -77,14 +153,26 @@ templ AlertsPage(user *auth.User, v AlertsView) {
 	@Layout(tr(ctx, "Release alerts")) {
 		@Navbar(user)
 		<main class="grow pb-20">
-			<div class="max-w-3xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
+			<div class="max-w-3xl mx-auto px-4 sm:px-8 mt-8 space-y-6" data-signals={ alertSignals(v) }>
 				<header class="space-y-1">
 					<h1 class="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
 						@Icon("bell", "size-6 text-primary")
 						{ tr(ctx, "Release alerts") }
 					</h1>
 					<p class="text-sm text-base-content/70">{ tr(ctx, "Releases found for the movies in your favourites and Want to watch.") }</p>
+					<p class="text-sm text-base-content/70">
+						{ tr(ctx, "These are sources turning up, not air dates. For when episodes of the series you follow air, see") }
+						<a href={ templ.SafeURL(CalendarPath) } class="link link-primary">{ tr(ctx, "Upcoming episodes") }</a>.
+					</p>
 				</header>
+				if v.MutedFailed {
+					<div role="alert" class="alert alert-warning alert-soft">
+						@Icon("circle-alert", "size-5")
+						<span>{ tr(ctx,"Your alert preferences could not be loaded. Please try again.") }</span>
+						<a href="/alerts" class="btn btn-sm">{ tr(ctx,"Retry") }</a>
+					</div>
+				}
+				@alertFeedSwitches(v.MutedFailed)
 				if v.Failed {
 					@loadFailed(tr(ctx, "Your release alerts could not be loaded right now. Please try again in a moment."))
 				} else if len(v.Alerts) == 0 {
@@ -105,9 +193,12 @@ templ AlertsPage(user *auth.User, v AlertsView) {
 									<a href={ templ.SafeURL(fmt.Sprintf("/movie/%d#sources", u.TMDBID)) } class="font-semibold link link-hover line-clamp-1">{ u.Title }</a>
 									<p class="text-sm text-base-content/70">{ tr(ctx, alertLabels[u.Feed]) }</p>
 								</div>
-								if !u.Seen {
-									<span class="badge badge-primary badge-sm">{ tr(ctx, "New") }</span>
-								}
+								<div class="flex items-center gap-1">
+									if !u.Seen {
+										<span class="badge badge-primary badge-sm">{ tr(ctx, "New") }</span>
+									}
+									@alertMuteToggle(u.TMDBID, u.Title, v.MutedFailed)
+								</div>
 							</li>
 						}
 					</ul>
@@ -118,9 +209,34 @@ templ AlertsPage(user *auth.User, v AlertsView) {
 						</a>
 					}
 				}
+				if len(v.Muted) > 0 {
+					<section class="space-y-2" aria-labelledby="muted-alerts" data-muted-ids={ mutedIDs(v.Muted) } data-show="el.dataset.mutedIds.split(',').some(id => $_muted[id])">
+						<h2 id="muted-alerts" class="text-lg font-semibold flex items-center gap-2">
+							@Icon("bell-off", "size-5")
+							{ tr(ctx, "Muted movies") }
+						</h2>
+						<p class="text-sm text-base-content/70">{ tr(ctx, "These movies bring no new release alerts until you unmute them.") }</p>
+						<ul class="list bg-base-200/60 rounded-box border border-base-content/10">
+							for _, m := range v.Muted {
+								<li class="list-row items-center" data-muted-id={ strconv.Itoa(m.TMDBID) } data-show="$_muted[el.dataset.mutedId]">
+									<a href={ templ.SafeURL(fmt.Sprintf("/movie/%d", m.TMDBID)) } class="link link-hover line-clamp-1">{ cmp.Or(m.Title, tr(ctx, "Movie")) }</a>
+									@alertMuteToggle(m.TMDBID, cmp.Or(m.Title, tr(ctx, "Movie")), v.MutedFailed)
+								</li>
+							}
+						</ul>
+					</section>
+				}
 			</div>
 			@toTopButton()
 		</main>
 		@siteFooter()
 	}
+}
+
+func mutedIDs(muted []store.MutedTitle) string {
+	ids := make([]string, len(muted))
+	for i, m := range muted {
+		ids[i] = strconv.Itoa(m.TMDBID)
+	}
+	return strings.Join(ids, ",")
 }
