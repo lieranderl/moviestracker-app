@@ -3,6 +3,7 @@ package store
 import (
 	"cmp"
 	"context"
+	"errors"
 	"maps"
 	"slices"
 	"strconv"
@@ -25,6 +26,8 @@ type Memory struct {
 type sharedList struct{ uid, id string }
 
 type memoryUser struct {
+	muted       map[int]MutedTitle
+	feeds       map[string]AlertFeed
 	prefs       Preferences
 	stamp       int // the library change last made
 	favorites   map[string]Favorite
@@ -563,6 +566,7 @@ func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error)
 	lists, _ := m.CustomLists(ctx, uid)
 	follows, _ := m.FollowedSeries(ctx, uid)
 	feedback, _ := accountFeedback(ctx, m, uid)
+	choices, _ := withAlertChoices(ctx, m, uid, Account{})
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	u := m.user(uid)
@@ -572,7 +576,7 @@ func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error)
 		Progress:    slices.SortedFunc(maps.Values(u.progress), func(a, b Progress) int { return b.UpdatedAt.Compare(a.UpdatedAt) }),
 		TitleStates: append(watched, want...), Updates: updates, ReleaseFilters: filters, Lists: lists,
 		Reviews: slices.Collect(maps.Values(u.reviews)), Episodes: u.watchedEpisodes(),
-		Follows: follows, Feedback: feedback,
+		Follows: follows, Feedback: feedback, MutedAlerts: choices.MutedAlerts, AlertFeeds: choices.AlertFeeds,
 	}, nil
 }
 
@@ -769,4 +773,59 @@ func (m *Memory) Reviews(_ context.Context, uid string) ([]Review, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return slices.Collect(maps.Values(m.user(uid).reviews)), nil
+}
+
+func (m *Memory) MuteAlerts(ctx context.Context, uid string, t MutedTitle, on bool) error {
+	if t.TMDBID <= 0 {
+		return errors.New("mute alerts: no movie")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
+	u := m.user(uid)
+	if !on {
+		delete(u.muted, t.TMDBID)
+		return nil
+	}
+	if u.muted == nil {
+		u.muted = map[int]MutedTitle{}
+	}
+	t.At = m.opts.now().UTC()
+	u.muted[t.TMDBID] = t
+	return nil
+}
+
+func (m *Memory) MutedAlerts(_ context.Context, uid string) ([]MutedTitle, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.SortedFunc(maps.Values(m.user(uid).muted), newestMuted), nil
+}
+
+func (m *Memory) SetAlertFeed(ctx context.Context, uid, feed string, on bool) error {
+	if feed == "" {
+		return errors.New("alert feed: none named")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.checkAccountSession(ctx, uid); err != nil {
+		return err
+	}
+	u := m.user(uid)
+	if u.feeds == nil {
+		u.feeds = map[string]AlertFeed{}
+	}
+	choice := AlertFeed{Off: true}
+	if on {
+		choice = AlertFeed{On: m.opts.now().UTC()}
+	}
+	u.feeds[feed] = choice
+	return nil
+}
+
+func (m *Memory) AlertFeeds(_ context.Context, uid string) (map[string]AlertFeed, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return maps.Clone(m.user(uid).feeds), nil
 }

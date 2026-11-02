@@ -464,13 +464,22 @@ in focused PRs before the larger episode/discovery and collaboration work.
   releases; file-based resume is unchanged and no seek position moves
   between releases. Torrserver and handler tests cover exact and uncertain
   names and that the series stays unmarked.
-- **R15 — stale source searches (2 November 2026):** a source search
-  started by sort, quality, HDR or season now sends those choices as
-  signals to one address instead of in its query, so Datastar cancels a
-  search still running when a newer one starts and a late answer can no
-  longer replace the newer results. Requests with the old query keep
-  working. Handler and view tests cover it; the rest of the R15 audit
-  (loading, retry and empty states elsewhere) remains open.
+- **R27 — first slice on the web, deployment unverified (2 November
+  2026):** a user mutes or unmutes a movie's release alerts from the alerts
+  page; a muted movie brings no new alerts, the alerts it already has stay
+  (read counts follow R03), and muted movies are listed with a way back. The
+  alerts page says it shows sources turning up, not air dates, and links to
+  Upcoming episodes. Muting is kept on the user's document (memory and
+  Firestore, contract-tested on the emulator). Not yet: series air-date
+  notifications and per-feed choices. App lifecycle: the self-hosted app
+  has no background discovery; it shows nothing on its own when closed, and
+  this slice promises nothing there.
+- **R27 — per-feed choices (2 November 2026):** the alerts page has a
+  switch per release feed (new on the trackers, HDR10, Dolby Vision). A feed
+  turned off brings no alerts; it is still read, so turned back on it alerts
+  only for releases found afterwards. Kept on the user's document (memory
+  and Firestore, emulator-tested); privacy page updated. Series air-date
+  notifications remain open.
 
 - **R19 — implemented, deployment unverified (2 November 2026):** series
   pages in both apps offer Hide spoilers (an `mt_spoilers` cookie, listed in

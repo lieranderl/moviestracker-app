@@ -1156,7 +1156,7 @@ func (f *Firestore) ExportAccount(ctx context.Context, uid string) (Account, err
 	if a.Follows, err = f.FollowedSeries(ctx, uid); err != nil {
 		return Account{}, err
 	}
-	return a, nil
+	return withAlertChoices(ctx, f, uid, a)
 }
 
 // DeleteAccount implements Store. Shared links go first, so none is left
@@ -1624,6 +1624,81 @@ func (f *Firestore) Reviews(ctx context.Context, uid string) ([]Review, error) {
 			return nil, fmt.Errorf("read review %s: %w", doc.Ref.ID, err)
 		}
 		out = append(out, Review(rec))
+	}
+	return out, nil
+}
+func (f *Firestore) MuteAlerts(ctx context.Context, uid string, t MutedTitle, on bool) error {
+	if t.TMDBID <= 0 {
+		return fmt.Errorf("mute alerts: no movie")
+	}
+	var entry any = firestore.Delete
+	if on {
+		entry = map[string]any{"title": t.Title, "at": f.opts.now().UTC()}
+	}
+	data := map[string]any{"mutedAlerts": map[string]any{strconv.Itoa(t.TMDBID): entry}}
+	if err := f.accountSet(ctx, uid, f.userDoc(uid), data, firestore.MergeAll); err != nil {
+		return fmt.Errorf("mute alerts: %w", err)
+	}
+	return nil
+}
+
+func (f *Firestore) MutedAlerts(ctx context.Context, uid string) ([]MutedTitle, error) {
+	snap, err := f.userDoc(uid).Get(ctx)
+	if notFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read muted alerts: %w", err)
+	}
+	raw, _ := snap.Data()["mutedAlerts"].(map[string]any)
+	out := make([]MutedTitle, 0, len(raw))
+	for key, v := range raw {
+		id, err := strconv.Atoi(key)
+		entry, ok := v.(map[string]any)
+		if err != nil || !ok {
+			continue
+		}
+		t := MutedTitle{TMDBID: id}
+		t.Title, _ = entry["title"].(string)
+		t.At, _ = entry["at"].(time.Time)
+		out = append(out, t)
+	}
+	slices.SortFunc(out, newestMuted)
+	return out, nil
+}
+
+func (f *Firestore) SetAlertFeed(ctx context.Context, uid, feed string, on bool) error {
+	if feed == "" {
+		return errors.New("alert feed: none named")
+	}
+	choice := map[string]any{"off": true}
+	if on {
+		choice = map[string]any{"off": false, "on": f.opts.now().UTC()}
+	}
+	// Merging on the feed's field replaces its choice whole.
+	data := map[string]any{"alertFeeds": map[string]any{feed: choice}}
+	if err := f.accountSet(ctx, uid, f.userDoc(uid), data, firestore.Merge([]string{"alertFeeds", feed})); err != nil {
+		return fmt.Errorf("set alert feed: %w", err)
+	}
+	return nil
+}
+
+func (f *Firestore) AlertFeeds(ctx context.Context, uid string) (map[string]AlertFeed, error) {
+	snap, err := f.userDoc(uid).Get(ctx)
+	if notFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read alert feeds: %w", err)
+	}
+	raw, _ := snap.Data()["alertFeeds"].(map[string]any)
+	out := make(map[string]AlertFeed, len(raw))
+	for feed, v := range raw {
+		entry, _ := v.(map[string]any)
+		var c AlertFeed
+		c.Off, _ = entry["off"].(bool)
+		c.On, _ = entry["on"].(time.Time)
+		out[feed] = c
 	}
 	return out, nil
 }

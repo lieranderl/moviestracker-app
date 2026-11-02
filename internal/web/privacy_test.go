@@ -37,6 +37,8 @@ func TestThePrivacyPolicyListsEverythingKeptAboutAUser(t *testing.T) {
 		"episodes of series you marked watched",
 		"where you stopped watching",
 		"release alerts",
+		"muted release alerts",
+		"turned alerts off for",
 		"your lists",
 		"anyone with its link",
 		"ratings and private notes",

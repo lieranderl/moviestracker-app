@@ -183,3 +183,48 @@ func TestAlertsRememberHowFarTheyLookedThroughTheFeeds(t *testing.T) {
 		}
 	})
 }
+
+// A user mutes a movie's release alerts and later unmutes it; muting one
+// leaves the others alone.
+func TestAUserMutesAMoviesAlerts(t *testing.T) {
+	eachStore(t, func(t *testing.T, s store.Store, uid string, _ *time.Time) {
+		ctx := context.Background()
+		for _, m := range []store.MutedTitle{{TMDBID: 438631, Title: "Dune"}, {TMDBID: 329865, Title: "Arrival"}} {
+			if err := s.MuteAlerts(ctx, uid, m, true); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := s.MuteAlerts(ctx, uid, store.MutedTitle{TMDBID: 329865}, false); err != nil {
+			t.Fatal(err)
+		}
+		got, err := s.MutedAlerts(ctx, uid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != 1 || got[0].TMDBID != 438631 || got[0].Title != "Dune" {
+			t.Errorf("muted = %+v, want only Dune", got)
+		}
+	})
+}
+
+// A user turns a release feed's alerts off and on again; the others stay on.
+func TestAUserChoosesWhichFeedsAlert(t *testing.T) {
+	eachStore(t, func(t *testing.T, s store.Store, uid string, _ *time.Time) {
+		ctx := context.Background()
+		for _, feed := range []string{"latesttorrentsmovies", "hdr10movies"} {
+			if err := s.SetAlertFeed(ctx, uid, feed, false); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := s.SetAlertFeed(ctx, uid, "hdr10movies", true); err != nil {
+			t.Fatal(err)
+		}
+		feeds, err := s.AlertFeeds(ctx, uid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !feeds["latesttorrentsmovies"].Off || feeds["hdr10movies"].Off || !feeds["hdr10movies"].On.Equal(now) || feeds["dvmovies"].Off {
+			t.Errorf("feeds = %+v, want trackers off and HDR10 on again since now", feeds)
+		}
+	})
+}
