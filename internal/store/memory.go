@@ -36,6 +36,7 @@ type memoryUser struct {
 	lists       shelf
 	reviews     map[string]Review
 	episodes    map[int]seriesEpisodes // by series ID
+	follows     map[int]FollowedSeries // by series ID
 }
 
 // NewMemory returns an empty in-memory store.
@@ -503,6 +504,7 @@ func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error)
 	want, _ := m.TitleStates(ctx, uid, WantToWatch)
 	filters, _ := m.ReleaseFilters(ctx, uid)
 	lists, _ := m.CustomLists(ctx, uid)
+	follows, _ := m.FollowedSeries(ctx, uid)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	u := m.user(uid)
@@ -512,6 +514,7 @@ func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error)
 		Progress:    slices.SortedFunc(maps.Values(u.progress), func(a, b Progress) int { return b.UpdatedAt.Compare(a.UpdatedAt) }),
 		TitleStates: append(watched, want...), Updates: updates, ReleaseFilters: filters, Lists: lists,
 		Reviews: slices.Collect(maps.Values(u.reviews)), Episodes: u.watchedEpisodes(),
+		Follows: follows,
 	}, nil
 }
 
@@ -574,4 +577,41 @@ func (u *memoryUser) watchedEpisodes() map[int]map[int][]int {
 		}
 	}
 	return out
+}
+
+// Follow implements Store.
+func (m *Memory) Follow(_ context.Context, uid string, f FollowedSeries, on bool) error {
+	if err := checkFollow(f); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u := m.user(uid)
+	if u.follows == nil {
+		u.follows = map[int]FollowedSeries{}
+	}
+	if on {
+		f.At = m.opts.now().UTC()
+		u.follows[f.TMDBID] = f
+	} else {
+		delete(u.follows, f.TMDBID)
+	}
+	return nil
+}
+
+// Following implements Store.
+func (m *Memory) Following(_ context.Context, uid string, tvID int) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, ok := m.user(uid).follows[tvID]
+	return ok, nil
+}
+
+// FollowedSeries implements Store.
+func (m *Memory) FollowedSeries(_ context.Context, uid string) ([]FollowedSeries, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := slices.Collect(maps.Values(m.user(uid).follows))
+	slices.SortFunc(out, newestFollowed)
+	return out, nil
 }

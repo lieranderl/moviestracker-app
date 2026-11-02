@@ -384,6 +384,16 @@ in focused PRs before the larger episode/discovery and collaboration work.
   browser check showed the buttons and the toast; TMDB lookups fail on the
   local network, so a successful mark was covered by tests only.
 
+- **R25 — implemented, deployment unverified (2 November 2026):** series
+  pages in both apps have Follow, kept per user (memory, Firestore, local
+  file), and a new Upcoming episodes page (user menu) lists each followed
+  series' next episode: dated ones soonest first, then those with no date
+  announced, then ended ones. TMDB gives episode air dates without a time,
+  so they are shown as dates only, with no timezone. Store contract tests
+  (Firestore emulator included) and a handler test cover following,
+  ordering, labels and unfollowing; no browser check (series details need
+  TMDB, unreachable from the local app over IPv6). Account export/deletion
+  (R07) must add the follows collection once both are merged.
 - **R18 — implemented, deployment unverified (2 November 2026):** when a
   series file finishes playing (the same rule that marks finished movies)
   and its own name gives the episode exactly (`S01E02`, `S02E05-E06`,

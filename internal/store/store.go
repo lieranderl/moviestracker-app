@@ -80,6 +80,7 @@ type Store interface {
 	ReviewStore
 	AccountStore
 	EpisodeStore
+	FollowStore
 }
 
 // ReleaseFilters are how a user last searched a title's releases.

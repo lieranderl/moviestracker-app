@@ -18,6 +18,7 @@ type Account struct {
 	Reviews        []Review       `json:"reviews"`
 	// Episodes are the watched episodes, by series and then season.
 	Episodes map[int]map[int][]int `json:"watchedEpisodes"`
+	Follows  []FollowedSeries      `json:"followedSeries"`
 }
 
 // AccountStore hands users everything kept for them, and deletes it.
