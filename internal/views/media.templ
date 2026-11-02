@@ -749,7 +749,8 @@ var sortOptions = []struct{ Key, Label string }{
 // quality or HDR filters narrowed the search: when it finds nothing, they
 // can be cleared at once, rather than JacRed blamed.
 templ TorrentResults(results []jacred.Result, sort, search string, filtered bool) {
-	<div id="torrent-results" class="space-y-4">
+	{{ gen := compareGen(results) }}
+	<div id="torrent-results" class="space-y-4" data-signals={ compareSignals(gen, len(results)) }>
 		if len(results) == 0 && filtered {
 			<div role="status" class="alert alert-soft">
 				@Icon("funnel-x", "size-5")
@@ -766,6 +767,7 @@ templ TorrentResults(results []jacred.Result, sort, search string, filtered bool
 			<div class="flex flex-wrap items-center gap-2">
 				@trackerFilter(results)
 				@voiceFilter(results)
+				@compareButton(gen)
 				if hasRecordings(results) {
 					<label class="label text-sm gap-2 cursor-pointer ml-1">
 						<input type="checkbox" class="toggle toggle-sm toggle-warning" data-bind="hideRecordings"/>
@@ -787,10 +789,11 @@ templ TorrentResults(results []jacred.Result, sort, search string, filtered bool
 			</div>
 			</div>
 			<ul class="list bg-base-200/50 rounded-box border border-base-content/5 max-h-[32rem] overflow-y-auto overscroll-contain">
-				for _, r := range results {
-					@torrentRow(r)
+				for i, r := range results {
+					@torrentRow(gen, i, r)
 				}
 			</ul>
+			@compareDialog(gen, results)
 			<p class="text-xs text-base-content/50">
 				{ tr(ctx, "Results from JacRed. Moviestracker does not host or distribute media — only access content you are legally authorized to use.") }
 			</p>
@@ -909,7 +912,7 @@ func sendLabel(ctx context.Context) string {
 	return trJS(ctx, "Add to %s") + ".replace('%s', $_tsSelectedName)"
 }
 
-templ torrentRow(r jacred.Result) {
+templ torrentRow(gen string, i int, r jacred.Result) {
 	<li
 		class="list-row items-center gap-3 sm:gap-4"
 		data-tracker={ r.Tracker }
@@ -975,6 +978,7 @@ templ torrentRow(r jacred.Result) {
 					<span>TorrServer</span>
 				}
 			</button>
+			@comparePick(gen, i, r)
 			<button type="button" class="btn btn-ghost btn-sm btn-square" data-action="copy" data-magnet={ r.Magnet } title={ tr(ctx, "Copy magnet link") } aria-label={ tr(ctx, "Copy magnet link") }>
 				@Icon("magnet", "size-4")
 			</button>
