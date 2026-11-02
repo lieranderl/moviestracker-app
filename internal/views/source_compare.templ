@@ -1,0 +1,127 @@
+package views
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/lieranderl/moviestracker-app/internal/jacred"
+)
+
+// comparePicked counts the releases picked for comparison ($_cmp).
+const comparePicked = "Object.values($_cmp).filter(Boolean).length"
+
+// compareMax is how many releases are compared at once.
+const compareMax = 4
+
+// compareSignals starts $_cmp with every release unpicked, by row (r0, r1,
+// …), and the comparison closed.
+func compareSignals(n int) string {
+	picks := make(map[string]bool, n)
+	for i := range n {
+		picks[fmt.Sprintf("r%d", i)] = false
+	}
+	b, _ := json.Marshal(map[string]any{"_cmp": picks, "_cmpOpen": false})
+	return string(b)
+}
+
+// comparePick picks a release for comparison, up to compareMax.
+templ comparePick(i int, r jacred.Result) {
+	<label class="label cursor-pointer gap-1 text-xs">
+		<input
+			type="checkbox"
+			class="checkbox checkbox-xs"
+			data-bind={ fmt.Sprintf("_cmp.r%d", i) }
+			data-attr:disabled={ fmt.Sprintf("!$_cmp.r%d && %s >= %d", i, comparePicked, compareMax) }
+			aria-label={ trf(ctx, "Compare %s", r.Title) }
+		/>
+		{ tr(ctx, "Compare") }
+	</label>
+}
+
+// compareButton opens the comparison once two releases are picked.
+templ compareButton() {
+	<button type="button" class="btn btn-sm btn-secondary gap-1.5" data-show={ comparePicked + " >= 2" } data-on:click="$_cmpOpen = true">
+		@Icon("columns-3", "size-4")
+		{ tr(ctx, "Compare releases") }
+		<span class="badge badge-sm" data-text={ comparePicked }></span>
+	</button>
+}
+
+// orUnknown is v, or Unknown when the tracker did not report it.
+func orUnknown(ctx context.Context, v string) string {
+	if v == "" {
+		return tr(ctx, "Unknown")
+	}
+	return v
+}
+
+// compareFacts are the comparison's rows: a label and each release's value.
+func compareFacts(ctx context.Context) []compareFact {
+	return []compareFact{
+		{tr(ctx, "Quality"), func(r jacred.Result) string { return r.QualityLabel() }},
+		{tr(ctx, "HDR"), func(r jacred.Result) string {
+			if r.HDR {
+				return "HDR"
+			}
+			return ""
+		}},
+		{tr(ctx, "Source"), func(r jacred.Result) string { return r.Format().Source }},
+		{tr(ctx, "Video"), func(r jacred.Result) string {
+			f := r.Format()
+			if f.TenBit {
+				return strings.TrimSpace(f.Codec + " 10-bit")
+			}
+			return f.Codec
+		}},
+		{tr(ctx, "Audio"), func(r jacred.Result) string { return r.Format().Audio }},
+		{tr(ctx, "Voices"), func(r jacred.Result) string { return strings.Join(r.Voices, ", ") }},
+		{tr(ctx, "Subtitles"), func(jacred.Result) string { return "" }}, // trackers do not report them
+		{tr(ctx, "Size"), func(r jacred.Result) string { return r.SizeName }},
+		{tr(ctx, "Bitrate"), func(r jacred.Result) string {
+			if mbps := r.Mbps(); mbps > 0 {
+				return "≈ " + trf(ctx, "%s Mbps", strconv.FormatFloat(mbps, 'f', 1, 64))
+			}
+			return ""
+		}},
+		{tr(ctx, "Seeders"), func(r jacred.Result) string { return strconv.Itoa(r.Seeders) }},
+		{tr(ctx, "Tracker"), func(r jacred.Result) string { return r.Tracker }},
+	}
+}
+
+type compareFact struct {
+	label string
+	value func(jacred.Result) string
+}
+
+// compareDialog shows the picked releases side by side, a column each.
+templ compareDialog(results []jacred.Result) {
+	@modalDialog("compare-releases", "_cmpOpen", "", "", "max-w-5xl", nil) {
+		@modalHeader("compare-releases", tr(ctx, "Compare releases"), "columns-3", "text-secondary")
+		<div class="overflow-x-auto mt-3">
+			<table class="table table-sm">
+				<thead>
+					<tr>
+						<th></th>
+						for i, r := range results {
+							<th class="align-top min-w-40 font-medium normal-case" data-show={ fmt.Sprintf("$_cmp.r%d", i) }>{ r.Title }</th>
+						}
+					</tr>
+				</thead>
+				<tbody>
+					for _, f := range compareFacts(ctx) {
+						<tr>
+							<th class="whitespace-nowrap">{ f.label }</th>
+							for i, r := range results {
+								<td data-show={ fmt.Sprintf("$_cmp.r%d", i) }>{ orUnknown(ctx, f.value(r)) }</td>
+							}
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+		<p class="text-xs text-base-content/60 mt-3">{ tr(ctx, "As the trackers report them. Playback is not checked: whether a release plays depends on your browser and TorrServer.") }</p>
+	}
+}

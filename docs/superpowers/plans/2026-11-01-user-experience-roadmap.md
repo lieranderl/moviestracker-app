@@ -419,6 +419,15 @@ in focused PRs before the larger episode/discovery and collaboration work.
   releases; file-based resume is unchanged and no seek position moves
   between releases. Torrserver and handler tests cover exact and uncertain
   names and that the series stays unmarked.
+- **R24 — implemented in both apps, deployment unverified (2 November
+  2026):** each release row has a Compare pick (up to four); Compare
+  releases opens a dialog with the picked releases side by side: quality,
+  HDR, source, video codec and bit depth, audio, voices, subtitles, size,
+  estimated bitrate, seeders and tracker. Values a tracker does not report
+  read Unknown (subtitles always, since trackers do not report them), and
+  the table says playback is not checked. Datastar signals only; a view test
+  covers picks, columns, unknown values and the limit. Not checked in a
+  browser: TMDB lookups fail on the local network.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding
