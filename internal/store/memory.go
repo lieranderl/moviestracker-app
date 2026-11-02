@@ -452,6 +452,7 @@ func (m *Memory) SaveReview(_ context.Context, uid string, r Review) error {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.libraryChanged(uid) // ratings shape recommendations
 	if empty {
 		delete(m.user(uid).reviews, id)
 		return nil

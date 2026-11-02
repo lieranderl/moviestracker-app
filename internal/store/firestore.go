@@ -995,14 +995,16 @@ func (f *Firestore) SaveReview(ctx context.Context, uid string, r Review) error 
 	if err != nil {
 		return err
 	}
+	// Ratings shape recommendations: a change gives the library a new stamp.
+	doc := f.reviews(uid).Doc(id)
 	if empty {
-		if _, err := f.reviews(uid).Doc(id).Delete(ctx); err != nil {
+		if err := f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error { return tx.Delete(doc) }); err != nil {
 			return fmt.Errorf("clear review: %w", err)
 		}
 		return nil
 	}
 	r.UpdatedAt = f.opts.now().UTC()
-	if _, err := f.reviews(uid).Doc(id).Set(ctx, reviewRecord(r)); err != nil {
+	if err := f.changeLibrary(ctx, uid, func(tx *firestore.Transaction) error { return tx.Set(doc, reviewRecord(r)) }); err != nil {
 		return fmt.Errorf("save review: %w", err)
 	}
 	return nil

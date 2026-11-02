@@ -5,6 +5,7 @@ import (
 	"html"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -60,8 +61,8 @@ func TestRecommendationsFollowTheUsersFeedback(t *testing.T) {
 		t.Error("a hidden title came back on the next visit")
 	}
 	more := send(http.MethodPost, "/api/recommendations/feedback?type=movie&id=13&feedback=moreLikeThis&on=1", "")
-	first := strings.Index(more, "More like Movie 13")
-	if first < 0 || strings.Index(more, "Because you watched") < first || !strings.Contains(more, `href="/movie/14"`) {
+	firstRow := regexp.MustCompile(`(?s)<h2.*?</h2>`).FindString(more)
+	if !strings.Contains(firstRow, "More like Movie 13") || !strings.Contains(more, `href="/movie/14"`) {
 		t.Errorf("asking for more like movie 13 should start the first row:\n%s", more)
 	}
 	reset := send(http.MethodPost, "/api/recommendations/feedback/reset", "")
