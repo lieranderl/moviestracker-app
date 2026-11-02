@@ -170,6 +170,7 @@ func TestADeletedSessionCannotRecreateAccountData(t *testing.T) {
 			{"progress", func() error {
 				return s.SaveProgress(ctx, uid, store.Progress{Hash: "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111", Index: 1, Position: time.Minute, Duration: time.Hour})
 			}},
+			{"reset progress", func() error { return s.ResetProgress(ctx, uid, "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111", 1) }},
 			{"watch states", func() error {
 				return s.SetTitleState(ctx, uid, store.TitleState{Kind: "movie", TMDBID: 438631, State: store.WantToWatch})
 			}},
