@@ -53,7 +53,7 @@ func TestTrackerNamesNeverEnterDatastarExpressions(t *testing.T) {
 // The search carries the qualities and HDR picked before it.
 func TestTheSourcesSearchSendsThePickedQualitiesAndHDR(t *testing.T) {
 	search := views.SourcesSearch("movie", 27205)
-	for _, want := range []string{"'&quality=' + $qual.filter(Boolean).join(',')", "($hdr ? '&hdr=1' : '')"} {
+	for _, want := range []string{"/^(sort|qual|hdr|sourceSeason)$/"} {
 		if !strings.Contains(search, want) {
 			t.Errorf("search %q lacks %q", search, want)
 		}
