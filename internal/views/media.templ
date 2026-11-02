@@ -1038,13 +1038,17 @@ templ TorrActivityStats(t *torrserver.Torrent) {
 	</div>
 }
 
+// toastClass places a popover toast at the screen's bottom end, above the
+// dock on phones.
+const toastClass = "toast toast-end toast-bottom m-0 inset-auto bottom-0 max-md:bottom-16 right-0 bg-transparent border-0 overflow-visible [&:not(:popover-open)]:hidden"
+
 // appToast shows $toast for 3s; $toastError switches it to the error tone.
 templ appToast() {
 	<div
 		popover="manual"
 		role="status"
 		aria-live="polite"
-		class="toast toast-end toast-bottom m-0 inset-auto bottom-0 max-md:bottom-16 right-0 bg-transparent border-0 overflow-visible [&:not(:popover-open)]:hidden"
+		class={ toastClass }
 		data-effect="if ($toast) { el.matches(':popover-open') ? (el.hidePopover(), el.showPopover()) : el.showPopover() } else if (el.matches(':popover-open')) { el.hidePopover() }"
 		data-on-signal-patch__debounce.3s={ toastAutoHide }
 		data-on-signal-patch-filter="{ include: /^toast$/ }"
