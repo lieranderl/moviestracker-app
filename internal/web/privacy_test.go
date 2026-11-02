@@ -34,6 +34,7 @@ func TestThePrivacyPolicyListsEverythingKeptAboutAUser(t *testing.T) {
 	for _, want := range []string{
 		"favourites",
 		"Watched and Want to watch",
+		"episodes of series you marked watched",
 		"where you stopped watching",
 		"release alerts",
 		"your lists",

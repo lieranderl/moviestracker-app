@@ -30,6 +30,7 @@ func keepEverything(t *testing.T, s store.Store, uid string) string {
 		},
 		func() error { return s.AddUpdates(ctx, uid, []store.Update{duneInDV}) },
 		func() error { return s.SaveReleaseFilters(ctx, uid, store.ReleaseFilters{HDR: true}) },
+		func() error { return s.MarkEpisodes(ctx, uid, 95396, 1, []int{1, 2}, true) },
 		func() error {
 			return s.SaveReview(ctx, uid, store.Review{Kind: "movie", TMDBID: 438631, Title: "Dune", Rating: 9, Note: "Loud"})
 		},
@@ -70,7 +71,8 @@ func TestAUserExportsEverythingKeptAboutThem(t *testing.T) {
 			len(got.Updates) != 1 || got.Updates[0].Title != "Dune",
 			!got.ReleaseFilters.HDR,
 			len(got.Lists) != 1 || got.Lists[0].Name != "Sci-fi" || len(got.Lists[0].Titles) != 1 || got.Lists[0].ShareID == "",
-			len(got.Reviews) != 1 || got.Reviews[0].Note != "Loud":
+			len(got.Reviews) != 1 || got.Reviews[0].Note != "Loud",
+			len(got.Episodes[95396][1]) != 2:
 			t.Errorf("export lacks something kept: %+v", got)
 		}
 	})
@@ -101,6 +103,9 @@ func TestDeletingAnAccountDeletesEverythingKeptForIt(t *testing.T) {
 		}
 		if _, ok, _ := s.SharedList(ctx, otherShare); !ok {
 			t.Error("another user's shared link stopped working")
+		}
+		if eps, _ := s.WatchedEpisodes(ctx, uid, 95396); len(eps) != 0 {
+			t.Errorf("the deleted account still has watched episodes: %v", eps)
 		}
 		if favs, _ := s.Favorites(ctx, other); len(favs) != 1 {
 			t.Error("another user's favourites went too")

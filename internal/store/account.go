@@ -16,6 +16,8 @@ type Account struct {
 	ReleaseFilters ReleaseFilters `json:"releaseFilters"`
 	Lists          []CustomList   `json:"lists"`
 	Reviews        []Review       `json:"reviews"`
+	// Episodes are the watched episodes, by series and then season.
+	Episodes map[int]map[int][]int `json:"watchedEpisodes"`
 }
 
 // AccountStore hands users everything kept for them, and deletes it.

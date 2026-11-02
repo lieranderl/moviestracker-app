@@ -52,9 +52,10 @@ type app struct {
 	signer   signer
 	catalog  *handlers.Catalog
 	progress *handlers.Progress
+	library  *handlers.Library // users' library summaries, kept until their library changes
+	feeds    *cachedFeeds      // the backend's release feeds, as the home rows read them
 	// deletions are when accounts were deleted, for ending their sessions.
 	deletions deletions
-	feeds     *cachedFeeds // the backend's release feeds, as the home rows read them
 }
 
 func (a *app) now() time.Time {
@@ -148,8 +149,10 @@ func New(cfg Config) http.Handler {
 	filters.Register(mux)
 	a.catalog.RememberReleaseFilters(filters)
 	titleStates := handlers.NewTitleStates(a.cfg.Store, a.userID, a.catalog)
-	handlers.NewRecommendations(a.cfg.Store, a.userID, a.cfg.Store.Favorites, a.catalog).Register(mux)
+	a.library = handlers.NewLibrary(a.cfg.Store, a.cfg.Store.Favorites, a.cfg.Store.LibraryStamp)
+	handlers.NewRecommendations(a.library, a.userID, a.catalog).Register(mux)
 	titleStates.Register(mux)
+	handlers.NewEpisodes(a.cfg.Store, a.userID, a.catalog).Register(mux)
 	handlers.NewReviews(a.cfg.Store, a.cfg.Store, a.userID, a.catalog).Register(mux)
 	handlers.NewCustomLists(a.cfg.Store, a.cfg.Store, a.userID, a.catalog).Register(mux)
 	a.progress.MarkFinishedMoviesIn(titleStates)

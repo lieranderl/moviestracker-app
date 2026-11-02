@@ -5,6 +5,7 @@ import (
 	"context"
 	"maps"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -17,6 +18,7 @@ type Memory struct {
 	shared map[string]sharedList // by share ID
 	// deleted is when each deleted account was deleted.
 	deleted map[string]time.Time
+	stamps  int // library changes, of every user
 }
 
 // sharedList is whose list a link opens.
@@ -24,6 +26,7 @@ type sharedList struct{ uid, id string }
 
 type memoryUser struct {
 	prefs       Preferences
+	stamp       int // the library change last made
 	favorites   map[string]Favorite
 	torrServers []TorrServer // in the order added
 	progress    map[string]Progress
@@ -32,6 +35,7 @@ type memoryUser struct {
 	filters     ReleaseFilters
 	lists       shelf
 	reviews     map[string]Review
+	episodes    map[int]seriesEpisodes // by series ID
 }
 
 // NewMemory returns an empty in-memory store.
@@ -43,7 +47,7 @@ func NewMemory(opts ...Option) *Memory {
 func (m *Memory) user(uid string) *memoryUser {
 	u, ok := m.users[uid]
 	if !ok {
-		u = &memoryUser{favorites: map[string]Favorite{}, progress: map[string]Progress{}, titles: map[string]TitleState{}, updates: map[string]Update{}, lists: shelf{}, reviews: map[string]Review{}}
+		u = &memoryUser{favorites: map[string]Favorite{}, progress: map[string]Progress{}, titles: map[string]TitleState{}, updates: map[string]Update{}, lists: shelf{}, reviews: map[string]Review{}, episodes: map[int]seriesEpisodes{}}
 		m.users[uid] = u
 	}
 	return u
@@ -100,8 +104,22 @@ func (m *Memory) AddFavorite(_ context.Context, uid string, f Favorite) error {
 	if _, ok := favs[id]; !ok {
 		f.AddedAt = cmp.Or(f.AddedAt, m.opts.now()).UTC()
 		favs[id] = f
+		m.libraryChanged(uid)
 	}
 	return nil
+}
+
+// libraryChanged gives the user's library a new stamp; m.mu is held.
+func (m *Memory) libraryChanged(uid string) {
+	m.stamps++
+	m.user(uid).stamp = m.stamps
+}
+
+// LibraryStamp implements Store.
+func (m *Memory) LibraryStamp(_ context.Context, uid string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return strconv.Itoa(m.user(uid).stamp), nil
 }
 
 // FavoritesPage implements Store.
@@ -125,6 +143,7 @@ func (m *Memory) RemoveFavorite(_ context.Context, uid, kind string, tmdbID int)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.user(uid).favorites, id)
+	m.libraryChanged(uid)
 	return nil
 }
 
@@ -204,6 +223,7 @@ func (m *Memory) SetTitleState(_ context.Context, uid string, ts TitleState) err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.libraryChanged(uid)
 	if ts.State == "" {
 		delete(m.user(uid).titles, id)
 		return nil
@@ -469,7 +489,7 @@ func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error)
 		Preferences: u.prefs, Favorites: favs, TorrServers: servers,
 		Progress:    slices.SortedFunc(maps.Values(u.progress), func(a, b Progress) int { return b.UpdatedAt.Compare(a.UpdatedAt) }),
 		TitleStates: append(watched, want...), Updates: updates, ReleaseFilters: filters, Lists: lists,
-		Reviews: slices.Collect(maps.Values(u.reviews)),
+		Reviews: slices.Collect(maps.Values(u.reviews)), Episodes: u.watchedEpisodes(),
 	}, nil
 }
 
@@ -499,4 +519,37 @@ func (m *Memory) DeleteAccount(_ context.Context, uid string) error {
 	}
 	delete(m.users, uid)
 	return nil
+}
+
+// WatchedEpisodes implements Store.
+func (m *Memory) WatchedEpisodes(_ context.Context, uid string, tvID int) (map[int][]int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.user(uid).episodes[tvID].bySeason(), nil
+}
+
+// MarkEpisodes implements Store.
+func (m *Memory) MarkEpisodes(_ context.Context, uid string, tvID, season int, episodes []int, watched bool) error {
+	if err := checkEpisodes(tvID, season, episodes); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	all := m.user(uid).episodes
+	if all[tvID] == nil {
+		all[tvID] = seriesEpisodes{}
+	}
+	all[tvID].mark(season, episodes, watched)
+	return nil
+}
+
+// watchedEpisodes are all the user's watched episodes, by series.
+func (u *memoryUser) watchedEpisodes() map[int]map[int][]int {
+	out := map[int]map[int][]int{}
+	for tvID, series := range u.episodes {
+		if seasons := series.bySeason(); len(seasons) > 0 {
+			out[tvID] = seasons
+		}
+	}
+	return out
 }
