@@ -37,7 +37,7 @@ type memoryUser struct {
 	episodes    map[int]seriesEpisodes // by series ID
 	checkpoints AlertCheckpoints
 	muted       map[int]MutedTitle     // by TMDB ID
-	feedsOff    map[string]bool        // release feeds without alerts
+	feeds       map[string]AlertFeed   // alert choices, by feed
 	follows     map[int]FollowedSeries // by series ID
 }
 
@@ -610,20 +610,20 @@ func (m *Memory) SetAlertFeed(_ context.Context, uid, feed string, on bool) erro
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	u := m.user(uid)
+	if u.feeds == nil {
+		u.feeds = map[string]AlertFeed{}
+	}
+	choice := AlertFeed{Off: true}
 	if on {
-		delete(u.feedsOff, feed)
-		return nil
+		choice = AlertFeed{On: m.opts.now().UTC()}
 	}
-	if u.feedsOff == nil {
-		u.feedsOff = map[string]bool{}
-	}
-	u.feedsOff[feed] = true
+	u.feeds[feed] = choice
 	return nil
 }
 
-// AlertFeedsOff implements Store.
-func (m *Memory) AlertFeedsOff(_ context.Context, uid string) (map[string]bool, error) {
+// AlertFeeds implements Store.
+func (m *Memory) AlertFeeds(_ context.Context, uid string) (map[string]AlertFeed, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return maps.Clone(m.user(uid).feedsOff), nil
+	return maps.Clone(m.user(uid).feeds), nil
 }

@@ -219,12 +219,12 @@ func TestAUserChoosesWhichFeedsAlert(t *testing.T) {
 		if err := s.SetAlertFeed(ctx, uid, "hdr10movies", true); err != nil {
 			t.Fatal(err)
 		}
-		off, err := s.AlertFeedsOff(ctx, uid)
+		feeds, err := s.AlertFeeds(ctx, uid)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(off) != 1 || !off["latesttorrentsmovies"] {
-			t.Errorf("feeds off = %v, want only latesttorrentsmovies", off)
+		if !feeds["latesttorrentsmovies"].Off || feeds["hdr10movies"].Off || !feeds["hdr10movies"].On.Equal(now) || feeds["dvmovies"].Off {
+			t.Errorf("feeds = %+v, want trackers off and HDR10 on again since now", feeds)
 		}
 	})
 }

@@ -1266,24 +1266,26 @@ func (f *Firestore) MutedAlerts(ctx context.Context, uid string) ([]MutedTitle, 
 	return out, nil
 }
 
-// SetAlertFeed implements Store: an alertFeedsOff map on the user's
-// document.
+// SetAlertFeed implements Store: an alertFeeds map on the user's document,
+// by feed.
 func (f *Firestore) SetAlertFeed(ctx context.Context, uid, feed string, on bool) error {
 	if feed == "" {
 		return errors.New("alert feed: none named")
 	}
-	var v any = true
+	choice := map[string]any{"off": true}
 	if on {
-		v = firestore.Delete
+		choice = map[string]any{"off": false, "on": f.opts.now().UTC()}
 	}
-	if _, err := f.userDoc(uid).Set(ctx, map[string]any{"alertFeedsOff": map[string]any{feed: v}}, firestore.MergeAll); err != nil {
+	// Merging on the feed's field replaces its choice whole.
+	data := map[string]any{"alertFeeds": map[string]any{feed: choice}}
+	if _, err := f.userDoc(uid).Set(ctx, data, firestore.Merge([]string{"alertFeeds", feed})); err != nil {
 		return fmt.Errorf("set alert feed: %w", err)
 	}
 	return nil
 }
 
-// AlertFeedsOff implements Store.
-func (f *Firestore) AlertFeedsOff(ctx context.Context, uid string) (map[string]bool, error) {
+// AlertFeeds implements Store.
+func (f *Firestore) AlertFeeds(ctx context.Context, uid string) (map[string]AlertFeed, error) {
 	snap, err := f.userDoc(uid).Get(ctx)
 	if notFound(err) {
 		return nil, nil
@@ -1291,12 +1293,14 @@ func (f *Firestore) AlertFeedsOff(ctx context.Context, uid string) (map[string]b
 	if err != nil {
 		return nil, fmt.Errorf("read alert feeds: %w", err)
 	}
-	raw, _ := snap.Data()["alertFeedsOff"].(map[string]any)
-	out := make(map[string]bool, len(raw))
+	raw, _ := snap.Data()["alertFeeds"].(map[string]any)
+	out := make(map[string]AlertFeed, len(raw))
 	for feed, v := range raw {
-		if off, _ := v.(bool); off {
-			out[feed] = true
-		}
+		entry, _ := v.(map[string]any)
+		var c AlertFeed
+		c.Off, _ = entry["off"].(bool)
+		c.On, _ = entry["on"].(time.Time)
+		out[feed] = c
 	}
 	return out, nil
 }
