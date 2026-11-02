@@ -12,7 +12,7 @@ func webListActions(ctx context.Context) string {
 	return `const b = evt.target.closest('[data-action]'); if (!b) return; const d = b.dataset
  switch (d.action) {
  case 'play':
-  $activeHash = d.hash; $activeFileIndex = +d.index; $streamTitle = d.title; $playKind = d.kind === 'hls' && $gst ? 'hls' : 'direct'; ` + webStartPlay() + `; break
+  $activeHash = d.hash; $activeFileIndex = +d.index; $streamTitle = d.title; $_resumeHref = '/search'; $playKind = d.kind === 'hls' && $gst ? 'hls' : 'direct'; ` + webStartPlay() + `; break
  case 'files': tsPlayerFiles(el, $tsSelected, d.hash); break
  case 'drop': tsTorrentAction(el, $tsSelected, 'drop', d.hash); break
  case 'remove': $confirmHash = d.hash; $confirmName = d.title; $confirmOpen = true; break
