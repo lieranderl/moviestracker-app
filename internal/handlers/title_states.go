@@ -39,6 +39,8 @@ func (ts *TitleStates) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/titles/state", ts.handleState)
 	mux.HandleFunc("POST /api/titles/state", ts.handleSet)
 	mux.HandleFunc("DELETE /api/titles/state", ts.handleSet)
+	mux.HandleFunc("POST /api/titles/quick", ts.handleQuick)
+	mux.HandleFunc("POST /api/titles/undo", ts.handleUndo)
 	mux.HandleFunc("GET /lists/{list}", ts.handleList)
 }
 

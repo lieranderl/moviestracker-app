@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
@@ -191,6 +192,19 @@ func TestAWatchListIsSearchedFilteredAndSorted(t *testing.T) {
 		if !strings.Contains(page, want) {
 			t.Errorf("the controls do not keep the query: lack %q", want)
 		}
+	}
+}
+
+// A long search is cut to 100 characters, never inside one.
+func TestALongSearchIsCutByCharacters(t *testing.T) {
+	s := titlesServer(t)
+	long := strings.Repeat("д", 150)
+	page := sendAs(t, s, http.MethodGet, "/lists/watched?q="+url.QueryEscape(long))
+	if !strings.Contains(page, `name="q" value="`+strings.Repeat("д", 100)+`"`) {
+		t.Error("a 150-character search is not kept as its first 100 characters")
+	}
+	if strings.ContainsRune(page, utf8.RuneError) {
+		t.Error("the cut search splits a character")
 	}
 }
 

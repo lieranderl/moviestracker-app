@@ -356,6 +356,19 @@ in focused PRs before the larger episode/discovery and collaboration work.
   Firestore emulator (including pre-paging records); web and handler tests
   cover read reuse, invalidation and paging. The full library is still read
   when a summary is rebuilt after a change.
+- **R23 — implemented in both apps, deployment unverified (2 November
+  2026):** a signed-in visitor's title cards (home rows, Discover, search,
+  lists, similar titles) carry Want to watch and Watched buttons, shown on
+  hover or focus and always on touch screens. A toast says what changed and
+  offers Undo, which puts back the prior state and its place in the list.
+  The store's ChangeTitleState changes a state only while the title still
+  has the expected one (a Firestore transaction, a lock in the memory and
+  file stores), so neither the action nor its undo overwrites a change made
+  meanwhile elsewhere; the toast says so instead. Store contract tests pass
+  on memory, the local file and the Firestore emulator; handler and web
+  tests cover undo, conflicts, no-op actions and signed-out cards. A local
+  browser check showed the buttons and the toast; TMDB lookups fail on the
+  local network, so a successful mark was covered by tests only.
 
 - **R13 — implemented, deployment unverified (2 November 2026):** Want to
   watch, Watched (both apps) and favourites (web) have a GET form to search by

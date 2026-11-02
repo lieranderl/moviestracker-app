@@ -56,6 +56,9 @@ templ layoutWithMeta(meta PageMeta) {
 		>
 			<div class="hidden" data-effect={ redirectEffect }></div>
 			{ children... }
+			if signedIn(ctx) {
+				@cardToast()
+			}
 		</body>
 	</html>
 }
