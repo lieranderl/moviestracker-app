@@ -187,7 +187,7 @@ func FavoriteButton(kind string, id int, on bool) templ.Component {
 
 // FavoritesPage lists the signed-in user's favourites, newest first;
 // failed says they could not be read. It is My lists' first tab.
-func FavoritesPage(user *auth.User, items []tmdb.MediaItem, failed bool) templ.Component {
+func FavoritesPage(user *auth.User, items []tmdb.MediaItem, more string, failed bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -208,7 +208,7 @@ func FavoritesPage(user *auth.User, items []tmdb.MediaItem, failed bool) templ.C
 			templ_7745c5c3_Var9 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = ListsPage(user, ListFavorites, items, failed).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ListsPage(user, ListFavorites, items, more, failed).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

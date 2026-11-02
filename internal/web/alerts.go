@@ -157,7 +157,7 @@ func (a *app) handleAlertsPage(w http.ResponseWriter, r *http.Request) {
 	} else {
 		v.Alerts, v.Next, err = a.cfg.Store.Updates(ctx, user.ID, after)
 	}
-	if errors.Is(err, store.ErrUpdateCursor) {
+	if errors.Is(err, store.ErrCursor) {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
