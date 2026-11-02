@@ -348,6 +348,17 @@ in focused PRs before the larger episode/discovery and collaboration work.
   cover read reuse, invalidation and paging. The full library is still read
   when a summary is rebuilt after a change.
 
+- **R21 — implemented, deployment unverified (2 November 2026):** Discover
+  (both apps) gains runtime and original-language filters next to genre,
+  year and rating, and a Pick for tonight button: a shortlist of five
+  matching titles the user has not marked (watched, saved or hidden), drawn
+  from Discover's first three pages, with Pick again for another draw. Every
+  chosen filter is sent to TMDB; when nothing is left the page says so and
+  offers to drop each filter in turn. Reuses the Discover form instead of a
+  new screen. TMDB client and handler tests cover the filters, exclusions,
+  reroll and relax links; no browser check (TMDB unreachable from the local
+  app over IPv6).
+
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding
 implementation plans before code; they are not delegated silently to execution.

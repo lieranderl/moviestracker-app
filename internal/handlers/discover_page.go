@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"slices"
 	"strconv"
@@ -48,6 +49,17 @@ func (c *Catalog) discoverView(ctx context.Context, r *http.Request) (views.Disc
 	case "rating", "newest":
 		v.Query.Sort = sort
 	}
+	if m, ok := positiveInt(q.Get("runtime")); ok && slices.Contains(views.DiscoverRuntimes, m) {
+		v.Query.MaxRuntime = m
+	}
+	for _, l := range views.DiscoverLanguages {
+		if l.Code == q.Get("lang") {
+			v.Query.Language = l.Code
+		}
+	}
+	if draw, ok := positiveInt(q.Get("pick")); ok {
+		v.Pick = draw
+	}
 	return v, nil
 }
 
@@ -76,6 +88,9 @@ func (c *Catalog) handleDiscoverPage(w http.ResponseWriter, r *http.Request) {
 		v.Items = p.Items
 		if p.TotalPages > 1 {
 			v.Next = 2
+		}
+		if v.Pick > 0 {
+			v.Picks = c.pickForTonight(ctx, r, v.Query, p, v.Pick)
 		}
 	}
 	templ.Handler(views.DiscoverPage(user, v)).ServeHTTP(w, r)
@@ -137,4 +152,39 @@ func (c *Catalog) handleDiscoverMore(w http.ResponseWriter, r *http.Request) {
 	if err := sse.PatchElementTempl(views.DiscoverMore(v)); err != nil {
 		logSSEError(r, "patch discover loader", err)
 	}
+}
+
+// pickPages is how many pages of Discover a shortlist for tonight draws
+// from.
+const pickPages = 3
+
+// pickForTonight is a shortlist of up to views.PickSize titles q finds that
+// the user has not marked, drawn (draw: the reroll's number) from the
+// first pickPages pages, first among them.
+func (c *Catalog) pickForTonight(ctx context.Context, r *http.Request, q tmdb.DiscoverQuery, first tmdb.Page, draw int) []tmdb.MediaItem {
+	marked := map[string]bool{}
+	if c.marked != nil {
+		marked = c.marked(r)
+	}
+	var pool []tmdb.MediaItem
+	page := first
+	for n := 1; ; n++ {
+		for _, it := range page.Items {
+			if !marked[titleKey(it.MediaType, it.ID)] {
+				pool = append(pool, it)
+			}
+		}
+		if n >= pickPages || n >= page.TotalPages {
+			break
+		}
+		next, err := c.clients().Details.Discover(ctx, q, n+1)
+		if err != nil {
+			slog.Warn("tmdb discover failed", "query", q, "error", err)
+			break
+		}
+		page = next
+	}
+	rng := rand.New(rand.NewPCG(uint64(max(draw, 0)), 0)) // #nosec G115 G404 -- draw is positive; a shuffle, not a secret
+	rng.Shuffle(len(pool), func(i, j int) { pool[i], pool[j] = pool[j], pool[i] })
+	return pool[:min(len(pool), views.PickSize)]
 }

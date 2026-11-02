@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"net/http"
 	"sync"
 
 	"github.com/lieranderl/moviestracker-app/internal/store"
@@ -126,4 +127,20 @@ func (l *Library) summarise(ctx context.Context, uid string) (LibrarySummary, er
 		}
 	}
 	return s, nil
+}
+
+// MarkedFor is the request's user's marked titles (Summary's Marked),
+// for keeping them out of picks; none when signed out or unreadable.
+func (l *Library) MarkedFor(user func(*http.Request) (string, bool)) func(*http.Request) map[string]bool {
+	return func(r *http.Request) map[string]bool {
+		uid, ok := user(r)
+		if !ok {
+			return nil
+		}
+		s, err := l.Summary(r.Context(), uid)
+		if err != nil {
+			return nil
+		}
+		return s.Marked
+	}
 }

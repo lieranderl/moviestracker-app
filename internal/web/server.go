@@ -146,6 +146,7 @@ func New(cfg Config) http.Handler {
 	titleStates := handlers.NewTitleStates(a.cfg.Store, a.userID, a.catalog)
 	a.library = handlers.NewLibrary(a.cfg.Store, a.cfg.Store.Favorites, a.cfg.Store.LibraryStamp)
 	handlers.NewRecommendations(a.library, a.userID, a.catalog).Register(mux)
+	a.catalog.ExcludeFromPicks(a.library.MarkedFor(a.userID))
 	titleStates.Register(mux)
 	handlers.NewEpisodes(a.cfg.Store, a.userID, a.catalog).Register(mux)
 	handlers.NewReviews(a.cfg.Store, a.cfg.Store, a.userID, a.catalog).Register(mux)

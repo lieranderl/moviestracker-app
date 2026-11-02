@@ -16,6 +16,10 @@ type DiscoverQuery struct {
 	Year      int     // released, or first aired, that year
 	MinRating float64 // TMDB's average vote, at least
 	Sort      string  // "popular" (the default), "rating" or "newest"
+	// MaxRuntime is the longest runtime, in minutes; 0 is any.
+	MaxRuntime int
+	// Language is the original language (ISO 639-1, "ko"); "" is any.
+	Language string
 }
 
 // minVotes keeps titles rated by a handful of people out of rated results.
@@ -40,6 +44,12 @@ func (q DiscoverQuery) values(today time.Time, page int) url.Values {
 	}
 	if q.Year > 0 {
 		v.Set(year, strconv.Itoa(q.Year))
+	}
+	if q.MaxRuntime > 0 {
+		v.Set("with_runtime.lte", strconv.Itoa(q.MaxRuntime))
+	}
+	if q.Language != "" {
+		v.Set("with_original_language", q.Language)
 	}
 	if q.MinRating > 0 {
 		v.Set("vote_average.gte", strconv.FormatFloat(q.MinRating, 'f', -1, 64))
