@@ -183,3 +183,26 @@ func TestAlertsRememberHowFarTheyLookedThroughTheFeeds(t *testing.T) {
 		}
 	})
 }
+
+// A user mutes a movie's release alerts and later unmutes it; muting one
+// leaves the others alone.
+func TestAUserMutesAMoviesAlerts(t *testing.T) {
+	eachStore(t, func(t *testing.T, s store.Store, uid string, _ *time.Time) {
+		ctx := context.Background()
+		for _, m := range []store.MutedTitle{{TMDBID: 438631, Title: "Dune"}, {TMDBID: 329865, Title: "Arrival"}} {
+			if err := s.MuteAlerts(ctx, uid, m, true); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := s.MuteAlerts(ctx, uid, store.MutedTitle{TMDBID: 329865}, false); err != nil {
+			t.Fatal(err)
+		}
+		got, err := s.MutedAlerts(ctx, uid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != 1 || got[0].TMDBID != 438631 || got[0].Title != "Dune" {
+			t.Errorf("muted = %+v, want only Dune", got)
+		}
+	})
+}

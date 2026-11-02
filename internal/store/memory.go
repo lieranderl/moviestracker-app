@@ -3,6 +3,7 @@ package store
 import (
 	"cmp"
 	"context"
+	"errors"
 	"maps"
 	"slices"
 	"strconv"
@@ -35,6 +36,7 @@ type memoryUser struct {
 	reviews     map[string]Review
 	episodes    map[int]seriesEpisodes // by series ID
 	checkpoints AlertCheckpoints
+	muted       map[int]MutedTitle     // by TMDB ID
 	follows     map[int]FollowedSeries // by series ID
 }
 
@@ -570,4 +572,31 @@ func (m *Memory) FollowedSeries(_ context.Context, uid string) ([]FollowedSeries
 	out := slices.Collect(maps.Values(m.user(uid).follows))
 	slices.SortFunc(out, newestFollowed)
 	return out, nil
+}
+
+// MuteAlerts implements Store.
+func (m *Memory) MuteAlerts(_ context.Context, uid string, t MutedTitle, on bool) error {
+	if t.TMDBID <= 0 {
+		return errors.New("mute alerts: no movie")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u := m.user(uid)
+	if !on {
+		delete(u.muted, t.TMDBID)
+		return nil
+	}
+	if u.muted == nil {
+		u.muted = map[int]MutedTitle{}
+	}
+	t.At = m.opts.now().UTC()
+	u.muted[t.TMDBID] = t
+	return nil
+}
+
+// MutedAlerts implements Store.
+func (m *Memory) MutedAlerts(_ context.Context, uid string) ([]MutedTitle, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.SortedFunc(maps.Values(m.user(uid).muted), newestMuted), nil
 }

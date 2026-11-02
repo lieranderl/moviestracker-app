@@ -1222,3 +1222,46 @@ func (f *Firestore) FollowedSeries(ctx context.Context, uid string) ([]FollowedS
 	slices.SortFunc(out, newestFollowed)
 	return out, nil
 }
+
+// MuteAlerts implements Store: a mutedAlerts map on the user's document,
+// by TMDB ID.
+func (f *Firestore) MuteAlerts(ctx context.Context, uid string, t MutedTitle, on bool) error {
+	if t.TMDBID <= 0 {
+		return fmt.Errorf("mute alerts: no movie")
+	}
+	var entry any = firestore.Delete
+	if on {
+		entry = map[string]any{"title": t.Title, "at": f.opts.now().UTC()}
+	}
+	data := map[string]any{"mutedAlerts": map[string]any{strconv.Itoa(t.TMDBID): entry}}
+	if _, err := f.userDoc(uid).Set(ctx, data, firestore.MergeAll); err != nil {
+		return fmt.Errorf("mute alerts: %w", err)
+	}
+	return nil
+}
+
+// MutedAlerts implements Store.
+func (f *Firestore) MutedAlerts(ctx context.Context, uid string) ([]MutedTitle, error) {
+	snap, err := f.userDoc(uid).Get(ctx)
+	if notFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read muted alerts: %w", err)
+	}
+	raw, _ := snap.Data()["mutedAlerts"].(map[string]any)
+	out := make([]MutedTitle, 0, len(raw))
+	for key, v := range raw {
+		id, err := strconv.Atoi(key)
+		entry, ok := v.(map[string]any)
+		if err != nil || !ok {
+			continue
+		}
+		t := MutedTitle{TMDBID: id}
+		t.Title, _ = entry["title"].(string)
+		t.At, _ = entry["at"].(time.Time)
+		out = append(out, t)
+	}
+	slices.SortFunc(out, newestMuted)
+	return out, nil
+}

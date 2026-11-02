@@ -405,6 +405,16 @@ in focused PRs before the larger episode/discovery and collaboration work.
   releases; file-based resume is unchanged and no seek position moves
   between releases. Torrserver and handler tests cover exact and uncertain
   names and that the series stays unmarked.
+- **R27 — first slice on the web, deployment unverified (2 November
+  2026):** a user mutes or unmutes a movie's release alerts from the alerts
+  page; a muted movie brings no new alerts, the alerts it already has stay
+  (read counts follow R03), and muted movies are listed with a way back. The
+  alerts page says it shows sources turning up, not air dates, and links to
+  Upcoming episodes. Muting is kept on the user's document (memory and
+  Firestore, contract-tested on the emulator). Not yet: series air-date
+  notifications and per-feed choices. App lifecycle: the self-hosted app
+  has no background discovery; it shows nothing on its own when closed, and
+  this slice promises nothing there.
 
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding

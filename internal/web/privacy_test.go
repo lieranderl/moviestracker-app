@@ -36,6 +36,7 @@ func TestThePrivacyPolicyListsEverythingKeptAboutAUser(t *testing.T) {
 		"Watched and Want to watch",
 		"where you stopped watching",
 		"release alerts",
+		"muted release alerts",
 		"your lists",
 		"anyone with its link",
 		"ratings and private notes",
