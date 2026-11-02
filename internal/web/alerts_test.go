@@ -313,3 +313,59 @@ func TestAlertsCatchUpOnWhatTheFeedsStillHold(t *testing.T) {
 		t.Errorf("with nothing new, a check read %d pages; want only each feed's first", pages)
 	}
 }
+
+// swappedFeeds are release feeds whose backend a test replaces.
+type swappedFeeds struct {
+	mu  sync.Mutex
+	src releases.Source
+}
+
+func (s *swappedFeeds) Page(ctx context.Context, feed releases.Feed, page int) (tmdb.Page, error) {
+	s.mu.Lock()
+	src := s.src
+	s.mu.Unlock()
+	return src.Page(ctx, feed, page)
+}
+
+func (s *swappedFeeds) set(src releases.Source) {
+	s.mu.Lock()
+	s.src = src
+	s.mu.Unlock()
+}
+
+// A catch-up never reads a fresh first page with an older page after it:
+// releases between them would be skipped for good.
+func TestAlertsCatchUpOnOneGenerationOfTheFeeds(t *testing.T) {
+	g := newGoogle(t)
+	cfg := withTMDB(t, g.config())
+	cfg.Store = store.NewMemory()
+	var old []releases.Release
+	for i := range 10 {
+		old = append(old, releases.Release{ID: 1000 + i, Title: fmt.Sprint("Old ", i), FoundAt: now.Add(-time.Duration(i+1) * time.Hour)})
+	}
+	feeds := &swappedFeeds{src: releases.NewMemory(map[releases.Feed][]releases.Release{releases.DolbyVision: old})}
+	cfg.Releases = feeds
+	clock := now
+	cfg.Now = func() time.Time { return clock }
+	h := web.New(cfg)
+	session := signIn(t, h)
+	send(t, h, http.MethodPost, "/api/favorites?type=movie&id=438631", session)
+	if got := bellCount(t, h, session); got != "" {
+		t.Fatalf("before Dune is found the bell shows %q", got)
+	}
+	clock = clock.Add(4 * time.Minute)
+	send(t, h, http.MethodGet, "/api/browse/dolby-vision-releases?page=2", session) // keeps the old page 2
+	var fresh []releases.Release
+	for i := range 25 { // Dune lands on page 2
+		id := 2000 + i
+		if i == 22 {
+			id = 438631
+		}
+		fresh = append(fresh, releases.Release{ID: id, Title: fmt.Sprint("New ", i), FoundAt: now.Add(time.Duration(25-i) * time.Minute)})
+	}
+	feeds.set(releases.NewMemory(map[releases.Feed][]releases.Release{releases.DolbyVision: append(fresh, old...)}))
+	clock = clock.Add(2 * time.Minute) // page 1 is read again, page 2 is still kept
+	if got := bellCount(t, h, session); got != "1" {
+		t.Errorf("Dune, newly on page 2, brought no alert (bell %q)", got)
+	}
+}

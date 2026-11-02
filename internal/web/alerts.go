@@ -14,6 +14,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/handlers"
 	"github.com/lieranderl/moviestracker-app/internal/releases"
 	"github.com/lieranderl/moviestracker-app/internal/store"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/views"
 )
 
@@ -45,37 +46,68 @@ func (a *app) foundAlerts(ctx context.Context, uid string) ([]store.Update, stor
 	if since.Library != stamp {
 		since.Feeds = nil
 	}
-	followed := library.Followed
-	var found []store.Update
 	checkpoints := store.AlertCheckpoints{Library: stamp, Feeds: map[string]time.Time{}}
+	var found []store.Update
 	for _, feed := range alertFeeds {
 		read := since.Feeds[string(feed)]
-	pages:
-		for page := 1; page <= alertPages; page++ {
-			p, err := a.feeds.Page(ctx, feed, page)
-			if err != nil {
-				return found, store.AlertCheckpoints{}, err
-			}
-			for _, it := range p.Items {
-				if !it.FoundAt.After(read) && !read.IsZero() {
-					break pages // looked through already
-				}
-				if it.FoundAt.After(checkpoints.Feeds[string(feed)]) {
-					checkpoints.Feeds[string(feed)] = it.FoundAt
-				}
-				if followed[it.ID] {
-					found = append(found, store.Update{Feed: string(feed), TMDBID: it.ID, Title: it.Title, Poster: it.PosterPath, FoundAt: a.now()})
-				}
-			}
-			if page >= p.TotalPages {
-				break
-			}
+		// The newest page usually holds all that is new, and the home rows
+		// keep it. A deeper look reads the backend afresh from the first
+		// page: kept pages may be of different ages, and a fresh first page
+		// before an older second would skip the releases between them.
+		scan, err := a.scanFeed(ctx, a.feeds.Page, feed, read, library.Followed, 1)
+		if err == nil && !scan.done {
+			scan, err = a.scanFeed(ctx, a.feeds.src.Page, feed, read, library.Followed, alertPages)
 		}
-		if _, ok := checkpoints.Feeds[string(feed)]; !ok && !read.IsZero() {
+		found = append(found, scan.found...)
+		if err != nil {
+			return found, store.AlertCheckpoints{}, err
+		}
+		switch {
+		case !scan.newest.IsZero():
+			checkpoints.Feeds[string(feed)] = scan.newest
+		case !read.IsZero():
 			checkpoints.Feeds[string(feed)] = read // nothing new
 		}
 	}
 	return found, checkpoints, nil
+}
+
+// feedScan is what a look through a feed found: the followed movies, the
+// newest release read, and whether it reached what was looked through
+// before or the feed's end.
+type feedScan struct {
+	found  []store.Update
+	newest time.Time
+	done   bool
+}
+
+// scanFeed looks through up to pages pages of feed, read by page, for the
+// followed movies found after read.
+func (a *app) scanFeed(ctx context.Context, page func(context.Context, releases.Feed, int) (tmdb.Page, error), feed releases.Feed, read time.Time, followed map[int]bool, pages int) (feedScan, error) {
+	var scan feedScan
+	for n := 1; n <= pages; n++ {
+		p, err := page(ctx, feed, n)
+		if err != nil {
+			return scan, err
+		}
+		for _, it := range p.Items {
+			if !read.IsZero() && !it.FoundAt.After(read) {
+				scan.done = true // looked through already
+				return scan, nil
+			}
+			if it.FoundAt.After(scan.newest) {
+				scan.newest = it.FoundAt
+			}
+			if followed[it.ID] {
+				scan.found = append(scan.found, store.Update{Feed: string(feed), TMDBID: it.ID, Title: it.Title, Poster: it.PosterPath, FoundAt: a.now()})
+			}
+		}
+		if n >= p.TotalPages {
+			scan.done = true
+			return scan, nil
+		}
+	}
+	return scan, nil
 }
 
 // keepFoundAlerts keeps the alerts the feeds newly hold for the user. The
