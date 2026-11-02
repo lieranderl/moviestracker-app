@@ -146,6 +146,7 @@ func New(cfg Config) http.Handler {
 	titleStates := handlers.NewTitleStates(a.cfg.Store, a.userID, a.catalog)
 	titleStates.RateFrom(a.cfg.Store)
 	a.library = handlers.NewLibrary(a.cfg.Store, a.cfg.Store.Favorites, a.cfg.Store.LibraryStamp)
+	a.library.Consider(a.cfg.Store, a.cfg.Store)
 	handlers.NewRecommendations(a.library, a.userID, a.catalog).Register(mux)
 	titleStates.Register(mux)
 	episodes := handlers.NewEpisodes(a.cfg.Store, a.userID, a.catalog)
