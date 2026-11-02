@@ -238,6 +238,12 @@ templ userMenu(user *auth.User) {
 				</a>
 			</li>
 		}
+		<li>
+			<a href={ templ.SafeURL(CalendarPath) }>
+				@Icon("calendar-days", "size-4")
+				{ tr(ctx, "Upcoming episodes") }
+			</a>
+		</li>
 		if user.IsAdmin() {
 			<li>
 				<a href="/settings/sources">
