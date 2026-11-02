@@ -40,11 +40,18 @@ type Progress struct {
 	timecodes func() Timecodes
 	// watched marks movies watched once finished; nil marks nothing.
 	watched *TitleStates
+	// episodes marks series' episodes watched once finished; nil marks none.
+	episodes *Episodes
 }
 
 // MarkFinishedMoviesIn marks a movie watched in ts when the player reports
 // it finished. Series are left alone: one episode is not the series.
 func (p *Progress) MarkFinishedMoviesIn(ts *TitleStates) { p.watched = ts }
+
+// MarkFinishedEpisodesIn marks a series' episode watched in e when the
+// player reports its file finished and the file's name gives the episode
+// exactly (torrserver.ExactEpisodes); uncertain ones are left to the user.
+func (p *Progress) MarkFinishedEpisodesIn(e *Episodes) { p.episodes = e }
 
 // Timecodes keeps where files were left in a TorrServer (its /viewed API).
 type Timecodes interface {
@@ -257,6 +264,9 @@ func (p *Progress) handleSave(w http.ResponseWriter, r *http.Request) {
 	}
 	if p.watched != nil && rec.Finished() && rec.Kind == "movie" {
 		p.watched.markWatched(r, uid, rec.TMDBID, rec.Title)
+	}
+	if p.episodes != nil && rec.Finished() && rec.Kind == "tv" {
+		p.episodes.markFinished(ctx, uid, rec.TMDBID, rec.File)
 	}
 	if p.timecodes != nil {
 		if err := p.timecodes().SetViewed(ctx, data.Hash, data.Index, math.Floor(data.Position)); err != nil {
