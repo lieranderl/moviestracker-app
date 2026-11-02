@@ -1,13 +1,67 @@
 # Moviestracker user experience roadmap
 
-Date: 1 November 2026. Status: approved roadmap; Phase 1 in progress.
+Created: 1 November 2026. Reviewed: 2 November 2026 against v0.11.1
+(`3c89359561d226395c234a5c87e1780dd3ef4b41`). Status: most individual-viewing
+features released; acceptance verification and remaining scope tracked below.
+
+## Release review and current status
+
+[v0.11.1](https://github.com/lieranderl/moviestracker-app/releases/tag/v0.11.1)
+is a Windows TorrServer startup fix over v0.11.0: it probes random peer ports
+below the dynamic range instead of repeatedly accepting nearby dynamic ports
+that Windows may reserve for UDP. The interactivity features below arrived in
+v0.11.0 and are included in v0.11.1. TorrServer was also updated to MatriX.148.
+
+The [release workflow](https://github.com/lieranderl/moviestracker-app/actions/runs/41488253261)
+passed Linux quality/race/security checks, Firestore store checks, Windows
+tests and install/upgrade/uninstall, Mac tests/packaging, and Docker smoke tests
+on amd64 and arm64. Windows and Mac installers and checksums are published.
+The [web deployment](https://github.com/lieranderl/moviestracker-app/actions/runs/41488011199)
+and [Docker latest promotion](https://github.com/lieranderl/moviestracker-app/actions/runs/41491118906)
+also succeeded for the release commit. These are delivery evidence, not proof
+that every signed-in interaction or media format works in a real browser.
+
+This review checked release metadata, workflow jobs, source, tests and the
+historical delivery log. It did not perform a new signed-in browser review or
+play media. Historical browser limitations in the log remain open until
+explicitly retested. The following status supersedes historical "deployment
+unverified" notes for release inclusion; it does not supersede their test limits.
+
+| Roadmap items | Current assessment | Remaining work |
+| --- | --- | --- |
+| R01–R04, R06–R08 | Implemented and included in release: list dialog, search restoration, alert acknowledgment, concurrent recommendations, privacy and account controls, primary title action. | Browser acceptance pass; measure latency before claiming a production improvement. |
+| R05 | Partial: cached summaries and default 60-title pages shipped. | Summary rebuilds still read the library; active search/filter/sort reads the full list. Establish realistic large-library read/latency budgets before extending this path. |
+| R09 | Declined by user; billboard stays first. | Do not reschedule the original reorder. Any home change needs a reviewed visual proposal. |
+| R10–R14 | Implemented and included: readable files, destination labels, playback explanations, library controls and localized titles. | Real-media compatibility and provider-failure browser checks; R13 retains the R05 scaling limit. |
+| R15 | Partial: missing-file recovery, retry states and newer-search cancellation shipped. | Verify loading/disconnected/reconnect states and that older requests cannot replace newer selections across the whole journey. |
+| R16 | Partial: control-name guards and reduced-motion behavior shipped. | Full keyboard/focus and screen-reader announcement audit on both surfaces. |
+| R17 | Implemented and included: episode/season marks and Next unwatched. | Browser verification with real series and persisted state. |
+| R18 | Partial: exact filename episode mapping and completion shipped. | Ambiguous filenames remain manual episode ticks; explicit mapping confirmation and persisted file mappings are not delivered. Preserve file-based resume. |
+| R19–R21, R23 | Implemented and included: spoiler protection, recommendation feedback, tonight shortlist, quick watch-state actions and undo. | End-to-end browser acceptance, including account isolation and concurrent changes. R23 covers watch-state actions; custom-list actions remain on title pages. |
+| R22 | Pending: saved discovery presets. | Next recommended feature after the acceptance pass. |
+| R24–R27 | Implemented in supported scope: release comparison, following/upcoming episodes, checkpointed release discovery and web alert preferences/episode alerts. | Compare metadata is not a playback guarantee. Discovery remains bounded by upstream history; episode alerts inspect only the latest aired episode, not all missed episodes. App background discovery remains unsupported. |
+| R28 | Pending: authorized device handoff. | Design reachability and scoped authorization after playback readiness is verified. |
+| R29–R32 | Pending: household voting, permissions, queue and cross-instance collaboration. | Keep deferred until the individual viewing journey is verified; permissions and persistence must ship with voting. |
+
+Continue watching removal/reset also shipped in
+[PR #140](https://github.com/lieranderl/moviestracker-app/pull/140), beyond the
+original item list. It removes one resume card, resets its saved position and
+suppresses stale external resume fallback without deleting episode/title history.
+The account inventory now includes episodes, follows and recommendation feedback
+in export/deletion (`internal/store/account.go`, `firestore.go` and account
+contract tests); the historical integration reminders below are resolved.
+
+The strongest product improvement is the connected individual-viewing journey:
+shortlist a title, save it without leaving discovery, compare releases, resume,
+track episodes and find upcoming ones. The next investment should make that
+journey dependable and repeatable before adding household collaboration.
 
 ## Goal and delivery order
 
 Make choosing, starting, and continuing a movie or series easier. Prioritize
 individual viewing, then household collaboration. This document consolidates
 the source review and the signed-in website review performed on the date above.
-It does not claim that the proposed features are implemented.
+The status table above separates delivered features from remaining proposals.
 
 Deliver each item as a focused, independently reviewable change. Complete the
 relevant dependencies before starting an item; phases express priority, not a
@@ -19,8 +73,8 @@ These are delivery priorities, not security severity ratings.
 
 Relative effort: **S** one narrow change; **M** several related slices;
 **L** coordinated UI, storage, and integration work. Estimates describe scope,
-not promised delivery dates. Items remain pending unless the delivery log
-records implementation; implementation does not imply deployment.
+not promised delivery dates. The current status table is authoritative; the
+delivery log retains historical implementation evidence and test limitations.
 
 Surfaces: **Both** means self-hosted app and cloud web app; **Web** means the
 cloud app; **App** means self-hosted deployments. Shared features use the same
@@ -212,11 +266,39 @@ pending, implemented, and deployed status separate in future updates here.
 
 ## Next implementation slice
 
-Continue with **R07**, then the Phase 2 items (R08 onward). They address observed and
-source-derived Phase 1 risks without introducing new product concepts. Continue Phase 1
-in focused PRs before the larger episode/discovery and collaboration work.
+Recommended sequence; this updates priorities, not approval to implement code:
+
+| Order | Scope / effort | Outcome and acceptance seam |
+| --- | --- | --- |
+| 1 | **Finish R15/R16 acceptance**, P1 / M | Walk search → title → sources → play → resume and series → episode mark → Next unwatched on both apps. Check Chromium/WebKit, desktop/375 px, keyboard, dialog focus return, announced SSE status, reduced motion, English/Russian. Use deterministic external fixtures for repeatable browser checks; record real-media checks separately. Include source replacement/cancellation, unavailable server/file, removal of the last resume card and stale external timecodes. Fix only demonstrated defects in separate slices. |
+| 2 | **R22 saved discovery presets**, P2 / M | Reuse Discover's existing controls; save/apply/rename/delete a named preset without a new discovery screen. Restore media type, genre, year, rating, sort, runtime and language; exclude transient page/reroll state. Test authenticated HTTP/SSE and public store contracts on applicable backends, user isolation, obsolete filters, failed writes, persistence and export/deletion. Confirm those seams and preset limits in the feature plan before code. |
+| 3 | **X01 playback readiness**, P2 / M | Extend the existing source/player controls with reachable server, known format/conversion capabilities and a useful next action. Preserve unknown metadata as unknown and do not begin playback/download as a side effect of checking. Test adapter/provider boundaries and the shared browse-to-play browser journey. Establish available signals before committing to a compatibility verdict. |
+| 4 | **X02 optional completion prompt**, P2 / S | Reuse rating/watch-state/recommendation controls at genuine completion; dismissible, no credits interruption, no automatic rating or autoplay. Confirm the existing completion rule is suitable first; test completion versus seeking/reconnect and duplicate prompts at the player/HTTP boundaries. |
+| 5 | **R28 device handoff**, P3 / L | Specify target devices and network reachability, then expiring/revocable scoped access. QR must not contain TorrServer credentials; unauthorized, expired, unreachable and missing-file cases need a recovery path. |
+
+Two follow-ups need measurement or an explicit product decision before scheduling:
+
+- **R05/R13 large libraries:** active query paths read and localize the entire
+  list before rendering, and summary invalidation rebuilds it. Measure reads,
+  provider calls and response time on realistic library sizes; choose a bounded
+  query/index strategy only if those budgets fail. Do not describe all library
+  access as paginated. See [favourites handler](../../../internal/web/favorites.go)
+  and [query processing](../../../internal/handlers/library_query.go).
+- **R27 missed episode policy:** [episode discovery](../../../internal/web/alerts.go)
+  reads `LastEpisode`. Several episodes airing between visits can yield only
+  the latest notice, including a batch release. Decide whether latest-only is
+  sufficient and label that scope, or add bounded per-season catch-up with
+  checkpoints and idempotent per-episode alerts. This is a source-derived
+  limitation, not a newly reproduced browser defect.
+
+Keep R29–R32 and synchronized playback deferred. R09 remains declined. X03
+guided onboarding should first be tested against the existing TorrServer intro;
+do not build a second setup flow without evidence the current one is insufficient.
 
 ## Delivery log
+
+Historical entries below describe evidence at implementation time. Use the
+release review/current status and revised sequence above for planning today.
 
 - **R01 — implemented, deployment unverified (1 November 2026):** replaced the
   clipped title-page dropdown with the existing native dialog helper. The same
