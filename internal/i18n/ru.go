@@ -2,6 +2,10 @@ package i18n
 
 // ru translates the interface into Russian, by English text.
 var ru = map[string]string{
+	"Remove %s from Continue watching":                              "Убрать «%s» из раздела «Продолжить просмотр»",
+	"Remove from Continue watching and reset saved progress":        "Убрать из раздела «Продолжить просмотр» и сбросить позицию просмотра",
+	"Continue watching could not be updated. Please try again.":     "Не удалось обновить раздел «Продолжить просмотр». Попробуйте ещё раз.",
+	"Removed from Continue watching.":                               "Убрано из раздела «Продолжить просмотр».",
 	"Alert preferences unavailable":                                 "Настройки уведомлений недоступны",
 	"Your alert preferences could not be loaded. Please try again.": "Не удалось загрузить настройки уведомлений. Попробуйте ещё раз.",
 	"Refresh":             "Обновить",

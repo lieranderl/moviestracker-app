@@ -197,3 +197,25 @@ func TestTheLocalPlayerResumesWhereAnotherTorrServerPlayerStopped(t *testing.T) 
 		t.Errorf("resume = %s, want TorrServer's 10:00", body)
 	}
 }
+
+func TestTheLocalAppRemovesContinueWatchingWithoutRestoringExternalTimecodes(t *testing.T) {
+	s, viewed := progressServerViewed(t)
+	postProgress(t, s, `{"hash":"`+duneHash+`","index":2,"position":2530,"duration":9360}`, true)
+	req := httptest.NewRequest(http.MethodDelete, "/api/progress?hash="+duneHash+"&index=2", nil)
+	req.Header.Set("Datastar-Request", "true")
+	req.AddCookie(signedIn(t, s))
+	res := httptest.NewRecorder()
+	s.ServeHTTP(res, req)
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "Removed from Continue watching.") {
+		t.Fatalf("local reset = %d %s", res.Code, res.Body)
+	}
+	if body := getResume(t, s, 2); strings.Contains(body, "Resume from") {
+		t.Errorf("TorrServer restored reset progress: %s", body)
+	}
+	if at, ok := viewed.Load(2); !ok || at != 2530.0 {
+		t.Errorf("reset changed the external TorrServer timecode: %v, %v", at, ok)
+	}
+	if page := get(t, s, "/", true).Body.String(); strings.Contains(page, "continue-watching-title") {
+		t.Error("the removed entry returns on the local home page")
+	}
+}

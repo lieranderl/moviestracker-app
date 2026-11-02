@@ -1,10 +1,10 @@
 package views
 
 import (
-	"net/url"
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"path"
 	"strconv"
 	"strings"
@@ -94,9 +94,31 @@ func progressPercent(p store.Progress) int {
 	return int(p.Position * 100 / p.Duration)
 }
 
+// ContinueWatching keeps a stable SSE target even after its final card is removed.
+templ ContinueWatching(watching []store.Progress) {
+	<div id="continue-watching" class="contents" data-signals="{_progressRemoving: false}">
+		<div id="continue-watching-status" role="status" aria-atomic="true"></div>
+		if len(watching) > 0 {
+			@continueWatching(watching)
+		}
+	</div>
+}
+
+templ ProgressResetNotice(failed bool) {
+	<div id="continue-watching-status" role="status" aria-atomic="true" class={ "alert alert-soft", templ.KV("alert-error", failed) }>
+		if failed {
+			@Icon("circle-alert", "size-5")
+			<span>{ tr(ctx, "Continue watching could not be updated. Please try again.") }</span>
+		} else {
+			@Icon("check", "size-5")
+			<span>{ tr(ctx, "Removed from Continue watching.") }</span>
+		}
+	</div>
+}
+
 // continueWatching is the home row of files the user has not finished.
 templ continueWatching(watching []store.Progress) {
-	<section id="continue-watching" class="relative space-y-4 scroll-mt-32" aria-labelledby="continue-watching-title">
+	<section class="relative space-y-4 scroll-mt-32" aria-labelledby="continue-watching-title">
 		<header>
 			<h2 id="continue-watching-title" class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
 				@Icon("history", "size-5 text-secondary")
@@ -105,7 +127,7 @@ templ continueWatching(watching []store.Progress) {
 		</header>
 		@carousel() {
 			for _, p := range watching {
-				<li class="carousel-item">
+				<li id={ fmt.Sprintf("continue-%s-%d", strings.ToLower(p.Hash), p.Index) } class="carousel-item relative">
 					<a href={ progressPlay(p) } class="card w-40 sm:w-48 shrink-0 bg-base-200/60 hover:bg-base-200 border border-base-content/5 shadow-md group focus-visible:outline-2 focus-visible:outline-primary">
 						<figure class="aspect-[2/3] relative bg-base-300">
 							if poster := progressPoster(p); poster != "" {
@@ -126,6 +148,17 @@ templ continueWatching(watching []store.Progress) {
 							<p class="text-xs text-base-content/70 font-mono">{ trf(ctx, "%s left", clockTime(p.Duration-p.Position)) }</p>
 						</div>
 					</a>
+					<button
+						type="button"
+						class="btn btn-circle absolute top-2 right-2 z-10"
+						aria-label={ trf(ctx, "Remove %s from Continue watching", p.Title) }
+						title={ tr(ctx, "Remove from Continue watching and reset saved progress") }
+						data-on:click={ fmt.Sprintf("@delete('/api/progress?hash=%s&index=%d')", p.Hash, p.Index) }
+						data-indicator="_progressRemoving"
+						data-attr:disabled="$_progressRemoving"
+					>
+						@Icon("x", "size-4")
+					</button>
 				</li>
 			}
 		}

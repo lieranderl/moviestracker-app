@@ -121,7 +121,7 @@ func Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, ser
 				return templ_7745c5c3_Err
 			}
 			if len(watching) > 0 {
-				templ_7745c5c3_Err = continueWatching(watching).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ContinueWatching(watching).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

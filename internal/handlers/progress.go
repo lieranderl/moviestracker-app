@@ -121,8 +121,51 @@ func (p *Progress) PlayRequest(r *http.Request) (views.PlayRequest, bool) {
 // Register adds the progress routes to mux.
 func (p *Progress) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/progress", p.handleSave)
+	mux.HandleFunc("DELETE /api/progress", p.handleReset)
 	mux.HandleFunc("GET /api/progress/resume", p.handleResume)
 	mux.HandleFunc("GET /api/progress/title", p.handleTitle)
+}
+
+// handleReset removes one file from Continue watching. A zero-position
+// record suppresses resume fallback to an older TorrServer timecode.
+func (p *Progress) handleReset(w http.ResponseWriter, r *http.Request) {
+	uid, ok := p.user(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	hash := r.URL.Query().Get("hash")
+	index, err := strconv.Atoi(r.URL.Query().Get("index"))
+	if !infoHash.MatchString(hash) || err != nil || index < 1 {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
+	defer cancel()
+	err = p.store.ResetProgress(ctx, uid, hash, index)
+	var watching []store.Progress
+	if err == nil {
+		watching, err = p.store.RecentProgress(ctx, uid, continueLimit)
+	}
+	// NewSSE applies its defaults and flushes immediately; override its cache
+	// header in an option, before the personal response is committed.
+	sse := datastar.NewSSE(w, r, func(_ *datastar.ServerSentEventGenerator) {
+		w.Header().Set("Cache-Control", "no-store")
+	})
+	if err != nil {
+		slog.Warn("resetting recent progress failed", "error", logError(err))
+		if err := sse.PatchElementTempl(views.ProgressResetNotice(true)); err != nil {
+			slog.Warn("patching progress failure failed", "error", err)
+		}
+		return
+	}
+	if err := sse.PatchElementTempl(views.ContinueWatching(watching)); err != nil {
+		slog.Warn("patching recent progress failed", "error", err)
+		return
+	}
+	if err := sse.PatchElementTempl(views.ProgressResetNotice(false)); err != nil {
+		slog.Warn("patching progress reset notice failed", "error", err)
+	}
 }
 
 // otherPlayers is where TorrServer's other players left a file: the local
