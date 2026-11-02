@@ -15,6 +15,7 @@ import (
 
 	"github.com/lieranderl/moviestracker-app/internal/releases"
 	"github.com/lieranderl/moviestracker-app/internal/store"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/web"
 )
 
@@ -262,5 +263,53 @@ func TestTheLibraryIsReadAgainOnlyAfterItChanges(t *testing.T) {
 	}
 	if users.count() == read {
 		t.Error("a changed library was not read again")
+	}
+}
+
+// pageCountingFeeds counts the feed pages read.
+type pageCountingFeeds struct {
+	releases.Source
+	mu    sync.Mutex
+	pages int
+}
+
+func (c *pageCountingFeeds) Page(ctx context.Context, feed releases.Feed, page int) (tmdb.Page, error) {
+	c.mu.Lock()
+	c.pages++
+	c.mu.Unlock()
+	return c.Source.Page(ctx, feed, page)
+}
+
+// Alerts catch up on everything the feeds still hold since the user last
+// looked, deeper than the newest pages, and later read only what is new.
+func TestAlertsCatchUpOnWhatTheFeedsStillHold(t *testing.T) {
+	g := newGoogle(t)
+	cfg := withTMDB(t, g.config())
+	users := store.NewMemory()
+	cfg.Store = users
+	var dv []releases.Release
+	for i := range 160 { // 8 pages; Dune is on page 8
+		id := 1000 + i
+		if i == 150 {
+			id = 438631
+		}
+		dv = append(dv, releases.Release{ID: id, Title: fmt.Sprint("Release ", i), FoundAt: now.Add(-time.Duration(i) * time.Hour)})
+	}
+	feeds := &pageCountingFeeds{Source: releases.NewMemory(map[releases.Feed][]releases.Release{releases.DolbyVision: dv})}
+	cfg.Releases = feeds
+	clock := now
+	cfg.Now = func() time.Time { return clock }
+	h := web.New(cfg)
+	session := signIn(t, h)
+	send(t, h, http.MethodPost, "/api/favorites?type=movie&id=438631", session)
+	if got := bellCount(t, h, session); got != "1" {
+		t.Fatalf("Dune, 150 releases down the feed, brought no alert (bell %q)", got)
+	}
+	clock = clock.Add(10 * time.Minute) // past the feeds' cache
+	read := func() int { feeds.mu.Lock(); defer feeds.mu.Unlock(); return feeds.pages }
+	before := read()
+	bellCount(t, h, session)
+	if pages := read() - before; pages > 3 {
+		t.Errorf("with nothing new, a check read %d pages; want only each feed's first", pages)
 	}
 }

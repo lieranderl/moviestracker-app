@@ -17,28 +17,52 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/views"
 )
 
-// alertPages is how deep into each release feed updates look: its newest
-// releases, which the home rows' cache usually holds already.
-const alertPages = 5
+// alertPages is how deep into each release feed updates look for releases
+// the user has not been through: deep enough to catch up after an absence.
+// Releases deeper than that, or gone from the feeds, bring no alert.
+const alertPages = 20
 
 // alertFeeds are the feeds a followed movie brings an update from.
 var alertFeeds = []releases.Feed{releases.Latest, releases.HDR10, releases.DolbyVision}
 
-// foundAlerts are the followed movies among the feeds' newest releases.
-func (a *app) foundAlerts(ctx context.Context, uid string) ([]store.Update, error) {
+// foundAlerts are the followed movies among the feeds' releases found
+// since the user's checkpoints, and the checkpoints to keep once those are
+// kept: each feed's newest release read. A changed library looks through
+// the feeds again, for releases of movies it newly follows.
+func (a *app) foundAlerts(ctx context.Context, uid string) ([]store.Update, store.AlertCheckpoints, error) {
+	stamp, err := a.cfg.Store.LibraryStamp(ctx, uid)
+	if err != nil {
+		return nil, store.AlertCheckpoints{}, err
+	}
 	library, err := a.library.Summary(ctx, uid)
 	if err != nil || len(library.Followed) == 0 {
-		return nil, err
+		return nil, store.AlertCheckpoints{}, err
+	}
+	since, err := a.cfg.Store.AlertCheckpoints(ctx, uid)
+	if err != nil {
+		return nil, store.AlertCheckpoints{}, err
+	}
+	if since.Library != stamp {
+		since.Feeds = nil
 	}
 	followed := library.Followed
 	var found []store.Update
+	checkpoints := store.AlertCheckpoints{Library: stamp, Feeds: map[string]time.Time{}}
 	for _, feed := range alertFeeds {
+		read := since.Feeds[string(feed)]
+	pages:
 		for page := 1; page <= alertPages; page++ {
 			p, err := a.feeds.Page(ctx, feed, page)
 			if err != nil {
-				return found, err
+				return found, store.AlertCheckpoints{}, err
 			}
 			for _, it := range p.Items {
+				if !it.FoundAt.After(read) && !read.IsZero() {
+					break pages // looked through already
+				}
+				if it.FoundAt.After(checkpoints.Feeds[string(feed)]) {
+					checkpoints.Feeds[string(feed)] = it.FoundAt
+				}
 				if followed[it.ID] {
 					found = append(found, store.Update{Feed: string(feed), TMDBID: it.ID, Title: it.Title, Poster: it.PosterPath, FoundAt: a.now()})
 				}
@@ -47,16 +71,20 @@ func (a *app) foundAlerts(ctx context.Context, uid string) ([]store.Update, erro
 				break
 			}
 		}
+		if _, ok := checkpoints.Feeds[string(feed)]; !ok && !read.IsZero() {
+			checkpoints.Feeds[string(feed)] = read // nothing new
+		}
 	}
-	return found, nil
+	return found, checkpoints, nil
 }
 
 // keepFoundAlerts keeps the alerts the feeds newly hold for the user. The
 // navbar asks on every page, so alerts already among the newest are not
 // written again. It says whether it kept any.
 func (a *app) keepFoundAlerts(ctx context.Context, uid string, newest []store.Update) bool {
-	found, err := a.foundAlerts(ctx, uid)
+	found, checkpoints, err := a.foundAlerts(ctx, uid)
 	if err != nil {
+		// The checkpoints stay, so what was not read is read next time.
 		slog.Warn("finding release alerts failed", "error", handlers.LogError(err))
 	}
 	known := map[string]bool{}
@@ -64,14 +92,19 @@ func (a *app) keepFoundAlerts(ctx context.Context, uid string, newest []store.Up
 		known[u.ID()] = true
 	}
 	found = slices.DeleteFunc(found, func(u store.Update) bool { return known[u.ID()] })
-	if len(found) == 0 {
-		return false
+	if len(found) > 0 {
+		if err := a.cfg.Store.AddUpdates(ctx, uid, found); err != nil {
+			slog.Warn("keeping release alerts failed", "error", handlers.LogError(err))
+			return false
+		}
 	}
-	if err := a.cfg.Store.AddUpdates(ctx, uid, found); err != nil {
-		slog.Warn("keeping release alerts failed", "error", handlers.LogError(err))
-		return false
+	// The checkpoints move only once the alerts before them are kept.
+	if err == nil && checkpoints.Library != "" {
+		if err := a.cfg.Store.SaveAlertCheckpoints(ctx, uid, checkpoints); err != nil {
+			slog.Warn("keeping alert checkpoints failed", "error", handlers.LogError(err))
+		}
 	}
-	return true
+	return len(found) > 0
 }
 
 // newestAlerts are the newest page of the user's release alerts, with any
