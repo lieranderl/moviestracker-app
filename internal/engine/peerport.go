@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math/rand/v2"
 	"net"
 	"os"
 	"path/filepath"
@@ -16,12 +17,16 @@ import (
 // (PeersListenPort), which TorrServer then uses, unless Options.OwnPeerPort.
 // Left to itself TorrServer takes a random TCP port and then wants UDP on the
 // same number, which Windows refuses when the number is in a reserved range.
+// The port is a random one from 10000 to 49151, below the dynamic ports:
+// Windows hands those out in sequence, so retries stay inside one reserved
+// range.
 func (s *Supervisor) peerAddr() (string, error) {
 	if set, known := userPeerPort(s.cfg.Dir); (set || !known) && !s.Options().OwnPeerPort {
 		return "", nil
 	}
-	for range 20 {
-		if port, ok := tcpUDPPort(); ok {
+	for range 50 {
+		port := 10000 + rand.IntN(49152-10000) // #nosec G404 -- a port number, not a secret
+		if tcpUDPFree(port) {
 			return ":" + strconv.Itoa(port), nil
 		}
 	}
@@ -47,18 +52,17 @@ func userPeerPort(dir string) (set, known bool) {
 	return stored.BitTorr.PeersListenPort > 0, true
 }
 
-// tcpUDPPort returns a port free for TCP on which UDP may listen too.
-func tcpUDPPort() (int, bool) {
-	tcp, err := net.Listen("tcp4", ":0") // #nosec G102 -- probing the port TorrServer will listen on for peers
+// tcpUDPFree reports whether TCP and UDP can both listen on port.
+func tcpUDPFree(port int) bool {
+	tcp, err := net.Listen("tcp4", fmt.Sprintf(":%d", port)) // #nosec G102 -- probing the port TorrServer will listen on for peers
 	if err != nil {
-		return 0, false
+		return false
 	}
 	defer func() { _ = tcp.Close() }()
-	port := tcp.Addr().(*net.TCPAddr).Port
 	udp, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", port)) // #nosec G102 -- as above
 	if err != nil {
-		return 0, false
+		return false
 	}
 	_ = udp.Close()
-	return port, true
+	return true
 }

@@ -456,8 +456,10 @@ func TestAnEngineWithoutAPeerPortGetsOneTCPAndUDPCanBind(t *testing.T) {
 	if len(addrs) != 1 || !strings.HasPrefix(addrs[0], ":") {
 		t.Fatalf("peer addresses = %q, want one :port", addrs)
 	}
-	if port, err := strconv.Atoi(addrs[0][1:]); err != nil || port <= 0 {
-		t.Errorf("peer address %q has no port", addrs[0])
+	// Below the dynamic ports (49152 and up), where Windows hands out ports
+	// in sequence and reserves whole ranges for UDP.
+	if port, err := strconv.Atoi(addrs[0][1:]); err != nil || port < 1024 || port >= 49152 {
+		t.Errorf("peer address %q is not a registered port (1024–49151)", addrs[0])
 	}
 }
 
