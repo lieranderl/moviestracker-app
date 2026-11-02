@@ -1,0 +1,108 @@
+package views
+
+import (
+	"fmt"
+
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/i18n"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+)
+
+// CalendarPath is the page of the user's followed series' next episodes.
+const CalendarPath = "/calendar"
+
+// UpcomingSeries is a followed series and its next episode, as TMDB gives
+// it: a date without a time, or none.
+type UpcomingSeries struct {
+	Item  tmdb.MediaItem
+	Next  tmdb.Airing
+	Ended bool
+}
+
+// followSlot is where a series page's follow button goes.
+templ followSlot(id int) {
+	<span id="follow-button" class="contents" data-init={ fmt.Sprintf("@get('/api/follow/state?id=%d')", id) }></span>
+}
+
+// FollowButton follows the series or, when on, stops following it.
+templ FollowButton(id int, on bool) {
+	<button
+		id="follow-button"
+		type="button"
+		aria-pressed={ boolAttr(on) }
+		class="btn sm:btn-lg btn-ghost text-neutral-content border-neutral-content/30 hover:bg-neutral-content/10 gap-2"
+		if on {
+			data-on:click={ fmt.Sprintf("@delete('/api/follow?id=%d')", id) }
+		} else {
+			data-on:click={ fmt.Sprintf("@post('/api/follow?id=%d')", id) }
+		}
+	>
+		if on {
+			@Icon("bell-ring", "size-5")
+			{ tr(ctx, "Following") }
+		} else {
+			@Icon("bell-plus", "size-5")
+			{ tr(ctx, "Follow") }
+		}
+	</button>
+}
+
+// CalendarPage lists the followed series' next episodes.
+templ CalendarPage(user *auth.User, upcoming []UpcomingSeries, failed bool) {
+	@Layout(tr(ctx, "Upcoming episodes")) {
+		@Navbar(user)
+		<main class="grow pb-20">
+			<div class="max-w-3xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
+				<header class="space-y-1">
+					<h1 class="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
+						@Icon("calendar-days", "size-6 text-primary")
+						{ tr(ctx, "Upcoming episodes") }
+					</h1>
+					<p class="text-sm text-base-content/70">{ tr(ctx, "The next episode of each series you follow. Dates are the day TMDB lists, without a time.") }</p>
+				</header>
+				if failed {
+					<div role="alert" class="alert alert-error alert-soft">
+						@Icon("circle-alert", "size-5")
+						<span>{ tr(ctx, "The series you follow could not be loaded right now. Please try again in a moment.") }</span>
+					</div>
+				} else if len(upcoming) == 0 {
+					@emptyState("calendar-days", tr(ctx, "You follow no series yet"), tr(ctx, "Press Follow on a series' page to see its next episodes here.")) {
+						@browseTrendingLink()
+					}
+				} else {
+					<ul class="list bg-base-200/60 rounded-box border border-base-content/10">
+						for _, u := range upcoming {
+							<li class="list-row items-center">
+								if poster := u.Item.PosterURL(); poster != "" {
+									<img src={ poster } alt="" class="w-12 aspect-[2/3] rounded-field object-cover" loading="lazy" width="48" height="72"/>
+								} else {
+									@Icon("tv", "size-8 opacity-40")
+								}
+								<div class="min-w-0">
+									<a href={ templ.SafeURL(fmt.Sprintf("/tv/%d", u.Item.ID)) } class="font-semibold link link-hover line-clamp-1">{ u.Item.Title }</a>
+									<p class="text-sm text-base-content/70">
+										switch {
+											case u.Ended:
+												{ tr(ctx, "Ended") }
+											case u.Next.AirDate.IsZero():
+												{ tr(ctx, "Date not announced") }
+											default:
+												<span class="font-mono text-primary">{ fmt.Sprintf("S%02dE%02d", u.Next.Season, u.Next.Number) }</span>
+												if u.Next.Name != "" {
+													· { u.Next.Name }
+												}
+										}
+									</p>
+								</div>
+								if !u.Ended && !u.Next.AirDate.IsZero() {
+									<span class="badge badge-soft badge-primary whitespace-nowrap">{ i18n.Date(ctx, u.Next.AirDate) }</span>
+								}
+							</li>
+						}
+					</ul>
+				}
+			</div>
+		</main>
+		@siteFooter()
+	}
+}
