@@ -143,3 +143,21 @@ func TestHiddenSpoilersKeepUnwatchedEpisodesSummariesOutOfThePage(t *testing.T) 
 		t.Error("without spoiler protection the summaries are hidden")
 	}
 }
+
+// Only a signed-in user's requests look up episodes on TMDB.
+func TestSignedOutVisitorsCannotLookUpEpisodes(t *testing.T) {
+	s, _ := severanceServer(t)
+	for _, path := range []string{
+		"/api/episodes/reveal?tv=95396&season=1&episode=2",
+		"/api/episodes/spoilers?on=1&tv=95396&season=1",
+	} {
+		method := http.MethodGet
+		if strings.Contains(path, "spoilers") {
+			method = http.MethodPost
+		}
+		res := requestWith(t, s, method, path)
+		if res.Code != http.StatusUnauthorized || strings.Contains(res.Body.String(), "Plot of") {
+			t.Errorf("%s %s signed out = %d:\n%s", method, path, res.Code, res.Body)
+		}
+	}
+}

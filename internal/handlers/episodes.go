@@ -87,9 +87,13 @@ func (e *Episodes) handleReveal(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-// season is the season a request names (?tv=, ?season=), from TMDB; it
-// answers the request itself when there is none.
+// season is the season a request names (?tv=, ?season=), from TMDB, for a
+// signed-in user, as season loads are; it answers the request itself when
+// there is none.
 func (e *Episodes) season(w http.ResponseWriter, r *http.Request) (*tmdb.Season, int, bool) {
+	if e.catalog.apiUser(w, r) == nil {
+		return nil, 0, false
+	}
 	tvID, idOK := positiveInt(r.URL.Query().Get("tv"))
 	number, err := strconv.Atoi(r.URL.Query().Get("season"))
 	if !idOK || err != nil || number < 0 || e.catalog.clients().Details == nil {
