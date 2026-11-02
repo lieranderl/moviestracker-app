@@ -348,6 +348,17 @@ in focused PRs before the larger episode/discovery and collaboration work.
   cover read reuse, invalidation and paging. The full library is still read
   when a summary is rebuilt after a change.
 
+- **R25 — implemented, deployment unverified (2 November 2026):** series
+  pages in both apps have Follow, kept per user (memory, Firestore, local
+  file), and a new Upcoming episodes page (user menu) lists each followed
+  series' next episode: dated ones soonest first, then those with no date
+  announced, then ended ones. TMDB gives episode air dates without a time,
+  so they are shown as dates only, with no timezone. Store contract tests
+  (Firestore emulator included) and a handler test cover following,
+  ordering, labels and unfollowing; no browser check (series details need
+  TMDB, unreachable from the local app over IPv6). Account export/deletion
+  (R07) must add the follows collection once both are merged.
+
 Unresolved questions for this roadmap document: none. Feature-specific API,
 schema, lifecycle, and product decisions must be resolved in the corresponding
 implementation plans before code; they are not delegated silently to execution.
