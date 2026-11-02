@@ -300,6 +300,21 @@ do not build a second setup flow without evidence the current one is insufficien
 Historical entries below describe evidence at implementation time. Use the
 release review/current status and revised sequence above for planning today.
 
+- **R14/R16 — audit follow-up implemented, PR pending (2 November 2026):**
+  a signed-in web audit reproduced Russian library search missing titles saved
+  in English. The web release-feed adapter dropped the optional title-naming
+  interface; it now forwards it, retaining saved-name fallback for unavailable
+  or unsupported providers. A real-router regression failed before the repair;
+  web favourites, custom-list contents and recommendation seed headings are
+  covered too. Season controls now use native navigation links with initial and
+  reactive `aria-current`, replacing incomplete tab roles. A rendered regression
+  failed before the template repair; disposable browser checks confirmed native
+  Tab/Enter, retained focus, changed episode content and current-link updates in
+  English/desktop and Russian/375 px. Affected race suites and full `make ci`
+  passed; an independent whole-branch review found no actionable issues.
+  Production account data was not changed. Live playback, personal progress
+  writes, real screen-reader and WebKit checks remain unverified.
+
 - **R01 — implemented, deployment unverified (1 November 2026):** replaced the
   clipped title-page dropdown with the existing native dialog helper. The same
   shared form, endpoints, and list fragments serve both apps. Browser checks
