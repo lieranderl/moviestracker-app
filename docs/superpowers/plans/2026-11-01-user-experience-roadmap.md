@@ -323,6 +323,15 @@ in focused PRs before the larger episode/discovery and collaboration work.
   and gains an accessible name. View tests cover the label, the selector's
   names and the local button; no browser check, as web title pages need a
   Google sign-in.
+- **R14 — implemented, deployment unverified (2 November 2026):** Want to
+  watch, Watched, favourites, custom lists and the "Because you…" headings
+  name titles in the interface language by their canonical TMDB IDs, through
+  a light cached lookup (name and poster), at most eight at a time and for at
+  most 1.5 s; a title not named in time, or at all, keeps its saved name. A
+  local browser check found the self-hosted app's health-tracking TMDB
+  wrapper hid the new lookup; it now passes it through. After that, the
+  Russian Watched list and recommendation heading showed «Дюна» for a title
+  saved as "Dune"; a cold first load can still fall back to the saved name.
 - **R08 — implemented, deployment unverified (2 November 2026):** title
   pages in both apps lead with Continue (now primary) when there is a file to
   resume, then Find sources, which is primary until Continue appears: the
