@@ -914,6 +914,7 @@ var ru = map[string]string{
 	"Copy failed: select the command instead":                                                "Не удалось скопировать: выделите команду вручную",
 	"Copy its Direct link below for VLC, another player or your TV, which play it as it is.": "Скопируйте прямую ссылку ниже для VLC, другого плеера или телевизора — они воспроизведут файл как есть.",
 	"Mark all read": "Отметить все прочитанными",
+	"Show more":     "Показать ещё",
 	"Older alerts":  "Более старые оповещения",
 	"Your alerts could not be marked read. Please try again.":                                                                         "Не удалось отметить оповещения прочитанными. Попробуйте ещё раз.",
 	"HLS converts it as it plays, in any browser.":                                                                                    "HLS преобразует его на лету — работает в любом браузере.",
