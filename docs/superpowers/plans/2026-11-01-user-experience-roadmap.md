@@ -271,10 +271,13 @@ pending, implemented, and deployed status separate in future updates here.
 - Production repairs delivered: Add-to-TorrServer selector initialization (#151),
   home-row/trailer initialization and shared magnet-copy data (#153). All required
   checks passed; real home rows and enabled Add were verified on revision00196-wic.
-- In progress: approved X02 completion prompt on `codex/completion-prompt`;
-  read-only identity/action boundaries and disposable native-media acceptance are
-  being completed. It is not yet merged or deployed. User-requested neutral-gray
-  shared player controls are included in this slice.
+- Delivered: X02 completion prompt and neutral-gray shared player controls (#154).
+  All required checks passed; revision00198-neg serves all web traffic. Native
+  completion/fullscreen checks used disposable media; production-account playback,
+  native WebKit and screen-reader acceptance remain unverified.
+- In progress: local queued-file position repair. Natural advancement incorrectly
+  carried the previous file's position into the next file; same-file stream/audio
+  changes must continue to preserve position.
 - Remaining: full R15/R16 acceptance (including WebKit, screen-reader and actual
   production-media flows), then R28 device-handoff design and implementation.
   R29–R32 remain deferred; R09 remains declined.

@@ -24,7 +24,7 @@ func torrPageSignals(connected, gst, gstKnown, canRemove bool, linkOrigin string
 	streamBase: '', playKind: 'direct', playNonce: 0, audioTrack: -1, mediaInfoOpen: false, subTrack: -1,
 	_resume: '', _resumeAt: 0, _seekHint: '', _seekSum: 0, _seekAt: 0, _zone: '',
 	_paused: true, _time: 0, _dur: 0, _vol: 1, _muted: false, _fs: false, _idle: false, _waiting: false, _seeking: false, _unplayable: '',
-	_queue: [], _queueHash: '', _listMenu: false,
+	_queue: [], _queueHash: '', _listMenu: false, _localPlayingFile: '',
 	_audioMenu: false, _subMenu: false, audioLang: localStorage.getItem('torrAudioLang') || '',
 	addModalOpen: false,
 	probeOpen: false, probeHash: '', probeIndex: 1, probeLoading: false,
@@ -157,8 +157,15 @@ func openFileMenu(clean, hls string) string {
 
 // torrPlayback (re)starts the stream once the audio track is known: right
 // after the tracks response on play, and again whenever the picker changes it.
-const torrPlayback = `$playNonce && $playerOpen && $audioTrack >= 0 &&
-	window.playHlsVideo($streamUrl = $streamBase + ($streamBase.includes('/gst/') ? '&audio=' + $audioTrack : ''))`
+// Only stream/audio changes within the same file retain its playback position.
+const torrPlayback = `if ($playNonce && $playerOpen && $audioTrack >= 0) {
+	const file = $activeHash.toLowerCase() + ':' + $activeFileIndex
+	const url = $streamBase + ($streamBase.includes('/gst/') ? '&audio=' + $audioTrack : '')
+	@peek(() => {
+		window.playHlsVideo($streamUrl = url, $_localPlayingFile === file)
+		$_localPlayingFile = file
+	})
+}`
 
 // torrPlayerStatsStream keeps the stats row (and, with GStreamer, the media
 // info) current from one server stream while the player is open. The effect

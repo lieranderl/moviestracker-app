@@ -39,6 +39,13 @@ This document defines testing conventions, the test-driven development loop, sea
   and track changes, starting a new file at zero, shared HLS task preservation, file-refresh cancellation isolation and
   suppressing late probe responses after close. Signed-in HTTP tests cover
   rendering relayed files/tracks/stats and rejecting invalid or oversized data.
+- **Player adapter acceptance**: use a disposable account and two generated
+  playable files on a fake TorrServer. Check natural ending, Next and playlist
+  selection start the new file at zero; Direct/HLS and audio changes within the
+  same file retain position. Close/reopen must clear the stopped player's position.
+  Run this against both rendered transports: the native API unit tests alone do
+  not exercise each adapter's choice of whether to preserve position. Keep this
+  separate from production-media acceptance; do not alter the user's history.
 - **Run Unit & Integration Tests**:
   ```bash
   go test -v ./...
