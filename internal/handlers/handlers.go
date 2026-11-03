@@ -332,6 +332,7 @@ func (s *Server) routes() {
 
 	// TorrServer API Endpoints
 	s.mux.HandleFunc("GET /api/torrserver/torrents", s.handleTorrServerTorrents)
+	s.mux.HandleFunc("GET /api/torrserver/readiness", s.handlePlaybackReadiness)
 	s.mux.HandleFunc("POST /api/torrserver/add", s.handleTorrServerAdd)
 	s.mux.HandleFunc("POST /api/torrserver/action", s.handleTorrServerAction)
 	s.mux.HandleFunc("GET /api/torrserver/files", s.handleTorrServerFiles)

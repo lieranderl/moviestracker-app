@@ -106,7 +106,7 @@ const status = (fields) => ({ checking: false, ok: false, version: "", hls: fals
 const canConvert = async (url, signal) => {
   const gst = await call(url, "gst/echo", { read: (res) => res.json(), signal });
   if (gst.status === 404) return { hls: false, hlsKnown: true };
-  if (gst.problem || typeof gst.value?.gstreamer !== "object") return { hls: false, hlsKnown: false };
+  if (gst.problem || !gst.value?.gstreamer || typeof gst.value.gstreamer !== "object" || Array.isArray(gst.value.gstreamer) || typeof gst.value.gstreamer.works !== "boolean") return { hls: false, hlsKnown: false };
   return { hls: gst.value.gstreamer.works === true, hlsKnown: true };
 };
 
@@ -115,23 +115,24 @@ const canConvert = async (url, signal) => {
 // { ok: false, problem, status }. A newer check on el discards this one.
 //
 // It fires nothing before its first await: called from a data-effect, an
-// event handled synchronously would make the effect depend on the signals
+// The optional event keeps file-menu readiness separate while sharing cancellation.
+// An event handled synchronously would make the effect depend on the signals
 // the handler sets ($tsStatus), and every answer would start another check.
-window.tsCheck = async (el, url) => {
+window.tsCheck = async (el, url, event = "ts-status") => {
   if (!url) return;
   const signal = begin(el);
   await Promise.resolve();
   if (signal.aborted) return;
-  tell(el, "ts-status", status({ checking: true }));
+  tell(el, event, status({ checking: true }));
   const echo = await call(url, "echo", { signal });
   if (signal.aborted) return;
   if (echo.problem) {
-    tell(el, "ts-status", status({ problem: echo.problem, status: echo.status || 0 }));
+    tell(el, event, status({ problem: echo.problem, status: echo.status || 0 }));
     return;
   }
   const hls = await canConvert(url, signal);
   if (signal.aborted) return;
-  tell(el, "ts-status", status({ ok: true, version: echo.value.trim(), ...hls }));
+  tell(el, event, status({ ok: true, version: echo.value.trim(), ...hls }));
 };
 
 // shown is the list each element last reported, so an unchanged list is not

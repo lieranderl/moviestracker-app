@@ -1,0 +1,74 @@
+package views
+
+import (
+	"context"
+	"path"
+	"strings"
+)
+
+type readinessTransport struct {
+	Connected, Checking, Checked, Conversion, ConversionKnown string
+	Refresh                                                   templ.Attributes
+}
+
+func readinessFor(browser bool) readinessTransport {
+	if browser {
+		state := "($_readinessServer === $tsSelected && $_readinessHasStatus ? $_readinessStatus : $tsStatus)"
+		return readinessTransport{Connected: state + ".ok", Checking: state + ".checking", Checked: state + ".ok || !!" + state + ".problem", Conversion: state + ".hls", ConversionKnown: state + ".hlsKnown",
+			Refresh: templ.Attributes{
+				"data-on:click":           "if (" + state + ".checking || !$tsSelected) return; $_readinessHasStatus = false; $_readinessServer = $tsSelected; tsCheck($_connectionCheck, $tsSelected, 'ts-readiness')",
+				"data-attr:aria-disabled": state + ".checking || !$tsSelected",
+				"data-attr:aria-busy":     state + ".checking",
+				"data-class:btn-disabled": state + ".checking || !$tsSelected",
+			}}
+	}
+
+	return readinessTransport{Connected: "$torrConnected", Checking: "$_readinessChecking", Checked: "true", Conversion: "$gst", ConversionKnown: "$gstKnown",
+		Refresh: templ.Attributes{"data-indicator:_readiness-checking": true, "data-on:click": "!$_readinessChecking && @get('/api/torrserver/readiness')", "data-attr:aria-disabled": "$_readinessChecking", "data-attr:aria-busy": "$_readinessChecking", "data-class:btn-disabled": "$_readinessChecking"}}
+}
+
+// fileFormat is a filename hint only; codecs require actual media inspection.
+func fileFormat(name string) string {
+	ext := strings.TrimPrefix(strings.ToUpper(path.Ext(name)), ".")
+	if len(ext) > 10 {
+		return ""
+	}
+	return ext
+}
+
+func readinessPlayHLS(browser bool) string {
+	prefix := ""
+	if browser {
+		prefix = "$_resumeHref = '/search'; "
+	}
+	return prefix + "$fileMenuOpen = false; $activeHash = $_file.hash; $activeFileIndex = $_file.index; $streamTitle = $_file.title; $streamCleanUrl = $_file.clean; $streamHlsUrl = $_file.hls; $playKind = 'hls'; " + playerStart(browser)
+}
+
+func connectionText(ctx context.Context, v readinessTransport) string {
+	return v.Checking + " ? " + trJS(ctx, "Checking…") + " : " + v.Connected + " ? " + trJS(ctx, "Connected") + " : (" + v.Checked + ") ? " + trJS(ctx, "Not connected") + " : " + trJS(ctx, "Not checked")
+}
+
+templ playbackReadiness(browser bool) {
+	{{ v := readinessFor(browser) }}
+	<section class="fieldset rounded-box bg-base-300/40 mt-4 p-3 gap-2" aria-labelledby="file-readiness-title">
+		<div class="flex items-center justify-between gap-2">
+			<h4 id="file-readiness-title" class="font-semibold text-sm">{ tr(ctx,"Playback readiness") }</h4>
+			<button type="button" class="btn btn-xs btn-ghost" { v.Refresh... }>{ tr(ctx,"Refresh") }</button>
+		</div>
+		<dl role="status" aria-atomic="true" class="space-y-1 text-sm">
+			<div class="flex justify-between gap-3"><dt>{ tr(ctx,"Connection") }</dt><dd data-text={ connectionText(ctx, v) }></dd></div>
+			<div class="flex justify-between gap-3"><dt>{ tr(ctx,"HLS conversion") }</dt><dd data-text={ "(" + v.Connected + " && " + v.ConversionKnown + ") ? (" + v.Conversion + " ? " + trJS(ctx, "Available") + " : " + trJS(ctx, "Unavailable") + ") : " + trJS(ctx, "Not checked") }></dd></div>
+			<div class="flex justify-between gap-3"><dt>{ tr(ctx,"Filename hint") }</dt><dd class="break-all" data-text={ "$_file.format || " + trJS(ctx, "Unknown") }></dd></div>
+			<div class="flex justify-between gap-3"><dt>{ tr(ctx,"Direct playback") }</dt><dd>{ tr(ctx,"Not checked") }</dd></div>
+		</dl>
+		<p class="text-xs text-base-content/70">{ tr(ctx,"A filename does not confirm browser codec support.") }</p>
+		<div class="flex flex-wrap gap-2">
+			<button type="button" class="btn btn-sm" data-show={ v.Connected + " && " + v.Conversion + " && $_file.video" } data-on:click={ readinessPlayHLS(browser) }>{ tr(ctx,"Play with HLS") }</button>
+			if browser {
+				<a href="#ts-status" class="link text-xs" data-show={ "!" + v.Connected } data-on:click="$fileMenuOpen = false">{ tr(ctx,"Connection settings") }</a>
+			} else {
+				<a href="/settings/sources" class="link text-xs" data-show={ "!" + v.Connected + " && $canRemove" }>{ tr(ctx,"Connection settings") }</a>
+			}
+		</div>
+	</section>
+}

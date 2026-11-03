@@ -16,10 +16,10 @@ import (
 // TorrServer's GStreamer support (kept current by the SSE stream) and gates
 // every HLS/probe control; $gstKnown is false while that support could not
 // be checked, so "cannot" is never claimed for "unknown".
-func torrPageSignals(gst, gstKnown, canRemove bool, linkOrigin string) string {
+func torrPageSignals(connected, gst, gstKnown, canRemove bool, linkOrigin string) string {
 	origin, _ := json.Marshal(linkOrigin)
 	return fmt.Sprintf(`{
-	gst: %t, gstKnown: %t, canRemove: %t, linkOrigin: %s,
+	torrConnected: %t, _readinessChecking: false, gst: %t, gstKnown: %t, canRemove: %t, linkOrigin: %s,
 	playerOpen: false, streamUrl: '', streamCleanUrl: '', streamHlsUrl: '', streamTitle: '', activeHash: '', activeFileIndex: 1,
 	streamBase: '', playKind: 'direct', playNonce: 0, audioTrack: -1, mediaInfoOpen: false, subTrack: -1,
 	_resume: '', _resumeAt: 0, _seekHint: '', _seekSum: 0, _seekAt: 0, _zone: '',
@@ -28,10 +28,10 @@ func torrPageSignals(gst, gstKnown, canRemove bool, linkOrigin string) string {
 	_audioMenu: false, _subMenu: false, audioLang: localStorage.getItem('torrAudioLang') || '',
 	addModalOpen: false,
 	probeOpen: false, probeHash: '', probeIndex: 1, probeLoading: false,
-	fileMenuOpen: false, _file: {hash: '', index: 1, title: '', clean: '', hls: '', video: false},
+	fileMenuOpen: false, _file: {hash: '', index: 1, title: '', format: '', clean: '', hls: '', video: false},
 	confirmOpen: false, confirmHash: '', confirmName: '',
 	filterQuery: '', toast: '', toastError: false
-}`, gst, gstKnown, canRemove, origin)
+}`, connected, gst, gstKnown, canRemove, origin)
 }
 
 // torrListActions is the single delegated click handler for every torrent and
@@ -152,7 +152,7 @@ func openPlayer(ctx context.Context, player, name, link string) string {
 // openFileMenu opens a file row's menu from its button's dataset d; clean and
 // hls are expressions for the file's links as players open them.
 func openFileMenu(clean, hls string) string {
-	return `$_file = {hash: d.hash, index: +d.index, title: d.path, clean: ` + clean + `, hls: ` + hls + `, video: d.video === 'true'}; $fileMenuOpen = true`
+	return `$_file = {hash: d.hash, index: +d.index, title: d.path, format: d.format || '', clean: ` + clean + `, hls: ` + hls + `, video: d.video === 'true'}; $fileMenuOpen = true`
 }
 
 // torrPlayback (re)starts the stream once the audio track is known: right
@@ -241,7 +241,7 @@ const toastAutoHide = `$toast && ($toast = '', $toastError = false)`
 // playAttrs carries what the player needs to play one file.
 func playAttrs(hash string, f torrserver.FileStat, clean, hls string) templ.Attributes {
 	return templ.Attributes{
-		"data-hash": hash, "data-index": fmt.Sprint(f.ID), "data-title": fileLabel(f), "data-path": f.Path,
+		"data-hash": hash, "data-index": fmt.Sprint(f.ID), "data-title": fileLabel(f), "data-path": f.Path, "data-format": fileFormat(f.Path),
 		"data-clean": clean, "data-hls": hls,
 	}
 }
@@ -338,7 +338,7 @@ templ TorrServer(user *auth.User, engine, linkOrigin string, links StreamLinks, 
 		<main
 			id="torrserver-app"
 			class="grow w-full max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6"
-			data-signals={ torrPageSignals(echo.GSTAvailable, echo.GSTKnown, user.IsAdmin(), linkOrigin) }
+			data-signals={ torrPageSignals(echo.Version != "", echo.GSTAvailable, echo.GSTKnown, user.IsAdmin(), linkOrigin) }
 		>
 			@resumeMissing()
 			<!-- Header & server status -->
@@ -1174,6 +1174,10 @@ func copyFileLink(ctx context.Context, link, copied string) string {
 // torrFileMenu is a file row's menu ($_file): external players, its links
 // and its tracks, kept off the row so the list stays compact.
 templ torrFileMenu() {
+ @torrFileMenuFor(false)
+}
+
+templ torrFileMenuFor(browser bool) {
 	@modalDialog("torr-file-menu", "fileMenuOpen", "", "", "max-w-md", nil) {
 		<header class="flex items-center justify-between gap-4 pb-3 border-b border-base-content/10">
 			<h3 id="torr-file-menu-title" class="font-bold flex items-center gap-2 min-w-0">
@@ -1186,6 +1190,7 @@ templ torrFileMenu() {
 				</button>
 			</form>
 		</header>
+		@playbackReadiness(browser)
 		<section class="mt-4 space-y-2" data-show="$_file.video">
 			<h4 class="text-xs font-bold uppercase tracking-wider text-base-content/70">{ tr(ctx, "Open in a player") }</h4>
 			<div class="flex flex-wrap items-center gap-2">
