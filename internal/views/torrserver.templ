@@ -56,7 +56,7 @@ switch (d.action) {
 		` + openFileMenu("d.clean", "d.hls") + `
 		break
 	case 'copy':
-		window.copyLink(d.url, $linkOrigin).then(ok => { $toastError = !ok; $toast = ok ? d.msg : ` + trJS(ctx, "Copy failed") + ` })
+		window.copyLink(d.copyLink, $linkOrigin).then(ok => { $toastError = !ok; $toast = ok ? d.msg : ` + trJS(ctx, "Copy failed") + ` })
 		break
 	case 'files':
 		@post('/api/torrserver/files?hash=' + hash, {filterSignals: {include: /^$/}})
@@ -549,7 +549,7 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 					<button
 						type="button"
 						data-action="copy"
-						data-url={ t.MagnetLink() }
+						data-copy-link={ t.MagnetLink() }
 						data-msg={ tr(ctx, "Magnet link copied to clipboard") }
 						class="btn btn-ghost btn-sm btn-circle text-accent"
 						title={ tr(ctx, "Copy magnet link") }

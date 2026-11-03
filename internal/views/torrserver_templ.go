@@ -65,7 +65,7 @@ switch (d.action) {
 		` + openFileMenu("d.clean", "d.hls") + `
 		break
 	case 'copy':
-		window.copyLink(d.url, $linkOrigin).then(ok => { $toastError = !ok; $toast = ok ? d.msg : ` + trJS(ctx, "Copy failed") + ` })
+		window.copyLink(d.copyLink, $linkOrigin).then(ok => { $toastError = !ok; $toast = ok ? d.msg : ` + trJS(ctx, "Copy failed") + ` })
 		break
 	case 'files':
 		@post('/api/torrserver/files?hash=' + hash, {filterSignals: {include: /^$/}})
@@ -1328,14 +1328,14 @@ func torrentCard(links StreamLinks, t torrserver.Torrent) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "<button type=\"button\" data-action=\"copy\" data-url=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "<button type=\"button\" data-action=\"copy\" data-copy-link=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var45 string
-		templ_7745c5c3_Var45, templ_7745c5c3_Err = templruntime.NewAttributeExpression(t.MagnetLink()).ResolveURL(ctx)
+		templ_7745c5c3_Var45, templ_7745c5c3_Err = templruntime.NewAttributeExpression(t.MagnetLink()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/torrserver.templ`, Line: 552, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/torrserver.templ`, Line: 552, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var45)
 		if templ_7745c5c3_Err != nil {
