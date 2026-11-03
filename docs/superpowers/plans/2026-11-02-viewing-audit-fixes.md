@@ -50,7 +50,9 @@ Interface: rendered `views.TVPage`; browser-native keyboard operation.
 ### Task 3: Delivery
 
 - [x] Run full `make ci`, review diff and update roadmap delivery evidence.
-- [ ] Push branch, create Conventional Commit PR and enable squash auto-merge
+- [x] Push branch, create Conventional Commit PR and enable squash auto-merge
       after required CI. Check final PR state.
 
 Unresolved questions: none.
+
+Delivered: PR #144 merged at ad2f002 after all required CI checks passed.

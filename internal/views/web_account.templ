@@ -35,6 +35,7 @@ templ AccountPage(user *auth.User) {
 					<div class="card-body gap-3">
 						<h2 class="card-title">{ tr(ctx, "Download your data") }</h2>
 						<p class="text-sm">{ tr(ctx, "A JSON file of everything kept for your account: favourites, watch marks, where you stopped watching, release alerts, lists, ratings and notes, release filters, TorrServers and your language.") }</p>
+						<p class="text-sm">{ tr(ctx, "Saved discovery filters are included in the download and can be renamed or deleted on Discover.") }</p>
 						<div class="card-actions">
 							<a href="/account/export" download class="btn btn-primary gap-1.5">
 								@Icon("download", "size-4")

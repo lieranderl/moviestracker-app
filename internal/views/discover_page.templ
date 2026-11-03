@@ -19,6 +19,7 @@ const DiscoverFirstYear = 1950
 
 // DiscoverView is the Discover page: TMDB's catalog filtered by Query.
 type DiscoverView struct {
+	Presets *DiscoveryPresetsState
 	Query    tmdb.DiscoverQuery
 	Genres   []tmdb.Genre // of Query's kind of title
 	ThisYear int
@@ -104,6 +105,9 @@ func (v DiscoverView) discoverParams(page int) string {
 	}
 	return q.Encode()
 }
+
+// FilterParams encodes the durable filters without pagination or a tonight draw.
+func (v DiscoverView) FilterParams() string { return v.discoverParams(0) }
 
 func (v DiscoverView) moreURL(page int) string {
 	return fmt.Sprintf("@get('/api/discover/page?%s')", v.discoverParams(page))
@@ -217,6 +221,9 @@ templ DiscoverPage(user *auth.User, v DiscoverView) {
 						{ tr(ctx, "Pick for tonight") }
 					</button>
 				</form>
+				if v.Presets != nil {
+					@DiscoveryPresets(*v.Presets)
+				}
 				if v.Pick > 0 && !v.Failed {
 					@tonightPicks(v)
 				}

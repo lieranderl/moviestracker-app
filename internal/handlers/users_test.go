@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/lieranderl/moviestracker-app/internal/config"
+	"github.com/lieranderl/moviestracker-app/internal/handlers"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 )
 
 // signedOut reports whether cookie no longer opens a page.
@@ -124,5 +126,34 @@ func TestDeletingAnAccountSignsItOutButAdministratorsCannotDeleteThemselves(t *t
 	rr = l.action(t, "/api/settings/users/admin/role/viewer", `{}`, admin)
 	if !strings.Contains(rr.Body.String(), "your own account") || !l.accounts.Lookup("admin").IsAdmin() {
 		t.Errorf("an administrator demoted themselves:\n%s", rr.Body)
+	}
+}
+
+func TestReusingADeletedUsernameDoesNotExposeItsSavedFilters(t *testing.T) {
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"genres":[],"results":[],"total_pages":1}`))
+	}))
+	t.Cleanup(fake.Close)
+	l := newLocal(t, func(st *config.Store) {
+		addAccount(t, st, "admin", config.RoleAdmin)
+		addAccount(t, st, "anna", config.RoleViewer)
+	}, func(cfg *handlers.Config) { cfg.Details = tmdb.NewClient("fixture", tmdb.WithBaseURL(fake.URL)) })
+	anna := l.signIn(t, l.accounts.Lookup("anna"))
+	admin := l.admin(t)
+	saved := l.action(t, "/api/discovery-presets?runtime=90", `{"presetName":"Private Friday"}`, anna)
+	if !strings.Contains(saved.Body.String(), "Private Friday") {
+		t.Fatal("preset was not saved")
+	}
+	l.action(t, "/api/settings/users/anna/delete", `{}`, admin)
+	l.action(t, "/api/settings/users", `{"newUsername":"anna","newPassword":"new anna password","newRole":"viewer"}`, admin)
+	replacement := l.signIn(t, l.accounts.Lookup("anna"))
+	got := l.do(t, httptest.NewRequest(http.MethodGet, "/discover", nil), replacement)
+	if strings.Contains(got.Body.String(), "Private Friday") {
+		t.Error("replacement account inherited deleted user's presets")
+	}
+	stale := l.action(t, "/api/discovery-presets", `{"presetName":"Stale write"}`, anna)
+	if stale.Code == http.StatusOK {
+		t.Error("deleted session saved a preset")
 	}
 }

@@ -83,6 +83,7 @@ type Store interface {
 	EpisodeStore
 	FeedbackStore
 	FollowStore
+	DiscoveryPresetStore
 }
 
 // ReleaseFilters are how a user last searched a title's releases.
