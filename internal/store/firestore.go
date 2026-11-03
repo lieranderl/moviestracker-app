@@ -1177,6 +1177,9 @@ func (f *Firestore) ExportAccount(ctx context.Context, uid string) (Account, err
 	if a.Follows, err = f.FollowedSeries(ctx, uid); err != nil {
 		return Account{}, err
 	}
+	if a.DiscoveryPresets, err = f.DiscoveryPresets(ctx, uid); err != nil {
+		return Account{}, err
+	}
 	return withAlertChoices(ctx, f, uid, a)
 }
 

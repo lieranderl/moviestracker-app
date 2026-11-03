@@ -24,7 +24,8 @@ type Catalog struct {
 	episodes        *Episodes                      // users' watched episodes; nil keeps none
 	// marked are the titles the request's user marked (watched, saved,
 	// hidden), kept out of picks for tonight; nil keeps none out.
-	marked func(*http.Request) map[string]bool
+	marked  func(*http.Request) map[string]bool
+	presets *DiscoveryPresets
 }
 
 // ExcludeFromPicks keeps the titles marked says the user marked out of
@@ -47,6 +48,9 @@ func NewCatalog(clients func() *sources.Clients, user func(*http.Request) *auth.
 // Register adds the catalog's routes to mux, its home page at home (none
 // when home is empty: serve it with Home).
 func (c *Catalog) Register(mux *http.ServeMux, home string) {
+	if c.presets != nil {
+		c.presets.Register(mux)
+	}
 	if home != "" {
 		mux.HandleFunc("GET "+home, c.handleMoviesPage)
 	}

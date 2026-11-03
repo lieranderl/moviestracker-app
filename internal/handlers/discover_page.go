@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
@@ -28,7 +29,11 @@ func (c *Catalog) discoverView(ctx context.Context, r *http.Request) (views.Disc
 	if q.Get("type") == "tv" {
 		v.Query.MediaType = "tv"
 	}
-	genres, err := c.clients().Details.Genres(ctx, v.Query.MediaType)
+	details := c.clients().Details
+	if details == nil {
+		return v, errors.New("catalog is unavailable")
+	}
+	genres, err := details.Genres(ctx, v.Query.MediaType)
 	if err != nil {
 		slog.Warn("tmdb genres failed", "type", v.Query.MediaType, "error", err)
 		if q.Get("genre") != "" {
@@ -92,6 +97,9 @@ func (c *Catalog) handleDiscoverPage(w http.ResponseWriter, r *http.Request) {
 		if v.Pick > 0 {
 			v.Picks = c.pickForTonight(ctx, r, v.Query, p, v.Pick)
 		}
+	}
+	if c.presets != nil {
+		v.Presets = c.presets.pageState(r, v.FilterParams())
 	}
 	templ.Handler(views.DiscoverPage(user, v)).ServeHTTP(w, r)
 }

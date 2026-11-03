@@ -44,6 +44,8 @@ func accountProblem(ctx context.Context, err error) views.SourceStatus {
 
 // handleCreateUser adds an account from the "Add an account" form.
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
+	s.presetAccounts.Lock()
+	defer s.presetAccounts.Unlock()
 	me := s.adminAPI(w, r)
 	if me == nil {
 		return
@@ -58,6 +60,14 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	if err := datastar.ReadSignals(r, &sig); err != nil {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
+	}
+	// A previous deletion may have failed to clean its file. Never reuse that data.
+	owner := strings.ToLower(strings.TrimSpace(sig.Username))
+	if owner != "" && s.accounts.Lookup(owner) == nil {
+		if err := s.localPresets.DeleteAccountPresets(r.Context(), owner); err != nil {
+			s.patchUsers(w, r, me, accountProblem(r.Context(), err), nil)
+			return
+		}
 	}
 	if err := s.accounts.Create(sig.Username, sig.Name, sig.Password, sig.Role); err != nil {
 		s.patchUsers(w, r, me, accountProblem(r.Context(), err), map[string]any{"newPassword": ""})
@@ -79,6 +89,8 @@ func accountName(accounts *auth.Accounts, username string) string {
 // Administrators cannot demote or delete themselves: another one has to, so
 // nobody locks themselves out by accident.
 func (s *Server) handleUserAction(w http.ResponseWriter, r *http.Request) {
+	s.presetAccounts.Lock()
+	defer s.presetAccounts.Unlock()
 	me := s.adminAPI(w, r)
 	if me == nil {
 		return
@@ -138,6 +150,10 @@ func (s *Server) handleUserAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.sessions.EndSessionsOf(username)
+		if err := s.localPresets.DeleteAccountPresets(r.Context(), username); err != nil {
+			s.patchUsers(w, r, me, accountProblem(r.Context(), err), nil)
+			return
+		}
 		s.patchUsers(w, r, me, succeeded("%s's account is deleted.", name), nil)
 	default:
 		http.NotFound(w, r)

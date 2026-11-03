@@ -96,6 +96,7 @@ func New(cfg Config) http.Handler {
 	}
 	a := &app{cfg: cfg, signer: signer{key: cfg.SessionKey}, feeds: feeds}
 	a.catalog = handlers.NewCatalog(func() *sources.Clients { return &a.cfg.Sources }, a.catalogUser, "/", catalogTimeout)
+	a.catalog.KeepDiscoveryPresets(handlers.NewDiscoveryPresets(a.cfg.Store, a.userID, a.catalog))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
