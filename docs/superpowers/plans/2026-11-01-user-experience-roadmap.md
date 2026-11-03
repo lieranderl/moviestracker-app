@@ -324,7 +324,9 @@ release review/current status and revised sequence above for planning today.
   file write rollback and future-field preservation are covered. Shared HTTP/SSE
   and disposable desktop/Russian 375 px browser checks pass, including native
   dialog Escape/focus, retained failed-write input and no document overflow.
-  Production viewing data stayed unchanged. Full `make ci` passed again on refreshed main 946f987; PR delivery remains pending.
+  Production viewing data stayed unchanged. Full `make ci` and emulator races passed again on refreshed main 7ec0fa5.
+  PR #149 delivery remains pending remote CI; its Windows permission assertion
+  is scoped to platforms supporting Unix mode bits.
 
 - **R01 — implemented, deployment unverified (1 November 2026):** replaced the
   clipped title-page dropdown with the existing native dialog helper. The same

@@ -96,3 +96,9 @@ were reproduced and fixed. Full gate and remote delivery remain in progress.
 Full `make ci` passed again after rebasing onto main 946f987 and installing
 its locked frontend dependencies. Generated artifacts are current. Remote PR
 checks/merge remain the final delivery step.
+
+Remote Windows exposed an unsupported Unix permission-bit assertion; only that
+assertion is now platform-scoped, while Windows persistence/restart/failure
+coverage remains active. The Windows job passed after correction. Main then
+advanced to 7ec0fa5 (Go dependency update); generated conflicts were resolved by
+regeneration. Full `make ci` and preset emulator races passed on this base too.
