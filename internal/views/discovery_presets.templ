@@ -1,0 +1,74 @@
+package views
+
+import "fmt"
+import "github.com/lieranderl/moviestracker-app/internal/auth"
+
+import "github.com/lieranderl/moviestracker-app/internal/store"
+
+// DiscoveryPresetsState is the account's presets next to its current filters.
+type DiscoveryPresetsState struct {
+	Items    []store.DiscoveryPreset
+	Query    string
+	Failed   bool
+	Adjusted bool
+	Message  string
+}
+
+templ DiscoveryPresets(v DiscoveryPresetsState) {
+	<section id="discovery-presets" aria-label={ tr(ctx, "Saved filters") } class="space-y-3" data-signals="{ _presetNewName: '', _presetEdit: '', _presetRenameName: '', _presetManageOpen: false, _presetPending: false, _presetFocusSave: false, _presetFocusManage: '' }">
+		if v.Adjusted {
+			@DiscoveryPresetNotice("discovery-preset-adjusted", tr(ctx, "Some saved filters are no longer available. The remaining filters were applied; your preset is unchanged."), false)
+		}
+		if v.Failed {
+			@loadFailed(tr(ctx, "Saved filters could not be loaded."))
+		} else {
+			<form class="flex flex-wrap items-center gap-2" aria-label={ tr(ctx, "Save filters") } data-indicator:_preset-pending data-on:submit={ fmt.Sprintf("!$_presetPending && @post('/api/discovery-presets?%s', {payload: {presetName: $_presetNewName}})", v.Query) }>
+				<input id="discovery-preset-name" data-effect="if ($_presetFocusSave && !$_presetPending) { el.focus(); $_presetFocusSave = false }" type="text" class="input input-sm w-full sm:w-52" aria-label={ tr(ctx, "Preset name") } placeholder={ tr(ctx, "Preset name") } required data-bind:_preset-new-name data-attr:disabled="$_presetPending"/>
+				<button id="discovery-preset-save" type="submit" class="btn btn-sm" data-attr:disabled="$_presetPending">{ tr(ctx, "Save filters") }</button>
+			</form>
+			<div class="flex flex-wrap items-center gap-2">
+				for _, p := range v.Items {
+					<div class="join min-w-0 max-w-full">
+						<a href={ templ.SafeURL("/discover/presets/" + p.ID) } class="btn btn-sm btn-outline join-item min-w-0" title={ tr(ctx, "Apply") }><span class="truncate">{ p.Name }</span></a>
+						<button id={ "discovery-preset-manage-" + p.ID } data-effect={ "if ($_presetFocusManage === " + jsString(p.ID) + " && !$_presetPending) { el.focus(); $_presetFocusManage = '' }" } type="button" class="btn btn-sm btn-ghost join-item" aria-label={ trf(ctx, "Manage %s", p.Name) } data-attr:disabled="$_presetPending" data-on:click={ "$_presetEdit = " + jsString(p.ID) + "; $_presetRenameName = " + jsString(p.Name) + "; $_presetManageOpen = true" }>@Icon("ellipsis", "size-4")</button>
+					</div>
+				}
+			</div>
+		}
+		@DiscoveryPresetNotice("discovery-preset-status", v.Message, false)
+		@modalDialog("discovery-preset-dialog", "_presetManageOpen", "", "", "max-w-md", nil) {
+			@modalHeader("discovery-preset-dialog", tr(ctx, "Manage saved filters"), "sliders-horizontal", "text-primary")
+			<form class="mt-4 space-y-3" data-indicator:_preset-pending data-on:submit={ fmt.Sprintf("!$_presetPending && @post('/api/discovery-presets/' + $_presetEdit + '/rename?%s', {payload: {presetName: $_presetRenameName}})", v.Query) }>
+				<label class="fieldset">
+					<span class="fieldset-legend">{ tr(ctx, "Preset name") }</span>
+					<input type="text" class="input w-full" required data-bind:_preset-rename-name data-attr:disabled="$_presetPending"/>
+				</label>
+				@DiscoveryPresetNotice("discovery-preset-dialog-status", "", false)
+				<div class="modal-action flex-wrap">
+					<button type="button" class="btn btn-error btn-outline" data-attr:disabled="$_presetPending" data-indicator:_preset-pending data-on:click={ fmt.Sprintf("!$_presetPending && @delete('/api/discovery-presets/' + $_presetEdit + '?%s')", v.Query) }>{ tr(ctx, "Delete") }</button>
+					<button type="button" class="btn btn-ghost" data-attr:disabled="$_presetPending" data-on:click="$_presetManageOpen = false">{ tr(ctx, "Cancel") }</button>
+					<button type="submit" class="btn" data-attr:disabled="$_presetPending">{ tr(ctx, "Rename") }</button>
+				</div>
+			</form>
+		}
+	</section>
+}
+
+templ DiscoveryPresetNotice(id, message string, failed bool) {
+	<div id={ id } role="status" aria-atomic="true" class={ templ.KV("alert alert-soft", message!=""),templ.KV("alert-error",message!=""&&failed),templ.KV("alert-success",message!=""&&!failed) }>
+		if message != "" {
+			<span>{ message }</span>
+		}
+	</div>
+}
+
+// DiscoveryPresetUnavailable preserves the Apply address for a plain retry.
+templ DiscoveryPresetUnavailable(user *auth.User) {
+	@Layout(tr(ctx, "Saved filters")) {
+		@Navbar(user)
+		<main class="grow max-w-7xl mx-auto px-4 py-8">
+			@loadFailed(tr(ctx, "Saved filters could not be applied. Please try again."))
+		</main>
+		@siteFooter()
+	}
+}

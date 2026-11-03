@@ -2,6 +2,25 @@ package i18n
 
 // ru translates the interface into Russian, by English text.
 var ru = map[string]string{
+	"Filters saved.":        "Фильтры сохранены.",
+	"Filter name updated.":  "Название набора обновлено.",
+	"Saved filter deleted.": "Набор фильтров удалён.",
+	"Rename":                "Переименовать",
+	"Saved filters":         "Сохранённые фильтры",
+	"Save filters":          "Сохранить фильтры",
+	"Preset name":           "Название набора",
+	"Manage %s":             "Управление набором «%s»",
+	"Manage saved filters":  "Управление фильтрами",
+	"Some saved filters are no longer available. The remaining filters were applied; your preset is unchanged.": "Некоторые сохранённые фильтры больше недоступны. Применены остальные фильтры; сохранённый набор не изменён.",
+	"Saved filters could not be loaded.":                                                              "Не удалось загрузить сохранённые фильтры.",
+	"Saved filters could not be applied. Please try again.":                                           "Не удалось применить сохранённые фильтры. Попробуйте ещё раз.",
+	"Your filters could not be saved. Please try again.":                                              "Не удалось сохранить фильтры. Попробуйте ещё раз.",
+	"You can save up to %d filter presets.":                                                           "Можно сохранить до %d наборов фильтров.",
+	"Use a name from 1 to 60 characters.":                                                             "Введите название от 1 до 60 символов.",
+	"This saved filter no longer exists.":                                                             "Этот набор фильтров больше не существует.",
+	"your saved discovery filters and their names;":                                                   "ваши сохранённые фильтры поиска и их названия;",
+	"Saved discovery filters are included in the download and can be renamed or deleted on Discover.": "Сохранённые фильтры поиска включены в выгрузку; их можно переименовать или удалить на странице «Подбор».",
+
 	"Remove %s from Continue watching":                              "Убрать «%s» из раздела «Продолжить просмотр»",
 	"Remove from Continue watching and reset saved progress":        "Убрать из раздела «Продолжить просмотр» и сбросить позицию просмотра",
 	"Continue watching could not be updated. Please try again.":     "Не удалось обновить раздел «Продолжить просмотр». Попробуйте ещё раз.",

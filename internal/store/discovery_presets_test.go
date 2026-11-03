@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -314,4 +315,51 @@ func TestARevokedSessionCannotChangeDiscoveryPresets(t *testing.T) {
 			t.Errorf("revoked operations changed the new account: %v, %v", got, err)
 		}
 	})
+}
+
+func TestAnEmptyJSONPresetFileCanAcceptSavedFilters(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "presets.json")
+	if err := os.WriteFile(path, []byte("null"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.OpenDiscoveryPresetFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateDiscoveryPreset(t.Context(), "alex", "Friday", store.DiscoveryFilters{Kind: "movie"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLocalPresetChangesPreserveUnknownStoredFields(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "presets.json")
+	const seed = `{"alex":{"first":{"id":"first","name":"Friday","filters":{"type":"movie","sort":"popular","futureFilter":"kept"},"createdAt":"2026-11-02T12:00:00Z","futurePreset":{"value":"kept"}}},"anna":{"other":{"id":"other","name":"Private","filters":{"type":"tv"},"futurePreset":"kept"}}}`
+	if err := os.WriteFile(path, []byte(seed), 0600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.OpenDiscoveryPresetFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RenameDiscoveryPreset(t.Context(), "alex", "first", "Sunday"); err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.CreateDiscoveryPreset(t.Context(), "alex", "New", store.DiscoveryFilters{Kind: "movie"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteDiscoveryPreset(t.Context(), "alex", p.ID); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path) // #nosec G304 -- path is the test-owned temporary preset file
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]map[string]map[string]json.RawMessage
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if string(got["alex"]["first"]["futurePreset"]) != `{"value":"kept"}` || string(got["anna"]["other"]["futurePreset"]) != `"kept"` || !strings.Contains(string(got["alex"]["first"]["filters"]), `"futureFilter":"kept"`) {
+		t.Errorf("future fields lost: %s", data)
+	}
 }

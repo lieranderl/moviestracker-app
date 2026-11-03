@@ -67,14 +67,16 @@ type Server struct {
 	live               *live.Hub                         // shared pollers behind every live view
 	progress           *Progress                         // where each account stopped watching
 	titleStates        *TitleStates                      // what each account wants to watch or watched
-	customLists        *CustomLists                      // the lists each account makes
-	reviews            *Reviews                          // each account's ratings and notes
-	episodes           *Episodes                         // each account's watched episodes
-	feedback           store.FeedbackStore               // each account's recommendation feedback
-	follows            *Follows                          // each account's followed series
-	releaseFilterPrefs *ReleaseFilterPrefs               // how each account last searched releases
-	plays              *playback.Tracker                 // what plays through the proxy
-	sampler            *stats.Sampler                    // this machine, for the dashboard
+	presetAccounts     sync.RWMutex
+	localPresets       *store.DiscoveryPresetFile
+	customLists        *CustomLists        // the lists each account makes
+	reviews            *Reviews            // each account's ratings and notes
+	episodes           *Episodes           // each account's watched episodes
+	feedback           store.FeedbackStore // each account's recommendation feedback
+	follows            *Follows            // each account's followed series
+	releaseFilterPrefs *ReleaseFilterPrefs // how each account last searched releases
+	plays              *playback.Tracker   // what plays through the proxy
+	sampler            *stats.Sampler      // this machine, for the dashboard
 	startedAt          time.Time
 	version            string
 	hlsOutputs         hlsOutputCache         // what GStreamer serves, as seen by the stream proxy
@@ -143,6 +145,14 @@ func NewServer(cfg Config) (*Server, error) {
 	s.live = live.New(s.liveTopic(cfg.LivePolling.withDefaults()))
 	s.current.Store(&sources.Clients{Catalog: cfg.TMDB, Details: cfg.Details, Torrents: cfg.Torrents, IMDb: cfg.IMDb})
 	s.Catalog = NewCatalog(s.clients, s.userFromRequest, "/login", s.catalogTimeout)
+	presets, err := store.OpenDiscoveryPresetFile(filepath.Join(cfg.Store.Dir(), "discovery-presets.json"))
+	if err != nil {
+		return nil, err
+	}
+	s.localPresets = presets
+	presetHandlers := NewDiscoveryPresets(presets, s.username, s.Catalog)
+	presetHandlers.guard = &s.presetAccounts
+	s.KeepDiscoveryPresets(presetHandlers)
 	progress, err := store.OpenProgressFile(filepath.Join(cfg.Store.Dir(), "progress.json"))
 	if err != nil {
 		return nil, err

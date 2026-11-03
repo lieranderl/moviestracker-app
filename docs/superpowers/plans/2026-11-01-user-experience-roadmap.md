@@ -38,7 +38,7 @@ unverified" notes for release inclusion; it does not supersede their test limits
 | R17 | Implemented and included: episode/season marks and Next unwatched. | Browser verification with real series and persisted state. |
 | R18 | Partial: exact filename episode mapping and completion shipped. | Ambiguous filenames remain manual episode ticks; explicit mapping confirmation and persisted file mappings are not delivered. Preserve file-based resume. |
 | R19–R21, R23 | Implemented and included: spoiler protection, recommendation feedback, tonight shortlist, quick watch-state actions and undo. | End-to-end browser acceptance, including account isolation and concurrent changes. R23 covers watch-state actions; custom-list actions remain on title pages. |
-| R22 | Pending: saved discovery presets. | Next recommended feature after the acceptance pass. |
+| R22 | Implemented on `codex/discovery-presets`; delivery pending. | Approved limits/seams; storage, HTTP and disposable browser checks pass. Full gate/PR remain. |
 | R24–R27 | Implemented in supported scope: release comparison, following/upcoming episodes, checkpointed release discovery and web alert preferences/episode alerts. | Compare metadata is not a playback guarantee. Discovery remains bounded by upstream history; episode alerts inspect only the latest aired episode, not all missed episodes. App background discovery remains unsupported. |
 | R28 | Pending: authorized device handoff. | Design reachability and scoped authorization after playback readiness is verified. |
 | R29–R32 | Pending: household voting, permissions, queue and cross-instance collaboration. | Keep deferred until the individual viewing journey is verified; permissions and persistence must ship with voting. |
@@ -300,7 +300,7 @@ do not build a second setup flow without evidence the current one is insufficien
 Historical entries below describe evidence at implementation time. Use the
 release review/current status and revised sequence above for planning today.
 
-- **R14/R16 — audit follow-up implemented, PR pending (2 November 2026):**
+- **R14/R16 — merged in PR #144 (2 November 2026):**
   a signed-in web audit reproduced Russian library search missing titles saved
   in English. The web release-feed adapter dropped the optional title-naming
   interface; it now forwards it, retaining saved-name fallback for unavailable
@@ -314,6 +314,17 @@ release review/current status and revised sequence above for planning today.
   passed; an independent whole-branch review found no actionable issues.
   Production account data was not changed. Live playback, personal progress
   writes, real screen-reader and WebKit checks remain unverified.
+
+- **R22 — implementation verified, delivery pending (3 November 2026):**
+  shared Discover controls save/apply/rename/delete up to 20 named filter sets
+  per account. Names use 1–60 trimmed Unicode characters. Durable fields only;
+  applying obsolete filters explains adjustments and does not rewrite presets.
+  Memory, atomic local JSON and transactional Firestore stores enforce isolation
+  and limits. Account export/deletion, local username reuse/session fencing,
+  file write rollback and future-field preservation are covered. Shared HTTP/SSE
+  and disposable desktop/Russian 375 px browser checks pass, including native
+  dialog Escape/focus, retained failed-write input and no document overflow.
+  Production viewing data stayed unchanged. Full gate and PR remain pending.
 
 - **R01 — implemented, deployment unverified (1 November 2026):** replaced the
   clipped title-page dropdown with the existing native dialog helper. The same
