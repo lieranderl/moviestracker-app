@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 
 	"github.com/starfederation/datastar-go/datastar"
@@ -102,6 +103,8 @@ func (ts *TitleStates) target(w http.ResponseWriter, r *http.Request) (uid, kind
 	return titleTarget(w, r, ts.user)
 }
 
+var playerControlKey = regexp.MustCompile(`^c_[a-f0-9]{40}_[1-9][0-9]{0,9}_[1-9][0-9]{0,9}$`)
+
 // titleTarget is the user user signs in and the title (?type=movie|tv&id=N)
 // of a request. It answers the request itself (401, 400) and returns
 // ok=false when there is none.
@@ -116,6 +119,13 @@ func titleTarget(w http.ResponseWriter, r *http.Request, user func(*http.Request
 	if (kind != "movie" && kind != "tv") || err != nil || id <= 0 {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return "", "", 0, false
+	}
+	if key := r.URL.Query().Get("player"); key != "" {
+		if kind != "movie" || !playerControlKey.MatchString(key) {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return "", "", 0, false
+		}
+		*r = *r.WithContext(views.WithPlayerControls(r.Context(), key))
 	}
 	return uid, kind, id, true
 }
@@ -164,6 +174,9 @@ func (ts *TitleStates) handleSet(w http.ResponseWriter, r *http.Request) {
 		}
 		if err != nil {
 			slog.Warn("looking up a title on TMDB failed", "error", logError(err))
+			if patchPlayerActionFailure(w, r, views.WatchStateSaveFailed(kind, id, rec.State)) {
+				return
+			}
 			http.Error(w, i18n.T(r.Context(), "TMDB is not responding right now. Please try again."), http.StatusBadGateway)
 			return
 		}
@@ -173,6 +186,9 @@ func (ts *TitleStates) handleSet(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	if err := ts.store.SetTitleState(ctx, uid, rec); err != nil {
 		slog.Warn("saving a watch state failed", "error", logError(err))
+		if patchPlayerActionFailure(w, r, views.WatchStateSaveFailed(kind, id, rec.State)) {
+			return
+		}
 		http.Error(w, i18n.T(r.Context(), "The change could not be saved. Please try again."), http.StatusServiceUnavailable)
 		return
 	}

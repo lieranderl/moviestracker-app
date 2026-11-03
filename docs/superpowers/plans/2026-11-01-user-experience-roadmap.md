@@ -264,6 +264,21 @@ An item is complete only when its acceptance criteria pass on its stated
 surfaces, relevant CI passes, and documentation matches shipped behavior. Keep
 pending, implemented, and deployed status separate in future updates here.
 
+## Current delivery snapshot — 3 November 2026
+
+- Delivered: localized-library/season-navigation audit repairs (#144), account-owned
+  discovery presets (#149), shared playback readiness (#152).
+- Production repairs delivered: Add-to-TorrServer selector initialization (#151),
+  home-row/trailer initialization and shared magnet-copy data (#153). All required
+  checks passed; real home rows and enabled Add were verified on revision00196-wic.
+- In progress: approved X02 completion prompt on `codex/completion-prompt`;
+  read-only identity/action boundaries and disposable native-media acceptance are
+  being completed. It is not yet merged or deployed. User-requested neutral-gray
+  shared player controls are included in this slice.
+- Remaining: full R15/R16 acceptance (including WebKit, screen-reader and actual
+  production-media flows), then R28 device-handoff design and implementation.
+  R29–R32 remain deferred; R09 remains declined.
+
 ## Next implementation slice
 
 Recommended sequence; this updates priorities, not approval to implement code:
@@ -337,7 +352,7 @@ release review/current status and revised sequence above for planning today.
   selector/Add state was verified read-only; adds, failures and retries used a
   disposable fake server. The user's account and real server stayed unchanged.
 
-- **X01 — local verification complete; PR delivery pending (3 November 2026):**
+- **X01 — delivered in PR #152 (3 November 2026):**
   the shared native file menu explains connection, known/unknown HLS conversion,
   and a filename extension hint. Direct playback stays Not checked. Refresh uses
   capability endpoints only, with stale-server suppression and isolated browser
@@ -347,7 +362,8 @@ release review/current status and revised sequence above for planning today.
   keyboard Refresh and Escape/focus. Independent review found no remaining
   actionable issues. Full `make ci` passed, including race tests, generated-asset
   checks, static analysis, security scans and build. Real-media compatibility
-  remains unverified.
+  remains unverified. Required CI passed and PR #152 merged; the shared panel
+  was verified in deployed web builds.
 
 - **R01 — implemented, deployment unverified (1 November 2026):** replaced the
   clipped title-page dropdown with the existing native dialog helper. The same

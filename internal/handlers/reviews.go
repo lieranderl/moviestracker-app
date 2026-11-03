@@ -55,7 +55,7 @@ func (rv *Reviews) handleReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sse := patchReview(w, r, kind, id, kept, false)
-	if err := sse.MarshalAndPatchSignals(map[string]any{"reviewRating": kept.Rating, "reviewNote": kept.Note, "_reviewReady": true}); err != nil {
+	if err := sse.MarshalAndPatchSignals(views.ReviewSignals(r.Context(), kept)); err != nil {
 		slog.Warn("patching review signals failed", "error", err)
 	}
 }
@@ -97,6 +97,9 @@ func (rv *Reviews) handleSave(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		slog.Warn("looking up a title on TMDB failed", "error", logError(err))
+		if patchPlayerActionFailure(w, r, views.TitleReviewSaveFailed(kind, id)) {
+			return
+		}
 		http.Error(w, i18n.T(r.Context(), "TMDB is not responding right now. Please try again."), http.StatusBadGateway)
 		return
 	}
@@ -110,6 +113,9 @@ func (rv *Reviews) handleSave(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		slog.Warn("saving a review failed", "error", logError(err))
+		if patchPlayerActionFailure(w, r, views.TitleReviewSaveFailed(kind, id)) {
+			return
+		}
 		http.Error(w, i18n.T(r.Context(), "The change could not be saved. Please try again."), http.StatusServiceUnavailable)
 		return
 	}

@@ -31,7 +31,7 @@ func torrPageSignals(connected, gst, gstKnown, canRemove bool, linkOrigin string
 	fileMenuOpen: false, _file: {hash: '', index: 1, title: '', format: '', clean: '', hls: '', video: false},
 	confirmOpen: false, confirmHash: '', confirmName: '',
 	filterQuery: '', toast: '', toastError: false
-}`, connected, gst, gstKnown, canRemove, origin)
+`+completionSignals+`}`, connected, gst, gstKnown, canRemove, origin)
 }
 
 // torrListActions is the single delegated click handler for every torrent and
@@ -825,16 +825,19 @@ templ torrPlayerModalFor(browser bool) {
 				data-on:pointerleave="$_zone = ''"
 				data-on:dblclick={ torrVideoDoubleTap }
 				data-on:play="$_paused = false"
-				data-on:pause="$_paused = true"
-				data-on:ended={ playerNext(browser) }
-				data-on:waiting="$_waiting = true"
-				data-on:playing="$_waiting = false"
+				data-on:pause={ "$_paused = true; " + completionStop }
+				data-on:ended={ completionEnded(browser) }
+				data-on:waiting={ "$_waiting = true; " + completionStop }
+				data-on:playing={ "$_waiting = false; " + completionStart }
 				data-on:canplay="$_waiting = false"
-				data-on:timeupdate="$_seeking || ($_time = el.currentTime)"
+				data-on:timeupdate={ "$_seeking || ($_time = el.currentTime); " + completionTick }
+				data-on:seeking={ completionReset }
+				data-on:seeked={ completionStart }
+				data-on:ratechange={ completionStart }
 				data-on:timeupdate__throttle.15s={ progressSave(browser) }
 				data-on:durationchange="$_dur = Number.isFinite(el.duration) ? el.duration : 0"
 				data-on:volumechange="$_vol = el.muted ? 0 : el.volume; $_muted = el.muted || el.volume === 0"
-				data-on:emptied="$_time = 0; $_dur = 0; $_paused = true; $_waiting = false"
+				data-on:emptied={ "$_time = 0; $_dur = 0; $_paused = true; $_waiting = false; " + completionReset }
 				data-on:torr-subtitle="$subTrack = evt.detail"
 				data-on:torr-unplayable="$_unplayable = evt.detail"
 				data-class:controls-shown={ torrControlsShown }
@@ -884,7 +887,7 @@ templ torrPlayerModalFor(browser bool) {
 			@seekZoneHint("fwd")
 			<!-- In fullscreen the header is gone: the title (and place in the playlist) shows over the video. -->
 			<div
-				class="absolute inset-x-0 top-0 z-10 bg-linear-to-b from-primary/90 to-transparent px-4 pt-3 pb-10 text-primary-content transition-opacity pointer-events-none"
+				class="absolute inset-x-0 top-0 z-10 bg-linear-to-b from-neutral/90 to-transparent px-4 pt-3 pb-10 text-neutral-content transition-opacity pointer-events-none"
 				data-show="$_fs"
 				data-class:opacity-0={ "!(" + torrControlsShown + ")" }
 			>
@@ -895,7 +898,7 @@ templ torrPlayerModalFor(browser bool) {
 			</div>
 			<!-- Custom control bar: native controls would hide these menus in fullscreen -->
 			<div
-				class="absolute inset-x-0 bottom-0 z-10 bg-linear-to-t from-primary/90 to-transparent px-3 pb-2 pt-10 text-primary-content transition-opacity"
+				class="absolute inset-x-0 bottom-0 z-10 bg-linear-to-t from-neutral/90 to-transparent px-3 pb-2 pt-10 text-neutral-content transition-opacity"
 				data-class:opacity-0={ "!(" + torrControlsShown + ")" }
 				data-class:pointer-events-none={ "!(" + torrControlsShown + ")" }
 			>
@@ -911,7 +914,7 @@ templ torrPlayerModalFor(browser bool) {
 					data-on:change="$_video.currentTime = +el.value; $_seeking = false"
 				/>
 				<div class="mt-1 flex items-center gap-1">
-					<button type="button" class="btn btn-ghost btn-sm btn-square text-primary-content" aria-label={ tr(ctx, "Play or pause") } data-on:click="$_video.paused ? $_video.play() : $_video.pause()">
+					<button type="button" class="btn btn-ghost btn-sm btn-square text-neutral-content" aria-label={ tr(ctx, "Play or pause") } data-on:click="$_video.paused ? $_video.play() : $_video.pause()">
 						<span data-show="$_paused">
 							@Icon("play", "size-5")
 						</span>
@@ -921,7 +924,7 @@ templ torrPlayerModalFor(browser bool) {
 					</button>
 					<button
 						type="button"
-						class="btn btn-ghost btn-sm btn-square text-primary-content"
+						class="btn btn-ghost btn-sm btn-square text-neutral-content"
 						aria-label={ tr(ctx, "Next file") }
 						title={ tr(ctx, "Next file") }
 						data-show={ torrHasNext }
@@ -929,7 +932,7 @@ templ torrPlayerModalFor(browser bool) {
 					>
 						@Icon("skip-forward", "size-5")
 					</button>
-					<button type="button" class="btn btn-ghost btn-sm btn-square text-primary-content" aria-label={ tr(ctx, "Mute") } data-on:click="$_video.muted = !$_video.muted">
+					<button type="button" class="btn btn-ghost btn-sm btn-square text-neutral-content" aria-label={ tr(ctx, "Mute") } data-on:click="$_video.muted = !$_video.muted">
 						<span data-show="!$_muted">
 							@Icon("volume-2", "size-5")
 						</span>
@@ -962,14 +965,14 @@ templ torrPlayerModalFor(browser bool) {
 					}
 					<button
 						type="button"
-						class="btn btn-ghost btn-sm btn-square text-primary-content"
+						class="btn btn-ghost btn-sm btn-square text-neutral-content"
 						aria-label={ tr(ctx, "Picture in picture") }
 						data-show="document.pictureInPictureEnabled"
 						data-on:click="document.pictureInPictureElement ? document.exitPictureInPicture() : $_video.requestPictureInPicture()"
 					>
 						@Icon("picture-in-picture-2", "size-5")
 					</button>
-					<button type="button" class="btn btn-ghost btn-sm btn-square text-primary-content" aria-label={ tr(ctx, "Fullscreen") } data-on:click={ torrFullscreenToggle }>
+					<button type="button" class="btn btn-ghost btn-sm btn-square text-neutral-content" aria-label={ tr(ctx, "Fullscreen") } data-on:click={ torrFullscreenToggle }>
 						<span data-show="!$_fs">
 							@Icon("maximize", "size-5")
 						</span>
@@ -980,6 +983,7 @@ templ torrPlayerModalFor(browser bool) {
 				</div>
 			</div>
 		</div>
+		@completionSlot()
 		if browser {
 			@webPlayerProblems()
 		}
@@ -1174,7 +1178,7 @@ func copyFileLink(ctx context.Context, link, copied string) string {
 // torrFileMenu is a file row's menu ($_file): external players, its links
 // and its tracks, kept off the row so the list stays compact.
 templ torrFileMenu() {
- @torrFileMenuFor(false)
+	@torrFileMenuFor(false)
 }
 
 templ torrFileMenuFor(browser bool) {
@@ -1402,7 +1406,7 @@ templ TorrSubtitleMenu(tracks []torrserver.ProbeTrack) {
 templ trackMenu(title, icon, openSignal, toggle, highlight, pick string) {
 	<details class="dropdown dropdown-top dropdown-end" data-attr:open={ openSignal } data-on:click__outside={ openSignal + " = false" }>
 		<summary
-			class="btn btn-ghost btn-sm btn-square text-primary-content"
+			class="btn btn-ghost btn-sm btn-square text-neutral-content"
 			aria-label={ title }
 			title={ title }
 			data-class:text-primary={ highlight }
@@ -1701,7 +1705,7 @@ templ playKindSwitch(browser ...bool) {
 		<button
 			type="button"
 			class="btn btn-xs join-item font-bold"
-			data-class="{ 'btn-primary': $playKind === 'direct' }"
+			data-class="{ 'btn-neutral': $playKind === 'direct' }"
 			aria-label={ trf(ctx, "Play %s", tr(ctx, "Direct")) }
 			data-on:click={ "if ($playKind !== 'direct') { $playKind = 'direct'\n" + playerStart(cloud) + "\n}" }
 		>{ tr(ctx, "Direct") }</button>

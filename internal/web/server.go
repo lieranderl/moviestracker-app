@@ -145,6 +145,7 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("POST /api/ts/settings/validate", a.handleValidateBrowserSettings)
 	a.progress = handlers.NewProgress(a.cfg.Store, a.userID, nil)
 	a.progress.Register(mux)
+	handlers.NewCompletion(a.cfg.Store, a.cfg.Store, a.cfg.Store, a.userID).Register(mux)
 	a.catalog.ShowProgress(a.progress)
 	filters := handlers.NewReleaseFilterPrefs(a.cfg.Store, a.userID)
 	filters.Register(mux)

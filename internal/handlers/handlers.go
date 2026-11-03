@@ -347,6 +347,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/torrserver/recent", s.handleRecentTorrents)
 	s.mux.HandleFunc("GET /api/torrserver/torrent-stats", s.handleTorrentStats)
 	s.progress.Register(s.mux)
+	NewCompletion(s.progress.store, s.reviews.store, s.titleStates.store, s.username).Register(s.mux)
 	s.titleStates.Register(s.mux)
 	s.customLists.Register(s.mux)
 	s.reviews.Register(s.mux)
