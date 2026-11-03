@@ -38,7 +38,7 @@ unverified" notes for release inclusion; it does not supersede their test limits
 | R17 | Implemented and included: episode/season marks and Next unwatched. | Browser verification with real series and persisted state. |
 | R18 | Partial: exact filename episode mapping and completion shipped. | Ambiguous filenames remain manual episode ticks; explicit mapping confirmation and persisted file mappings are not delivered. Preserve file-based resume. |
 | R19–R21, R23 | Implemented and included: spoiler protection, recommendation feedback, tonight shortlist, quick watch-state actions and undo. | End-to-end browser acceptance, including account isolation and concurrent changes. R23 covers watch-state actions; custom-list actions remain on title pages. |
-| R22 | Implemented on `codex/discovery-presets`; delivery pending. | Approved limits/seams; storage, HTTP and disposable browser checks pass. Full local gate passed; PR delivery remains. |
+| R22 | Delivered in [PR #149](https://github.com/lieranderl/moviestracker-app/pull/149). | Public store, signed-in HTTP/SSE, emulator races, desktop/Russian mobile browser checks and required CI passed. |
 | R24–R27 | Implemented in supported scope: release comparison, following/upcoming episodes, checkpointed release discovery and web alert preferences/episode alerts. | Compare metadata is not a playback guarantee. Discovery remains bounded by upstream history; episode alerts inspect only the latest aired episode, not all missed episodes. App background discovery remains unsupported. |
 | R28 | Pending: authorized device handoff. | Design reachability and scoped authorization after playback readiness is verified. |
 | R29–R32 | Pending: household voting, permissions, queue and cross-instance collaboration. | Keep deferred until the individual viewing journey is verified; permissions and persistence must ship with voting. |
@@ -315,7 +315,7 @@ release review/current status and revised sequence above for planning today.
   Production account data was not changed. Live playback, personal progress
   writes, real screen-reader and WebKit checks remain unverified.
 
-- **R22 — implementation verified, delivery pending (3 November 2026):**
+- **R22 — delivered (3 November 2026):**
   shared Discover controls save/apply/rename/delete up to 20 named filter sets
   per account. Names use 1–60 trimmed Unicode characters. Durable fields only;
   applying obsolete filters explains adjustments and does not rewrite presets.
@@ -325,8 +325,29 @@ release review/current status and revised sequence above for planning today.
   and disposable desktop/Russian 375 px browser checks pass, including native
   dialog Escape/focus, retained failed-write input and no document overflow.
   Production viewing data stayed unchanged. Full `make ci` and emulator races passed again on refreshed main 7ec0fa5.
-  PR #149 delivery remains pending remote CI; its Windows permission assertion
-  is scoped to platforms supporting Unix mode bits.
+  [PR #149](https://github.com/lieranderl/moviestracker-app/pull/149) merged after
+  required CI passed; its Windows permission assertion is scoped to platforms
+  supporting Unix mode bits.
+
+- **Web Add regression — delivered (3 November 2026):**
+  templ 0.3.1100 sanitized the JSON-valued `data-server-urls` attribute as a URL,
+  preventing selector initialization and leaving Add disabled. [PR #151](https://github.com/lieranderl/moviestracker-app/pull/151)
+  uses a non-URL attribute and a signed-in selector regression. Required CI and
+  web deployment passed; revision `00192-gag` served 100% of traffic. Production
+  selector/Add state was verified read-only; adds, failures and retries used a
+  disposable fake server. The user's account and real server stayed unchanged.
+
+- **X01 — local verification complete; PR delivery pending (3 November 2026):**
+  the shared native file menu explains connection, known/unknown HLS conversion,
+  and a filename extension hint. Direct playback stays Not checked. Refresh uses
+  capability endpoints only, with stale-server suppression and isolated browser
+  status that does not reload torrents. Recorded fake requests and public
+  signed-in HTTP/SSE cover these limits; missing/null/incomplete health remains
+  unknown. Desktop/Russian 375 px checks cover retry recovery, long filenames,
+  keyboard Refresh and Escape/focus. Independent review found no remaining
+  actionable issues. Full `make ci` passed, including race tests, generated-asset
+  checks, static analysis, security scans and build. Real-media compatibility
+  remains unverified.
 
 - **R01 — implemented, deployment unverified (1 November 2026):** replaced the
   clipped title-page dropdown with the existing native dialog helper. The same

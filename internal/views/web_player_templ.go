@@ -26,7 +26,7 @@ func webNext() string {
 }
 
 func webPlayerSignals() string {
-	return strings.TrimSuffix(torrPageSignals(false, false, true, ""), "}") + `, _tsPlayerProblem: '', _tsProbeProblem: '', _resumeHref: '/search', _tsPlayerOrigin: '', _tsPlayingFile: '', _progressTorrent: null }`
+	return strings.TrimSuffix(torrPageSignals(false, false, false, true, ""), "}") + `, _tsPlayerProblem: '', _tsProbeProblem: '', _resumeHref: '/search', _tsPlayerOrigin: '', _tsPlayingFile: '', _progressTorrent: null }`
 }
 
 func playerStart(browser bool) string {
@@ -83,7 +83,7 @@ func webPlayer() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = torrFileMenu().Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = torrFileMenuFor(true).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -484,7 +484,7 @@ func (c *Client) GetCachedFiles(hash string) ([]FileStat, bool) {
 // gstComponent is one component's status in TorrServer's /gst/echo answer.
 type gstComponent struct {
 	Available bool   `json:"available"`
-	Works     bool   `json:"works"`
+	Works     *bool  `json:"works"`
 	Version   string `json:"version"`
 }
 
@@ -521,16 +521,16 @@ func (c *Client) Echo(ctx context.Context) (EchoInfo, error) {
 			info.GSTKnown = gstResp.StatusCode == http.StatusNotFound
 			if gstResp.StatusCode == http.StatusOK {
 				var gstData struct {
-					GStreamer     gstComponent `json:"gstreamer"`
-					Discoverer    gstComponent `json:"gst_discoverer"`
-					HDRToneMapper gstComponent `json:"hdr_tone_mapping"`
+					GStreamer     *gstComponent `json:"gstreamer"`
+					Discoverer    gstComponent  `json:"gst_discoverer"`
+					HDRToneMapper gstComponent  `json:"hdr_tone_mapping"`
 				}
-				if decodeJSON(gstResp.Body, &gstData) == nil {
+				if decodeJSON(gstResp.Body, &gstData) == nil && gstData.GStreamer != nil && gstData.GStreamer.Works != nil {
 					info.GSTKnown = true
-					info.GSTAvailable = gstData.GStreamer.Available && gstData.GStreamer.Works
+					info.GSTAvailable = gstData.GStreamer.Available && *gstData.GStreamer.Works
 					info.GSTVersion = gstData.GStreamer.Version
-					info.Discoverer = gstData.Discoverer.Works
-					info.HDRTonemap = gstData.HDRToneMapper.Works
+					info.Discoverer = gstData.Discoverer.Works != nil && *gstData.Discoverer.Works
+					info.HDRTonemap = gstData.HDRToneMapper.Works != nil && *gstData.HDRToneMapper.Works
 				}
 			}
 		}

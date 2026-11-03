@@ -18,7 +18,7 @@ func webTorrServerSignals(servers []store.TorrServer) string {
 	if len(servers) > 0 {
 		first = servers[0].URL
 	}
-	return fmt.Sprintf(`{ tsSelected: localStorage.getItem('mt-ts-selected') || %q, tsStatus: {checking: false, ok: false, version: '', hls: false, hlsKnown: false, problem: '', status: 0}, tsAddOpen: false, tsName: '', tsUrl: '', tsUser: '', tsPass: '', tsFormError: '', tsForget: '' }`, first)
+	return fmt.Sprintf(`{ tsSelected: localStorage.getItem('mt-ts-selected') || %q, _readinessStatus: {}, _readinessHasStatus: false, _readinessServer: '', tsStatus: {checking: false, ok: false, version: '', hls: false, hlsKnown: false, problem: '', status: 0}, tsAddOpen: false, tsName: '', tsUrl: '', tsUser: '', tsPass: '', tsFormError: '', tsForget: '' }`, first)
 }
 
 // webTorrServerAdd saves the form's login in this browser, then sends only
@@ -142,10 +142,12 @@ templ WebTorrServers(servers []store.TorrServer) {
 templ webTorrServerStatus() {
 	<section
 		id="ts-status"
+ data-ref:_connection-check
 		class="card bg-base-200/60 border border-base-content/10"
 		data-show="$tsSelected"
 		data-effect="tsCheck(el, $tsSelected)"
-		data-on:ts-status="$tsStatus = evt.detail"
+		data-on:ts-status="$tsStatus = evt.detail; $_readinessHasStatus = false"
+ data-on:ts-readiness="if ($_readinessServer !== $tsSelected) return; $_readinessStatus = evt.detail; $_readinessHasStatus = true; if (!evt.detail.checking) { $gst = evt.detail.hls; $gstKnown = evt.detail.hlsKnown }"
 	>
 		<div class="card-body gap-3">
 			<div class="flex flex-wrap items-center justify-between gap-3">

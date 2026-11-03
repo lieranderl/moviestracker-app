@@ -582,6 +582,11 @@ test("the player reads where TorrServer's other players left a file", async () =
 
 test("the TorrServer check tells HLS it could not check from HLS the TorrServer cannot do", async () => {
   const cases = [
+    [Response.json({}), { hls: false, hlsKnown: false }],
+    [Response.json({gstreamer:null}), { hls: false, hlsKnown: false }],
+    [Response.json({gstreamer:[]}), { hls: false, hlsKnown: false }],
+    [Response.json({gstreamer:{}}), { hls: false, hlsKnown: false }],
+    [Response.json({gstreamer:{works:null}}), { hls: false, hlsKnown: false }],
     [new Response("404 page not found", { status: 404 }), { hls: false, hlsKnown: true }],
     [Response.json({ gstreamer: { works: false } }), { hls: false, hlsKnown: true }],
     [Response.json({ gstreamer: { works: true } }), { hls: true, hlsKnown: true }],
@@ -620,4 +625,30 @@ test("a file TorrServer no longer has is reported missing, not as a connection p
   expect(gone.problem).toBe("missing");
   expect(gone.torrent).toBeNull();
   expect((await load(async () => new Response("boom", { status: 500 }), 1)).problem).toBe("status");
+});
+
+test("refreshing playback readiness reads capabilities without loading or probing media", async () => {
+  globalThis.fetch = requests = mock(async (url) => {
+    const endpoint = new URL(url).pathname;
+    if (endpoint === "/echo") return new Response("MatriX.147.2");
+    if (endpoint === "/gst/echo") return Response.json({gstreamer:{works:true}});
+    throw new Error(`Unexpected media request: ${endpoint}`);
+  });
+  const el = new EventTarget();
+  const statuses = [];
+  el.addEventListener("ts-status", (evt) => statuses.push(evt.detail));
+  await client.tsCheck(el, server);
+  expect(requests.mock.calls.map(([url]) => new URL(url).pathname)).toEqual(["/echo", "/gst/echo"]);
+  expect(statuses.at(-1)).toMatchObject({ok:true,hls:true,hlsKnown:true});
+});
+
+test("a file-menu capability check reports readiness separately from torrent-list connection state", async () => {
+  globalThis.fetch = mock(async (url) => new URL(url).pathname === "/echo" ? new Response("MatriX.147.2") : Response.json({gstreamer:{works:true}}));
+  const el = new EventTarget();
+  const connection = [], readiness = [];
+  el.addEventListener("ts-status", (evt) => connection.push(evt.detail));
+  el.addEventListener("ts-readiness", (evt) => readiness.push(evt.detail));
+  await client.tsCheck(el, server, "ts-readiness");
+  expect(connection).toEqual([]);
+  expect(readiness.at(-1)).toMatchObject({ok:true,hls:true,hlsKnown:true});
 });

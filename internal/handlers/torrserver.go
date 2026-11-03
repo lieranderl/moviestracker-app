@@ -147,7 +147,7 @@ func (s *Server) patchTorrLive(sse *datastar.ServerSentEventGenerator, torrents 
 }
 
 func patchGSTSignal(sse *datastar.ServerSentEventGenerator, echo torrserver.EchoInfo) error {
-	return sse.MarshalAndPatchSignals(map[string]any{"gst": echo.GSTAvailable, "gstKnown": echo.GSTKnown})
+	return sse.MarshalAndPatchSignals(map[string]any{"gst": echo.GSTAvailable, "gstKnown": echo.GSTKnown, "torrConnected": echo.Version != ""})
 }
 
 // patchTorrLiveIfChanged renders the live fragment and patches it only when it
