@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -232,8 +233,12 @@ func TestTheLocalAppKeepsPresetsAcrossRestartsAndFailedWrites(t *testing.T) {
 		t.Errorf("retry after persistence recovery = %v, %v", got, err)
 	}
 	info, err := os.Stat(path)
-	if err != nil || info.Mode().Perm() != 0o600 {
-		t.Errorf("preset file must be owner-only: %v, %v", info, err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Windows exposes the read-only attribute here, not Unix owner/group permissions.
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+		t.Errorf("preset file must be owner-only: %v", info.Mode().Perm())
 	}
 }
 
