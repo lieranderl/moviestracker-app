@@ -220,7 +220,7 @@ func watchStateButton(kind string, id int, value, state, icon, label string) tem
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var12 = []any{watchStateButtonClass(ctx), templ.KV("btn-primary", state == value), templ.KV("btn-ghost text-neutral-content border-neutral-content/30 hover:bg-neutral-content/10", state != value)}
+			var templ_7745c5c3_Var12 = []any{watchStateButtonClass(ctx), templ.KV("btn-primary", state == value), templ.KV("btn-ghost text-base-content border-base-content/30 hover:bg-base-content/10", state != value && playerControls(ctx) != ""), templ.KV("btn-ghost text-neutral-content border-neutral-content/30 hover:bg-neutral-content/10", state != value && playerControls(ctx) == "")}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_ElementWriter, templ_7745c5c3_Var12...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

@@ -26,7 +26,7 @@ templ watchStateButton(kind string, id int, value, state, icon, label string) {
 		type="button"
 		data-state={ value }
 		aria-pressed={ boolAttr(state == value) }
-		class={ watchStateButtonClass(ctx), templ.KV("btn-primary", state == value), templ.KV("btn-ghost text-neutral-content border-neutral-content/30 hover:bg-neutral-content/10", state != value) }
+		class={ watchStateButtonClass(ctx), templ.KV("btn-primary", state == value), templ.KV("btn-ghost text-base-content border-base-content/30 hover:bg-base-content/10", state != value && playerControls(ctx) != ""), templ.KV("btn-ghost text-neutral-content border-neutral-content/30 hover:bg-neutral-content/10", state != value && playerControls(ctx) == "") }
 		if state == value {
 			data-on:click={ fmt.Sprintf("@delete('%s')", titleControlURL(ctx, watchStateURL(kind, id))) }
 		} else {
