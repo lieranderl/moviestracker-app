@@ -1,0 +1,17 @@
+package views
+
+import (
+ "fmt"
+ "github.com/lieranderl/moviestracker-app/internal/store"
+)
+
+templ PlayerCompletion(key,title string,id int,review store.Review,state string) {
+ <section id="player-completion" class="card bg-base-200 mt-4" data-request-key={ key } data-attr:data-request-key="$_completionRequest" data-show={ "$_completionOpen && $_completionRequest === " + jsString(key) } aria-labelledby="completion-heading">
+ <div class="card-body gap-3">
+ <div class="flex items-start justify-between gap-3"><div><h3 id="completion-heading" class="card-title">{ tr(ctx,"Finished watching?") }</h3><p class="text-sm break-words">{ title }</p></div><button type="button" class="btn btn-sm btn-ghost" data-on:click="$_completionOpen = false; $_completionRequest = ''">{tr(ctx,"Dismiss")}</button></div>
+ @TitleReview("movie",id,review.Rating,false)
+ @WatchStateButtons("movie",id,state)
+ <a class="link" href={ templ.SafeURL(fmt.Sprintf("/movie/%d#similar",id)) }>{tr(ctx,"More like this")}</a>
+ </div>
+ </section>
+}

@@ -2,6 +2,7 @@ package i18n
 
 // ru translates the interface into Russian, by English text.
 var ru = map[string]string{
+	"Finished watching?":    "Закончили просмотр?",
 	"Filters saved.":        "Фильтры сохранены.",
 	"Filter name updated.":  "Название набора обновлено.",
 	"Saved filter deleted.": "Набор фильтров удалён.",
