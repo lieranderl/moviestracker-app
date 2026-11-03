@@ -59,14 +59,14 @@ func WebSourceSelector(servers []store.TorrServer) templ.Component {
 		if len(servers) > 0 {
 			first = servers[0].URL
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"ts-source-selector\" class=\"flex flex-wrap items-center gap-2\" data-server-urls=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"ts-source-selector\" class=\"flex flex-wrap items-center gap-2\" data-server-addresses=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templruntime.NewAttributeExpression(torrServerURLs(servers)).ResolveURL(ctx)
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templruntime.NewAttributeExpression(torrServerURLs(servers)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_sources.templ`, Line: 35, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_sources.templ`, Line: 35, Col: 49}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
@@ -98,7 +98,7 @@ func WebSourceSelector(servers []store.TorrServer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" data-effect=\"$_tsSelectedName = JSON.parse(el.dataset.serverNames)[$tsSelected] || ''\" data-init=\"if (!JSON.parse(el.dataset.serverUrls).includes($tsSelected)) { $tsSelected = el.dataset.firstServer }; $tsSelectorReady = true\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" data-effect=\"$_tsSelectedName = JSON.parse(el.dataset.serverNames)[$tsSelected] || ''\" data-init=\"if (!JSON.parse(el.dataset.serverAddresses).includes($tsSelected)) { $tsSelected = el.dataset.firstServer }; $tsSelectorReady = true\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
