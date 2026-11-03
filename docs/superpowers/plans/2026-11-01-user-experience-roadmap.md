@@ -38,7 +38,7 @@ unverified" notes for release inclusion; it does not supersede their test limits
 | R17 | Implemented and included: episode/season marks and Next unwatched. | Browser verification with real series and persisted state. |
 | R18 | Partial: exact filename episode mapping and completion shipped. | Ambiguous filenames remain manual episode ticks; explicit mapping confirmation and persisted file mappings are not delivered. Preserve file-based resume. |
 | R19–R21, R23 | Implemented and included: spoiler protection, recommendation feedback, tonight shortlist, quick watch-state actions and undo. | End-to-end browser acceptance, including account isolation and concurrent changes. R23 covers watch-state actions; custom-list actions remain on title pages. |
-| R22 | Implemented on `codex/discovery-presets`; delivery pending. | Approved limits/seams; storage, HTTP and disposable browser checks pass. Full gate/PR remain. |
+| R22 | Implemented on `codex/discovery-presets`; delivery pending. | Approved limits/seams; storage, HTTP and disposable browser checks pass. Full local gate passed; PR delivery remains. |
 | R24–R27 | Implemented in supported scope: release comparison, following/upcoming episodes, checkpointed release discovery and web alert preferences/episode alerts. | Compare metadata is not a playback guarantee. Discovery remains bounded by upstream history; episode alerts inspect only the latest aired episode, not all missed episodes. App background discovery remains unsupported. |
 | R28 | Pending: authorized device handoff. | Design reachability and scoped authorization after playback readiness is verified. |
 | R29–R32 | Pending: household voting, permissions, queue and cross-instance collaboration. | Keep deferred until the individual viewing journey is verified; permissions and persistence must ship with voting. |
@@ -324,7 +324,7 @@ release review/current status and revised sequence above for planning today.
   file write rollback and future-field preservation are covered. Shared HTTP/SSE
   and disposable desktop/Russian 375 px browser checks pass, including native
   dialog Escape/focus, retained failed-write input and no document overflow.
-  Production viewing data stayed unchanged. Full gate and PR remain pending.
+  Production viewing data stayed unchanged. Full `make ci` passed again on refreshed main 946f987; PR delivery remains pending.
 
 - **R01 — implemented, deployment unverified (1 November 2026):** replaced the
   clipped title-page dropdown with the existing native dialog helper. The same

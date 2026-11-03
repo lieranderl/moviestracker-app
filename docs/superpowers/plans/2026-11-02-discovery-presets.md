@@ -93,5 +93,6 @@ delete, Escape and focus return, pending recovery, English desktop and Russian
 input. Review findings on local account cleanup/fencing and unknown file fields
 were reproduced and fixed. Full gate and remote delivery remain in progress.
 
-Full `make ci` passed before rebasing onto the latest dependency-only main.
-Revalidation on the refreshed base remains required before PR delivery.
+Full `make ci` passed again after rebasing onto main 946f987 and installing
+its locked frontend dependencies. Generated artifacts are current. Remote PR
+checks/merge remain the final delivery step.
