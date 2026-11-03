@@ -1,14 +1,21 @@
 package views
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 func reviewURL(kind string, id int) string {
 	return fmt.Sprintf("/api/titles/review?type=%s&id=%d", kind, id)
 }
 
 // reviewPost saves $reviewRating and $reviewNote for a title.
-func reviewPost(kind string, id int) string {
-	return fmt.Sprintf("@post('%s', {filterSignals: {include: /^review(Rating|Note)$/}})", reviewURL(kind, id))
+func reviewPost(ctx context.Context, kind string, id int) string {
+	if key := playerControls(ctx); key != "" {
+		base := "$_completionReviews." + key
+		return fmt.Sprintf("@post('%s', {payload: {reviewRating: %s.rating, reviewNote: %s.note}})", titleControlURL(ctx, reviewURL(kind, id)), base, base)
+	}
+	return fmt.Sprintf("@post('%s', {filterSignals: {include: /^review(Rating|Note)$/}})", titleControlURL(ctx, reviewURL(kind, id)))
 }
 
 // reviewSlot is a title page's section for the user's rating and note: it
@@ -22,7 +29,7 @@ templ reviewSlot(kind string, id int) {
 					@Icon("star", "size-5 text-warning")
 					{ tr(ctx, "Your rating and note") }
 				</h2>
-				<div id="title-review" data-init={ fmt.Sprintf("@get('%s')", reviewURL(kind, id)) }>
+				<div id={ titleControlID(ctx, "title-review") } data-init={ fmt.Sprintf("@get('%s')", titleControlURL(ctx, reviewURL(kind, id))) }>
 					<span class="loading loading-dots loading-sm text-base-content/50" aria-label={ tr(ctx, "Loading") }></span>
 				</div>
 				<fieldset class="fieldset">
@@ -30,7 +37,7 @@ templ reviewSlot(kind string, id int) {
 					<textarea class="textarea w-full h-24" maxlength="2000" placeholder={ tr(ctx, "What did you think? Who recommended it?") } data-bind:review-note data-attr:disabled="!$_reviewReady"></textarea>
 				</fieldset>
 				<div class="card-actions items-center">
-					<button type="button" class="btn btn-sm btn-primary gap-2" data-attr:disabled="!$_reviewReady" data-on:click={ reviewPost(kind, id) }>
+					<button type="button" class="btn btn-sm btn-primary gap-2" data-attr:disabled="!$_reviewReady" data-on:click={ reviewPost(ctx, kind, id) }>
 						@Icon("save", "size-4")
 						{ tr(ctx, "Save note") }
 					</button>
@@ -43,22 +50,22 @@ templ reviewSlot(kind string, id int) {
 // TitleReview is the user's rating of a title, out of 10: picking a star
 // saves it, and marks the title watched. saved says it was just saved.
 templ TitleReview(kind string, id int, rating int, saved bool) {
-	<div id="title-review" class="flex flex-wrap items-center gap-3">
+	<div id={ titleControlID(ctx, "title-review") } class="flex flex-wrap items-center gap-3">
 		<div class="rating rating-sm sm:rating-md" role="radiogroup" aria-label={ tr(ctx, "Your rating") }>
 			for n := 1; n <= 10; n++ {
 				<input
 					type="radio"
-					name="title-rating"
+					name={ titleControlID(ctx, "title-rating") }
 					class="mask mask-star-2 bg-warning"
 					aria-label={ trf(ctx, "%d of 10", n) }
 					checked?={ n == rating }
-					data-on:change={ fmt.Sprintf("$reviewRating = %d; %s", n, reviewPost(kind, id)) }
+					data-on:change={ fmt.Sprintf("%s = %d; %s", reviewRatingSignal(ctx), n, reviewPost(ctx, kind, id)) }
 				/>
 			}
 		</div>
 		if rating > 0 {
 			<span class="badge badge-warning badge-soft font-semibold">{ fmt.Sprintf("%d/10", rating) }</span>
-			<button type="button" class="btn btn-xs btn-ghost" data-on:click={ "$reviewRating = 0; " + reviewPost(kind, id) }>{ tr(ctx, "Clear rating") }</button>
+			<button type="button" class="btn btn-xs btn-ghost" data-on:click={ reviewRatingSignal(ctx) + " = 0; " + reviewPost(ctx, kind, id) }>{ tr(ctx, "Clear rating") }</button>
 		}
 		if saved {
 			<span role="status" class="text-sm text-success flex items-center gap-1">
@@ -72,9 +79,13 @@ templ TitleReview(kind string, id int, rating int, saved bool) {
 // TitleReviewFailed says the user's rating and note could not be loaded,
 // with a way to ask again; until they load nothing can be changed.
 templ TitleReviewFailed(kind string, id int) {
-	<div id="title-review" role="alert" class="alert alert-warning alert-soft">
+	<div id={ titleControlID(ctx, "title-review") } role="alert" class="alert alert-warning alert-soft">
 		@Icon("triangle-alert", "size-5")
 		<span>{ tr(ctx, "Your rating and note could not be loaded right now.") }</span>
-		<button type="button" class="btn btn-sm" data-on:click={ fmt.Sprintf("@get('%s')", reviewURL(kind, id)) }>{ tr(ctx, "Try again") }</button>
+		<button type="button" class="btn btn-sm" data-on:click={ fmt.Sprintf("@get('%s')", titleControlURL(ctx, reviewURL(kind, id))) }>{ tr(ctx, "Try again") }</button>
 	</div>
+}
+
+templ TitleReviewSaveFailed(kind string, id int) {
+	@titleControlFailure(titleControlID(ctx, "title-review"), reviewPost(ctx, kind, id))
 }

@@ -1,0 +1,10 @@
+package views
+
+// Shared action feedback reuses the existing endpoints and file-specific targets.
+templ titleControlFailure(id, retry string) {
+	<div id={ id } role="alert" class="alert alert-warning alert-soft">
+		@Icon("triangle-alert", "size-5")
+		<span>{ tr(ctx,"The change could not be saved. Please try again.") }</span>
+		<button type="button" class="btn btn-sm" data-on:click={ retry }>{ tr(ctx,"Retry") }</button>
+	</div>
+}

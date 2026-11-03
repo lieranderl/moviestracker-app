@@ -1,17 +1,56 @@
 package views
 
 import (
- "fmt"
- "github.com/lieranderl/moviestracker-app/internal/store"
+	"fmt"
+	"github.com/lieranderl/moviestracker-app/internal/store"
 )
 
-templ PlayerCompletion(key,title string,id int,review store.Review,state string) {
- <section id="player-completion" class="card bg-base-200 mt-4" data-request-key={ key } data-attr:data-request-key="$_completionRequest" data-show={ "$_completionOpen && $_completionRequest === " + jsString(key) } aria-labelledby="completion-heading">
- <div class="card-body gap-3">
- <div class="flex items-start justify-between gap-3"><div><h3 id="completion-heading" class="card-title">{ tr(ctx,"Finished watching?") }</h3><p class="text-sm break-words">{ title }</p></div><button type="button" class="btn btn-sm btn-ghost" data-on:click="$_completionOpen = false; $_completionRequest = ''">{tr(ctx,"Dismiss")}</button></div>
- @TitleReview("movie",id,review.Rating,false)
- @WatchStateButtons("movie",id,state)
- <a class="link" href={ templ.SafeURL(fmt.Sprintf("/movie/%d#similar",id)) }>{tr(ctx,"More like this")}</a>
- </div>
- </section>
+// Completion eligibility is presentation state, handled through native media events.
+const completionSignals = `, _completionElapsed: 0, _completionLastTime: 0, _completionLastStamp: 0, _completionRunning: false, _completionSeen: {}, _completionOpen: false, _completionRequest: '', _completionReviews: {}`
+
+const completionStop = `$_completionRunning = false; $_completionLastStamp = 0`
+const completionStart = `$_completionRunning = !el.paused && !el.seeking; $_completionLastTime = el.currentTime; $_completionLastStamp = evt.timeStamp`
+const completionReset = `$_completionElapsed = 0; $_completionRunning = false; $_completionLastTime = 0; $_completionLastStamp = 0; $_completionOpen = false; $_completionRequest = ''`
+const completionTick = `{
+ const seconds = (evt.timeStamp - $_completionLastStamp) / 1000
+ const played = (el.currentTime - $_completionLastTime) / Math.max(el.playbackRate, 0.01)
+ if ($_completionRunning && !el.paused && !el.seeking && seconds > 0 && seconds <= 5 && played > 0 && played <= seconds + 0.5) {
+  $_completionElapsed = Math.min(60, $_completionElapsed + Math.min(seconds, played))
+ }
+ $_completionLastTime = el.currentTime; $_completionLastStamp = evt.timeStamp
+}`
+
+func completionEnded(browser bool) string {
+	origin := "''"
+	if browser {
+		origin = "$tsSelected"
+	}
+	return `{
+ const file = ` + origin + ` + ':' + $activeHash.toLowerCase() + ':' + $activeFileIndex
+ const at = $_queueHash === $activeHash ? $_queue.findIndex(f => f.index === +$activeFileIndex) : -1
+ if ($playerOpen && $_completionElapsed >= 60 && at >= 0 && at === $_queue.length - 1 && !$_completionSeen[file]) {
+  $_completionSeen[file] = true
+  $_completionRequest = 'c_' + $activeHash.toLowerCase() + '_' + $activeFileIndex + '_' + $playNonce
+  $_completionOpen = true
+  @get('/api/player/completion?hash=' + encodeURIComponent($activeHash) + '&index=' + $activeFileIndex + '&nonce=' + $playNonce, {filterSignals: {include: /^$/}})
+ }
+ }
+ ` + playerNext(browser)
+}
+
+templ completionSlot() {
+	<div class="hidden" data-effect={ "$activeHash; $activeFileIndex; $playNonce; $playerOpen; @peek(() => { " + completionReset + " })" }></div>
+	<div id="player-completion" data-attr:data-request-key="$_completionRequest" data-request-key=""></div>
+}
+
+templ PlayerCompletion(key, title string, id int, review store.Review, state string) {
+	<section id="player-completion" class="card bg-base-200 mt-4" data-request-key={ key } data-attr:data-request-key="$_completionRequest" data-show={ "$_completionOpen && $_completionRequest === " + jsString(key) } aria-labelledby="completion-heading" data-signals={ reviewInitialSignals(ctx, review) }>
+		<div class="card-body gap-3">
+			<div class="flex items-start justify-between gap-3"><div><h3 id="completion-heading" class="card-title">{ tr(ctx,"Finished watching?") }</h3><p class="text-sm break-words">{ title }</p></div><button type="button" class="btn btn-sm btn-ghost" data-on:click="$_completionOpen = false; $_completionRequest = ''; $_player?.focus()">{ tr(ctx,"Dismiss") }</button></div>
+			@TitleReview("movie", id, review.Rating, false)
+			<p class="text-xs text-base-content/70">{ tr(ctx,"Rating a movie also marks it watched.") }</p>
+			@WatchStateButtons("movie", id, state)
+			<a class="link" href={ templ.SafeURL(fmt.Sprintf("/movie/%d#similar", id)) }>{ tr(ctx,"More like this") }</a>
+		</div>
+	</section>
 }
