@@ -45,6 +45,7 @@ templ SearchPage(user *auth.User, v SearchView) {
 							autocomplete="off"
 							class="grow"
 							data-bind:q
+							data-attr:value="$q"
 							data-init="if (performance.getEntriesByType('navigation')[0]?.type !== 'back_forward') { el.focus({preventScroll: true}) }"
 							data-effect={ searchURLEffect }
 							data-indicator:searching
