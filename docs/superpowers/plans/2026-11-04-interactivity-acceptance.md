@@ -1,0 +1,39 @@
+# Interactivity acceptance audit
+
+The goal remains active. This audit supplements the [roadmap](2026-11-01-user-experience-roadmap.md); a merged change or a green suite does not prove every browser journey. Account/history and real TorrServer writes remain prohibited. Writes and playable media checks use disposable accounts and external fixtures.
+
+## Current delivery evidence
+
+- [PR #155](https://github.com/lieranderl/moviestracker-app/pull/155) is merged at `37ea6d4cf6a9fb371bfed1fec6a4ce2e8ac752ef`; web deployment [41733602409](https://github.com/lieranderl/moviestracker-app/actions/runs/41733602409) succeeded for that commit. Cloud Run revision `moviestracker-web-00200-mez` was rechecked at 100% traffic during this audit.
+- The current full local `make ci` passed with the buffering-status repair. This includes the existing frontend tests, Go race suites, generated output, lint, security scans and build. Remote checks/deployment for this repair are pending.
+- Desktop installers and container release images have not been republished with the later player repairs. Their release workflow is separate from the hosted web deployment.
+
+## Acceptance matrix
+
+| Requirement | Evidence available | Remaining work or limit |
+| --- | --- | --- |
+| R01–R02: list dialog, search restoration | Existing HTTP/rendered tests and earlier browser records; current full suite passes. | Recheck the complete search → title → Back journey and popup boundaries in both transports and Safari. |
+| R03, R06–R07: alerts, privacy, account data | Existing pagination/concurrency/account contracts run in the suite; shipped implementation is recorded in the roadmap. | Do not exercise deletion/export or alert acknowledgment on the production account. Broader browser acceptance must use a disposable account. |
+| R04–R05, R13: recommendations and large libraries | Existing deadline/concurrency/query tests pass. Active library filtering/localization still reads the full list. | Measure realistic sizes and provider/read volume before selecting a scaling strategy or claiming production latency improvement. |
+| R08, R10–R14: title actions, filenames, source explanations, libraries | Shared components, localization and public HTTP contracts; earlier production Add/home repairs and delivery records. | The complete browse → sources → playable file journey still needs its broader recorded browser pass. Format metadata is not a codec guarantee. |
+| R15: recovery and cancellation | Existing route/provider/frontend tests pass. Disposable direct/HLS queue and stream/audio changes were checked in Chromium; missing-file and replacement guards have contract coverage. | Complete browser recovery/cancellation checks through the full signed-in journey on both surfaces, including unavailable file/server and stale responses. |
+| R16: keyboard/status/accessibility | New shared buffering-status regression failed before the fix and passes local/web, English/Russian. Native waiting exposes Buffering in Chromium and Safari27.2 AX; actual playing clears it. At375px Russian cloud and1280px English local player, no horizontal overflow or status layout shift was observed. | This is an accessibility-tree check, not a speech/compliance claim. User explicitly declined enabling VoiceOver: leave it unchanged and report speech unverified. Full keyboard, focus, reduced-motion, zoom and remaining status checks are still open. |
+| R17–R19: episodes, mapping, spoilers | Existing episode/season/Next-unwatched, exact filename completion and spoiler HTTP/store contracts pass. File-based resume is retained. | Complete persisted episode-state browser checks. Confirmed ambiguous-file mappings and their persistence are not implemented; design approval is required before adding them. |
+| R20–R21, R23: feedback, shortlist, quick actions/undo | Existing account-owned feedback/filter/watch-state contracts pass; shipped scope recorded in the roadmap. | Complete browser isolation/concurrency/undo checks. Custom-list actions remain on title pages; do not call this a new card-level list capability. |
+| R22: discovery presets | PR149 delivery, store/HTTP/emulator and earlier English/Russian browser evidence recorded in its approved plan. | Retain the agreed20/account and1–60 character scope. No new design is needed. |
+| R24–R27: comparison, following, discovery, notifications | Existing metadata/follow/checkpoint/preferences contracts pass; shared readiness and source comparison already shipped. | Upstream history bounds catch-up. Missed-episode policy and local app discovery lifecycle require a product decision before broader promises. |
+| R28: device handoff | User explicitly said “let's skip device handoff.” | Skipped; no implementation or QR authorization work. |
+| R09, R29–R32, X03–X05 | R09 was declined; household collaboration remains deferred. X03–X05 remain proposals. | Do not silently activate these proposals or describe them as delivered. |
+
+## Buffering defect and narrow repair
+
+The existing visual spinner exposed no role, name or text after a native waiting event. The repair keeps its styling, marks it decorative and adds a persistent, visually hidden polite/atomic status in the shared player. Its text is Buffering / Буферизация while waiting and not showing an unsupported-media error; existing playing/emptied handling clears it. No extra JavaScript, playback requests or account writes are introduced.
+
+The standalone in-app browser identified itself as Chrome156 and was not counted as WebKit. Native Safari identified itself as Version27.2 / AppleWebKit605.1.15 through its real HTTP request. Only the owned disposable Safari tab was used. The cloud browser fixture uses the shared cloud player/transport against a fake TorrServer; signed-in web routing is covered separately by real HTTP tests. These boundaries do not prove production-media compatibility or a full cloud end-to-end journey.
+
+## Next order
+
+1. Deliver the verified buffering repair and preserve its acceptance limits.
+2. Continue the disposable full-journey, Safari, keyboard, failure/retry, persisted episode and reduced-motion checks; fix demonstrated defects in separate slices.
+3. Resolve the R18 confirmed-mapping design and large-library measurement/product-decision follow-ups.
+4. Audit the full active scope again before claiming the goal complete. Keep skipped, deferred, unverified and delivered items distinct.

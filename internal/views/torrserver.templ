@@ -850,7 +850,8 @@ templ torrPlayerModalFor(browser bool) {
 				data-class:controls-shown={ torrControlsShown }
 			></video>
 			@TorrResume("", 0, 0)
-			<span class="loading loading-spinner loading-lg text-primary absolute inset-0 m-auto pointer-events-none" data-show="$_waiting && !$_unplayable"></span>
+			<span class="loading loading-spinner loading-lg text-primary absolute inset-0 m-auto pointer-events-none" aria-hidden="true" data-show="$_waiting && !$_unplayable"></span>
+			<p id="player-buffering-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true" data-text={ "$_waiting && !$_unplayable ? " + trJS(ctx, "Buffering") + " : ''" }></p>
 			<!-- The browser refused the stream (player.js names the format it cannot decode). -->
 			<div class="absolute inset-0 z-20 grid place-items-center p-6 bg-base-content/90" data-show="$_unplayable" role="alert">
 				<div class="max-w-md text-center space-y-2 text-base-100">

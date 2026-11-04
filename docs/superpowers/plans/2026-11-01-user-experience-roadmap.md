@@ -40,7 +40,7 @@ unverified" notes for release inclusion; it does not supersede their test limits
 | R19–R21, R23 | Implemented and included: spoiler protection, recommendation feedback, tonight shortlist, quick watch-state actions and undo. | End-to-end browser acceptance, including account isolation and concurrent changes. R23 covers watch-state actions; custom-list actions remain on title pages. |
 | R22 | Delivered in [PR #149](https://github.com/lieranderl/moviestracker-app/pull/149). | Public store, signed-in HTTP/SSE, emulator races, desktop/Russian mobile browser checks and required CI passed. |
 | R24–R27 | Implemented in supported scope: release comparison, following/upcoming episodes, checkpointed release discovery and web alert preferences/episode alerts. | Compare metadata is not a playback guarantee. Discovery remains bounded by upstream history; episode alerts inspect only the latest aired episode, not all missed episodes. App background discovery remains unsupported. |
-| R28 | Pending: authorized device handoff. | Design reachability and scoped authorization after playback readiness is verified. |
+| R28 | Skipped by user on 3 November 2026. | Do not implement device handoff unless explicitly requested again. |
 | R29–R32 | Pending: household voting, permissions, queue and cross-instance collaboration. | Keep deferred until the individual viewing journey is verified; permissions and persistence must ship with voting. |
 
 Continue watching removal/reset also shipped in
@@ -169,7 +169,7 @@ feature's implementation plan.
 | R25 | P2 / L | Both | R17 | **Series following/calendar:** follow/unfollow a series and show upcoming episodes. Distinguish date-only air dates from timed events; use a timezone only where the provider supplies a time. Handle ended series and unknown dates. |
 | R26 | P2 / L | Web first | R03, R05 | **Durable release discovery:** process feed arrivals using persisted checkpoints and idempotent updates. Catch-up covers user absence within the available feed history; duplicates create no duplicate notifications. State upstream history limits explicitly. |
 | R27 | P2 / M | Both where supported | R25, R26 | **Notification preferences:** in-app notifications first, per-title preferences, and clear labels for air dates versus source availability. Muting prevents future notices; read counts stay consistent with R03. Specify the App's discovery lifecycle before promising background alerts there. |
-| R28 | P3 / L | Both | R12, R18 | **Device handoff:** QR opens the intended title/file using expiring, revocable authorization without embedded TorrServer credentials. A recipient authenticates or has appropriate scoped access; an unreachable server or missing file offers recovery. Existing long-lived share-link behavior is not silently changed. |
+| R28 | Skipped | Both | R12, R18 | **Device handoff:** user explicitly skipped this item on 3 November 2026. Retain the proposal as history; no implementation is scheduled. Existing share-link behavior stays in its supported scope. |
 
 Interface direction: add follow/preferences storage and durable discovery
 checkpoints. Separate airing events from release events. Handoff needs a scoped
@@ -272,15 +272,17 @@ pending, implemented, and deployed status separate in future updates here.
   home-row/trailer initialization and shared magnet-copy data (#153). All required
   checks passed; real home rows and enabled Add were verified on revision00196-wic.
 - Delivered: X02 completion prompt and neutral-gray shared player controls (#154).
-  All required checks passed; revision00198-neg serves all web traffic. Native
+  All required checks passed; revision00198-neg initially served all web traffic. Native
   completion/fullscreen checks used disposable media; production-account playback,
   native WebKit and screen-reader acceptance remain unverified.
-- In progress: local queued-file position repair. Natural advancement incorrectly
-  carried the previous file's position into the next file; same-file stream/audio
-  changes must continue to preserve position.
+- Delivered: local queued-file position repair (#155, merge37ea6d4). New files
+  start at zero; same-file stream/audio changes preserve position. Native browser
+  checks and required CI passed; revision00200-mez serves all web traffic.
+  Desktop installers and container release images still require a separate release.
 - Remaining: full R15/R16 acceptance (including WebKit, screen-reader and actual
-  production-media flows), then R28 device-handoff design and implementation.
-  R29–R32 remain deferred; R09 remains declined.
+  production-media flows), confirmed episode mappings (R18), and the measurement
+  and product-decision follow-ups below. R28 is skipped by the user; R29–R32 remain
+  deferred; R09 remains declined. The plan is not yet complete.
 
 ## Next implementation slice
 
@@ -292,7 +294,6 @@ Recommended sequence; this updates priorities, not approval to implement code:
 | 2 | **R22 saved discovery presets**, P2 / M | Reuse Discover's existing controls; save/apply/rename/delete a named preset without a new discovery screen. Restore media type, genre, year, rating, sort, runtime and language; exclude transient page/reroll state. Test authenticated HTTP/SSE and public store contracts on applicable backends, user isolation, obsolete filters, failed writes, persistence and export/deletion. Confirm those seams and preset limits in the feature plan before code. |
 | 3 | **X01 playback readiness**, P2 / M | Extend the existing source/player controls with reachable server, known format/conversion capabilities and a useful next action. Preserve unknown metadata as unknown and do not begin playback/download as a side effect of checking. Test adapter/provider boundaries and the shared browse-to-play browser journey. Establish available signals before committing to a compatibility verdict. |
 | 4 | **X02 optional completion prompt**, P2 / S | Reuse rating/watch-state/recommendation controls at genuine completion; dismissible, no credits interruption, no automatic rating or autoplay. Confirm the existing completion rule is suitable first; test completion versus seeking/reconnect and duplicate prompts at the player/HTTP boundaries. |
-| 5 | **R28 device handoff**, P3 / L | Specify target devices and network reachability, then expiring/revocable scoped access. QR must not contain TorrServer credentials; unauthorized, expired, unreachable and missing-file cases need a recovery path. |
 
 Two follow-ups need measurement or an explicit product decision before scheduling:
 
