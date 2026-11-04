@@ -137,12 +137,12 @@ func TestEpisodeMappingRejectsInvalidRangesAndUntrustedIdentity(t *testing.T) {
 		name, field, value string
 		status             int
 	}{
-		{"unknown season", "season", "99", 200}, {"zero", "first", "0", 200},
-		{"reversed", "first", "5", 200}, {"missing episode", "last", "5", 200},
-		{"huge range", "last", "9223372036854775807", 200},
-		{"bad hash", "hash", "bad", 400}, {"bad index", "index", "0", 400},
-		{"unknown series", "tv", "0", 400}, {"nonvideo", "file", "notes.txt", 400},
-		{"oversized path", "file", strings.Repeat("a", 4096) + ".mkv", 400},
+		{"unknown season", "season", "99", http.StatusOK}, {"zero", "first", "0", http.StatusOK},
+		{"reversed", "first", "5", http.StatusOK}, {"missing episode", "last", "5", http.StatusOK},
+		{"huge range", "last", "9223372036854775807", http.StatusOK},
+		{"bad hash", "hash", "bad", http.StatusBadRequest}, {"bad index", "index", "0", http.StatusBadRequest},
+		{"unknown series", "tv", "0", http.StatusBadRequest}, {"nonvideo", "file", "notes.txt", http.StatusBadRequest},
+		{"oversized path", "file", strings.Repeat("a", 4096) + ".mkv", http.StatusBadRequest},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			users := store.NewMemory()
@@ -163,7 +163,7 @@ func TestEpisodeMappingRejectsInvalidRangesAndUntrustedIdentity(t *testing.T) {
 	}
 	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodDelete} {
 		h, _ := episodeMappingAPI(t, store.NewMemory(), nil)
-		if res := mappingRequest(t, h, nil, method, mappingParams()); res.Code != 401 {
+		if res := mappingRequest(t, h, nil, method, mappingParams()); res.Code != http.StatusUnauthorized {
 			t.Errorf("signed-out %s=%d", method, res.Code)
 		}
 	}
@@ -178,7 +178,7 @@ func TestEpisodeMappingAcceptsSingleSpecialAndIgnoresForeignOwner(t *testing.T) 
 	p.Set("last", "1")
 	p.Set("uid", "another-account")
 	res := mappingRequest(t, h, cookie, http.MethodPost, p)
-	if res.Code != 200 {
+	if res.Code != http.StatusOK {
 		t.Fatalf("special=%d: %s", res.Code, res.Body)
 	}
 	got, found, err := users.EpisodeMapping(t.Context(), "viewer", p.Get("hash"), 1)
@@ -202,7 +202,7 @@ func TestEpisodeMappingRejectsGapsAndPreservesConfirmationDuringProviderFailure(
 		}
 		h, cookie := episodeMappingAPI(t, users, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if failure {
-				http.Error(w, "offline", 503)
+				http.Error(w, "offline", http.StatusServiceUnavailable)
 				return
 			}
 			if strings.HasSuffix(r.URL.Path, "/season/2") {
@@ -217,7 +217,7 @@ func TestEpisodeMappingRejectsGapsAndPreservesConfirmationDuringProviderFailure(
 		p.Set("last", "3")
 		res := mappingRequest(t, h, cookie, http.MethodPost, p)
 		got, found, err := users.EpisodeMapping(t.Context(), "viewer", kept.Hash, 1)
-		if res.Code != 200 || err != nil || !found || got != kept {
+		if res.Code != http.StatusOK || err != nil || !found || got != kept {
 			t.Fatalf("failed validation replaced record: %+v %v %v %d", got, found, err, res.Code)
 		}
 		if failure {
@@ -255,7 +255,7 @@ func TestDeletedAccountCannotLeaveEpisodeMappingsForReusedUsername(t *testing.T)
 		t.Fatalf("replacement inherited confirmation: %v %v", found, err)
 	}
 	res := mappingRequest(t, l.server, old, http.MethodDelete, mappingParams())
-	if res.Code == 200 {
+	if res.Code == http.StatusOK {
 		t.Fatal("deleted session can mutate mappings")
 	}
 }

@@ -2,7 +2,17 @@ package i18n
 
 // ru translates the interface into Russian, by English text.
 var ru = map[string]string{
-	"No confirmed episodes for this file.":                            "Для этого файла эпизоды не подтверждены.",
+	"No confirmed episodes for this file.": "Для этого файла эпизоды не подтверждены.",
+	"Season":                               "Сезон",
+	"First episode":                        "Первая серия",
+	"Last episode":                         "Последняя серия",
+	"Choose a season":                      "Выберите сезон",
+	"Pick the same episode twice for a single episode.": "Для одной серии выберите её дважды.",
+	"confirmed for this file":                           "подтверждено для этого файла",
+	"From the file name: %s. Not confirmed.":            "По имени файла: %s. Не подтверждено.",
+	"Confirm episodes":                                  "Подтвердить эпизоды",
+	"Edit":                                              "Изменить",
+	"Clear":                                             "Сбросить",
 	"File details are unavailable. Refresh TorrServer and try again.": "Не удалось получить сведения о файле. Обновите TorrServer и попробуйте ещё раз.",
 	"Episode confirmations could not be loaded. Please try again.":    "Не удалось загрузить подтверждённые эпизоды. Попробуйте ещё раз.",
 	"Episode details could not be loaded. Please try again.":          "Не удалось загрузить сведения об эпизодах. Попробуйте ещё раз.",

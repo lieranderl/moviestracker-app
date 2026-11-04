@@ -229,7 +229,7 @@ func (m *EpisodeMappings) handleClear(w http.ResponseWriter, r *http.Request) {
 	read := r.Clone(r.Context())
 	read.Method = http.MethodGet
 	v = m.load(read, uid, v, p)
-	v.Focus = true
+	v.Focus, v.Editing = true, false
 	if err != nil {
 		slog.Warn("clearing episode confirmation failed", "error", logError(err))
 		v.Problem = i18n.T(r.Context(), "Episode confirmation could not be cleared. Please try again.")

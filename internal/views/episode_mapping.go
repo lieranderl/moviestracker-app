@@ -37,3 +37,18 @@ type EpisodeMappingView struct {
 	FromFilename   bool
 	Stale          bool
 }
+
+// episodeRange names one episode (S02E03) or a range in one season (S02E03–E04).
+func episodeRange(season, first, last int) string {
+	if first == last {
+		return fmt.Sprintf("S%02dE%02d", season, first)
+	}
+	return fmt.Sprintf("S%02dE%02d–E%02d", season, first, last)
+}
+
+func episodeLabel(number int, name string) string {
+	if name == "" {
+		return fmt.Sprintf("E%02d", number)
+	}
+	return fmt.Sprintf("E%02d · %s", number, name)
+}
