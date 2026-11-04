@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"sync"
@@ -104,21 +105,29 @@ func (f *EpisodeFile) MarkEpisodes(_ context.Context, uid string, tvID, season i
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	series := f.users[uid]
+	users := maps.Clone(f.users)
+	if users == nil {
+		users = map[string]map[string]seriesEpisodes{}
+	}
+	series := maps.Clone(users[uid])
 	if series == nil {
 		series = map[string]seriesEpisodes{}
-		f.users[uid] = series
 	}
 	key := strconv.Itoa(tvID)
-	if series[key] == nil {
-		series[key] = seriesEpisodes{}
+	seasons := maps.Clone(series[key])
+	if seasons == nil {
+		seasons = seriesEpisodes{}
 	}
-	series[key].mark(season, episodes, watched)
-	if len(series[key]) == 0 {
+	seasons.mark(season, episodes, watched)
+	if len(seasons) == 0 {
 		delete(series, key)
+	} else {
+		series[key] = seasons
 	}
-	if err := writeJSONFile(f.path, f.users); err != nil {
+	users[uid] = series
+	if err := writeJSONFile(f.path, users); err != nil {
 		return fmt.Errorf("save watched episodes: %w", err)
 	}
+	f.users = users
 	return nil
 }

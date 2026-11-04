@@ -308,13 +308,19 @@ func (p *Progress) handleSave(w http.ResponseWriter, r *http.Request) {
 	if p.watched != nil && rec.Finished() && rec.Kind == "movie" {
 		p.watched.markWatched(r, uid, rec.TMDBID, rec.Title)
 	}
+	var episodeErr error
 	if p.episodes != nil && rec.Finished() && rec.Kind == "tv" {
-		p.episodes.markFinished(ctx, uid, rec.TMDBID, rec.File)
+		episodeErr = p.episodes.markFinished(ctx, uid, rec)
 	}
 	if p.timecodes != nil {
 		if err := p.timecodes().SetViewed(ctx, data.Hash, data.Index, math.Floor(data.Position)); err != nil {
 			slog.Warn("telling TorrServer the timecode failed", "error", err)
 		}
+	}
+	if episodeErr != nil {
+		slog.Warn("marking a finished episode watched failed", "error", logError(episodeErr))
+		http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

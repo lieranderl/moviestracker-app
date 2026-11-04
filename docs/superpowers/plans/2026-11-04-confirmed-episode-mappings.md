@@ -64,10 +64,10 @@
 
 **Interfaces:** `func (e *Episodes) UseFileMappings(s store.EpisodeMappingStore)` opts the existing episode service into mapping lookup. Replace its private `markFinished` input with `(ctx context.Context, uid string, p store.Progress) error`; Progress passes the accepted canonical file record. Existing `MarkFinishedEpisodesIn` public wiring remains.
 
-- [ ] Add HTTP capability `TestFinishingConfirmedFileMarksItsCanonicalEpisodeRange`: save a mapping for an uncertain filename to series95396/S02E03–04; unfinished progress changes no episode; a subsequent finished report marks3and4 only, preserves another watched episode and file resume, and never marks the whole series. Verify red, implement minimum, rerun green.
-- [ ] Add one behavior at a time: confirmed mapping overrides a misleading exact filename; another hash/index/account or inconsistent known series/path cannot use it; no record retains existing exact-filename behavior; uncertain/no mapping changes none. No confirmation Save backfills past progress.
-- [ ] Add a public failure test through an unavailable external persistence boundary: failed mapping lookup marks nothing instead of falling back; progress remains saved. Return/report failure through the existing progress error path and make retry idempotent. Do not mock Episodes or other domain packages.
-- [ ] Run `go test -race ./internal/handlers ./internal/web -run 'Episode|Progress' -count=1` and commit: `feat(episodes): apply confirmed mappings at file completion`.
+- [x] Add HTTP capability `TestFinishingConfirmedFileMarksItsCanonicalEpisodeRange`: save a mapping for an uncertain filename to series95396/S02E03–04; unfinished progress changes no episode; a subsequent finished report marks3and4 only, preserves another watched episode and file resume, and never marks the whole series. Verify red, implement minimum, rerun green.
+- [x] Add one behavior at a time: confirmed mapping overrides a misleading exact filename; another hash/index/account or inconsistent known series/path cannot use it; no record retains existing exact-filename behavior; uncertain/no mapping changes none. No confirmation Save backfills past progress.
+- [x] Add a public failure test through an unavailable external persistence boundary: failed mapping lookup marks nothing instead of falling back; progress remains saved. Return/report failure through the existing progress error path and make retry idempotent. Do not mock Episodes or other domain packages.
+- [x] Run `go test -race ./internal/handlers ./internal/web -run 'Episode|Progress' -count=1` and commit: `feat(episodes): apply confirmed mappings at file completion`.
 
 ### Task 4: Authenticated confirmation routes and local account fencing
 
