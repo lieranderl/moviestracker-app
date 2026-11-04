@@ -67,8 +67,9 @@ type Server struct {
 	live               *live.Hub                         // shared pollers behind every live view
 	progress           *Progress                         // where each account stopped watching
 	titleStates        *TitleStates                      // what each account wants to watch or watched
-	presetAccounts     sync.RWMutex
+	accountData        sync.RWMutex
 	localPresets       *store.DiscoveryPresetFile
+	localMappings      *store.EpisodeMappingFile
 	customLists        *CustomLists        // the lists each account makes
 	reviews            *Reviews            // each account's ratings and notes
 	episodes           *Episodes           // each account's watched episodes
@@ -151,7 +152,7 @@ func NewServer(cfg Config) (*Server, error) {
 	}
 	s.localPresets = presets
 	presetHandlers := NewDiscoveryPresets(presets, s.username, s.Catalog)
-	presetHandlers.guard = &s.presetAccounts
+	presetHandlers.guard = &s.accountData
 	s.KeepDiscoveryPresets(presetHandlers)
 	progress, err := store.OpenProgressFile(filepath.Join(cfg.Store.Dir(), "progress.json"))
 	if err != nil {
@@ -172,6 +173,12 @@ func NewServer(cfg Config) (*Server, error) {
 		return nil, err
 	}
 	s.episodes = NewEpisodes(episodes, s.username, s.Catalog)
+	mappings, err := store.OpenEpisodeMappingFile(filepath.Join(cfg.Store.Dir(), "episode-mappings.json"))
+	if err != nil {
+		return nil, err
+	}
+	s.localMappings = mappings
+	s.episodes.UseFileMappings(mappings)
 	follows, err := store.OpenFollowFile(filepath.Join(cfg.Store.Dir(), "follows.json"))
 	if err != nil {
 		return nil, err
@@ -352,6 +359,9 @@ func (s *Server) routes() {
 	s.customLists.Register(s.mux)
 	s.reviews.Register(s.mux)
 	s.episodes.Register(s.mux)
+	mappingHandlers := NewEpisodeMappings(s.localMappings, s.username, s.Catalog, s.progressTorrent)
+	mappingHandlers.guard = &s.accountData
+	mappingHandlers.Register(s.mux)
 	library := NewLibrary(s.titleStates.store, nil, nil)
 	library.Consider(s.feedback, s.reviews.store)
 	NewRecommendations(library, s.username, s.Catalog).Register(s.mux)

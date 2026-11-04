@@ -1,0 +1,117 @@
+package views
+
+import "fmt"
+
+// EpisodeMappingPanel is the file menu's episode section, shared by the app
+// and the web. Its form names the file and the dialog request it answers,
+// never an account or a TorrServer address: the server takes the account
+// from the session. Its requests all come from the form, so a newer season
+// load aborts an older one.
+templ EpisodeMappingPanel(v EpisodeMappingView) {
+	<section
+		class="space-y-2"
+		aria-labelledby="episode-mapping-title"
+		data-show={ fmt.Sprintf("$_mappingEpoch === %d", v.Context.Request) }
+		data-init={ fmt.Sprintf("$_mappingReadyEpoch = %d; $_mappingFailed = 0", v.Context.Request) }
+	>
+		<h4 id="episode-mapping-title" class="text-xs font-bold uppercase tracking-wider text-base-content/70">{ tr(ctx, "Episodes") }</h4>
+		if v.Series != nil {
+			<p class="text-sm font-medium">{ v.Series.Title }</p>
+		}
+		if v.Problem != "" {
+			<div
+				role="alert"
+				tabindex="-1"
+				class="alert alert-warning alert-soft text-sm"
+				if v.Focus {
+					data-init="el.focus()"
+				}
+			>{ v.Problem }</div>
+		}
+		if v.Message != "" {
+			<p
+				role="status"
+				tabindex="-1"
+				class="text-sm"
+				if v.Focus && v.Problem == "" {
+					data-init="el.focus()"
+				}
+			>{ v.Message }</p>
+		}
+		<form
+			id="episode-mapping-form"
+			class="space-y-2"
+			data-indicator:_mapping-busy
+			data-on:change="evt.target.name === 'season' && @get('/api/episodes/mapping', {contentType: 'form'})"
+			data-on:submit="@post('/api/episodes/mapping', {contentType: 'form'})"
+		>
+			<input type="hidden" name="hash" value={ v.Context.Hash }/>
+			<input type="hidden" name="index" value={ fmt.Sprint(v.Context.Index) }/>
+			<input type="hidden" name="file" value={ v.Context.File }/>
+			<input type="hidden" name="tv" value={ fmt.Sprint(v.Context.TMDBID) }/>
+			<input type="hidden" name="key" value={ fmt.Sprint(v.Context.Request) }/>
+			if v.Editing && v.Series != nil && !v.Blocked {
+				<input type="hidden" name="editing" value="1"/>
+				<fieldset class="fieldset">
+					<label class="fieldset-legend" for="episode-mapping-season">{ tr(ctx, "Season") }</label>
+					<select id="episode-mapping-season" name="season" class="select select-sm w-full" data-attr:disabled="$_mappingBusy">
+						if v.SelectedSeason < 0 {
+							<option value="" selected>{ tr(ctx, "Choose a season") }</option>
+						}
+						for _, s := range v.Series.Seasons {
+							<option value={ fmt.Sprint(s.Number) } selected?={ s.Number == v.SelectedSeason }>{ seasonLabel(ctx, s) }</option>
+						}
+					</select>
+				</fieldset>
+				if v.Season != nil {
+					<div class="grid grid-cols-2 gap-2">
+						@episodeChoice("episode-mapping-first", "first", tr(ctx, "First episode"), v, v.First)
+						@episodeChoice("episode-mapping-last", "last", tr(ctx, "Last episode"), v, v.Last)
+					</div>
+					<p class="text-xs text-base-content/70">{ tr(ctx, "Pick the same episode twice for a single episode.") }</p>
+				}
+				<div class="flex flex-wrap items-center gap-2">
+					if v.Season != nil {
+						<button type="submit" class="btn btn-sm btn-primary" data-attr:disabled="$_mappingBusy">{ tr(ctx, "Save") }</button>
+					}
+					if v.Saved != nil {
+						@clearMapping()
+					}
+				</div>
+			} else if v.Saved != nil {
+				<p class="text-sm"><span class="badge badge-sm badge-primary font-mono">{ episodeRange(v.Saved.Season, v.Saved.First, v.Saved.Last) }</span> { tr(ctx, "confirmed for this file") }</p>
+				<div class="flex flex-wrap items-center gap-2">
+					@editMapping(tr(ctx, "Edit"))
+					@clearMapping()
+				</div>
+			} else if !v.Blocked {
+				if v.FromFilename {
+					<p class="text-sm">{ trf(ctx, "From the file name: %s. Not confirmed.", episodeRange(v.SelectedSeason, v.First, v.Last)) }</p>
+				} else {
+					<p class="text-sm text-base-content/70">{ tr(ctx, "No confirmed episodes for this file.") }</p>
+				}
+				@editMapping(tr(ctx, "Confirm episodes"))
+			}
+		</form>
+	</section>
+}
+
+templ episodeChoice(id, name, label string, v EpisodeMappingView, selected int) {
+	<fieldset class="fieldset">
+		<label class="fieldset-legend" for={ id }>{ label }</label>
+		<select id={ id } name={ name } class="select select-sm w-full" data-attr:disabled="$_mappingBusy">
+			for _, e := range v.Season.Episodes {
+				<option value={ fmt.Sprint(e.Number) } selected?={ e.Number == selected }>{ episodeLabel(e.Number, e.Name) }</option>
+			}
+		</select>
+	</fieldset>
+}
+
+templ editMapping(label string) {
+	<button type="button" name="editing" value="1" class="btn btn-sm btn-outline btn-primary" data-attr:disabled="$_mappingBusy" data-on:click="@get('/api/episodes/mapping', {contentType: 'form'})">{ label }</button>
+}
+
+// clearMapping forgets only this file's confirmation; watched episodes stay.
+templ clearMapping() {
+	<button type="button" class="btn btn-sm btn-ghost" data-attr:disabled="$_mappingBusy" data-on:click="@delete('/api/episodes/mapping', {contentType: 'form'})">{ tr(ctx, "Clear") }</button>
+}

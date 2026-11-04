@@ -43,6 +43,7 @@ type memoryUser struct {
 	feedback    map[string]feedbackEntry
 	follows     map[int]FollowedSeries // by series ID
 	presets     map[string]DiscoveryPreset
+	mappings    map[string]EpisodeMapping
 }
 
 // NewMemory returns an empty in-memory store.
@@ -598,6 +599,7 @@ func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error)
 		Reviews: slices.Collect(maps.Values(u.reviews)), Episodes: u.watchedEpisodes(),
 		Follows: follows, Feedback: feedback, MutedAlerts: choices.MutedAlerts, AlertFeeds: choices.AlertFeeds,
 		DiscoveryPresets: discoveryPresetList(u.presets),
+		EpisodeMappings:  slices.Collect(maps.Values(u.mappings)),
 	}, nil
 }
 

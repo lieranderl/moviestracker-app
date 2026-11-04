@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,7 +29,7 @@ func torrPageSignals(connected, gst, gstKnown, canRemove bool, linkOrigin string
 	_audioMenu: false, _subMenu: false, audioLang: localStorage.getItem('torrAudioLang') || '',
 	addModalOpen: false,
 	probeOpen: false, probeHash: '', probeIndex: 1, probeLoading: false,
-	fileMenuOpen: false, _file: {hash: '', index: 1, title: '', format: '', clean: '', hls: '', video: false},
+	fileMenuOpen: false, _file: {hash: '', index: 1, title: '', format: '', clean: '', hls: '', video: false, tv: 0}, _mappingEpoch: 0, _mappingReadyEpoch: 0, _mappingFailed: 0,
 	confirmOpen: false, confirmHash: '', confirmName: '',
 	filterQuery: '', toast: '', toastError: false
 `+completionSignals+`}`, connected, gst, gstKnown, canRemove, origin)
@@ -150,9 +151,12 @@ func openPlayer(ctx context.Context, player, name, link string) string {
 }
 
 // openFileMenu opens a file row's menu from its button's dataset d; clean and
-// hls are expressions for the file's links as players open them.
+// hls are expressions for the file's links as players open them. A known
+// series' video also asks for its confirmed episodes, keyed by a new epoch so
+// a reply for a file opened earlier finds no section to fill.
 func openFileMenu(clean, hls string) string {
-	return `$_file = {hash: d.hash, index: +d.index, title: d.path, format: d.format || '', clean: ` + clean + `, hls: ` + hls + `, video: d.video === 'true'}; $fileMenuOpen = true`
+	return `$_file = {hash: d.hash, index: +d.index, title: d.path, format: d.format || '', clean: ` + clean + `, hls: ` + hls + `, video: d.video === 'true', tv: +d.tv || 0}; $fileMenuOpen = true; $_mappingEpoch++
+if ($_file.video && $_file.tv > 0) { @get('/api/episodes/mapping?' + new URLSearchParams({hash: $_file.hash, index: $_file.index, file: $_file.title, tv: $_file.tv, key: $_mappingEpoch}), {filterSignals: {include: /^$/}}) }`
 }
 
 // torrPlayback (re)starts the stream once the audio track is known: right
@@ -608,7 +612,7 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 						<ul class="divide-y divide-base-content/10">
 							{{ shared := filesFolder(t.FileStats) }}
 							for _, f := range t.FileStats {
-								@torrentFileRow(links, t.Hash, f, fileFolder(f, shared))
+								@torrentFileRow(links, t.Hash, f, fileFolder(f, shared), seriesID(links, t))
 							}
 						</ul>
 						<div class="mt-3 pt-3 border-t border-base-content/10 flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -673,7 +677,24 @@ templ torrStat(title, value, tone string) {
 	</div>
 }
 
-templ torrentFileRow(links StreamLinks, hash string, f torrserver.FileStat, folder string) {
+// seriesID is the torrent's TMDB series, or 0 for a movie or an unknown title:
+// from TorrServer's data, else from the title page the app matched itself.
+func seriesID(links StreamLinks, t torrserver.Torrent) int {
+	if kind, id := t.TMDB(); kind != "" {
+		if kind == "tv" {
+			return id
+		}
+		return 0
+	}
+	if href, _, _ := titlePage(links, t.Hash); strings.HasPrefix(href, "/tv/") {
+		if id, err := strconv.Atoi(strings.TrimPrefix(href, "/tv/")); err == nil && id > 0 {
+			return id
+		}
+	}
+	return 0
+}
+
+templ torrentFileRow(links StreamLinks, hash string, f torrserver.FileStat, folder string, tv int) {
 	{{
 		isVideo := torrserver.IsVideoFile(f.Path)
 		code := torrserver.EpisodeCode(f.Path)
@@ -715,6 +736,7 @@ templ torrentFileRow(links StreamLinks, hash string, f torrserver.FileStat, fold
 				data-action="more"
 				{ playAttrs(hash, f, clean, hls)... }
 				data-video={ fmt.Sprint(isVideo) }
+				data-tv={ fmt.Sprint(tv) }
 				class="btn btn-xs btn-ghost btn-square"
 				aria-label={ tr(ctx, "More for this file") }
 				title={ tr(ctx, "Open in VLC or IINA, copy links, inspect tracks") }
@@ -1203,6 +1225,15 @@ templ torrFileMenuFor(browser bool) {
 			</form>
 		</header>
 		@playbackReadiness(browser)
+		<div
+			class="mt-4"
+			data-show="$_file.video && $_file.tv > 0"
+			data-on:datastar-fetch="evt.detail.type === 'error' && $fileMenuOpen && ($_mappingReadyEpoch !== $_mappingEpoch || el.contains(evt.detail.el)) && ($_mappingFailed = $_mappingEpoch)"
+		>
+			<span class="loading loading-spinner loading-sm" aria-label={ tr(ctx, "Loading") } data-show="$_mappingReadyEpoch !== $_mappingEpoch && $_mappingFailed !== $_mappingEpoch"></span>
+			<div role="alert" class="alert alert-warning alert-soft text-sm mb-2" data-show="$_mappingFailed === $_mappingEpoch">{ tr(ctx, "Episode confirmations could not be loaded. Please try again.") }</div>
+			<div id="episode-mapping" data-attr:data-file-key="$_file.hash + '-' + $_file.index + '-' + $_mappingEpoch"></div>
+		</div>
 		<section class="mt-4 space-y-2" data-show="$_file.video">
 			<h4 class="text-xs font-bold uppercase tracking-wider text-base-content/70">{ tr(ctx, "Open in a player") }</h4>
 			<div class="flex flex-wrap items-center gap-2">

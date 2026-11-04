@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -16,9 +17,10 @@ import (
 
 // Episodes lets users mark the episodes of a series watched, for both apps.
 type Episodes struct {
-	store   store.EpisodeStore
-	user    func(*http.Request) (uid string, ok bool)
-	catalog *Catalog
+	store    store.EpisodeStore
+	user     func(*http.Request) (uid string, ok bool)
+	catalog  *Catalog
+	mappings store.EpisodeMappingStore
 }
 
 // NewEpisodes keeps users' watched episodes in s and shows them on the
@@ -28,6 +30,9 @@ func NewEpisodes(s store.EpisodeStore, user func(*http.Request) (string, bool), 
 	catalog.episodes = e
 	return e
 }
+
+// UseFileMappings connects explicitly confirmed file associations to completion.
+func (e *Episodes) UseFileMappings(s store.EpisodeMappingStore) { e.mappings = s }
 
 // Register adds the episode routes to mux.
 func (e *Episodes) Register(mux *http.ServeMux) {
@@ -198,18 +203,31 @@ func airedEpisodes(s *tmdb.Season) []int {
 	return out
 }
 
-// markFinished marks the episodes a finished file's name gives exactly
-// watched in series tvID; a file whose episode is uncertain marks nothing.
-func (e *Episodes) markFinished(ctx context.Context, uid string, tvID int, file string) {
-	season, from, to, exact := torrserver.ExactEpisodes(file)
-	if !exact || tvID <= 0 {
-		return
+// markFinished prefers the account's confirmed file association, otherwise
+// using only an exact filename. A stale association cannot mark another title.
+func (e *Episodes) markFinished(ctx context.Context, uid string, p store.Progress) error {
+	if p.TMDBID <= 0 {
+		return nil
+	}
+	season, from, to, exact := torrserver.ExactEpisodes(p.File)
+	if e.mappings != nil {
+		m, found, err := e.mappings.EpisodeMapping(ctx, uid, p.Hash, p.Index)
+		if err != nil {
+			return fmt.Errorf("read confirmed episode mapping: %w", err)
+		}
+		if found {
+			if m.TMDBID != p.TMDBID || m.File != p.File {
+				return nil
+			}
+			season, from, to, exact = m.Season, m.First, m.Last, true
+		}
+	}
+	if !exact {
+		return nil
 	}
 	episodes := make([]int, 0, to-from+1)
 	for n := from; n <= to; n++ {
 		episodes = append(episodes, n)
 	}
-	if err := e.store.MarkEpisodes(ctx, uid, tvID, season, episodes, true); err != nil {
-		slog.Warn("marking a finished episode watched failed", "error", logError(err))
-	}
+	return e.store.MarkEpisodes(ctx, uid, p.TMDBID, season, episodes, true)
 }

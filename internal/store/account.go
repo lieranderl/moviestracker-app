@@ -26,6 +26,7 @@ type Account struct {
 	// Feedback is the recommendation feedback given, by kind.
 	Feedback         map[Feedback][]TitleRef `json:"recommendationFeedback"`
 	DiscoveryPresets []DiscoveryPreset       `json:"discoveryPresets"`
+	EpisodeMappings  []EpisodeMapping        `json:"episodeMappings"`
 }
 
 // AccountStore hands users everything kept for them, and deletes it.
