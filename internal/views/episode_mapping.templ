@@ -1,0 +1,24 @@
+package views
+
+import "fmt"
+
+// EpisodeMappingPanel contains no account identity or browser credentials.
+templ EpisodeMappingPanel(v EpisodeMappingView) {
+	<section class="space-y-2" data-show={ fmt.Sprintf("$fileMenuOpen && $_mappingEpoch === %d", v.Context.Request) } data-init={ fmt.Sprintf("$_mappingReadyEpoch = %d", v.Context.Request) }>
+		<h4 class="text-sm font-semibold">{ tr(ctx, "Episodes") }</h4>
+		if v.Series != nil {
+			<p class="text-sm">{ v.Series.Title }</p>
+		}
+		if v.Problem != "" {
+			<div role="alert" class="alert alert-warning alert-soft text-sm">{ v.Problem }</div>
+		}
+		if v.Message != "" {
+			<p role="status" class="text-sm">{ v.Message }</p>
+		}
+		if v.Saved != nil {
+			<p class="text-sm font-mono">{ fmt.Sprintf("S%02dE%02d–E%02d", v.Saved.Season, v.Saved.First, v.Saved.Last) }</p>
+		} else if v.Problem == "" {
+			<p class="text-sm text-base-content/70">{ tr(ctx, "No confirmed episodes for this file.") }</p>
+		}
+	</section>
+}

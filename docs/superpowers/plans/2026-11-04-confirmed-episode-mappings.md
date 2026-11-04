@@ -73,12 +73,12 @@
 
 **Interfaces:** `NewEpisodeMappings(s store.EpisodeMappingStore, user func(*http.Request) (string, bool), catalog *Catalog, torrent func(context.Context, string) (torrserver.Torrent, bool)) *EpisodeMappings`; `Register(mux *http.ServeMux)` registers `GET/POST/DELETE /api/episodes/mapping`. GET renders the panel/options; POST explicitly saves; DELETE clears. A local torrent resolver verifies current metadata; web resolver is nil and validates browser-supplied account-owned context. Local handlers share the existing account-data mutex with username create/delete and preset operations.
 
-- [ ] Add signed-in HTTP `TestUserCanConfirmOneEpisodeOrRange`: GET known series/file, POST season2/3–4, keyed store read equals submitted canonical range. Save itself leaves watched episodes and progress unchanged. Establish red, implement validation/save, green.
-- [ ] Add validation/failure cycles: season0 special; equal first/last; missing/gapped episodes; reversed/huge range; malformed file identity; provider failure; persistence failure; signed-out requests; supplied foreign UID ignored. Validate membership before allocating a range. Preserve the previous confirmed record on any failure.
-- [ ] Add GET/DELETE behavior: existing saved record shown; explicit clear returns to labeled filename fallback/unconfirmed; no history reversal or seek change. Use existing body limits, CSRF/middleware, deadlines, safe logging and no-store headers.
-- [ ] Wire Memory/Firestore to actual web routes and local JSON to actual app routes. Rename/extend the existing `presetAccounts` guard to an account-data guard shared by mappings/presets/user create/delete; hold read lock while rechecking authentication and mutating local mappings.
-- [ ] Add local public lifecycle tests: deletion cleanup plus recreating the same username exposes no old mapping; concurrent late requests cannot repopulate it; failed cleanup is retriable before username reuse. Preserve preset behavior.
-- [ ] Run `go test -race ./internal/handlers ./internal/web -run 'EpisodeMapping|Confirmed|User|Account' -count=1`; commit: `feat(episodes): add account-scoped confirmation routes`.
+- [x] Add signed-in HTTP `TestUserCanConfirmOneEpisodeOrRange`: GET known series/file, POST season2/3–4, keyed store read equals submitted canonical range. Save itself leaves watched episodes and progress unchanged. Establish red, implement validation/save, green.
+- [x] Add validation/failure cycles: season0 special; equal first/last; missing/gapped episodes; reversed/huge range; malformed file identity; provider failure; persistence failure; signed-out requests; supplied foreign UID ignored. Validate membership before allocating a range. Preserve the previous confirmed record on any failure.
+- [x] Add GET/DELETE behavior: existing saved record shown; explicit clear returns to labeled filename fallback/unconfirmed; no history reversal or seek change. Use existing body limits, CSRF/middleware, deadlines, safe logging and no-store headers.
+- [x] Wire Memory/Firestore to actual web routes and local JSON to actual app routes. Rename/extend the existing `presetAccounts` guard to an account-data guard shared by mappings/presets/user create/delete; hold read lock while rechecking authentication and mutating local mappings.
+- [x] Add local public lifecycle tests: deletion cleanup plus recreating the same username exposes no old mapping; concurrent late requests cannot repopulate it; failed cleanup is retriable before username reuse. Preserve preset behavior.
+- [x] Run `go test -race ./internal/handlers ./internal/web -run 'EpisodeMapping|Confirmed|User|Account' -count=1`; commit: `feat(episodes): add account-scoped confirmation routes`.
 
 ### Task 5: Shared file menu and full browser behavior
 

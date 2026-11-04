@@ -202,6 +202,24 @@ func TestUnconfirmedFilesKeepExactFilenameBehavior(t *testing.T) {
 
 func confirmedProgress(t *testing.T, users *store.Memory, mappings store.EpisodeMappingStore, uid string, episodeStores ...store.EpisodeStore) (http.Handler, *http.Cookie) {
 	t.Helper()
+	user, owner, cookie := episodeTestAuth(t, uid)
+	catalog := handlers.NewCatalog(func() *sources.Clients { return &sources.Clients{} }, user, "/login", time.Second)
+	var episodeStore store.EpisodeStore = users
+	if len(episodeStores) > 0 {
+		episodeStore = episodeStores[0]
+	}
+	episodes := handlers.NewEpisodes(episodeStore, owner, catalog)
+	episodes.UseFileMappings(mappings)
+	progress := handlers.NewProgress(users, owner, nil)
+	progress.MarkFinishedEpisodesIn(episodes)
+	progress.MarkFinishedMoviesIn(handlers.NewTitleStates(users, owner, catalog))
+	mux := http.NewServeMux()
+	progress.Register(mux)
+	return mux, cookie
+}
+
+func episodeTestAuth(t *testing.T, uid string) (func(*http.Request) *auth.User, func(*http.Request) (string, bool), *http.Cookie) {
+	t.Helper()
 	sessions := auth.NewSessionManager(8, rand.Reader)
 	t.Cleanup(sessions.Close)
 	token, err := sessions.CreateSession(&auth.User{Username: uid, Name: uid})
@@ -221,19 +239,7 @@ func confirmedProgress(t *testing.T, users *store.Memory, mappings store.Episode
 		}
 		return "", false
 	}
-	catalog := handlers.NewCatalog(func() *sources.Clients { return &sources.Clients{} }, user, "/login", time.Second)
-	var episodeStore store.EpisodeStore = users
-	if len(episodeStores) > 0 {
-		episodeStore = episodeStores[0]
-	}
-	episodes := handlers.NewEpisodes(episodeStore, owner, catalog)
-	episodes.UseFileMappings(mappings)
-	progress := handlers.NewProgress(users, owner, nil)
-	progress.MarkFinishedEpisodesIn(episodes)
-	progress.MarkFinishedMoviesIn(handlers.NewTitleStates(users, owner, catalog))
-	mux := http.NewServeMux()
-	progress.Register(mux)
-	return mux, &http.Cookie{
+	return user, owner, &http.Cookie{
 		Name: auth.SessionCookieName, Value: token,
 		Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode,
 	}
