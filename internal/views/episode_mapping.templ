@@ -12,7 +12,7 @@ templ EpisodeMappingPanel(v EpisodeMappingView) {
 		class="space-y-2"
 		aria-labelledby="episode-mapping-title"
 		data-show={ fmt.Sprintf("$_mappingEpoch === %d", v.Context.Request) }
-		data-init={ fmt.Sprintf("$_mappingReadyEpoch = %d", v.Context.Request) }
+		data-init={ fmt.Sprintf("$_mappingReadyEpoch = %d; $_mappingFailed = 0", v.Context.Request) }
 	>
 		<h4 id="episode-mapping-title" class="text-xs font-bold uppercase tracking-wider text-base-content/70">{ tr(ctx, "Episodes") }</h4>
 		if v.Series != nil {
@@ -108,10 +108,10 @@ templ episodeChoice(id, name, label string, v EpisodeMappingView, selected int) 
 }
 
 templ editMapping(label string) {
-	<button type="button" name="editing" value="1" class="btn btn-sm btn-outline btn-primary" data-on:click="@get('/api/episodes/mapping', {contentType: 'form'})">{ label }</button>
+	<button type="button" name="editing" value="1" class="btn btn-sm btn-outline btn-primary" data-attr:disabled="$_mappingBusy" data-on:click="@get('/api/episodes/mapping', {contentType: 'form'})">{ label }</button>
 }
 
 // clearMapping forgets only this file's confirmation; watched episodes stay.
 templ clearMapping() {
-	<button type="button" class="btn btn-sm btn-ghost" data-on:click="@delete('/api/episodes/mapping', {contentType: 'form'})">{ tr(ctx, "Clear") }</button>
+	<button type="button" class="btn btn-sm btn-ghost" data-attr:disabled="$_mappingBusy" data-on:click="@delete('/api/episodes/mapping', {contentType: 'form'})">{ tr(ctx, "Clear") }</button>
 }

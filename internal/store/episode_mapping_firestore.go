@@ -28,7 +28,7 @@ func (f *Firestore) EpisodeMapping(ctx context.Context, uid, hash string, index 
 	if err := snap.DataTo(&m); err != nil {
 		return EpisodeMapping{}, false, fmt.Errorf("read episode mapping: %w", err)
 	}
-	return m, true, nil
+	return servedEpisodeMapping(uid, m, true)
 }
 
 // SaveEpisodeMapping implements EpisodeMappingStore.

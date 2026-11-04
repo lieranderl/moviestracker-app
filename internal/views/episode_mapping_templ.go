@@ -51,9 +51,9 @@ func EpisodeMappingPanel(v EpisodeMappingView) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
-		templ_7745c5c3_Var3, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("$_mappingReadyEpoch = %d", v.Context.Request)).Resolve(ctx)
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("$_mappingReadyEpoch = %d; $_mappingFailed = 0", v.Context.Request)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/episode_mapping.templ`, Line: 15, Col: 72}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/episode_mapping.templ`, Line: 15, Col: 93}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 		if templ_7745c5c3_Err != nil {
@@ -607,14 +607,14 @@ func editMapping(label string) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<button type=\"button\" name=\"editing\" value=\"1\" class=\"btn btn-sm btn-outline btn-primary\" data-on:click=\"@get('/api/episodes/mapping', {contentType: 'form'})\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<button type=\"button\" name=\"editing\" value=\"1\" class=\"btn btn-sm btn-outline btn-primary\" data-attr:disabled=\"$_mappingBusy\" data-on:click=\"@get('/api/episodes/mapping', {contentType: 'form'})\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var31 string
 		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/episode_mapping.templ`, Line: 111, Col: 167}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/episode_mapping.templ`, Line: 111, Col: 202}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 		if templ_7745c5c3_Err != nil {
@@ -646,14 +646,14 @@ func clearMapping() templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<button type=\"button\" class=\"btn btn-sm btn-ghost\" data-on:click=\"@delete('/api/episodes/mapping', {contentType: 'form'})\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<button type=\"button\" class=\"btn btn-sm btn-ghost\" data-attr:disabled=\"$_mappingBusy\" data-on:click=\"@delete('/api/episodes/mapping', {contentType: 'form'})\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var33 string
 		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Clear"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/episode_mapping.templ`, Line: 116, Col: 142}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/episode_mapping.templ`, Line: 116, Col: 177}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {

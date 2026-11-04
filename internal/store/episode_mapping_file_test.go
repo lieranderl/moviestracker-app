@@ -115,3 +115,19 @@ func TestConfirmedMappingAccountCleanupPreservesOtherAccounts(t *testing.T) {
 		t.Errorf("other account mapping changed: %+v, found=%v, err=%v", got, found, err)
 	}
 }
+
+// A record edited by hand into an impossible range fails closed on read
+// rather than reaching episode marking.
+func TestAHandEditedOversizedMappingIsNotServed(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "episode-mappings.json")
+	if err := os.WriteFile(path, []byte(`{"viewer":{"aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111-1":{"hash":"aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111","index":1,"file":"episode.mp4","tmdbId":95396,"season":2,"first":1,"last":2000000000}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f, err := store.OpenEpisodeMappingFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, found, err := f.EpisodeMapping(t.Context(), "viewer", "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111", 1); err == nil {
+		t.Errorf("served an impossible range: %+v found=%v", got, found)
+	}
+}

@@ -19,10 +19,21 @@ import (
 func TestBothFileMenusOfferEpisodeConfirmationForKnownSeriesFiles(t *testing.T) {
 	for app, page := range map[string]string{"local": torrPage(t, true), "web": html.UnescapeString(render(t, views.WebTorrServerPage(testUser, nil, nil)))} {
 		menu := regexp.MustCompile(`(?s)<dialog id="torr-file-menu".*?</dialog>`).FindString(page)
-		section := regexp.MustCompile(`(?s)<div\s+id="episode-mapping".*?></div>`).FindString(menu)
-		for _, want := range []string{`data-show="$_file.video && $_file.tv > 0"`, `data-attr:data-file-key="$_file.hash + '-' + $_file.index + '-' + $_mappingEpoch"`} {
-			if !strings.Contains(section, want) {
-				t.Errorf("%s menu's episode section lacks %s: %q", app, want, section)
+		if !strings.Contains(menu, `data-show="$_file.video && $_file.tv > 0"`) {
+			t.Errorf("%s menu shows its episode section for every file", app)
+		}
+		if !strings.Contains(menu, `<div id="episode-mapping" data-attr:data-file-key="$_file.hash + '-' + $_file.index + '-' + $_mappingEpoch"></div>`) {
+			t.Errorf("%s menu's episode section is not bound to the opened file", app)
+		}
+		// A reply that is no SSE (an expired session's 401) cannot fill the
+		// section, so a failed request shows an error instead of loading forever.
+		for _, want := range []string{
+			`data-on:datastar-fetch="evt.detail.type === 'error' && $fileMenuOpen && ($_mappingReadyEpoch !== $_mappingEpoch || el.contains(evt.detail.el)) && ($_mappingFailed = $_mappingEpoch)"`,
+			`data-show="$_mappingReadyEpoch !== $_mappingEpoch && $_mappingFailed !== $_mappingEpoch"`,
+			`data-show="$_mappingFailed === $_mappingEpoch"`, "Episode confirmations could not be loaded. Please try again.",
+		} {
+			if !strings.Contains(menu, want) {
+				t.Errorf("%s menu lacks %s", app, want)
 			}
 		}
 		if !strings.Contains(page, `$_mappingEpoch++`) || !strings.Contains(page, `'/api/episodes/mapping?'`) {
@@ -54,6 +65,17 @@ func TestSeriesFileRowsCarryTheirSeriesAndMoviesDoNot(t *testing.T) {
 	}
 }
 
+// The app also knows a torrent's series from the title it matched itself.
+func TestSeriesFileRowsUseTheAppsOwnTitleMatch(t *testing.T) {
+	links := testLinks
+	links.Page = func(string) string { return "/tv/95396" }
+	torrents := []torrserver.Torrent{{Hash: "hash1", Title: "Show (2024)", FileStats: []torrserver.FileStat{{ID: 1, Path: "Show/episode.mkv", Length: 1 << 30}}}}
+	out := html.UnescapeString(render(t, views.TorrServer(testUser, "http://nas:8090", "", links, torrserver.EchoInfo{Version: "1.0"}, torrents, views.GStreamerSetup{})))
+	if more := regexp.MustCompile(`<button[^>]*data-action="more"[^>]*>`).FindString(out); !strings.Contains(more, `data-tv="95396"`) {
+		t.Errorf("a matched series' file lacks its series: %s", more)
+	}
+}
+
 func mappingView() views.EpisodeMappingView {
 	return views.EpisodeMappingView{
 		Context:        views.EpisodeMappingContext{Hash: "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111", Index: 1, File: "Show/episode.mkv", TMDBID: 95396, Request: 7},
@@ -81,6 +103,10 @@ func TestTheEpisodeFormOffersLabeledSeasonAndRangeControls(t *testing.T) {
 	v := mappingView()
 	v.Saved, v.Editing = &store.EpisodeMapping{Hash: v.Context.Hash, Index: 1, TMDBID: 95396, Season: 2, First: 3, Last: 4}, false
 	saved := html.UnescapeString(render(t, views.EpisodeMappingPanel(v)))
+	// A season still loading must not land over a Clear or Edit reply.
+	if n := strings.Count(saved, `data-attr:disabled="$_mappingBusy"`); n != 2 {
+		t.Errorf("Edit and Clear wait for the form's request: %d bound of 2", n)
+	}
 	for _, want := range []string{"S02E03–E04", "Edit", "Clear", `@delete('/api/episodes/mapping', {contentType: 'form'})`} {
 		if !strings.Contains(saved, want) {
 			t.Errorf("saved confirmation lacks %q:\n%s", want, saved)

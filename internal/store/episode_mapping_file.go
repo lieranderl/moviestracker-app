@@ -35,7 +35,7 @@ func (f *EpisodeMappingFile) EpisodeMapping(_ context.Context, uid, hash string,
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	m, found := f.users[uid][id]
-	return m, found, nil
+	return servedEpisodeMapping(uid, m, found)
 }
 
 // SaveEpisodeMapping implements EpisodeMappingStore.

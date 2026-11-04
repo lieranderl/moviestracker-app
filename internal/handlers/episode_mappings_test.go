@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -257,5 +258,46 @@ func TestDeletedAccountCannotLeaveEpisodeMappingsForReusedUsername(t *testing.T)
 	res := mappingRequest(t, l.server, old, http.MethodDelete, mappingParams())
 	if res.Code == http.StatusOK {
 		t.Fatal("deleted session can mutate mappings")
+	}
+}
+
+// A filename naming a season the series lacks cannot preselect it: the form
+// asks for a season, so picking any one of them loads its episodes.
+func TestAFilenameSeasonTheSeriesLacksLeavesTheSeasonToChoose(t *testing.T) {
+	h, cookie := episodeMappingAPI(t, store.NewMemory(), nil)
+	p := mappingParams()
+	p.Set("file", "Show/Example.S05E01.mkv")
+	res := mappingRequest(t, h, cookie, http.MethodGet, p)
+	if body := res.Body.String(); strings.Contains(body, "From the file name") || strings.Contains(body, "Choose a season from this series.") {
+		t.Errorf("read-only view offers an unknown filename season: %s", body)
+	}
+	p.Set("editing", "1")
+	res = mappingRequest(t, h, cookie, http.MethodGet, p)
+	if body := res.Body.String(); !strings.Contains(body, `<option value="" selected>`) || strings.Contains(body, "Choose a season from this series.") {
+		t.Errorf("edit form preselects an unknown season: %s", body)
+	}
+}
+
+// Opening a file's menu asks TMDB for the series only; its season's
+// episodes load once the user edits, so a season outage cannot hide a
+// saved confirmation behind an error.
+func TestTheReadOnlyViewLoadsNoSeasonEpisodes(t *testing.T) {
+	users := store.NewMemory()
+	kept := store.EpisodeMapping{Hash: mappingParams().Get("hash"), Index: 1, File: "Show/episode.mkv", TMDBID: 95396, Season: 2, First: 3, Last: 4}
+	if err := users.SaveEpisodeMapping(t.Context(), "viewer", kept); err != nil {
+		t.Fatal(err)
+	}
+	var seasons atomic.Int32
+	h, cookie := episodeMappingAPI(t, users, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/season/") {
+			seasons.Add(1)
+			http.Error(w, "offline", http.StatusServiceUnavailable)
+			return
+		}
+		mappingCatalogResponse(w, r)
+	}))
+	res := mappingRequest(t, h, cookie, http.MethodGet, mappingParams())
+	if body := res.Body.String(); !strings.Contains(body, "S02E03–E04") || strings.Contains(body, "could not be loaded") || seasons.Load() != 0 {
+		t.Errorf("read-only view asked for %d seasons: %s", seasons.Load(), body)
 	}
 }

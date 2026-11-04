@@ -83,6 +83,7 @@ func TestConfirmedEpisodeMappingRejectsInvalidFileOrEpisodeContext(t *testing.T)
 		{"negative season", func(m *store.EpisodeMapping) { m.Season = -1 }},
 		{"zero episode", func(m *store.EpisodeMapping) { m.First = 0 }},
 		{"reversed range", func(m *store.EpisodeMapping) { m.Last = 2 }},
+		{"oversized range", func(m *store.EpisodeMapping) { m.Last = m.First + store.MaxMappedEpisodes }},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			eachEpisodeMappingStore(t, func(t *testing.T, s store.EpisodeMappingStore) {

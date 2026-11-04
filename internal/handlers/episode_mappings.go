@@ -35,19 +35,26 @@ func NewEpisodeMappings(s store.EpisodeMappingStore, user func(*http.Request) (s
 
 // Register adds the authenticated mapping endpoints.
 func (m *EpisodeMappings) Register(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/episodes/mapping", m.guarded(m.handleGet))
-	mux.HandleFunc("POST /api/episodes/mapping", m.guarded(m.handleSave))
-	mux.HandleFunc("DELETE /api/episodes/mapping", m.guarded(m.handleClear))
+	mux.HandleFunc("GET /api/episodes/mapping", m.handleGet)
+	mux.HandleFunc("POST /api/episodes/mapping", m.handleSave)
+	mux.HandleFunc("DELETE /api/episodes/mapping", m.handleClear)
 }
 
-func (m *EpisodeMappings) guarded(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if m.guard != nil {
-			m.guard.RLock()
-			defer m.guard.RUnlock()
-		}
-		next(w, r)
+// errMappingSignedOut reports an account that ended while its request ran.
+var errMappingSignedOut = errors.New("episode mapping: account signed out")
+
+// write changes the account's mappings while no local account is created or
+// deleted, rechecking the session under that guard. Metadata lookups stay
+// outside it, so a slow provider never holds up account changes.
+func (m *EpisodeMappings) write(r *http.Request, uid string, change func() error) error {
+	if m.guard != nil {
+		m.guard.RLock()
+		defer m.guard.RUnlock()
 	}
+	if now, ok := m.user(r); !ok || now != uid {
+		return errMappingSignedOut
+	}
+	return change()
 }
 
 func (m *EpisodeMappings) target(w http.ResponseWriter, r *http.Request) (string, views.EpisodeMappingView, url.Values, bool) {
@@ -158,9 +165,17 @@ func (m *EpisodeMappings) load(r *http.Request, uid string, v views.EpisodeMappi
 			known = known || season.Number == v.SelectedSeason
 		}
 		if !known {
-			v.Problem = i18n.T(r.Context(), "Choose a season from this series.")
+			// Only a season the form submitted is a mistake to point out; one
+			// from the file name or an old confirmation is left to choose.
+			if p.Get("season") != "" {
+				v.Problem = i18n.T(r.Context(), "Choose a season from this series.")
+			}
+			v.SelectedSeason, v.First, v.Last, v.FromFilename = -1, 0, 0, false
 			return v
 		}
+	}
+	// The read-only view shows the saved or filename range without its episodes.
+	if v.SelectedSeason >= 0 && v.Editing {
 		v.Season, err = clients.Details.Season(ctx, v.Context.TMDBID, v.SelectedSeason)
 		if err != nil || v.Season == nil || v.Season.Number != v.SelectedSeason || v.Season.ShowID != v.Context.TMDBID {
 			v.Problem = i18n.T(r.Context(), "Episode details could not be loaded. Please try again.")
@@ -207,7 +222,7 @@ func (m *EpisodeMappings) handleSave(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
 	defer cancel()
-	if err := m.store.SaveEpisodeMapping(ctx, uid, kept); err != nil {
+	if err := m.write(r, uid, func() error { return m.store.SaveEpisodeMapping(ctx, uid, kept) }); err != nil {
 		slog.Warn("saving episode confirmation failed", "error", logError(err))
 		v.Problem = i18n.T(r.Context(), "Episode confirmation could not be saved. Please try again.")
 	} else {
@@ -222,14 +237,15 @@ func (m *EpisodeMappings) handleClear(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	v.Editing = false
 	ctx, cancel := context.WithTimeout(r.Context(), progressTimeout)
-	err := m.store.ClearEpisodeMapping(ctx, uid, v.Context.Hash, v.Context.Index)
+	err := m.write(r, uid, func() error { return m.store.ClearEpisodeMapping(ctx, uid, v.Context.Hash, v.Context.Index) })
 	cancel()
 	// Clearing an owned key does not depend on the metadata provider being up.
 	read := r.Clone(r.Context())
 	read.Method = http.MethodGet
 	v = m.load(read, uid, v, p)
-	v.Focus, v.Editing = true, false
+	v.Focus = true
 	if err != nil {
 		slog.Warn("clearing episode confirmation failed", "error", logError(err))
 		v.Problem = i18n.T(r.Context(), "Episode confirmation could not be cleared. Please try again.")
