@@ -1,0 +1,60 @@
+package store
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+)
+
+// ErrEpisodeMapping identifies invalid confirmation input.
+var ErrEpisodeMapping = errors.New("store: invalid episode mapping")
+
+// EpisodeMapping is one account's confirmed association of a torrent file
+// with an inclusive episode range in a canonical series and season.
+type EpisodeMapping struct {
+	Hash   string `json:"hash"`
+	Index  int    `json:"index"`
+	File   string `json:"file"`
+	TMDBID int    `json:"tmdbId"`
+	Season int    `json:"season"`
+	First  int    `json:"first"`
+	Last   int    `json:"last"`
+}
+
+// EpisodeMappingStore keeps confirmations independently of recent progress.
+type EpisodeMappingStore interface {
+	EpisodeMapping(ctx context.Context, uid, hash string, index int) (EpisodeMapping, bool, error)
+	SaveEpisodeMapping(ctx context.Context, uid string, m EpisodeMapping) error
+	ClearEpisodeMapping(ctx context.Context, uid, hash string, index int) error
+}
+
+func checkMappingOwner(uid string) error {
+	if strings.TrimSpace(uid) == "" {
+		return fmt.Errorf("%w: account is empty", ErrEpisodeMapping)
+	}
+	return nil
+}
+
+func episodeMappingID(uid, hash string, index int) (string, error) {
+	if err := checkMappingOwner(uid); err != nil {
+		return "", err
+	}
+	id, err := progressID(hash, index)
+	if err != nil {
+		return "", fmt.Errorf("%w: invalid file identity", ErrEpisodeMapping)
+	}
+	return id, nil
+}
+
+func checkEpisodeMapping(uid string, m EpisodeMapping) (EpisodeMapping, string, error) {
+	id, err := episodeMappingID(uid, m.Hash, m.Index)
+	if err != nil {
+		return EpisodeMapping{}, "", err
+	}
+	if m.File == "" || len(m.File) > 4096 || m.TMDBID <= 0 || m.Season < 0 || m.First <= 0 || m.Last < m.First {
+		return EpisodeMapping{}, "", fmt.Errorf("%w: invalid episode or file context", ErrEpisodeMapping)
+	}
+	m.Hash = strings.ToLower(m.Hash)
+	return m, id, nil
+}

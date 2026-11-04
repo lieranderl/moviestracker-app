@@ -39,18 +39,18 @@
 - Create `internal/views/episode_mapping.go`, `episode_mapping.templ`; extend `torrserver.templ` and existing web adapters only for shared file context/requests. Generated files and assets are committed.
 - Extend `internal/handlers/episode_progress_test.go`, `users_test.go`, `internal/web/progress_test.go`; create `internal/web/episode_mappings_test.go`; update translation/render coverage.
 
-### Task1: Exact file mapping persists through public stores
+### Task 1: Exact file mapping persists through public stores
 
 **Interfaces:** Create `store.EpisodeMapping{Hash string; Index int; File string; TMDBID int; Season int; First int; Last int}` and `EpisodeMappingStore` with `EpisodeMapping(ctx context.Context, uid, hash string, index int) (EpisodeMapping, bool, error)`, `SaveEpisodeMapping(ctx context.Context, uid string, m EpisodeMapping) error`, `ClearEpisodeMapping(ctx context.Context, uid, hash string, index int) error`. `OpenEpisodeMappingFile(path string) (*EpisodeMappingFile, error)` supplies the local backend; `DeleteAccountMappings(ctx context.Context, uid string) error` is its cleanup capability.
 
-- [ ] Write one public Memory contract test `TestConfirmedEpisodeMappingBelongsToOneAccountAndFile`: save hash`aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111`, index1, file`episode.mp4`, series95396, season2, First3/Last4. Read returns that literal range; another account/index/hash finds none. Run `go test ./internal/store -run ConfirmedEpisodeMapping -count=1`; establish the missing-capability red.
-- [ ] Implement the minimal Memory contract with normalized identity and account-session checks. Rerun the test to green.
-- [ ] Add one validation behavior at a time: empty owner, invalid hash/index/show, negative season, zero/reversed episodes and oversized file path fail; uppercase valid hash reads the same record. Basic storage validation does not make TMDB network calls. Rerun each red/green cycle.
-- [ ] Apply the contract to a real owner-only atomic JSON file. Add `TestConfirmedMappingSurvivesReopenAndFailedWrite`: save3–4, make the owned disposable directory unwritable, attempt5–6, require error and still3–4 both live and after reopening. Restore permission. Implement clone/write/commit after success; do not mutate live state first.
-- [ ] Add distinct-file concurrent writes and idempotent clear; reopen retains each accepted record. Returned values are independent copies. Run `go test -race ./internal/store -run 'Confirmed|EpisodeMapping' -count=1`.
-- [ ] Commit focused store/file changes: `feat(store): persist confirmed episode file mappings`.
+- [x] Write one public Memory contract test `TestConfirmedEpisodeMappingBelongsToOneAccountAndFile`: save hash`aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111`, index1, file`episode.mp4`, series95396, season2, First3/Last4. Read returns that literal range; another account/index/hash finds none. Run `go test ./internal/store -run ConfirmedEpisodeMapping -count=1`; establish the missing-capability red.
+- [x] Implement the minimal Memory contract with normalized identity and account-session checks. Rerun the test to green.
+- [x] Add one validation behavior at a time: empty owner, invalid hash/index/show, negative season, zero/reversed episodes and oversized file path fail; uppercase valid hash reads the same record. Basic storage validation does not make TMDB network calls. Rerun each red/green cycle.
+- [x] Apply the contract to a real owner-only atomic JSON file. Add `TestConfirmedMappingSurvivesReopenAndFailedWrite`: save3–4, make the owned disposable directory unwritable, attempt5–6, require error and still3–4 both live and after reopening. Restore permission. Implement clone/write/commit after success; do not mutate live state first.
+- [x] Add distinct-file concurrent writes and idempotent clear; reopen retains each accepted record. Returned values are independent copies. Run `go test -race ./internal/store -run 'Confirmed|EpisodeMapping' -count=1`.
+- [x] Commit focused store/file changes: `feat(store): persist confirmed episode file mappings`.
 
-### Task2: Firestore, export and account lifecycle
+### Task 2: Firestore, export and account lifecycle
 
 **Interfaces:** Embed `EpisodeMappingStore` in `store.Store`. Memory/Firestore implement Task1 methods. Account adds `EpisodeMappings []EpisodeMapping` with JSON key`episodeMappings`. Firestore uses `users/{uid}/episodeMappings/{normalizedHash-index}` and the existing deletion/session transaction guard.
 
@@ -60,7 +60,7 @@
 - [ ] Run `FIRESTORE_EMULATOR_HOST=localhost:8086 go test -race ./internal/store -run 'Confirmed|EpisodeMapping|Account' -count=1` using the existing pinned emulator. Verify the emulator is live; start only if absent. Fix affected public fixtures that must satisfy the extended Store interface.
 - [ ] Commit: `feat(store): include episode mappings in account lifecycle`.
 
-### Task3: Finished progress uses the confirmed association
+### Task 3: Finished progress uses the confirmed association
 
 **Interfaces:** `func (e *Episodes) UseFileMappings(s store.EpisodeMappingStore)` opts the existing episode service into mapping lookup. Replace its private `markFinished` input with `(ctx context.Context, uid string, p store.Progress) error`; Progress passes the accepted canonical file record. Existing `MarkFinishedEpisodesIn` public wiring remains.
 
@@ -69,7 +69,7 @@
 - [ ] Add a public failure test through an unavailable external persistence boundary: failed mapping lookup marks nothing instead of falling back; progress remains saved. Return/report failure through the existing progress error path and make retry idempotent. Do not mock Episodes or other domain packages.
 - [ ] Run `go test -race ./internal/handlers ./internal/web -run 'Episode|Progress' -count=1` and commit: `feat(episodes): apply confirmed mappings at file completion`.
 
-### Task4: Authenticated confirmation routes and local account fencing
+### Task 4: Authenticated confirmation routes and local account fencing
 
 **Interfaces:** `NewEpisodeMappings(s store.EpisodeMappingStore, user func(*http.Request) (string, bool), catalog *Catalog, torrent func(context.Context, string) (torrserver.Torrent, bool)) *EpisodeMappings`; `Register(mux *http.ServeMux)` registers `GET/POST/DELETE /api/episodes/mapping`. GET renders the panel/options; POST explicitly saves; DELETE clears. A local torrent resolver verifies current metadata; web resolver is nil and validates browser-supplied account-owned context. Local handlers share the existing account-data mutex with username create/delete and preset operations.
 
@@ -80,7 +80,7 @@
 - [ ] Add local public lifecycle tests: deletion cleanup plus recreating the same username exposes no old mapping; concurrent late requests cannot repopulate it; failed cleanup is retriable before username reuse. Preserve preset behavior.
 - [ ] Run `go test -race ./internal/handlers ./internal/web -run 'EpisodeMapping|Confirmed|User|Account' -count=1`; commit: `feat(episodes): add account-scoped confirmation routes`.
 
-### Task5: Shared file menu and full browser behavior
+### Task 5: Shared file menu and full browser behavior
 
 **Interfaces:** `views.EpisodeMappingContext{Hash string; Index int; File string; TMDBID int}` and `EpisodeMappingView{Context EpisodeMappingContext; Series *tmdb.TVDetails; Season *tmdb.Season; Saved *store.EpisodeMapping; Problem string; Editing bool}`; `EpisodeMappingPanel(v EpisodeMappingView)` is the only mapping markup. Both transports mount it inside existing `torrFileMenuFor`. Add the known series ID to the shared file row/context; movie/unknown files do not request mapping UI.
 
@@ -90,7 +90,7 @@
 - [ ] Disposable app/web browser loop: file More → Edit → confirm single/range → reopen/restart → same mapping; validation/store failure → retry; clear → labeled fallback; other account/file isolated. Check English/Russian at desktop/375px, keyboard focus after Save/error, Escape/close focus return and ordinary playback unchanged.
 - [ ] Generated playable/native-media completion uses the confirmed range; another release retains canonical episode history but no mapping or transferred seek. Confirm no watched change on Save. Run relevant rendered/i18n/race suites and regenerate Templ/icons/assets through repository commands. Commit: `feat(player): confirm episode mappings in the shared file menu`.
 
-### Task6: Whole feature verification and delivery
+### Task 6: Whole feature verification and delivery
 
 - [ ] Self-audit every spec section against authoritative store, HTTP and browser evidence; keep production-media/VoiceOver limits explicit. Confirm all five Review Focus behaviors have their owning tests.
 - [ ] Run `make test-store`, full `make ci`, and a final diff/whitespace check after staging regenerated assets. Inspect every result, including emulator availability; a skipped emulator test is not a pass.

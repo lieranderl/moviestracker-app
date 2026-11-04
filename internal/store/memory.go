@@ -43,6 +43,7 @@ type memoryUser struct {
 	feedback    map[string]feedbackEntry
 	follows     map[int]FollowedSeries // by series ID
 	presets     map[string]DiscoveryPreset
+	mappings    map[string]EpisodeMapping
 }
 
 // NewMemory returns an empty in-memory store.

@@ -1,6 +1,6 @@
 # Confirmed episode mappings (R18)
 
-Status: design and test boundaries approved by the user on4 November2026. No mapping implementation has started; implementation plan review follows.
+Status: design and test boundaries approved by the user on4 November2026. Implementation plan approved; native inline implementation is in progress.
 
 ## Intent and agreed choices
 
