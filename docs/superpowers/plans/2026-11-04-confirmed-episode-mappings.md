@@ -92,9 +92,9 @@
 
 ### Task 6: Whole feature verification and delivery
 
-- [ ] Self-audit every spec section against authoritative store, HTTP and browser evidence; keep production-media/VoiceOver limits explicit. Confirm all five Review Focus behaviors have their owning tests.
-- [ ] Run `make test-store`, full `make ci`, and a final diff/whitespace check after staging regenerated assets. Inspect every result, including emulator availability; a skipped emulator test is not a pass.
-- [ ] Request a fresh independent whole-branch review, fix important findings and rerun only affected checks/full checks when changes justify it.
+- [x] Self-audit every spec section against authoritative store, HTTP and browser evidence; keep production-media/VoiceOver limits explicit. Confirm all five Review Focus behaviors have their owning tests.
+- [x] Run `make test-store`, full `make ci`, and a final diff/whitespace check after staging regenerated assets. Inspect every result, including emulator availability; a skipped emulator test is not a pass.
+- [x] Request a fresh independent whole-branch review, fix important findings and rerun only affected checks/full checks when changes justify it. Seven findings fixed with tests (title-matched series, non-SSE failure state, unknown filename season, read-only season fetch, Edit/Clear busy fence, narrowed account-data lock, bounded stored ranges); `make ci` and `make test-store` re-passed.
 - [ ] Commit approved design/plan and acceptance records with explicit owned paths; preserve unrelated `scripts/jacred-probe.py`. Push `codex/confirmed-episode-mappings`, create Conventional Commit PR, inspect remote review/checks, squash merge after all required checks pass.
 - [ ] Verify normal web deployment for the actual merge commit, traffic revision and readiness. Update roadmap/audit with delivered/unverified limits; do not equate hosted delivery with republished desktop/container releases.
 
