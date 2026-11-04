@@ -335,6 +335,7 @@ var ru = map[string]string{
 	"Try again":                   "Повторить",
 	"Loading more":                "Загрузка",
 	"Loading":                     "Загрузка",
+	"Buffering":                   "Буферизация",
 	"That is the whole list.":     "Это весь список.",
 	"Categories":                  "Категории",
 	"Back to top":                 "Наверх",
