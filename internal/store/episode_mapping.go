@@ -13,13 +13,13 @@ var ErrEpisodeMapping = errors.New("store: invalid episode mapping")
 // EpisodeMapping is one account's confirmed association of a torrent file
 // with an inclusive episode range in a canonical series and season.
 type EpisodeMapping struct {
-	Hash   string `json:"hash"`
-	Index  int    `json:"index"`
-	File   string `json:"file"`
-	TMDBID int    `json:"tmdbId"`
-	Season int    `json:"season"`
-	First  int    `json:"first"`
-	Last   int    `json:"last"`
+	Hash   string `json:"hash" firestore:"hash"`
+	Index  int    `json:"index" firestore:"index"`
+	File   string `json:"file" firestore:"file"`
+	TMDBID int    `json:"tmdbId" firestore:"tmdbId"`
+	Season int    `json:"season" firestore:"season"`
+	First  int    `json:"first" firestore:"first"`
+	Last   int    `json:"last" firestore:"last"`
 }
 
 // EpisodeMappingStore keeps confirmations independently of recent progress.
@@ -30,8 +30,8 @@ type EpisodeMappingStore interface {
 }
 
 func checkMappingOwner(uid string) error {
-	if strings.TrimSpace(uid) == "" {
-		return fmt.Errorf("%w: account is empty", ErrEpisodeMapping)
+	if strings.TrimSpace(uid) == "" || strings.Contains(uid, "/") {
+		return fmt.Errorf("%w: invalid account identity", ErrEpisodeMapping)
 	}
 	return nil
 }

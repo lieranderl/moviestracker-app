@@ -1097,7 +1097,10 @@ func (f *Firestore) Review(ctx context.Context, uid, kind string, tmdbID int) (R
 }
 
 // userCollections are the collections under users/{uid}.
-var userCollections = []string{"favorites", "torrservers", "progress", "titles", "updates", "lists", "reviews", "episodes", "follows", "feedback"}
+var userCollections = []string{
+	"favorites", "torrservers", "progress", "titles", "updates", "lists",
+	"reviews", "episodes", "follows", "feedback", "episodeMappings",
+}
 
 // ExportAccount implements Store.
 func (f *Firestore) ExportAccount(ctx context.Context, uid string) (Account, error) {
@@ -1179,6 +1182,17 @@ func (f *Firestore) ExportAccount(ctx context.Context, uid string) (Account, err
 	}
 	if a.DiscoveryPresets, err = f.DiscoveryPresets(ctx, uid); err != nil {
 		return Account{}, err
+	}
+	mappings, err := f.episodeMappings(uid).Documents(ctx).GetAll()
+	if err != nil {
+		return Account{}, fmt.Errorf("read episode mappings: %w", err)
+	}
+	for _, doc := range mappings {
+		var mapping EpisodeMapping
+		if err := doc.DataTo(&mapping); err != nil {
+			return Account{}, fmt.Errorf("read episode mapping: %w", err)
+		}
+		a.EpisodeMappings = append(a.EpisodeMappings, mapping)
 	}
 	return withAlertChoices(ctx, f, uid, a)
 }

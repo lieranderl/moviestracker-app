@@ -54,11 +54,11 @@
 
 **Interfaces:** Embed `EpisodeMappingStore` in `store.Store`. Memory/Firestore implement Task1 methods. Account adds `EpisodeMappings []EpisodeMapping` with JSON key`episodeMappings`. Firestore uses `users/{uid}/episodeMappings/{normalizedHash-index}` and the existing deletion/session transaction guard.
 
-- [ ] Run Task1 contracts against the real Firestore emulator; introduce one failing store behavior before its implementation. Require one keyed document lookup, no collection scan on playback.
-- [ ] Add `TestAccountExportAndDeletionIncludeConfirmedMappings`: export contains the saved3–4 range for its owner only; deletion removes it; an old `WithAccountSession` cannot recreate it. Implement Memory export/deletion and Firestore collection export/cleanup plus atomic session validation for writes/clear.
-- [ ] Add `TestResettingResumePreservesConfirmedEpisodeMapping`: reset progress/remove its recent card; mapping still reads3–4. Implement no coupling to recent-progress pruning.
-- [ ] Run `FIRESTORE_EMULATOR_HOST=localhost:8086 go test -race ./internal/store -run 'Confirmed|EpisodeMapping|Account' -count=1` using the existing pinned emulator. Verify the emulator is live; start only if absent. Fix affected public fixtures that must satisfy the extended Store interface.
-- [ ] Commit: `feat(store): include episode mappings in account lifecycle`.
+- [x] Run Task1 contracts against the real Firestore emulator; introduce one failing store behavior before its implementation. Require one keyed document lookup, no collection scan on playback.
+- [x] Add `TestAccountExportAndDeletionIncludeConfirmedMappings`: export contains the saved3–4 range for its owner only; deletion removes it; an old `WithAccountSession` cannot recreate it. Implement Memory export/deletion and Firestore collection export/cleanup plus atomic session validation for writes/clear.
+- [x] Add `TestResettingResumePreservesConfirmedEpisodeMapping`: reset progress/remove its recent card; mapping still reads3–4. Implement no coupling to recent-progress pruning.
+- [x] Run `FIRESTORE_EMULATOR_HOST=localhost:8086 go test -race ./internal/store -run 'Confirmed|EpisodeMapping|Account' -count=1` using the existing pinned emulator. Verify the emulator is live; start only if absent. Fix affected public fixtures that must satisfy the extended Store interface.
+- [x] Commit: `feat(store): include episode mappings in account lifecycle`.
 
 ### Task 3: Finished progress uses the confirmed association
 

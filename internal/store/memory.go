@@ -599,6 +599,7 @@ func (m *Memory) ExportAccount(ctx context.Context, uid string) (Account, error)
 		Reviews: slices.Collect(maps.Values(u.reviews)), Episodes: u.watchedEpisodes(),
 		Follows: follows, Feedback: feedback, MutedAlerts: choices.MutedAlerts, AlertFeeds: choices.AlertFeeds,
 		DiscoveryPresets: discoveryPresetList(u.presets),
+		EpisodeMappings:  slices.Collect(maps.Values(u.mappings)),
 	}, nil
 }
 
