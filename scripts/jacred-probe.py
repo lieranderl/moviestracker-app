@@ -96,9 +96,31 @@ def norm(s):
 
 
 def named(release, names):
-    """The release's name, or a "/" or "|" part of it, starts with one of names."""
-    parts = [norm(p) for p in release["title"].replace("|", "/").split("/")]
+    """The release's name, a "/" or "|" part of it, or the whole title (for a
+    name with a slash, "Face/Off") starts with one of names."""
+    title = release["title"]
+    parts = [norm(p) for p in [*title.replace("|", "/").split("/"), title]]
     return any(p == n or p.startswith(n + " ") for p in parts for n in names)
+
+
+def near_year(released, year):
+    return year > 0 and year - 1 <= released <= year + 1
+
+
+def belongs(release, year, season, season_year):
+    """Query.belongs in internal/jacred/jacred.go."""
+    released = release.get("year") or 0
+    if season:
+        if release.get("seasons") and season not in release["seasons"]:
+            return False
+        if released == 0:  # single-episode uploads; the season filter vouches
+            return True
+        return near_year(released, year) or near_year(released, season_year)
+    if year == 0:
+        return True
+    if released == 0:
+        return str(year) in release["title"]
+    return near_year(released, year)
 
 
 def search(term, season):
@@ -128,6 +150,10 @@ for spec in sys.argv[1:] or DEFAULT:
         f"\n{kind} {tmdb_id} {local} ({year})" + (f" season {season}" if season else "")
     )
     names = [norm(t) for label, t in candidates if label != "imdb"]
+    season_year = 0
+    if season:
+        air = tmdb(f"tv/{tmdb_id}/season/{season}").get("air_date") or ""
+        season_year = int(air[:4] or 0)
     got = {}
     for label, term in candidates:
         found = search(term, season)
@@ -135,11 +161,7 @@ for spec in sys.argv[1:] or DEFAULT:
         if isinstance(found, str):
             print(f"  {label:8} {term!r:40} {found}")
             continue
-        near = [
-            r
-            for r in found
-            if season or not r.get("year") or abs(r["year"] - year) <= 1
-        ]
+        near = [r for r in found if belongs(r, year, season, season_year)]
         got[label] = [r for r in near if named(r, names)]
         print(
             f"  {label:8} {term!r:40} {len(found):4d} found, {len(near):4d} kept,"
