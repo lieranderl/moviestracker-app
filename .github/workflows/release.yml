@@ -141,9 +141,12 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  # A skipped `ci` counts as skipped for every later job too: the jobs after
+  # it say which results they accept.
   docker:
     name: Docker image (linux/amd64, linux/arm64)
     needs: docker-build
+    if: ${{ !cancelled() && needs.docker-build.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -257,6 +260,7 @@ jobs:
   publish:
     name: Draft the GitHub release
     needs: [docker, macos, windows]
+    if: ${{ !cancelled() && needs.docker.result == 'success' && needs.macos.result == 'success' && needs.windows.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
