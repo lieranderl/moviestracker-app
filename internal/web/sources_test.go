@@ -74,7 +74,7 @@ func TestPagesLoadTheirBrowserHelpersBeforeDatastar(t *testing.T) {
 	session := signIn(t, h)
 	for _, path := range []string{"/movie/438631", "/tv/95396", "/torrserver"} {
 		body := getWith(t, h, path, session).Body.String()
-		helpers, datastar := strings.Index(body, `src="/static/torrserver.js"`), strings.Index(body, `src="/static/datastar.js"`)
+		helpers, datastar := strings.Index(body, `src="/static/torrserver.js?v=`), strings.Index(body, `src="/static/datastar.js?v=`)
 		if helpers < 0 || datastar < 0 || helpers > datastar {
 			t.Errorf("%s loads torrserver.js at %d and datastar.js at %d, want the helpers first", path, helpers, datastar)
 		}
