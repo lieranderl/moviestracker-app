@@ -479,6 +479,20 @@ func TestEveryStartAttemptGetsAPeerPortOfItsOwn(t *testing.T) {
 	}
 }
 
+// make dev keeps its data in a folder named relative to the checkout
+// (MT_DATA_DIR=.devdata): TorrServer still starts in it.
+func TestTheEngineStartsFromARelativeDataDirectory(t *testing.T) {
+	t.Chdir(t.TempDir())
+	sup := newSupervisor(t, filepath.Join("devdata", "engine"), freePort(t))
+	if err := sup.Start(context.Background()); err != nil {
+		t.Fatalf("Start() from a relative directory: %v", err)
+	}
+	url, user, pass := sup.Endpoint()
+	if code := get(t, url, user, pass); code != http.StatusOK {
+		t.Errorf("TorrServer with Moviestracker's login = %d, want 200", code)
+	}
+}
+
 func TestAPeerPortTheUserSetIsLeftToTheEngine(t *testing.T) {
 	dir := t.TempDir()
 	sup := newSupervisor(t, dir, freePort(t))

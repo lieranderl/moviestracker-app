@@ -11,7 +11,7 @@ coverage.out
 *.syso
 
 # Local data, secrets and logs: never commit these
-.devdata/
+.devdata*/
 .env
 .env.*
 !.env.example

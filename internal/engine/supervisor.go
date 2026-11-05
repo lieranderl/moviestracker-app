@@ -116,6 +116,11 @@ func New(cfg Config) *Supervisor {
 	if cfg.MaxBackoff == 0 {
 		cfg.MaxBackoff = time.Minute
 	}
+	// TorrServer runs inside Dir and is also told Dir: a relative one would
+	// name a folder inside itself.
+	if dir, err := filepath.Abs(cfg.Dir); err == nil {
+		cfg.Dir = dir
+	}
 	return &Supervisor{
 		cfg:    cfg,
 		http:   &http.Client{Timeout: 3 * time.Second},
