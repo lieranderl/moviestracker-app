@@ -16,6 +16,7 @@
 # - immutable releases: a published release's files and tag stay as they are
 # - the `pins` environment, which only main can use, with the pins app's
 #   client id and private key from .pins-app-client-id and .pins-app-key.pem
+# - the `web` environment (web.yml deploys to Cloud Run), which only main can use
 # - the `release` environment, which only v* tags can use, with the
 #   MT_SHARED_TMDB_KEY secret from .tmdb-shared-key when present
 #   JACRED_APIKEY secret (jacred.su project key) from .jacred-shared-key when present
@@ -196,6 +197,16 @@ else
   say "No .pins-app-client-id and .pins-app-key.pem: weekly pin updates stay off until you set them:"
   say "  gh variable set PINS_APP_CLIENT_ID --env pins --repo $repo --body <client id>"
   say "  gh secret set PINS_APP_PRIVATE_KEY --env pins --repo $repo < <app>.private-key.pem"
+fi
+
+say "Environment: web, for main only"
+gh api -X PUT "repos/$repo/environments/web" --input - --silent <<<'{
+  "deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}
+}'
+if ! gh api "repos/$repo/environments/web/deployment-branch-policies" \
+  --jq '.branch_policies[] | select(.type == "branch" and .name == "main") | .id' | grep -q .; then
+  gh api -X POST "repos/$repo/environments/web/deployment-branch-policies" --silent \
+    -f name=main -f type=branch
 fi
 
 say "Done: https://github.com/$repo/settings"
