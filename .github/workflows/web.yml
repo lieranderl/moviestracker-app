@@ -102,10 +102,11 @@ jobs:
       # /readyz, not /healthz: Cloud Run reserves paths ending in "z" such as
       # /healthz and answers them itself with a 404.
       - name: Check the new revision
+        timeout-minutes: 3
         run: |
           url="$(gcloud run services describe "$SERVICE" --project "$PROJECT" --region "$REGION" --format=json \
             | jq -r '.status.traffic[] | select(.tag == "candidate") | .url')"
-          curl --fail --silent --show-error --retry 5 --retry-all-errors "$url/readyz"
+          curl --fail --silent --show-error --max-time 10 --retry 5 --retry-all-errors "$url/readyz"
       - name: Note the revision serving now
         id: previous
         run: |
@@ -117,11 +118,14 @@ jobs:
         id: shift
         run: |
           gcloud run services update-traffic "$SERVICE" --project "$PROJECT" --region "$REGION" --to-latest --quiet
+      # Bounded, so a hanging revision fails this step and the rollback below
+      # still runs inside the job's time.
       - name: Check the service with all traffic
+        timeout-minutes: 3
         run: |
           url="$(gcloud run services describe "$SERVICE" --project "$PROJECT" --region "$REGION" --format='value(status.url)')"
           for _ in 1 2 3; do
-            curl --fail --silent --show-error --retry 5 --retry-all-errors "$url/readyz"
+            curl --fail --silent --show-error --max-time 10 --retry 5 --retry-all-errors "$url/readyz"
             sleep 5
           done
       # Roll back: all traffic to the revision that served before.
