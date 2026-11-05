@@ -1,7 +1,7 @@
 # Weekly dependency updates, grouped so minor and patch bumps arrive as one
 # pull request per ecosystem, for versions out at least a week (a hijacked
 # release is usually caught by then). Security updates are not grouped or
-# delayed. Minor and patch updates merge themselves once CI passes (pr.yml).
+# delayed. Minor and patch updates merge themselves once CI passes (dependabot-merge.yml).
 version: 2
 updates:
   - package-ecosystem: gomod
