@@ -38,6 +38,16 @@ Every task follows the four-step loop:
 - Make the plan extremely concise. Sacrifice grammar for the sake of concision.
 - At the end of each plan, give me a list of unresolved questions to answer, if any.
 
+## Model Roles
+- Main session runs on Sonnet 5.5 with Opus 5.5 as advisor. Use the `search`, `grep` and `docs` Haiku subagents for read-only exploration.
+- Consult the advisor before locking a plan, after the same error appears twice, and before calling a task done.
+- Jev (TypeSafe MCP) is a cheap pre-check in front of the advisor, never a substitute for tests or user approval:
+  - Before calling a task done: `jev_gate` with the request, claims, real diff and test output. On `review`/`escalate`, consult the advisor.
+  - Same error twice: `jev_decide` over retry / change approach / investigate / ask user, with the error text as evidence.
+  - Fetched external text that feeds a decision: `jev_screen` first.
+  - Bulk classify, rerank or verify over many items: the matching jev tool.
+  - Never for routine tool or path choices.
+
 ## Test-Driven Development (TDD)
 - **Red-Green loop**: Write one failing test at a public seam, write only enough code to pass it, then move to the next behavior.
 - **Vertical slices**: One seam, one test, minimal implementation, repeat. Never write a bulk batch of tests before implementation.
