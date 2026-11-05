@@ -1,0 +1,54 @@
+name: Dependabot auto-merge
+
+# Turns on auto-merge for Dependabot's minor and patch updates; major ones
+# wait for a person. The pins app turns it on, not GITHUB_TOKEN: a merge made
+# by auto-merge that GITHUB_TOKEN turned on pushes to main without starting
+# any workflow, so main's CI and the web app's deploy (web.yml) never ran.
+#
+# pull_request_target, so the job can use the `pins` environment, which only
+# main can use. It checks out and runs nothing from the pull request.
+on:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] runs no code from the pull request
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: dependabot-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  merge:
+    name: Auto-merge minor and patch updates
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: pins
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+
+      - name: Get a token for the pins app
+        id: app
+        if: contains(fromJSON('["version-update:semver-patch", "version-update:semver-minor"]'), steps.meta.outputs.update-type)
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.PINS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PINS_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      # Merges once every required check passes.
+      - name: Merge when CI passes
+        if: steps.app.outputs.token != ''
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          PR: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR"
