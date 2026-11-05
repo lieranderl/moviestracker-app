@@ -38,16 +38,16 @@ templ layoutWithMeta(meta PageMeta) {
 			@pageMeta(meta)
 			<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎬</text></svg>"/>
 			<!-- Render-blocking by design: tiny, sets data-theme before first paint -->
-			<script src="/static/theme.js"></script>
-			<link href="/static/app.css" rel="stylesheet"/>
+			<script src={ asset("/static/theme.js") }></script>
+			<link href={ asset("/static/app.css") } rel="stylesheet"/>
 			<!-- Page modules run before Datastar (modules execute in document order):
 			     its first scan calls their window helpers, and one ReferenceError
 			     there would stop the scan and leave the page inert. -->
 			for _, src := range pageScripts(ctx, meta.Scripts) {
-				<script type="module" src={ src }></script>
+				<script type="module" src={ asset(src) }></script>
 			}
 			<!-- Datastar Client (v1.0.4); modules are deferred and never block rendering -->
-			<script type="module" src="/static/datastar.js"></script>
+			<script type="module" src={ asset("/static/datastar.js") }></script>
 		</head>
 		<body
 			class="bg-base-100 text-base-content min-h-dvh flex flex-col font-sans antialiased selection:bg-primary selection:text-primary-content max-md:has-[.dock]:pb-16"

@@ -215,11 +215,11 @@ func TestEverySignedInPageCanCheckTheVisitorsTorrServer(t *testing.T) {
 		if strings.Contains(body, "/api/torrserver/state") {
 			t.Errorf("%s asks the server for a TorrServer only the browser can reach", path)
 		}
-		helpers, datastar := strings.Index(body, `src="/static/torrserver.js"`), strings.Index(body, `src="/static/datastar.js"`)
+		helpers, datastar := strings.Index(body, `src="/static/torrserver.js?v=`), strings.Index(body, `src="/static/datastar.js?v=`)
 		if helpers < 0 || helpers > datastar {
 			t.Errorf("%s loads torrserver.js at %d and datastar.js at %d: the navbar's check needs the helpers first", path, helpers, datastar)
 		}
-		if n := strings.Count(body, `src="/static/torrserver.js"`); n > 1 {
+		if n := strings.Count(body, `src="/static/torrserver.js?v=`); n > 1 {
 			t.Errorf("%s loads torrserver.js %d times", path, n)
 		}
 	}

@@ -126,9 +126,9 @@ container-stop:
 	container rm -f $(CONTAINER_NAME) 2>/dev/null || true
 
 # Development keeps its accounts and keys apart from a real install, and runs
-# the TorrServer from `make torrserver` when there is one.
+# the pinned TorrServer (bin/torrserver), fetched again when the lock changes.
 DEV_DATA_DIR ?= .devdata
-DEV_ENV = MT_DATA_DIR=$(DEV_DATA_DIR) $(if $(wildcard bin/torrserver),MT_TORRSERVER_BIN=$(CURDIR)/bin/torrserver)
+DEV_ENV = MT_DATA_DIR=$(DEV_DATA_DIR) MT_TORRSERVER_BIN=$(CURDIR)/bin/torrserver
 
 torrserver: bin/torrserver
 
@@ -146,10 +146,10 @@ winapp:
 bin/torrserver: scripts/torrserver.lock
 	scripts/fetch-torrserver.sh $@
 
-run: templ assets
+run: templ assets bin/torrserver
 	$(DEV_ENV) $(GO) run ./cmd/server
 
-dev: assets
+dev: assets bin/torrserver
 	$(DEV_ENV) $(AIR)
 
 # The cloud web app (cmd/web) on http://localhost:8080 (PORT changes it),

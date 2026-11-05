@@ -51,7 +51,7 @@ func TestTheTorrServerPageListsTheUsersServers(t *testing.T) {
 	if page.Code != http.StatusOK || !strings.Contains(body, "http://localhost:8090") || !strings.Contains(body, "Home") {
 		t.Fatalf("GET /torrserver = %d, want Ann's Home TorrServer listed", page.Code)
 	}
-	if !strings.Contains(body, `src="/static/torrserver.js"`) {
+	if !strings.Contains(body, `src="/static/torrserver.js?v=`) {
 		t.Error("the TorrServer page does not load the browser's TorrServer client")
 	}
 	if !strings.Contains(getWith(t, h, "/", session).Body.String(), `href="/torrserver"`) {

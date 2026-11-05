@@ -3,8 +3,11 @@ package views
 import (
 	"context"
 	"slices"
+	"strings"
 
 	"github.com/a-h/templ"
+
+	"github.com/lieranderl/moviestracker-app/static"
 )
 
 // Site is which app a page belongs to: the local app (the zero value) or
@@ -50,6 +53,15 @@ func pageScripts(ctx context.Context, scripts []string) []string {
 }
 
 const torrServerScript = "/static/torrserver.js"
+
+// asset is path (/static/…) with its file's version, so a new build's
+// stylesheet and scripts are never taken from a browser's cache.
+func asset(path string) string {
+	if name, ok := strings.CutPrefix(path, "/static/"); ok {
+		return static.URL(name)
+	}
+	return path
+}
 
 func titleScripts(ctx context.Context) []string {
 	if siteOf(ctx).Cloud {
