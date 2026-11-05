@@ -274,6 +274,37 @@ func TestPlayersStreamSavedTorrentsWithoutALogin(t *testing.T) {
 	}
 }
 
+// Players of an app sharing TorrServer play GStreamer HLS like its direct
+// link: without a login for the torrents already saved.
+func TestPlayersStreamSavedTorrentsOverHLSWithoutALogin(t *testing.T) {
+	s := newSetup(t)
+	s.engine.saved[savedHash] = true
+	user, password := s.addLogin(t, "Moviestracker web")
+
+	for _, target := range []string{
+		"/gst/" + savedHash + "/master.m3u8?index=1&audio=0",
+		"/gst/" + strings.ToUpper(savedHash) + "/1/0/index.m3u8",
+		"/gst/" + savedHash + "/heartbeat",
+	} {
+		if rec := s.ask(t, http.MethodGet, target, "", "", "", tv); rec.Code != http.StatusOK {
+			t.Errorf("a player without a login: GET %s = %d, want the stream", target, rec.Code)
+		}
+	}
+	const unknown = "fedcba9876543210fedcba9876543210fedcba98"
+	for _, target := range []string{
+		"/gst/" + unknown + "/master.m3u8?index=1&audio=0",
+		"/gst/echo",
+		"/gst/settings",
+	} {
+		if rec := s.ask(t, http.MethodGet, target, "", "", "", tv); rec.Code != http.StatusUnauthorized {
+			t.Errorf("a player without a login: GET %s = %d, want 401", target, rec.Code)
+		}
+		if rec := s.ask(t, http.MethodGet, target, "", user, password, tv); rec.Code != http.StatusOK {
+			t.Errorf("an app with its login: GET %s = %d, want it passed to TorrServer", target, rec.Code)
+		}
+	}
+}
+
 func TestStreamsSeekThroughTheGateway(t *testing.T) {
 	s := newSetup(t)
 	s.engine.saved[savedHash] = true

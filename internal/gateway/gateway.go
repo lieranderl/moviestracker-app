@@ -307,7 +307,7 @@ func (g *Gateway) savedStream(r *http.Request) bool {
 }
 
 // streamedHash is the one torrent r streams or lists: /stream?link=,
-// /play/{hash}/{file} or /playlist?hash=.
+// /play/{hash}/{file}, /playlist?hash= or GStreamer HLS under /gst/{hash}/.
 func streamedHash(r *http.Request) (string, bool) {
 	p, q := r.URL.Path, r.URL.Query()
 	one := func(key string) (string, bool) {
@@ -324,6 +324,11 @@ func streamedHash(r *http.Request) (string, bool) {
 	case strings.HasPrefix(p, "/play/"):
 		if parts := strings.Split(strings.TrimPrefix(p, "/play/"), "/"); len(parts) == 2 {
 			return infoHash(parts[0])
+		}
+	case strings.HasPrefix(p, "/gst/"):
+		// /gst/settings and /gst/echo name no torrent.
+		if hash, rest, ok := strings.Cut(strings.TrimPrefix(p, "/gst/"), "/"); ok && rest != "" {
+			return infoHash(hash)
 		}
 	}
 	return "", false
