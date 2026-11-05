@@ -3,7 +3,8 @@ name: Web app
 # Deploys the cloud web app (cmd/web, Dockerfile.web) to the Cloud Run service
 # moviestracker-web on every push to main that can change it. main only takes
 # pull requests whose CI passed, so this builds, deploys the new revision
-# without traffic, checks its /readyz, then moves all traffic to it. The local app's
+# without traffic, checks its /readyz, then moves all traffic to it, and
+# moves it back if the revision then fails its check. The local app's
 # releases (release.yml, v* tags) are separate.
 #
 # Roll back: `gcloud run services update-traffic moviestracker-web
@@ -53,7 +54,8 @@ jobs:
       url: https://moviestracker.net
     permissions:
       contents: read
-      id-token: write # sign in to Google Cloud
+      id-token: write # sign in to Google Cloud, sign the build provenance
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -65,15 +67,38 @@ jobs:
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.DEPLOYER }}
       - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
-      - name: Build and push the image
+      - name: Build the image
+        run: docker build -f Dockerfile.web -t "$IMAGE:$GITHUB_SHA" .
+      # Fixable HIGH and CRITICAL findings in the image's Go modules stop the
+      # deploy (the base is distroless/static: no OS packages).
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.76.1
+      - name: Scan the image with Trivy
+        env:
+          TRIVY_TIMEOUT: 10m
+          TRIVY_SCANNERS: vuln
+          TRIVY_NO_PROGRESS: "true"
+        run: trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$IMAGE:$GITHUB_SHA"
+      - name: Push the image
+        id: push
         run: |
           gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
-          docker build -f Dockerfile.web -t "$IMAGE:$GITHUB_SHA" .
           docker push "$IMAGE:$GITHUB_SHA"
+          digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE:$GITHUB_SHA")"
+          echo "digest=${digest#*@}" >>"$GITHUB_OUTPUT"
+      # `gh attestation verify oci://<image>@<digest> -R lieranderl/moviestracker-app`
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+      # By digest: the revision runs exactly the image just scanned.
       - name: Deploy a revision without traffic
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
         run: |
           gcloud run deploy "$SERVICE" --project "$PROJECT" --region "$REGION" \
-            --image "$IMAGE:$GITHUB_SHA" --no-traffic --tag candidate --quiet
+            --image "$IMAGE@$DIGEST" --no-traffic --tag candidate --quiet
       # /readyz, not /healthz: Cloud Run reserves paths ending in "z" such as
       # /healthz and answers them itself with a 404.
       - name: Check the new revision
@@ -81,6 +106,30 @@ jobs:
           url="$(gcloud run services describe "$SERVICE" --project "$PROJECT" --region "$REGION" --format=json \
             | jq -r '.status.traffic[] | select(.tag == "candidate") | .url')"
           curl --fail --silent --show-error --retry 5 --retry-all-errors "$url/readyz"
+      - name: Note the revision serving now
+        id: previous
+        run: |
+          revision="$(gcloud run services describe "$SERVICE" --project "$PROJECT" --region "$REGION" --format=json \
+            | jq -r '[.status.traffic[] | select(.percent == 100) | .revisionName][0] // ""')"
+          echo "Serving now: ${revision:-a traffic split}"
+          echo "revision=$revision" >>"$GITHUB_OUTPUT"
       - name: Move all traffic to it
+        id: shift
         run: |
           gcloud run services update-traffic "$SERVICE" --project "$PROJECT" --region "$REGION" --to-latest --quiet
+      - name: Check the service with all traffic
+        run: |
+          url="$(gcloud run services describe "$SERVICE" --project "$PROJECT" --region "$REGION" --format='value(status.url)')"
+          for _ in 1 2 3; do
+            curl --fail --silent --show-error --retry 5 --retry-all-errors "$url/readyz"
+            sleep 5
+          done
+      # Roll back: all traffic to the revision that served before.
+      - name: Move traffic back
+        if: failure() && steps.shift.outcome == 'success' && steps.previous.outputs.revision != ''
+        env:
+          PREVIOUS: ${{ steps.previous.outputs.revision }}
+        run: |
+          gcloud run services update-traffic "$SERVICE" --project "$PROJECT" --region "$REGION" \
+            --to-revisions "$PREVIOUS=100" --quiet
+          echo "::error::The new revision failed its check with all traffic: traffic is back on $PREVIOUS."
