@@ -6,32 +6,22 @@
 [![Release](https://img.shields.io/github/v/release/lieranderl/moviestracker-app?sort=semver)](https://github.com/lieranderl/moviestracker-app/releases/latest)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
-**Your own movie and TV catalog for every screen in your home: on a Mac, a
-Windows PC, or a NAS or home server.**
+A self-hosted movie and TV catalog with built-in streaming. It shows what is
+trending (trailers, cast, seasons, ratings), finds sources for a title, and
+plays them in the browser or on a TV through
+[TorrServer](https://github.com/YouROK/TorrServer), which it runs for you. The
+self-hosted app needs no cloud account, and its pages never expose your
+TorrServer or keys.
 
-Moviestracker shows what is trending, with trailers, cast, seasons and ratings,
-finds sources for a title, and plays them in your browser or on your TV
-through [TorrServer](https://github.com/YouROK/TorrServer), which it runs for
-you. It is free, runs entirely on your own machine, and needs no account
-anywhere.
-
-- **Discover:** trending movies and series, trailers, cast and crew, seasons
-  and episodes, recommendations, IMDb ratings, and live search.
-- **Find sources:** choose the quality (4K to SD) and HDR before searching,
-  then narrow the releases by tracker and voice (dubbing).
-- **Play anywhere:** in any browser, on phones and TVs, a whole season in a
-  row; or send a link or playlist to VLC or a smart TV on your network.
-- **Share the house:** accounts for the family (administrators and viewers)
-  and a live dashboard of what is playing and on which device.
-- **Works with TorrServer apps:** TorrServe on an Android TV, Lampa and other
-  TorrServer apps can use the same TorrServer and torrent list, each with a
-  login of its own ([more](#torrserver-apps-torrserve-lampa)).
-- **English and Russian:** the whole interface, and TMDB's titles, overviews,
-  logos and trailers, in either language. A browser starts in the language it
-  prefers; the language menu in the navbar switches it, and it is remembered
-  for that browser.
-- **Private by design:** everything stays on your machine. Pages never show
-  your TorrServer or keys, and links for TVs expire after a week.
+- **Discover:** trending titles, search, trailers, cast, seasons, IMDb ratings.
+- **Find sources:** filter by quality and HDR, then by tracker and voice.
+- **Play anywhere:** direct streams, or HLS transcoded by GStreamer so MKV/AC3/DTS
+  play in any browser; playlists and share links for VLC and smart TVs.
+- **Multi-user:** local accounts (administrators and viewers) and a live
+  dashboard of what is playing.
+- **TorrServer apps:** an authenticated gateway lets TorrServe, Lampa and similar
+  apps share the same TorrServer.
+- **English and Russian** interface, and TMDB metadata in either language.
 
 > Moviestracker does not host, upload, seed or distribute any media. Use it
 > only for content you have the right to access. This product uses the TMDB
@@ -39,357 +29,127 @@ anywhere.
 
 ## Get it
 
-| Where | Download | Guide |
-| --- | --- | --- |
-| **macOS 13+** (Apple Silicon, Intel) | `Moviestracker-<version>.dmg` | [Install on your Mac](#install-on-your-mac) |
-| **Windows 10/11** (64-bit, preview) | `Moviestracker-Setup-<version>-x64.exe` | [Windows](#windows-preview) |
-| **Linux, NAS, home servers** (amd64, arm64) | `ghcr.io/lieranderl/moviestracker` | [Docker](#linux-nas-and-home-servers-docker) |
-| **Any browser**, nothing to install | [moviestracker.net](https://moviestracker.net) | [Web version](#web-version) |
+| Where | Download |
+| --- | --- |
+| **macOS 13+** (Apple Silicon, Intel), menu bar app | `Moviestracker-<version>.dmg` |
+| **Windows 10/11** x64 (preview), tray app | `Moviestracker-Setup-<version>-x64.exe` |
+| **Linux, NAS, home server** (`amd64`, `arm64`) | `ghcr.io/lieranderl/moviestracker` |
+| **Any browser**, cloud version | [moviestracker.net](https://moviestracker.net) |
 
-Downloads are on the [latest release](https://github.com/lieranderl/moviestracker-app/releases/latest),
-with `checksums.txt`. Every file and image is built by this repository's
-release workflow, which anyone can check with the
-[GitHub CLI](https://cli.github.com):
+Binaries are on the [latest release](https://github.com/lieranderl/moviestracker-app/releases/latest)
+with `checksums.txt` and build attestations:
 
 ```bash
 gh attestation verify Moviestracker-<version>.dmg -R lieranderl/moviestracker-app
 ```
 
-## Install on your Mac
+### Quick start
 
-You need macOS 13 Ventura or newer, on Apple Silicon or Intel.
+- **macOS / Windows:** install, open the app (the installers are not signed
+  yet, so the OS asks for confirmation once), then create the administrator
+  account on the setup page that opens. TorrServer is bundled. On macOS,
+  install GStreamer from **Settings → Sources** for in-browser MKV playback;
+  the Windows build carries it already.
+- **Docker:** save [compose.yaml](compose.yaml) in a folder, then:
 
-1. Download **`Moviestracker-<version>.dmg`** from the
-   [latest release](https://github.com/lieranderl/moviestracker-app/releases/latest).
-2. Open it and drag **Moviestracker** to **Applications**.
-3. Open Moviestracker from Applications. The first time, macOS refuses to
-   open it, because the app is not signed with an Apple Developer ID yet:
-   - click **Done** (not *Move to Trash*);
-   - open **System Settings → Privacy & Security**, scroll to *Security*, and
-     click **Open Anyway** next to Moviestracker;
-   - confirm with your password or Touch ID, then choose **Open**.
+  ```bash
+  docker compose up -d
+  docker compose logs moviestracker   # one-time setup code
+  ```
 
-   On macOS 15 and newer, right-click → Open no longer skips this step.
-   The DMG includes these steps in *If macOS won't open it.txt*.
-4. A clapperboard icon appears in the menu bar (there is no Dock icon), and
-   your browser opens the setup page. Create your administrator account, and
-   you are done.
+  Open `http://<host>:8095`, enter the code and create the administrator.
+  Data lives in the `/data` volume. Update with
+  `docker compose pull && docker compose up -d`.
 
-Nothing else needs installing: TorrServer is inside the app, and search works
-right away with Moviestracker's shared TMDB key.
+Other devices on the LAN open the address shown in the app menu (for example
+`http://192.168.1.20:8095`) and sign in with an account.
 
-### Play MKV files in the browser
+- **Web version:** sign in with Google; favourites and settings are kept in
+  your account. It runs no TorrServer: your browser talks to your own
+  TorrServer directly, which must be at an `https://` address or on the same
+  computer (`http://localhost:8090`).
 
-Most movie files are MKV, often with AC3 or DTS sound, which browsers cannot
-play. Moviestracker can fix that with [GStreamer](https://gstreamer.freedesktop.org):
-on **Settings → Sources** (or the menu's **Set Up Browser Playback**), click
-**Install GStreamer**. It downloads the official GStreamer runtime (about
-146 MB, checked against a pinned checksum) into Moviestracker's own folder.
-No Homebrew, Terminal or password is needed, and it is removed with the app.
+## Technology
 
-Without GStreamer, MKV files still play in VLC and other players, and on TVs,
-through stream links.
-
-### Watch on a TV, phone or tablet
-
-The menu shows your Mac's address for other devices, for example
-`http://192.168.1.20:8095`. Click it to copy it, then open it in the browser on
-your phone or tablet, or on your TV. Other devices on your network can open
-Moviestracker only with an account. [Finding sources and watching](#finding-sources-and-watching)
-explains the rest.
-
-### The menu bar icon
-
-| Menu item | What it does |
+| Layer | Stack |
 | --- | --- |
-| Open Moviestracker, Dashboard | Opens it in your browser |
-| On a TV or phone: http://… | Copies the address for other devices |
-| Set Up Browser Playback | Opens the GStreamer setup |
-| Start at Login | Starts Moviestracker when you log in (on by default) |
-| Show Logs | Opens the log, handy when something goes wrong |
-| Restart | Restarts Moviestracker and TorrServer |
-| Uninstall Moviestracker… | Removes it; see below |
-| Quit Moviestracker | Stops Moviestracker and TorrServer |
+| Language | Go 1.27, standard library `net/http` (`ServeMux`) |
+| Views | [Templ](https://templ.guide), type-safe components compiled to Go |
+| Interactivity | [Datastar](https://data-star.dev) v1: server-driven state over SSE, no client framework |
+| Styling | [Tailwind CSS](https://tailwindcss.com) v4, [DaisyUI](https://daisyui.com) v5 |
+| Icons | Lucide, rendered server-side |
+| Custom JS | Only where Datastar cannot: hls.js player (`frontend/player.js`), browser-side TorrServer calls for the web app (`frontend/torrserver.js`), theme (`frontend/theme.js`) |
+| Frontend build | Bun (CSS, JS bundles, icon generation) |
+| Streaming | TorrServer (child process) with GStreamer for HLS |
+| Data sources | TMDB (metadata), JacRed (sources), IMDb rating service |
+| Local storage | One owner-only JSON state file, replaced atomically |
+| Cloud app | `cmd/web` on Cloud Run, Google sign-in, Firestore (`internal/store`, `internal/releases`) |
+| Desktop shells | macOS menu bar app in Swift (`macos/`), Windows tray app in Go with `fyne.io/systray` (`cmd/tray`) |
+| Packaging | Docker image (`linux/amd64`, `linux/arm64`, runs as uid 1000), macOS DMG, Windows installer |
+| CI/CD | GitHub Actions: tests, linters, CodeQL, release with attestations |
 
-### Update
+## How it works
 
-Download the new DMG and drag Moviestracker to Applications again, replacing
-the old one. Your accounts, settings and torrent list are kept. When a new
-version pins a newer GStreamer, the dashboard offers an **Update** button.
+- The server renders HTML with Templ and keeps pages live by streaming
+  HTML/signal patches over Server-Sent Events. Shared topics (`internal/live`)
+  poll TorrServer once per topic instead of once per viewer.
+- Auth is local: bcrypt-hashed accounts, persisted sessions (only token hashes
+  stored), login rate limiting, host allowlist against DNS rebinding, and a
+  strict CSP.
+- TorrServer runs as a managed child process, bound to `127.0.0.1` behind a
+  generated password and restarted with backoff. A separate gateway
+  (ports 8090/8091) exposes it to other apps with per-app logins.
+- Share links are HMAC-signed and expire after 7 days.
+- The self-hosted app and the cloud web app render the same `internal/views`
+  components and use the same player; only adapters (auth, storage, browser-side
+  TorrServer calls) differ.
+- Interface text is English in code and translated at render time
+  (`internal/i18n`); a test fails if a Russian translation is missing.
 
-### Uninstall
-
-Choose **Uninstall Moviestracker…** in the menu. It removes the app,
-TorrServer with its torrent list, and the GStreamer Moviestracker downloaded.
-You choose whether to also delete Moviestracker's accounts and settings.
-
-Everything Moviestracker keeps is in
-`~/Library/Application Support/moviestracker`.
-
-### Troubleshooting
-
-- **The browser says it cannot connect.** Check that the menu bar icon says
-  Moviestracker is running; if not, choose **Restart**, then **Show Logs**.
-- **Another program uses port 8095.** Quit it, then restart Moviestracker.
-- **A TV or phone cannot connect.** It must be on the same network as the
-  Mac. Allow incoming connections for Moviestracker if the macOS firewall
-  asks.
-- **Search shows nothing.** The shared TMDB key may be busy: add your own free
-  key in **Settings → Sources**.
-- **Sources say "JacRed needs a key"** or that today's searches are used up:
-  that is a build without Moviestracker's JacRed key (built from source, for
-  example), or a personal key's 100 searches a day. Update to the latest
-  release, or press **Use Moviestracker's key instead** in
-  **Settings → Sources**.
-- Still stuck? [Open an issue](https://github.com/lieranderl/moviestracker-app/issues/new/choose)
-  with the version (in the page footer) and the relevant part of the log.
-
-## Windows (preview)
-
-You need 64-bit Windows 10 or 11. Download
-`Moviestracker-Setup-<version>-x64.exe` from the
-[latest release](https://github.com/lieranderl/moviestracker-app/releases/latest)
-and run it. It installs for your Windows account only and needs no
-administrator rights.
-
-1. The installer is not signed yet, so Windows SmartScreen may say it
-   "protected your PC". Click **More info**, then **Run anyway**.
-2. Keep **Start Moviestracker when I sign in** ticked, and finish. A
-   clapperboard icon appears in the taskbar's notification area, and the
-   setup page opens in your browser.
-3. The first time Moviestracker and TorrServer start, Windows Firewall asks
-   whether to allow them. Allow **private networks**, so your TV and phone
-   can reach them.
-
-MKV files play in the browser straight away: TorrServer's Windows build
-carries GStreamer inside, so there is nothing else to install. The first MKV
-takes a few extra seconds while TorrServer unpacks it.
-
-The tray icon's menu (click the clapperboard) has the same items as the
-Mac's menu bar icon: open Moviestracker, the dashboard, the address for TVs
-and phones (click to copy), start when you sign in, logs, restart,
-uninstall and quit.
-
-- **Update:** run the newer installer. Accounts and settings stay.
-- **Uninstall:** choose **Uninstall Moviestracker…** in the tray menu, or
-  remove it in **Settings → Apps → Installed apps**. It asks whether to
-  delete your accounts and settings too.
-- **Where things are:** the programs in
-  `%LOCALAPPDATA%\Programs\Moviestracker`, accounts, settings, TorrServer's
-  data and the log (`moviestracker.log`) in `%LOCALAPPDATA%\Moviestracker`.
-
-## Linux, NAS and home servers (Docker)
-
-On Linux, a NAS (Synology, QNAP, Unraid, TrueNAS…) or a home server,
-Moviestracker runs in Docker. The image is for `linux/amd64` and
-`linux/arm64` (Raspberry Pi 4/5, most NAS boxes) and has everything: it runs
-its own TorrServer with GStreamer, so MKV files play in the browser.
-
-1. Save [compose.yaml](compose.yaml) in a folder, then start it:
-
-   ```bash
-   docker compose up -d
-   ```
-
-2. Find the one-time setup code in its log:
-
-   ```bash
-   docker compose logs moviestracker
-   ```
-
-3. Open `http://<the server's address>:8095`, enter the code and create the
-   administrator account. Then see
-   [Finding sources and watching](#finding-sources-and-watching).
-
-Without Compose:
-
-```bash
-docker run -d --name moviestracker --restart unless-stopped -p 8095:8095 \
-  -v moviestracker-data:/data --read-only --tmpfs /tmp --cap-drop ALL \
-  --security-opt no-new-privileges --stop-timeout 30 \
-  ghcr.io/lieranderl/moviestracker:latest
+```
+cmd/server   self-hosted app          internal/handlers, views   HTTP + Templ UI
+cmd/tray     Windows tray app         internal/engine, gateway   TorrServer
+macos/       macOS menu bar app       internal/update            release check
+cmd/web      cloud app (Cloud Run)    internal/tmdb, jacred      data sources
+frontend/    player, theme, icons     internal/auth, store       accounts, Firestore
 ```
 
-- **Your data:** accounts, settings and TorrServer's torrent list live in the
-  `/data` volume and survive updates. To use a folder of your own instead
-  (`./moviestracker:/data`), give it to uid 1000 (`sudo chown 1000:1000
-  moviestracker`), or set `user:` in `compose.yaml` to the folder's owner.
-- **Only port 8095** is published. TorrServer stays inside the container,
-  behind a password Moviestracker generates; to let
-  [TorrServer apps](#torrserver-apps-torrserve-lampa) in, publish 8090 and 8091 too.
-- **Names and links:** Moviestracker answers to IP addresses and `localhost`.
-  To use a name such as `http://nas.local:8095`, add it to `MT_HOSTNAMES` in
-  `compose.yaml`. If you open it as `localhost`, set `MT_LAN_ADDRESS` to the
-  server's address, so links for TVs and phones point there.
-- **Your own TorrServer** (advanced): set `TORRSERVER_URL`, or choose it in
-  **Settings → Sources**. The bundled one then stays off.
-- **Update:** `docker compose pull && docker compose up -d`.
-- **Uninstall:** `docker compose down` keeps the data volume; add `-v` to
-  delete it too.
-- **Logs:** `docker compose logs moviestracker`. `docker compose ps` shows
-  whether it is healthy.
+## Development
 
-HDR-to-SDR conversion needs TorrServer's `hdrtonemap` plugin, which only its
-Windows build has. The other conversions work the same as in the apps. All
-settings are in [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+Requires Go 1.27, [Bun](https://bun.sh) and [Air](https://github.com/air-verse/air)
+(for `make dev`). Templ, golangci-lint, staticcheck, gosec and govulncheck run
+through `go tool`. Docker is needed only for the image.
 
-## Web version
+```bash
+make dev        # dev server with Air hot reload
+make web-dev    # cloud web app on http://localhost:8080
+make test       # go test -race ./...
+make lint       # vet, staticcheck, golangci-lint, gofmt
+make ci         # full pipeline: format, lint, templ, assets, tests, security, build
+make build      # self-contained binary at bin/server
+```
 
-[moviestracker.net](https://moviestracker.net) is the same catalog as a
-website: sign in with Google and use it from any browser, with nothing to
-install. It adds favourites and rows of new releases found on trackers
-(latest movies, HDR10, Dolby Vision), and keeps your favourites, settings
-and TorrServer addresses in your account, on every device you sign in on.
+`make firestore` starts the Firestore emulator for `make test-store`. All
+settings and environment variables are in
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md); design notes in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DATASTAR.md](docs/DATASTAR.md),
+[docs/TESTING.md](docs/TESTING.md) and [docs/MAINTAINING.md](docs/MAINTAINING.md).
+Changes go through pull requests on a feature branch; `main` is protected and
+squash-merged once CI passes. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-It does not run a TorrServer for you. Add your own on the **TorrServer**
-page; your browser talks to it directly. The website keeps its address in
-your account but never connects to it, and its login stays in that browser.
-From there you find
-sources, send them to your TorrServer and play them, with the same player
-as the apps.
+## Privacy and data
 
-- The site is served over HTTPS, so the browser only reaches a TorrServer
-  at an `https://` address (TorrServer `--ssl` with a certificate the
-  browser trusts) or one on the same computer at `http://localhost:8090`.
-  A plain `http://` TorrServer on another machine is blocked. For the
-  TorrServer the Moviestracker app runs, use the HTTPS address and a login
-  from its **Settings → Other apps**.
-- Chrome asks once to allow access to your local network; allow it.
-- With a self-signed certificate, open the TorrServer's address once in the
-  same browser and accept it.
+TMDB, JacRed and the IMDb rating service see the titles you look up, and
+TorrServer talks to BitTorrent peers while playing. The self-hosted app also
+asks GitHub once a day for a newer release (it can be switched off in
+**Settings → Updates**), and the Mac app downloads GStreamer when you ask it to.
+Nothing else is contacted: no analytics, no telemetry. Data is kept in `~/Library/Application Support/moviestracker`
+(macOS), `%LOCALAPPDATA%\Moviestracker` (Windows) or the `/data` volume (Docker).
 
-## Finding sources and watching
-
-The same on a Mac, on Windows and in Docker, in any browser.
-
-### Find sources
-
-On a movie or series page, go to **Sources**:
-
-1. Choose the qualities you want (**4K**, **1080p**, **720p**, **SD**; none
-   means all) and, if you like, **HDR only**. For a series, pick the season.
-2. Press **Find sources**. Nothing is searched before that. Changing a
-   quality, HDR or the season searches again.
-3. Sort by **Seeders**, **Newest** or **Size**, and narrow the list by
-   **tracker** and **voice** (the dubbing or voice-over), any number of each.
-4. **TorrServer** sends a release to your TorrServer, ready to play; the
-   magnet button copies its magnet link.
-
-Search is powered by [JacRed](https://jacred.su). Releases carry
-Moviestracker's own JacRed key, with unlimited searches, so there is nothing
-to set up.
-
-### Watch
-
-The **TorrServer** page lists your torrents. Each file has two ways to watch:
-
-- **Direct**, the original file at full quality, for VLC, other players and
-  TVs;
-- **HLS**, converted by GStreamer as it plays: it plays in any browser, on
-  phones and on TVs, and lets you pick the audio track.
-
-HLS needs a TorrServer with GStreamer. The Windows installer and the Docker
-image have it; on a Mac, install it once
-([Play MKV files in the browser](#play-mkv-files-in-the-browser)). With your
-own TorrServer, it depends on that build. Without GStreamer, only Direct is
-offered, and the HLS playlist and audio picker are hidden.
-
-Each has ▶ to play it here and 🔗 to copy its link for another device. A
-torrent with several videos (a season, say) also has **Play all** and a
-**Direct .m3u8** and (with GStreamer) **HLS .m3u8** playlist of all of them.
-
-In the player:
-
-- **Playlist** (in the control bar) lists the torrent's videos; the next one
-  starts when one ends, and **Next** skips ahead;
-- in fullscreen, the file's name and its place in the list show at the top;
-- **Space** or **K** plays and pauses, **←** / **→** skip 10 seconds, **↑** / **↓**
-  and the mouse wheel or trackpad change the volume, **M** mutes, **F** goes
-  fullscreen; double-tap the left or right of the video to skip 10 seconds;
-- **VLC** (and **IINA** on a Mac) open the original file in that player. If
-  nothing opens, the page says so: the player is probably not installed, and
-  the copied link works in any other.
-
-A few files use audio or video browsers cannot decode at all, such as the
-rare AAC Main audio: the player then says what it cannot play, and the file's
-**Direct** link plays in VLC or on a TV.
-
-Links work for 7 days; **Settings → Security** cancels all of them at once.
-
-## TorrServer apps: TorrServe, Lampa
-
-TorrServer apps, such as TorrServe on an Android TV or Lampa, can use the
-TorrServer Moviestracker runs, on the Mac, on Windows and in Docker. They see
-the same torrents: what you save in Moviestracker shows up in the app, and the
-other way round.
-
-1. In **Settings → Other apps**, switch on **Open TorrServer to other apps**.
-2. Under **Logins for apps**, make a login for the TV or app (for example
-   *Living room TV*). Its password is shown once: enter it in the app then.
-3. In the app, add an address the page shows, with that username and
-   password: `http://192.168.1.20:8090`, or `https://192.168.1.20:8091`
-   once **Serve HTTPS** is on in **Settings → HTTPS** (with that page's
-   certificate).
-
-- Apps can play, add and remove torrents. TorrServer's settings stay
-  Moviestracker's, and apps cannot stop it.
-- Video players the app hands a stream to need no login, as with TorrServer
-  itself, but only for torrents already saved.
-- Only devices on your home network (and your
-  [Tailscale](https://tailscale.com) network) get in. **Also allow from the
-  internet** opens it further, over HTTPS only, so logins never cross the
-  internet unencrypted. Still, for access away from home a VPN such as
-  Tailscale or WireGuard is the safer way.
-- Some TV apps refuse a self-signed certificate: use the HTTP address at
-  home for them, or upload a certificate of your own (Let's Encrypt) in
-  **Settings → HTTPS**.
-- TorrServer itself stays on this computer: other devices and the web
-  version come in only through these ports, with logins of their own.
-- In Lampa, switch on authorization in its TorrServer settings, or it sends
-  no login. Lampa opened from an `https://` address cannot reach an
-  `http://` one: the browser blocks it. Use the Lampa app, or open Lampa
-  from an `http://` address.
-- Removing a login in **Settings → Other apps** signs that app out at once.
-- Ports 8090 (HTTP) and 8091 (HTTPS) are the ones TorrServer apps suggest.
-  If a TorrServer of its own already uses them, stop that one, or choose
-  other ports with `MT_TORRSERVER_LISTEN` and `MT_TORRSERVER_TLS_LISTEN`. In
-  Docker, publish them too (`"8090:8090"` and `"8091:8091"`, in
-  `compose.yaml`).
-
-## Where the data comes from
-
-- **TMDB** for titles, images, cast and trailers: Moviestracker's shared key
-  works out of the box, or add your own free key.
-- **JacRed** for finding sources: the public [jacred.su](https://jacred.su),
-  or your own [JacRed](https://github.com/jacred-fdb/jacred). jacred.su needs
-  a key from 9 October 2026: releases carry Moviestracker's own (unlimited),
-  so nothing to set up; you can use a personal key from
-  [jacred.su/account](https://jacred.su/account) instead.
-- **IMDb ratings** from a small rating service; they can be switched off.
-- **TorrServer** does the streaming, inside the app or one you already run
-  (on a NAS, for example).
-
-These services see the titles you look up, as any website would, and
-TorrServer talks to BitTorrent peers while it plays. Apart from that,
-Moviestracker contacts nothing: no analytics, no telemetry, no accounts.
-
-## Contributing
-
-Bug reports, ideas and pull requests are welcome: see
-[CONTRIBUTING.md](CONTRIBUTING.md). It is built with Go, [Templ](https://templ.guide),
-[Datastar](https://data-star.dev) and [DaisyUI](https://daisyui.com): the server
-renders HTML and keeps pages live over server-sent events, with no
-JavaScript framework. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains
-how it fits together.
-
-Security problems: please report them privately, see [SECURITY.md](SECURITY.md).
+Report security problems privately: see [SECURITY.md](SECURITY.md).
 
 ## License
 
-[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). You may
-use, change and share Moviestracker freely. If you run a changed version that
-other people use over a network, you must offer them its source code, as the
-footer link does; see [NOTICE](NOTICE) for the software Moviestracker
-bundles. TorrServer, shipped in the Mac app, the Windows installer and the
-Docker image, is a separate program under the GPL-3.0, with its license and
-source link included.
+[AGPL-3.0-only](LICENSE). See [NOTICE](NOTICE) for bundled software. TorrServer,
+shipped with the apps and the Docker image, is a separate GPL-3.0 program with
+its license and source link included.
