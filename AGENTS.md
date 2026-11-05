@@ -48,6 +48,18 @@ Every task follows the four-step loop:
   - Bulk classify, rerank or verify over many items: the matching jev tool.
   - Never for routine tool or path choices.
 
+## Loops & Gates
+A loop makes one unit correct; the graph around it decides which units exist. Human approves the PR, not intermediate steps.
+- **Check first**: define a green condition a program can evaluate (`go test -race` exits 0, `make lint` clean, diff touches only planned files). "Looks good", "model is confident", "no errors raised" are not checks.
+- **Fan out independent work**: an arrow is an edge only if the next step reads the previous output. Otherwise run in parallel via `search`/`grep`/`docs` subagents. Each subagent gets its own context and one lens.
+- **Code, not models, for mechanical steps**: merge, dedupe, rank, before/after compare are scripts (see `scripts/`). If it needs no "judge/decide/summarize", it is code.
+- **Return the unit, not the batch**: a failing slice goes back alone with unit, verdict, reason, evidence (file:line), and scope ("fix this file only"). Never rewrite passing slices. Max 3 correction attempts, then the plan is wrong: stop and re-plan.
+- **Gate by blast radius, not confidence**:
+  - Open: copy changes, tests, isolated covered functions. Deterministic checks suffice.
+  - Wide: shared `internal/views` components, auth and Firestore adapters, `frontend/player.js`. Need `make ci` and a clean diff.
+  - Closed (never auto): Firestore data writes or deletes, deploys to moviestracker.net, release tags. Explicit user yes every time.
+- **Learning edge**: an accepted fix that exposes a missed rule becomes a permanent constraint: add a test if it is checkable, otherwise a memory/doc line that the Plan step reads first.
+
 ## Test-Driven Development (TDD)
 - **Red-Green loop**: Write one failing test at a public seam, write only enough code to pass it, then move to the next behavior.
 - **Vertical slices**: One seam, one test, minimal implementation, repeat. Never write a bulk batch of tests before implementation.
