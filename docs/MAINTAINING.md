@@ -23,7 +23,7 @@ changing it (it updates what exists).
     is one commit on `main`, signed by GitHub, titled as a Conventional
     Commit; conversations must be resolved;
   - required checks, on a branch up to date with `main`: **CI passed**
-    (`ci.yml`'s last job, green only when every CI job is), **Title follows
+    (`ci.yml`'s last job, green only when every CI job is, or was skipped for a documentation-only change), **Title follows
     Conventional Commits** and **Dependency review** (`pr.yml`), and no new
     CodeQL errors or high-severity alerts;
   - no deletion, force-push or merge commits (linear history). Commits on
@@ -50,7 +50,7 @@ changing it (it updates what exists).
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `ci.yml` | pull requests, pushes to `main`, called by releases | `make ci` (generated files, lint, race tests, govulncheck, gosec, build) and the TorrServer API contract; gitleaks over the whole history; macOS tests and a real DMG build; Windows tests, a real installer build, and its install, upgrade, quit, uninstall and purge; the Docker image end to end with `compose.yaml` (`scripts/ci/docker-e2e.sh`: TorrServer and GStreamer, setup, persistence, shutdown, licences) on amd64 and on native arm64 runners, then Trivy over that image (fixable HIGH/CRITICAL fail: the Dockerfile's `base` stage's Debian packages, without GStreamer and its codec libraries, and the image's Go modules; TorrServer's are only reported in the job summary); zizmor over the workflows; **CI passed** when all of them are green |
+| `ci.yml` | pull requests, pushes to `main`, called by releases | `make ci` split into parallel jobs (`make lint-linux`: generated files and lint; `make test-only`: race tests and the TorrServer API contract; `make security lint-windows binary`); gitleaks over the whole history; macOS tests and a real DMG build; Windows tests, a real installer build, and its install, upgrade, quit, uninstall and purge; the Docker image end to end with `compose.yaml` (`scripts/ci/docker-e2e.sh`: TorrServer and GStreamer, setup, persistence, shutdown, licences) on amd64 and on native arm64 runners, then Trivy over that image (fixable HIGH/CRITICAL fail: the Dockerfile's `base` stage's Debian packages, without GStreamer and its codec libraries, and the image's Go modules; TorrServer's are only reported in the job summary); zizmor over the workflows; **CI passed** when all of them are green. A pull request that changes only Markdown or `docs/` runs only the secret scan and zizmor. Each Go job restores its own module and build cache, saved only by pushes to `main` |
 | `pr.yml` | pull requests | Conventional Commit titles; dependency review (vulnerable or AGPL-incompatible dependencies); labels from the title |
 | `dependabot-merge.yml` | Dependabot's pull requests | Turns on auto-merge for minor and patch updates as the pins app (major ones wait for a person); a merge that `GITHUB_TOKEN` turned on would push to `main` without starting its CI or the web app's deploy. It runs nothing from the pull request |
 | `dependabot-assets.yml` | Dependabot's Bun and Go pull requests | Rebuilds the committed frontend assets or Templ-generated Go files from the pull request merged into `main` and, when they changed, commits them to its branch as the pins app, so CI's generated-files check passes; Go uses the generator pinned in `go.mod`; the build runs with a read-only token and no secrets, the commit job runs nothing from the pull request |
