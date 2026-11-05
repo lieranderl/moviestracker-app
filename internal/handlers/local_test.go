@@ -3,6 +3,7 @@ package handlers_test
 import (
 	"crypto/rand"
 	"fmt"
+	mathrand "math/rand/v2"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -481,12 +482,14 @@ func freePort(t *testing.T) int {
 // freePeerPort returns a port TCP and UDP are both free on.
 func freePeerPort(t *testing.T) int {
 	t.Helper()
-	for range 20 {
-		tcp, err := net.Listen("tcp4", ":0") // #nosec G102 -- test: a peer port listens on every interface
+	// Below Windows' dynamic range, where reserved (Hyper-V/WinNAT) blocks
+	// refuse UDP on ports TCP was just given, as the engine picks its own.
+	for range 50 {
+		port := 10000 + mathrand.IntN(49152-10000)             // #nosec G404 -- a port number, not a secret
+		tcp, err := net.Listen("tcp4", ":"+strconv.Itoa(port)) // #nosec G102 -- test: a peer port listens on every interface
 		if err != nil {
-			t.Fatal(err)
+			continue
 		}
-		port := tcp.Addr().(*net.TCPAddr).Port
 		udp, err := net.ListenPacket("udp4", ":"+strconv.Itoa(port)) // #nosec G102 -- as above
 		_ = tcp.Close()
 		if err == nil {
