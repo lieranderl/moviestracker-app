@@ -481,12 +481,15 @@ window.tsPlayerTick = async (el) => {
       if (!settings.problem) session.cacheSize = Number.isSafeInteger(capacity) && capacity > 0 ? capacity : 0;
     }
     let heartbeat={};
-    if (session.kind==="hls" && !ctl.signal.aborted) {
-      heartbeat=await call(session.url,`gst/${session.hash}/heartbeat`,{signal:ctl.signal,read:res=>res.json()});
-    }
-    if (session.kind === "hls" && !session.master && !heartbeat.problem && !ctl.signal.aborted) {
+    // The master playlist starts TorrServer's HLS task: a heartbeat before
+    // it finds none (404).
+    if (session.kind === "hls" && !session.master && !ctl.signal.aborted) {
       const master = await call(session.url,`gst/${session.hash}/master.m3u8?index=${session.index}&audio=${session.audio}`,{signal:ctl.signal,read:res=>res.text()});
       if (master.value?.includes("#EXT-X-STREAM-INF:") && master.value.length <= 65536) session.master = master.value;
+      heartbeat = master.problem ? master : {};
+    }
+    if (session.kind==="hls" && !heartbeat.problem && !ctl.signal.aborted) {
+      heartbeat=await call(session.url,`gst/${session.hash}/heartbeat`,{signal:ctl.signal,read:res=>res.json()});
     }
     if (ctl.signal.aborted || playerSessions.get(el)!==session) return;
     const media = playerMedia.get(el);

@@ -214,9 +214,28 @@ test("an HLS viewer sends heartbeats and stops them when closing", async () => {
  await client.tsPlayerTick(el);
  await client.tsPlayerRelease(el);
  await client.tsPlayerRelease(el);
- expect(requests.mock.calls.map(([target])=>target.pathname)).toEqual(["/torrents","/settings","/gst/08ada5a7a6183aae1e09d831df6748d566095a10/heartbeat","/gst/08ada5a7a6183aae1e09d831df6748d566095a10/master.m3u8"]);
+ expect(requests.mock.calls.map(([target])=>target.pathname)).toEqual(["/torrents","/settings","/gst/08ada5a7a6183aae1e09d831df6748d566095a10/master.m3u8","/gst/08ada5a7a6183aae1e09d831df6748d566095a10/heartbeat"]);
  await client.tsPlayerTick(el);
  expect(requests).toHaveBeenCalledTimes(4);
+});
+
+test("an HLS viewer starts TorrServer's task before its first heartbeat", async () => {
+  const el = new EventTarget();
+  const hash = "08ada5a7a6183aae1e09d831df6748d566095a10";
+  const stats = [];
+  el.addEventListener("ts-player-stats", evt => stats.push(evt.detail));
+  // TorrServer has no HLS task for a file until its master playlist is asked for.
+  let task = false;
+  requests.mockImplementation(async target => {
+    if (target.pathname.endsWith("/master.m3u8")) { task = true; return new Response("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\nv.m3u8"); }
+    if (target.pathname.endsWith("/heartbeat")) return task ? Response.json({}) : new Response("", {status: 404});
+    return Response.json(target.pathname === "/torrents" ? {hash} : {});
+  });
+  await client.tsPlayerLease(el, server, hash, 1, "hls", 0);
+  await client.tsPlayerTick(el);
+  expect(requests.mock.calls.map(([target]) => target.pathname)).toEqual(["/torrents", "/settings", `/gst/${hash}/master.m3u8`, `/gst/${hash}/heartbeat`]);
+  expect(stats.at(-1).heartbeatProblem).toBe("");
+  await client.tsPlayerRelease(el);
 });
 
 test("changing an HLS audio track does not remove another viewer's shared task", async () => {
@@ -265,7 +284,7 @@ test("closing one viewer does not remove the HLS task used by another viewer", a
   expect(requests).not.toHaveBeenCalled();
   requests.mockImplementation(async target => Response.json(target.pathname === "/torrents" ? {hash} : {}));
   await client.tsPlayerTick(second);
-  expect(requests.mock.calls.map(([target]) => target.pathname)).toEqual(["/torrents", "/settings", `/gst/${hash}/heartbeat`, `/gst/${hash}/master.m3u8`]);
+  expect(requests.mock.calls.map(([target]) => target.pathname)).toEqual(["/torrents", "/settings", `/gst/${hash}/master.m3u8`, `/gst/${hash}/heartbeat`]);
   await client.tsPlayerRelease(second);
 });
 
@@ -383,7 +402,7 @@ test("media comparison relays the selected audio and master playlist without log
  expect(events[0].probe).toEqual(probe);
  expect(events[0].master).toBe(master);
  expect(JSON.stringify(events)).not.toContain("browser-secret");
- expect(requests.mock.calls.at(-1)[0].search).toBe("?index=1&audio=1");
+ expect(requests.mock.calls.find(([target])=>target.pathname.endsWith("master.m3u8"))[0].search).toBe("?index=1&audio=1");
  await client.tsPlayerCancel(el);
 });
 
