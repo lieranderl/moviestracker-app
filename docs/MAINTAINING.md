@@ -51,7 +51,8 @@ changing it (it updates what exists).
 | Workflow | When | What |
 | --- | --- | --- |
 | `ci.yml` | pull requests, pushes to `main`, called by releases | `make ci` (generated files, lint, race tests, govulncheck, gosec, build) and the TorrServer API contract; gitleaks over the whole history; macOS tests and a real DMG build; Windows tests, a real installer build, and its install, upgrade, quit, uninstall and purge; the Docker image end to end with `compose.yaml` (`scripts/ci/docker-e2e.sh`: TorrServer and GStreamer, setup, persistence, shutdown, licences) on amd64 and on native arm64 runners, then Trivy over that image (fixable HIGH/CRITICAL fail: the Dockerfile's `base` stage's Debian packages, without GStreamer and its codec libraries, and the image's Go modules; TorrServer's are only reported in the job summary); zizmor over the workflows; **CI passed** when all of them are green |
-| `pr.yml` | pull requests | Conventional Commit titles; dependency review (vulnerable or AGPL-incompatible dependencies); labels from the title; auto-merge for Dependabot's minor and patch updates |
+| `pr.yml` | pull requests | Conventional Commit titles; dependency review (vulnerable or AGPL-incompatible dependencies); labels from the title |
+| `dependabot-merge.yml` | Dependabot's pull requests | Turns on auto-merge for minor and patch updates as the pins app (major ones wait for a person); a merge that `GITHUB_TOKEN` turned on would push to `main` without starting its CI or the web app's deploy. It runs nothing from the pull request |
 | `dependabot-assets.yml` | Dependabot's Bun and Go pull requests | Rebuilds the committed frontend assets or Templ-generated Go files from the pull request merged into `main` and, when they changed, commits them to its branch as the pins app, so CI's generated-files check passes; Go uses the generator pinned in `go.mod`; the build runs with a read-only token and no secrets, the commit job runs nothing from the pull request |
 | `codeql.yml` | pull requests, `main`, weekly | CodeQL for Go, JavaScript and the workflows; results in templ's generated `*_templ.go` are dropped before upload |
 | `release.yml` | `v*` tags | Checks the tag is on `main`, runs CI, then in parallel the Docker image for linux/amd64 and linux/arm64 (pushed to `ghcr.io/lieranderl/moviestracker:<version>` with SBOM and signed provenance), the DMG and the Windows installer; checksums, signed build provenance, and a **draft** release |
@@ -214,8 +215,8 @@ create a new read-only token for the Moviestracker TMDB account, update the
 secret, release, then revoke the old token.
 
 The `pins` environment, which only `main` can use, holds the pins app that
-opens the weekly pin updates and commits rebuilt assets to Dependabot's Bun
-updates: the variable `PINS_APP_CLIENT_ID` and the secret
+opens the weekly pin updates, commits rebuilt assets to Dependabot's Bun
+updates and turns on their auto-merge: the variable `PINS_APP_CLIENT_ID` and the secret
 `PINS_APP_PRIVATE_KEY`. Actions may not open pull requests in this
 repository, and pull requests opened or pushed with `GITHUB_TOKEN` would not
 start CI, so the app does it. To create it (once):
