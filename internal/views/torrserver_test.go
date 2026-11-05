@@ -668,3 +668,56 @@ func TestAnUnplayableFileOffersTheAlternativeThatApplies(t *testing.T) {
 		}
 	}
 }
+
+func TestALongTrackMenuScrollsInsideThePlayer(t *testing.T) {
+	tracks := []torrserver.ProbeTrack{{Index: 0, Type: "subtitle", Language: "en"}, {Index: 1, Type: "subtitle", Language: "ru"}}
+	menu := regexp.MustCompile(`<ul class="dropdown-content menu[^"]*"`).FindString(render(t, views.TorrSubtitleMenu(tracks)))
+	// A menu wraps into columns unless told not to, and the player clips it,
+	// so its height has to follow the player's, however small that is.
+	for _, want := range []string{"flex-nowrap", "overflow-y-auto", "100cqh"} {
+		if !strings.Contains(menu, want) {
+			t.Errorf("the track menu lacks %s: %s", want, menu)
+		}
+	}
+	player := regexp.MustCompile(`<div class="([^"]*)"[^>]*data-ref:_player`).FindStringSubmatch(torrPage(t, true))
+	if player == nil || !strings.Contains(player[1], "[container-type:size]") {
+		t.Errorf("the track menu cannot measure the player: %v", player)
+	}
+}
+
+func TestTheWheelScrollsAnOpenMenuInsteadOfTurningTheVolume(t *testing.T) {
+	wheel := regexp.MustCompile(`data-ref:_player[^<]*data-on:wheel="([^"]*)"`).FindStringSubmatch(torrPage(t, true))
+	if wheel == nil {
+		t.Fatal("the player has no wheel handler")
+	}
+	guard := strings.Index(wheel[1], "evt.target.closest('.dropdown-content')")
+	if guard < 0 || guard > strings.Index(wheel[1], "evt.preventDefault()") {
+		t.Errorf("the wheel is taken from an open menu: %s", wheel[1])
+	}
+}
+
+func TestAFileWithOneAudioTrackStillShowsIt(t *testing.T) {
+	out := render(t, views.TorrAudioPicker([]torrserver.ProbeTrack{{Index: 0, Type: "audio", Language: "en", Channels: 6}}, 0))
+	for _, want := range []string{`data-track="0"`, `data-lang="en"`, ">EN · 5.1<"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %s in:\n%s", want, out)
+		}
+	}
+	if out := render(t, views.TorrAudioPicker(nil, 0)); strings.Contains(out, "<details") {
+		t.Errorf("a file without audio tracks should have no audio menu:\n%s", out)
+	}
+}
+
+// With one track the menu is a label: clicking it must not replace the
+// language remembered for the next file.
+func TestPickingThePlayingAudioTrackKeepsTheRememberedLanguage(t *testing.T) {
+	out := html.UnescapeString(render(t, views.TorrAudioPicker([]torrserver.ProbeTrack{{Index: 0, Type: "audio", Language: "en"}}, 0)))
+	pick := regexp.MustCompile(`(?s)data-on:click="(const b = [^"]*)"`).FindStringSubmatch(out)
+	if pick == nil {
+		t.Fatalf("the audio menu has no pick handler:\n%s", out)
+	}
+	guard := strings.Index(pick[1], "+b.dataset.track !== $audioTrack")
+	if guard < 0 || guard > strings.Index(pick[1], "localStorage.setItem") {
+		t.Errorf("picking the playing track overwrites the remembered language: %s", pick[1])
+	}
+}

@@ -125,8 +125,9 @@ const torrQueueFetch = `$playerOpen && $activeHash && @get('/api/torrserver/queu
 // torrWheelVolume turns the volume up as the wheel or the fingers go up,
 // down as they go down: 5% a mouse notch, finer on a trackpad. Macs scroll
 // "naturally" (inverted: fingers up scroll down), which Safari reports and
-// other browsers leave to guess from the platform.
-const torrWheelVolume = `if (!evt.deltaY) return
+// other browsers leave to guess from the platform. Over an open menu the
+// wheel scrolls the menu instead.
+const torrWheelVolume = `if (!evt.deltaY || evt.target.closest('.dropdown-content')) return
 evt.preventDefault()
 const inverted = evt.webkitDirectionInvertedFromDevice ?? (` + onMac + `)
 const px = (evt.deltaMode ? evt.deltaY * 40 : evt.deltaY) * (inverted ? -1 : 1)
@@ -832,7 +833,7 @@ templ torrPlayerModalFor(browser bool) {
 			</form>
 		</header>
 		<div
-			class="relative mt-4 bg-black rounded-box overflow-hidden shadow-2xl aspect-video outline-none"
+			class="relative mt-4 bg-black rounded-box overflow-hidden shadow-2xl aspect-video outline-none [container-type:size]"
 			tabindex="0"
 			data-ref:_player
 			data-on:pointermove="$_idle = false"
@@ -1441,7 +1442,8 @@ templ TorrSubtitleMenu(tracks []torrserver.ProbeTrack) {
 
 // trackMenu is an upward-opening dropdown in the control bar. openSignal
 // drives it so picking an item (or clicking outside) closes it; highlight
-// tints the icon (e.g. while subtitles are on).
+// tints the icon (e.g. while subtitles are on). The player clips its content,
+// so a long list scrolls within the player's height (100cqh) above the bar.
 templ trackMenu(title, icon, openSignal, toggle, highlight, pick string) {
 	<details class="dropdown dropdown-top dropdown-end" data-attr:open={ openSignal } data-on:click__outside={ openSignal + " = false" }>
 		<summary
@@ -1453,7 +1455,7 @@ templ trackMenu(title, icon, openSignal, toggle, highlight, pick string) {
 		>
 			@Icon(icon, "size-5")
 		</summary>
-		<ul class="dropdown-content menu menu-sm bg-base-200 text-base-content rounded-box w-56 p-2 mb-2 shadow-lg font-mono" data-on:click={ pick }>
+		<ul class="dropdown-content menu menu-sm flex-nowrap bg-base-200 text-base-content rounded-box w-56 max-h-[min(20rem,calc(100cqh-4rem))] overflow-y-auto overscroll-contain p-2 mb-2 shadow-lg font-mono" data-on:click={ pick }>
 			<li class="menu-title">{ title }</li>
 			{ children... }
 		</ul>
@@ -1461,18 +1463,22 @@ templ trackMenu(title, icon, openSignal, toggle, highlight, pick string) {
 }
 
 // torrAudioPick switches the audio track (restarting the HLS stream on it)
-// and remembers its language for the next file.
+// and remembers its language for the next file. Picking the playing track
+// changes nothing: a file's only track says nothing about the viewer's choice.
 const torrAudioPick = `const b = evt.target.closest('[data-track]')
 if (b) {
-	$audioTrack = +b.dataset.track; $audioLang = b.dataset.lang; $_audioMenu = false
-	localStorage.setItem('torrAudioLang', $audioLang)
+	$_audioMenu = false
+	if (+b.dataset.track !== $audioTrack) {
+		$audioTrack = +b.dataset.track; $audioLang = b.dataset.lang
+		localStorage.setItem('torrAudioLang', $audioLang)
+	}
 }`
 
-// TorrAudioPicker is the audio menu in the player's control bar. It is only
-// shown when the file has more than one audio track.
+// TorrAudioPicker is the audio menu in the player's control bar. A file's only
+// track is listed too, so the viewer can see which audio is playing.
 templ TorrAudioPicker(tracks []torrserver.ProbeTrack, selected int) {
 	<div id="torr-audio-picker" class="contents">
-		if len(tracks) > 1 {
+		if len(tracks) > 0 {
 			@trackMenu(tr(ctx, "Audio"), "audio-lines", "$_audioMenu", "$_audioMenu = !$_audioMenu; $_subMenu = false", "false", torrAudioPick) {
 				for _, trk := range tracks {
 					<li>
