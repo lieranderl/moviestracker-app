@@ -55,8 +55,15 @@ func macApp(t *testing.T) (app, dmg string) {
 	return app, dmg
 }
 
-func TestTheMacAppRunsOnAppleSiliconAndIntel(t *testing.T) {
+// One build for every check: building the universal app and its DMG takes
+// minutes.
+func TestTheMacApp(t *testing.T) {
 	app, _ := macApp(t)
+	t.Run("runs on Apple Silicon and Intel", func(t *testing.T) { runsOnAppleSiliconAndIntel(t, app) })
+	t.Run("is a menu bar app with its icon and licences", func(t *testing.T) { isAMenuBarAppWithItsIconAndLicences(t, app) })
+}
+
+func runsOnAppleSiliconAndIntel(t *testing.T, app string) {
 	for _, exe := range []string{"Moviestracker", "moviestracker-server", "torrserver"} {
 		archs := strings.Fields(run(t, app, nil, "lipo", "-archs", filepath.Join(app, "Contents", "MacOS", exe)))
 		if len(archs) != 2 || !strings.Contains(strings.Join(archs, " "), "arm64") || !strings.Contains(strings.Join(archs, " "), "x86_64") {
@@ -69,8 +76,7 @@ func TestTheMacAppRunsOnAppleSiliconAndIntel(t *testing.T) {
 	run(t, app, nil, "codesign", "--verify", "--deep", "--strict", app)
 }
 
-func TestTheMacAppIsAMenuBarAppWithItsIconAndLicences(t *testing.T) {
-	app, _ := macApp(t)
+func isAMenuBarAppWithItsIconAndLicences(t *testing.T, app string) {
 	info := filepath.Join(app, "Contents", "Info.plist")
 	for key, want := range map[string]string{
 		"CFBundleIdentifier":         "app.moviestracker",

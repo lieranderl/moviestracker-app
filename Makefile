@@ -12,7 +12,7 @@ CONTAINER_TOOL ?= $(shell command -v docker 2>/dev/null || command -v container 
 CONTAINER_NAME ?= moviestracker-app
 CONTAINER_PORT ?= 8095
 
-.PHONY: all help torrserver dmg winapp assets templ templ-check assets-check lint test security coverage ci build run dev web web-dev firestore test-store clean \
+.PHONY: all help torrserver dmg winapp assets templ templ-check assets-check lint lint-linux lint-windows test test-only security coverage ci build binary run dev web web-dev firestore test-store clean \
 	docker-build docker-smoke container-run container-stop
 
 all: ci
@@ -23,6 +23,7 @@ help:
 	@echo "  make templ           Generate Go code from Templ templates"
 	@echo "  make lint            Verify generated code/assets and run static analysis"
 	@echo "  make test            Run lint and the race-enabled test suite"
+	@echo "  make test-only       Run the test suites without lint (CI's test job)"
 	@echo "  make security        Run govulncheck and gosec"
 	@echo "  make coverage        Write Go coverage data to coverage.out"
 	@echo "  make ci              Run the complete CI quality gate"
@@ -57,21 +58,29 @@ assets-check: node_modules
 	$(BUN) run assets
 	git diff --exit-code -- static/app.css static/player.js static/theme.js static/torrserver.js internal/views/icons_gen.go
 
-lint: templ-check assets-check
+# lint is lint-linux and lint-windows; CI runs them in parallel jobs.
+lint: lint-linux lint-windows
+
+lint-linux: templ-check assets-check
 	@if command -v shellcheck >/dev/null; then shellcheck scripts/*.sh scripts/ci/*.sh macos/install-gstreamer.sh; else echo "shellcheck not installed: shell scripts not checked"; fi
 	$(ACTIONLINT)
 	@if command -v uvx >/dev/null; then uvx zizmor@1.30.1 --offline --quiet .github; else echo "uv not installed: workflows not audited with zizmor (CI does)"; fi
 	$(GO) vet ./...
 	$(GO) tool staticcheck ./...
 	$(GOLANGCI_LINT) run ./...
-	@# The Windows tray app and the Windows halves of the engine: checked for
-	@# Windows by the tools built for this machine (go tool -n prints their path).
+	@test -z "$$(gofmt -l cmd internal static)" || (echo "Unformatted Go files:" && gofmt -l cmd internal static && exit 1)
+
+# The Windows tray app and the Windows halves of the engine: checked for
+# Windows by the tools built for this machine (go tool -n prints their path).
+lint-windows:
 	GOOS=windows $(GO) vet ./...
 	GOOS=windows $$($(GO) tool -n staticcheck) ./...
 	GOOS=windows $$($(GO) tool -n golangci-lint) run ./...
-	@test -z "$$(gofmt -l cmd internal static)" || (echo "Unformatted Go files:" && gofmt -l cmd internal static && exit 1)
 
-test: lint
+test: lint test-only
+
+# The tests alone, without lint first.
+test-only: node_modules
 	$(BUN) run test
 	$(GO) test -race -count=1 ./...
 
@@ -84,7 +93,9 @@ security:
 coverage:
 	$(GO) test -coverprofile=coverage.out ./...
 
-build: lint
+build: lint binary
+
+binary:
 	mkdir -p bin
 	$(GO) build -trimpath -o bin/server ./cmd/server
 
