@@ -16,18 +16,48 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  quality:
-    name: Lint, test, security (Linux)
+  # Pull requests that change only documentation skip the builds and tests;
+  # pushes, releases and every other change run everything.
+  changes:
+    name: What changed
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            echo "code=true" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          code="$(git diff --name-only "$BASE...$HEAD" | grep -vE '\.md$|^docs/' || true)"
+          if [ -n "$code" ]; then echo "code=true"; else echo "code=false"; fi >>"$GITHUB_OUTPUT"
+
+  lint:
+    name: Generated files and lint (Linux)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - id: go
+        uses: ./.github/actions/setup-go
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          job: lint
+          extra-paths: ~/.cache/golangci-lint
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json
@@ -40,12 +70,79 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Install ShellCheck
         run: sudo apt-get install -y --no-install-recommends shellcheck
-      - name: Quality gate (generated files, lint, race tests, govulncheck, gosec, build)
-        run: make ci
+      - name: Generated files, ShellCheck, actionlint, go vet, staticcheck, golangci-lint, gofmt
+        run: make lint-linux
+      - name: Save the Go cache (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go.outputs.paths }}
+          key: ${{ steps.go.outputs.key }}
+
+  test:
+    name: Race tests (Linux)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: go
+        uses: ./.github/actions/setup-go
+        with:
+          job: test
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - name: Install frontend tools
+        run: bun install --frozen-lockfile
+      - name: Frontend and race-enabled Go tests
+        run: make test-only
       - name: The client speaks the pinned TorrServer's API
         run: |
           make torrserver
           TORRSERVER_BIN="$PWD/bin/torrserver" go test -count=1 -run TestTheClientSpeaksTheRealTorrServerAPI ./internal/engine/
+      - name: Save the Go cache (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go.outputs.paths }}
+          key: ${{ steps.go.outputs.key }}
+
+  security:
+    name: Security, Windows lint and build (Linux)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: go
+        uses: ./.github/actions/setup-go
+        with:
+          job: security
+          extra-paths: ~/.cache/golangci-lint
+      - name: govulncheck and gosec
+        run: make security
+      - name: go vet, staticcheck and golangci-lint for Windows
+        run: make lint-windows
+      - name: Build the server
+        run: make binary
+      - name: Save the Go cache (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go.outputs.paths }}
+          key: ${{ steps.go.outputs.key }}
 
   secrets:
     name: Secret scan (whole history)
@@ -67,16 +164,18 @@ jobs:
     name: Tests and Mac app (macOS)
     # ARM64 hosted capacity can abandon jobs before a runner is assigned.
     # Packaging still builds and verifies both CPU slices on this Intel host.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-26-intel
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - id: go
+        uses: ./.github/actions/setup-go
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          job: macos
       # Includes the packaging tests that build Moviestracker.app with Swift,
       # check both CPU slices and install GStreamer from a fake download.
       - name: Tests on macOS
@@ -89,19 +188,27 @@ jobs:
           path: dist/*.dmg
           retention-days: 7
           if-no-files-found: error
+      - name: Save the Go cache (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go.outputs.paths }}
+          key: ${{ steps.go.outputs.key }}
 
   windows:
     name: Windows tests, installer, install and uninstall
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - id: go
+        uses: ./.github/actions/setup-go
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          job: windows
       - name: Tests on Windows
         run: go test -count=1 ./...
       - name: Install Inno Setup
@@ -117,6 +224,12 @@ jobs:
           path: dist/*.exe
           retention-days: 7
           if-no-files-found: error
+      - name: Save the Go cache (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go.outputs.paths }}
+          key: ${{ steps.go.outputs.key }}
 
   docker:
     name: Docker image (${{ matrix.arch }})
@@ -130,6 +243,8 @@ jobs:
             runner: ubuntu-latest
           - arch: linux/arm64
             runner: ubuntu-24.04-arm
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     steps:
@@ -177,6 +292,8 @@ jobs:
 
   web:
     name: Web app image and user store
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -193,10 +310,10 @@ jobs:
           docker run -d --name web -p 8080:8080 moviestracker-web:ci
           curl --fail --silent --show-error --retry 10 --retry-delay 1 --retry-all-errors http://localhost:8080/readyz
           docker rm -f web
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - id: go
+        uses: ./.github/actions/setup-go
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          job: web
       # The user store's and release feeds' behaviors, against Firestore's
       # emulator as well as in memory (make firestore, make test-store).
       - name: The user store and release feeds work with Firestore
@@ -210,6 +327,12 @@ jobs:
           grep -q -- '--- PASS: TestAUsersLanguageIsKept/firestore' store.log
           grep -q -- '--- PASS: TestTheNewestReleasesComeFirstTwentyAPage/firestore' store.log
           docker rm -f firestore
+      - name: Save the Go cache (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go.outputs.paths }}
+          key: ${{ steps.go.outputs.key }}
 
   workflows:
     name: Workflow security (zizmor)
@@ -227,11 +350,13 @@ jobs:
           version: 1.30.1
 
   # The one check the main ruleset requires: it passes only when every job
-  # above did, so jobs can be added or renamed without touching the ruleset.
+  # above did (or was skipped because a pull request changed only
+  # documentation), so jobs can be added or renamed without touching the
+  # ruleset.
   passed:
     name: CI passed
     if: ${{ always() }}
-    needs: [quality, secrets, macos, windows, docker, web, workflows]
+    needs: [changes, lint, test, security, secrets, macos, windows, docker, web, workflows]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -240,4 +365,6 @@ jobs:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
           echo "Results: $RESULTS"
-          for result in $RESULTS; do [ "$result" = success ] || exit 1; done
+          for result in $RESULTS; do
+            case "$result" in success | skipped) ;; *) exit 1 ;; esac
+          done
