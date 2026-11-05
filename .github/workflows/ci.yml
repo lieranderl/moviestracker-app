@@ -132,7 +132,7 @@ jobs:
           - arch: linux/arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -141,6 +141,40 @@ jobs:
         run: scripts/ci/docker-hub-mirror.sh
       - name: Build and test the image end to end with compose.yaml
         run: scripts/ci/docker-e2e.sh
+      # Trivy over the image just tested: fixable HIGH and CRITICAL findings
+      # fail. Debian packages are gated from the Dockerfile's `base` stage,
+      # without GStreamer and its codec libraries; Go modules from the final
+      # image, without TorrServer, a pinned upstream binary whose findings are
+      # only reported. govulncheck covers our own source in `quality`.
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        if: matrix.arch == 'linux/amd64'
+        with:
+          version: v0.76.1
+      - name: Scan the image with Trivy
+        if: matrix.arch == 'linux/amd64'
+        env:
+          TRIVY_TIMEOUT: 15m
+          TRIVY_SCANNERS: vuln
+          TRIVY_NO_PROGRESS: "true"
+        run: |
+          docker build --target base -t moviestracker-base:scan .
+          trivy image --pkg-types os --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 moviestracker-base:scan
+          trivy image --pkg-types library --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+            --skip-files usr/local/bin/torrserver moviestracker:e2e
+      - name: Report TorrServer's Go modules
+        if: ${{ always() && matrix.arch == 'linux/amd64' }}
+        env:
+          TRIVY_TIMEOUT: 15m
+          TRIVY_SCANNERS: vuln
+          TRIVY_NO_PROGRESS: "true"
+        run: |
+          {
+            echo '### TorrServer: fixable HIGH and CRITICAL findings (not gated)'
+            echo '```'
+            trivy image --quiet --pkg-types library --severity HIGH,CRITICAL --ignore-unfixed \
+              --skip-files usr/local/bin/moviestracker moviestracker:e2e || echo "Trivy failed: $?"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   web:
     name: Web app image and user store
