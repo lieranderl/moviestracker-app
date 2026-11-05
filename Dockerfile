@@ -52,22 +52,29 @@ RUN TS_TARGET="$TARGETOS/$TARGETARCH" scripts/fetch-torrserver.sh /out/bin/torrs
       > /out/doc/TorrServer-SOURCE.txt && \
     install -m 0644 LICENSE NOTICE packaging/docker/GSTREAMER.txt /out/doc/
 
-FROM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
-# GStreamer as TorrServer's README lists it (Debian 13: GStreamer 1.26), for
-# MKV, AC3/DTS and HEVC in the browser; tini forwards signals and reaps.
-# Each package keeps its licence in /usr/share/doc/<package>/copyright.
+# The runtime without GStreamer: CI's Trivy scan gates this stage's Debian
+# packages (ci.yml), not GStreamer's codec libraries. tini forwards signals
+# and reaps.
+FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2 AS base
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-      ca-certificates tini \
-      libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 \
-      gstreamer1.0-plugins-base gstreamer1.0-plugins-base-apps \
-      gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
-      gstreamer1.0-libav gstreamer1.0-tools && \
+    apt-get install -y --no-install-recommends ca-certificates tini && \
     rm -rf /var/lib/apt/lists/* && \
     groupadd --gid 1000 moviestracker && \
     useradd --uid 1000 --gid moviestracker --home-dir /data --no-create-home \
       --shell /usr/sbin/nologin moviestracker && \
     install -d -o moviestracker -g moviestracker -m 0700 /data
+
+FROM base
+# GStreamer as TorrServer's README lists it (Debian 13: GStreamer 1.26), for
+# MKV, AC3/DTS and HEVC in the browser.
+# Each package keeps its licence in /usr/share/doc/<package>/copyright.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 \
+      gstreamer1.0-plugins-base gstreamer1.0-plugins-base-apps \
+      gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+      gstreamer1.0-libav gstreamer1.0-tools && \
+    rm -rf /var/lib/apt/lists/*
 COPY --from=build /out/bin/ /usr/local/bin/
 COPY --from=build /out/doc/ /usr/share/doc/moviestracker/
 
