@@ -5,27 +5,25 @@
 [![CI](https://github.com/lieranderl/moviestracker-app/actions/workflows/ci.yml/badge.svg)](https://github.com/lieranderl/moviestracker-app/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/lieranderl/moviestracker-app?sort=semver)](https://github.com/lieranderl/moviestracker-app/releases/latest)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16384/badge)](https://www.bestpractices.dev/projects/16384)
 
 Самостоятельно размещаемый каталог фильмов и сериалов со встроенным
-воспроизведением. Он показывает, что сейчас популярно (трейлеры, актёры,
-сезоны, рейтинги), находит источники для фильма и воспроизводит их в браузере
-или на телевизоре через [TorrServer](https://github.com/YouROK/TorrServer),
-который запускает сам. Локальному приложению облачная учётная запись не нужна,
-а его страницы никогда не показывают адрес вашего TorrServer и ключи.
+воспроизведением. Найдите, что посмотреть, выберите источник и смотрите в
+браузере или на телевизоре. Moviestracker сам запускает
+[TorrServer](https://github.com/YouROK/TorrServer), не требует облачной учётной
+записи и не показывает на страницах адрес вашего TorrServer и ключи.
 
 - **Открывайте новое:** популярные фильмы и сериалы, поиск, трейлеры, актёры,
-  сезоны, рейтинги IMDb.
-- **Находите источники:** фильтры по качеству и HDR, затем по трекеру и
-  озвучке.
-- **Смотрите где угодно:** прямые потоки или HLS, который конвертирует
-  GStreamer, так что MKV/AC3/DTS играют в любом браузере; плейлисты и ссылки
-  для VLC и Smart TV.
-- **Несколько пользователей:** локальные учётные записи (администраторы и
-  зрители) и живая панель с тем, что сейчас играет.
-- **Приложения TorrServer:** шлюз с авторизацией позволяет TorrServe, Lampa и
-  подобным приложениям пользоваться тем же TorrServer.
-- **Русский и английский** интерфейс, а метаданные TMDB — на любом из двух
-  языков.
+  сезоны и рейтинги IMDb.
+- **Находите источники:** фильтры по качеству и HDR, затем по трекеру и озвучке.
+- **Смотрите где угодно:** прямые потоки или HLS, который конвертирует GStreamer,
+  так что MKV, AC3 и DTS играют в любом браузере. Плейлисты и ссылки работают с
+  VLC и Smart TV.
+- **Смотрите всей семьёй:** локальные учётные записи для администраторов и
+  зрителей и живая панель с тем, что сейчас играет.
+- **Подключайте приложения TorrServer:** шлюз с авторизацией позволяет TorrServe,
+  Lampa и подобным приложениям пользоваться тем же TorrServer.
+- **Русский и английский:** интерфейс и метаданные TMDB на любом из двух языков.
 
 > Moviestracker не хранит, не загружает, не раздаёт и не распространяет
 > медиафайлы. Используйте его только для контента, на который у вас есть
@@ -34,45 +32,86 @@
 
 ## Скачать
 
-| Где | Файл |
+| Где | Что скачать |
 | --- | --- |
-| **macOS 13+** (Apple Silicon, Intel), приложение в строке меню | `Moviestracker-<version>.dmg` |
-| **Windows 10/11** x64 (предварительная версия), значок в трее | `Moviestracker-Setup-<version>-x64.exe` |
-| **Linux, NAS, домашний сервер** (`amd64`, `arm64`) | `ghcr.io/lieranderl/moviestracker` |
+| **macOS 13+** (Apple Silicon, Intel), приложение в строке меню | [`Moviestracker-<version>.dmg`](https://github.com/lieranderl/moviestracker-app/releases/latest) |
+| **Windows 10/11** x64 (предварительная версия), значок в трее | [`Moviestracker-Setup-<version>-x64.exe`](https://github.com/lieranderl/moviestracker-app/releases/latest) |
+| **Linux, NAS, домашний сервер** (`amd64`, `arm64`) | [Образ Docker](#docker): `ghcr.io/lieranderl/moviestracker` |
 | **Любой браузер**, облачная версия | [moviestracker.net](https://moviestracker.net) |
 
-Файлы лежат в [последнем релизе](https://github.com/lieranderl/moviestracker-app/releases/latest)
-вместе с `checksums.txt` и аттестациями сборки:
+### macOS и Windows
+
+1. Установите и откройте приложение. Установщики пока не подписаны, поэтому
+   система один раз попросит подтверждение.
+2. Создайте учётную запись администратора на открывшейся странице настройки.
+
+TorrServer уже внутри. На macOS для воспроизведения MKV в браузере установите
+GStreamer в **Настройки → Источники**; в сборке для Windows он уже есть.
+
+### Docker
+
+Сохраните [compose.yaml](compose.yaml) в папку и выполните:
+
+```bash
+docker compose up -d
+docker compose logs moviestracker   # показывает одноразовый код настройки
+```
+
+Откройте `http://<хост>:8095`, введите код и создайте администратора. Данные
+лежат в томе `/data`. Обновление:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+### Другие устройства дома
+
+Откройте адрес из меню приложения (например, `http://192.168.1.20:8095`) и
+войдите с учётной записью.
+
+### Веб-версия
+
+Войдите через Google на [moviestracker.net](https://moviestracker.net). Избранное
+и настройки хранятся в вашей учётной записи. Своего TorrServer у веб-версии нет:
+браузер обращается к вашему TorrServer напрямую, и он должен быть по адресу
+`https://` или на том же компьютере (`http://localhost:8090`).
+
+### Проверка загрузки
+
+В каждом [релизе](https://github.com/lieranderl/moviestracker-app/releases/latest) есть `checksums.txt` и аттестации сборки:
 
 ```bash
 gh attestation verify Moviestracker-<version>.dmg -R lieranderl/moviestracker-app
+gh attestation verify oci://ghcr.io/lieranderl/moviestracker:<version> -R lieranderl/moviestracker-app
 ```
 
-### Быстрый старт
+## Приватность и данные
 
-- **macOS / Windows:** установите и откройте приложение (установщики пока не
-  подписаны, поэтому система один раз попросит подтверждение), затем создайте
-  учётную запись администратора на открывшейся странице настройки. TorrServer
-  уже внутри. На macOS для воспроизведения MKV в браузере установите
-  GStreamer в **Настройки → Источники**; в сборке для Windows он уже есть.
-- **Docker:** сохраните [compose.yaml](compose.yaml) в папку, затем:
+В локальном приложении нет аналитики и телеметрии. Оно обращается только к этим
+сервисам:
 
-  ```bash
-  docker compose up -d
-  docker compose logs moviestracker   # одноразовый код настройки
-  ```
+- **TMDB, JacRed и сервис рейтингов IMDb** видят названия, которые вы ищете.
+- **YouTube** отдаёт вашему браузеру трейлеры и их миниатюры.
+- **BitTorrent-пиры** соединяются с TorrServer во время воспроизведения.
+- **GitHub** раз в день проверяется на наличие нового релиза. Это отключается в
+  **Настройки → Обновления**.
+- **Сайт загрузки GStreamer** использует приложение для Mac, только когда вы об
+  этом попросите.
 
-  Откройте `http://<хост>:8095`, введите код и создайте администратора.
-  Данные лежат в томе `/data`. Обновление:
-  `docker compose pull && docker compose up -d`.
+| Приложение | Где хранятся данные |
+| --- | --- |
+| macOS | `~/Library/Application Support/moviestracker` |
+| Windows | `%LOCALAPPDATA%\Moviestracker` |
+| Docker | том `/data` |
 
-Другие устройства в локальной сети открывают адрес из меню приложения
-(например, `http://192.168.1.20:8095`) и входят с учётной записью.
+Веб-версия хранит данные в Google Cloud Firestore под идентификатором вашей
+учётной записи Google: см. [политику конфиденциальности](https://moviestracker.net/privacy).
 
-- **Веб-версия:** вход через Google; избранное и настройки хранятся в вашей
-  учётной записи. Своего TorrServer у неё нет: браузер обращается к вашему
-  TorrServer напрямую, и он должен быть по адресу `https://` или на том же
-  компьютере (`http://localhost:8090`).
+## Помощь и участие
+
+- **Ошибки и идеи:** [создайте issue](https://github.com/lieranderl/moviestracker-app/issues/new/choose).
+- **Проблемы безопасности:** сообщайте приватно, как описано в [SECURITY.md](SECURITY.md).
+- **Код:** сначала прочитайте [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Технологии
 
@@ -129,10 +168,10 @@ frontend/    плеер, тема, иконки      internal/auth, store       
 ```bash
 make dev        # сервер разработки с горячей перезагрузкой Air
 make web-dev    # облачное веб-приложение на http://localhost:8080
-make test       # go test -race ./...
-make lint       # vet, staticcheck, golangci-lint, gofmt
+make test       # линтеры, затем тесты фронтенда и Go с детектором гонок
+make lint       # сгенерированные файлы, vet, staticcheck, golangci-lint, gofmt
 make ci         # полный конвейер: формат, линтеры, templ, ассеты, тесты, безопасность, сборка
-make build      # самодостаточный бинарник bin/server
+make build      # линтеры, затем самодостаточный бинарник bin/server
 ```
 
 `make firestore` запускает эмулятор Firestore для `make test-store`. Все
@@ -142,19 +181,6 @@ make build      # самодостаточный бинарник bin/server
 [docs/TESTING.md](docs/TESTING.md) и [docs/MAINTAINING.md](docs/MAINTAINING.md).
 Изменения вносятся через pull request из отдельной ветки; `main` защищена и
 сливается squash после прохождения CI. См. [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Приватность и данные
-
-TMDB, JacRed и сервис рейтингов IMDb видят названия, которые вы ищете, а
-TorrServer общается с BitTorrent-пирами во время воспроизведения. Локальное
-приложение также раз в день спрашивает у GitHub, нет ли нового релиза (это
-отключается в **Настройки → Обновления**), а приложение для Mac скачивает
-GStreamer, когда вы об этом попросите. Больше никуда обращений нет: ни
-аналитики, ни телеметрии. Данные хранятся в
-`~/Library/Application Support/moviestracker` (macOS),
-`%LOCALAPPDATA%\Moviestracker` (Windows) или в томе `/data` (Docker).
-
-О проблемах безопасности сообщайте приватно: см. [SECURITY.md](SECURITY.md).
 
 ## Лицензия
 
