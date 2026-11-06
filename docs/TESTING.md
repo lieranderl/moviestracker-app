@@ -67,3 +67,6 @@ This document defines testing conventions, the test-driven development loop, sea
   - Concurrency and SSE tests must assert that goroutines terminate cleanly after context cancellation and that active stream counters decrement to zero.
 
 Cloud TorrServer settings tests exercise signed-in HTTP rendering and validation, and browser calls to an external TorrServer boundary: allowlisted relays, browser-only Basic authentication, fresh merges preserving future fields, GStreamer support, failures, and cancellation. Manual checks use an isolated TorrServer and a disposable signed-in preview; verify an engine save survives Refresh and a GStreamer save succeeds.
+
+### Fuzzing
+Parsers of untrusted input have native Go fuzz targets (`func FuzzXxx`). `make test` runs their seeds; to explore further, run one at a time: `go test ./internal/streams -run '^$' -fuzz '^FuzzRangeStart' -fuzztime 30s`. Commit any failing input Go saves under `testdata/fuzz/`.
