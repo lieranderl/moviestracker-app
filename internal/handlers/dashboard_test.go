@@ -63,40 +63,66 @@ func quickDashboard(c *handlers.Config) {
 // dashboardResponse ends a stream once its public output has arrived.
 type dashboardResponse struct {
 	*httptest.ResponseRecorder
-	want   []string
+	done   func(body string) bool
 	cancel context.CancelFunc
 }
 
 func (w *dashboardResponse) Flush() {
 	w.ResponseRecorder.Flush()
-	for _, want := range w.want {
-		if !strings.Contains(w.Body.String(), want) {
-			return
+	if w.done(w.Body.String()) {
+		w.cancel()
+	}
+}
+
+func containsAll(body string, want ...string) bool {
+	for _, text := range want {
+		if !strings.Contains(body, text) {
+			return false
 		}
 	}
-	w.cancel()
+	return true
+}
+
+// latestCard is the latest patch of the card with this id: its SSE event.
+func latestCard(body, id string) string {
+	at := strings.LastIndex(body, `id="`+id+`"`)
+	if at < 0 {
+		return ""
+	}
+	card := body[at:]
+	if end := strings.Index(card, "\n\n"); end >= 0 {
+		card = card[:end]
+	}
+	return card
 }
 
 // dashboardUntil waits for an observable patch, rather than assuming that
 // collecting machine and upstream metadata finishes within a fixed window.
 func dashboardUntil(t *testing.T, l *local, cookie *http.Cookie, want ...string) string {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
-	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "/api/dashboard?stream=true", nil)
-	req.AddCookie(cookie)
-	rr := &dashboardResponse{ResponseRecorder: httptest.NewRecorder(), want: want, cancel: cancel}
-	l.server.ServeHTTP(rr, req)
-	body := rr.Body.String()
-	if rr.Code != http.StatusOK {
-		t.Fatalf("dashboard status %d, want 200:\n%s", rr.Code, body)
-	}
+	body := dashboardWhen(t, l, cookie, func(body string) bool { return containsAll(body, want...) })
 	for _, text := range want {
 		if !strings.Contains(body, text) {
 			t.Fatalf("dashboard never showed %q before the deadline:\n%s", text, body)
 		}
 	}
 	return body
+}
+
+// dashboardWhen streams the dashboard until done holds for what arrived, or
+// a 10s deadline passes.
+func dashboardWhen(t *testing.T, l *local, cookie *http.Cookie, done func(body string) bool) string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "/api/dashboard?stream=true", nil)
+	req.AddCookie(cookie)
+	rr := &dashboardResponse{ResponseRecorder: httptest.NewRecorder(), done: done, cancel: cancel}
+	l.server.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("dashboard status %d, want 200:\n%s", rr.Code, rr.Body.String())
+	}
+	return rr.Body.String()
 }
 
 func TestTheDashboardShowsWhatIsPlayingAndWhereFrom(t *testing.T) {
@@ -130,9 +156,16 @@ func TestTheDashboardShowsWhatIsPlayingAndWhereFrom(t *testing.T) {
 	close(release)
 	stop()
 	// Once past the idle time the streams leave the list for Played today.
-	body = dashboardUntil(t, l, admin, "Nothing is playing", `id="dash-played"`)
-	played := body[strings.LastIndex(body, `id="dash-played"`):]
-	for _, want := range []string{"Dune", "admin", "Shared link", "192.168.1.31"} {
+	finished := []string{"Dune", "admin", "Shared link", "192.168.1.31"}
+	body = dashboardWhen(t, l, admin, func(body string) bool {
+		return strings.Contains(latestCard(body, "dash-streams"), "Nothing is playing") &&
+			containsAll(latestCard(body, "dash-played"), finished...)
+	})
+	if !strings.Contains(latestCard(body, "dash-streams"), "Nothing is playing") {
+		t.Errorf("finished streams still listed:\n%s", body)
+	}
+	played := latestCard(body, "dash-played")
+	for _, want := range finished {
 		if !strings.Contains(played, want) {
 			t.Errorf("Played today lacks %q", want)
 		}
