@@ -54,9 +54,11 @@ RUN TS_TARGET="$TARGETOS/$TARGETARCH" scripts/fetch-torrserver.sh /out/bin/torrs
 
 # The runtime without GStreamer: CI's Trivy scan gates this stage's Debian
 # packages (ci.yml), not GStreamer's codec libraries. tini forwards signals
-# and reaps.
+# and reaps. apt-get upgrade takes Debian security fixes released after the
+# pinned image (e.g. zlib CVE-2026-76844/85091 in 1.3.1-1+deb13u1).
 FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2 AS base
 RUN apt-get update && \
+    apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends ca-certificates tini && \
     rm -rf /var/lib/apt/lists/* && \
     groupadd --gid 1000 moviestracker && \
