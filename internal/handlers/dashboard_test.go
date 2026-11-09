@@ -115,31 +115,23 @@ func TestTheDashboardShowsWhatIsPlayingAndWhereFrom(t *testing.T) {
 	go l.do(t, tv, nil)
 	time.Sleep(150 * time.Millisecond)
 
-	body := openStreams(t, l, admin, 300*time.Millisecond, "/api/dashboard?stream=true")[0]
-	for _, want := range []string{
+	body := dashboardUntil(t, l, admin,
 		`id="dash-streams"`, "Dune", "Dune.2021.mkv", "admin", "Shared link", "192.168.1.31", "25%", // the TV reads a quarter in
 		`id="dash-swarm"`, "5.00 MB/s", "1.00 MB/s", "21", // totals of the list
 		"↓ 1.00 GB", "↑ 100 MB uploaded", // since TorrServer connected them
 		`id="dash-pulse"`, "1 in the app · 1 shared link",
 		"To the player", "Torrent download", // each stream's delivery against its torrent
 		`id="dash-app"`, "MatriX.145",
-	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("dashboard lacks %q", want)
-		}
-	}
+	)
 	if strings.Contains(body, engine.URL) || strings.Contains(body, strings.TrimPrefix(engine.URL, "http://")) {
 		t.Error("the dashboard contains the TorrServer address")
 	}
 
 	close(release)
 	stop()
-	time.Sleep(300 * time.Millisecond) // past the idle time
-	body = openStreams(t, l, admin, 200*time.Millisecond, "/api/dashboard?stream=true")[0]
-	if !strings.Contains(body, "Nothing is playing") {
-		t.Errorf("finished streams still listed:\n%s", body)
-	}
-	played := body[strings.Index(body, `id="dash-played"`):]
+	// Once past the idle time the streams leave the list for Played today.
+	body = dashboardUntil(t, l, admin, "Nothing is playing", `id="dash-played"`)
+	played := body[strings.LastIndex(body, `id="dash-played"`):]
 	for _, want := range []string{"Dune", "admin", "Shared link", "192.168.1.31"} {
 		if !strings.Contains(played, want) {
 			t.Errorf("Played today lacks %q", want)
