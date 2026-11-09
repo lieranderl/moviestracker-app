@@ -10,7 +10,7 @@
       "devDependencies": {
         "@tailwindcss/cli": "4.3.3",
         "daisyui": "5.7.50",
-        "lucide": "1.64.0",
+        "lucide": "1.66.0",
         "simple-icons": "16.36.0",
         "tailwindcss": "4.3.3",
       },
@@ -131,7 +131,7 @@
 
     "lightningcss-win32-x64-msvc": ["lightningcss-win32-x64-msvc@1.32.0", "", { "os": "win32", "cpu": "x64" }, "sha512-Amq9B/SoZYdDi1kFrojnoqPLxYhQ4Wo5XiL8EVJrVsB8ARoC1PWW6VGtT0WKCemjy8aC+louJnjS7U18x3b06Q=="],
 
-    "lucide": ["lucide@1.64.0", "", {}, "sha512-2k481p+2dnI88E5chX8D1niwJzar/0EMFZwS93E/umHVxl+Po5uoDIGuo64Ij3a35YaD1J6EsWulDzKaod5wOw=="],
+    "lucide": ["lucide@1.66.0", "", {}, "sha512-Ngq8coV3XJ9S/DLTNnIWk9lmdJusoSnuuoO1rK7C0H9/VaV93LoWkv/u5GyUAJhL+rFesAd4gL3YG544bnH6gQ=="],
 
     "magic-string": ["magic-string@0.30.21", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.5" } }, "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ=="],
 
