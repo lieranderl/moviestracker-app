@@ -16,6 +16,32 @@ func TestHomeHelpsAUserChooseSomethingForTonight(t *testing.T) {
 	}
 }
 
+func TestTonightCardsFitTheirGridColumns(t *testing.T) {
+	out := render(t, views.DiscoverPage(&auth.User{Name: "Ann"}, views.DiscoverView{
+		Pick: 1, Picks: []tmdb.MediaItem{{ID: 42, MediaType: "movie", Title: "Arrival"}},
+	}))
+	start := strings.Index(out, `id="tonight-picks"`)
+	end := strings.Index(out[start:], "</section>")
+	shortlist := out[start : start+end]
+	if strings.Contains(shortlist, "w-40") || !strings.Contains(shortlist, "w-full") {
+		t.Fatal("tonight cards must fit their grid columns rather than use carousel widths")
+	}
+}
+
+func TestApplyingChooserFiltersSubmitsPinnedTitlesAndTheirKind(t *testing.T) {
+	out := render(t, views.DiscoverPage(&auth.User{Name: "Ann"}, views.DiscoverView{
+		Query: tmdb.DiscoverQuery{MediaType: "movie"}, Pick: 1, Pins: []int{42, 43},
+	}))
+	start := strings.Index(out, `action="/discover"`)
+	end := strings.Index(out[start:], "</form>")
+	form := out[start : start+end]
+	for _, want := range []string{`type="hidden" name="pin" value="42"`, `type="hidden" name="pin" value="43"`, `type="hidden" name="pinType" value="movie"`} {
+		if !strings.Contains(form, want) {
+			t.Errorf("filter submission loses %s", want)
+		}
+	}
+}
+
 func TestTonightShowsRuntimeAndKeepsPinnedCandidatesWhenRerolling(t *testing.T) {
 	out := render(t, views.DiscoverPage(&auth.User{Name: "Ann"}, views.DiscoverView{
 		Query: tmdb.DiscoverQuery{MediaType: "movie", Sort: "popular"},

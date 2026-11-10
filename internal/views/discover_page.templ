@@ -173,6 +173,10 @@ templ DiscoverPage(user *auth.User, v DiscoverView) {
 				<form action="/discover" method="GET" class="flex flex-wrap items-center gap-2" data-on:change="el.requestSubmit()" aria-label={ tr(ctx, "Filters") }>
 					if v.Pick > 0 {
 						<input type="hidden" name="pick" value="1"/>
+						<input type="hidden" name="pinType" value={ v.Query.MediaType }/>
+						for _, id := range v.Pins {
+							<input type="hidden" name="pin" value={ strconv.Itoa(id) }/>
+						}
 					}
 					<label class="select select-sm w-auto">
 						<span class="label">{ tr(ctx, "Choose from") }</span>
@@ -311,7 +315,7 @@ templ tonightPicks(v DiscoverView) {
 				<ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
 					for _, item := range v.Picks {
 						<li class="flex flex-col gap-2">
-							@MediaCard(item)
+							@mediaCard(item, "w-full")
 							if minutes := v.PickRuntimes[item.ID]; minutes > 0 {
 								<span class="badge badge-ghost">
 									if item.MediaType == "tv" {

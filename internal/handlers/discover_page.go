@@ -76,6 +76,10 @@ func (c *Catalog) discoverView(ctx context.Context, r *http.Request) (views.Disc
 			v.Pins = append(v.Pins, id)
 		}
 	}
+	if kind := q.Get("pinType"); kind != "" && kind != v.Query.MediaType {
+		v.Pins = nil
+		v.PickNotice = "Some pinned titles no longer match your choices."
+	}
 	return v, nil
 }
 

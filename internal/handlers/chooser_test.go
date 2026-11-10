@@ -2,9 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"github.com/lieranderl/moviestracker-app/internal/auth"
-	"github.com/lieranderl/moviestracker-app/internal/sources"
-	"github.com/lieranderl/moviestracker-app/internal/store"
 	"html"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lieranderl/moviestracker-app/internal/auth"
+	"github.com/lieranderl/moviestracker-app/internal/sources"
+	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 )
 
@@ -87,9 +87,10 @@ func TestTonightKeepsAtMostFiveEligiblePins(t *testing.T) {
 func TestWatchlistPicksLimitMetadataWorkAndExplainTheWindow(t *testing.T) {
 	details := discoverDetails()
 	details.movies = map[int]*tmdb.MovieDetails{}
-	saved := store.NewMemory()
+	clock := time.Date(2026, time.November, 10, 20, 0, 0, 0, time.UTC)
+	saved := store.NewMemory(store.WithClock(func() time.Time { return clock }))
 	for id := 51; id >= 1; id-- {
-		if err := saved.SetTitleState(t.Context(), "viewer", store.TitleState{Kind: "movie", TMDBID: id, Title: fmt.Sprintf("Movie %d", id), State: store.WantToWatch}); err != nil {
+		if _, err := saved.ChangeTitleState(t.Context(), "viewer", store.TitleState{Kind: "movie", TMDBID: id, Title: fmt.Sprintf("Movie %d", id), State: store.WantToWatch, UpdatedAt: clock.Add(-time.Duration(id) * time.Minute)}, store.TitleState{}); err != nil {
 			t.Fatal(err)
 		}
 		if id <= 50 {
@@ -105,5 +106,16 @@ func TestWatchlistPicksLimitMetadataWorkAndExplainTheWindow(t *testing.T) {
 	page := html.UnescapeString(rec.Body.String())
 	if len(picks(page)) != 5 || strings.Contains(page, `href="/movie/51"`) || !strings.Contains(page, "Picks use your 50 most recently saved titles.") {
 		t.Fatal("watchlist budget did not omit oldest metadata lookup and explain candidate window")
+	}
+}
+
+func TestMoviePinsDoNotBecomeSeriesPinsWhenChangingType(t *testing.T) {
+	details := discoverDetails()
+	details.discovered = tmdb.Page{TotalPages: 1, Items: []tmdb.MediaItem{{ID: 42, Title: "Series 42", MediaType: "tv"}}}
+	details.series = map[int]*tmdb.TVDetails{42: {MediaItem: tmdb.MediaItem{ID: 42, Title: "Series 42", MediaType: "tv"}}}
+	server := newMediaServer(t, details, nil, "")
+	page := html.UnescapeString(get(t, server, "/discover?type=tv&pick=1&pin=42&pinType=movie", true).Body.String())
+	if !strings.Contains(page, `aria-label="Pin Series 42"`) || strings.Contains(page, `aria-label="Unpin Series 42"`) {
+		t.Fatal("movie pin 42 was reinterpreted as series pin 42 after changing type")
 	}
 }
