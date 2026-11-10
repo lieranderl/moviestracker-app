@@ -96,7 +96,8 @@ func (v Video) WatchURL() string { return "https://www.youtube.com/watch?v=" + v
 // MovieDetails is the full movie page model.
 type MovieDetails struct {
 	MediaItem
-	OriginalTitle string
+	OriginalTitle    string
+	OriginalLanguage string
 	// EnglishTitle is the title's English name, empty when TMDB has none.
 	EnglishTitle    string
 	Tagline         string
@@ -223,22 +224,23 @@ func (c *Client) movie(ctx context.Context, id int) (*MovieDetails, error) {
 		raw.Tagline = cmp.Or(raw.Tagline, english.Tagline)
 		lang := i18n.FromContext(ctx)
 		m := &MovieDetails{
-			MediaItem:       raw.mediaItem("movie"),
-			OriginalTitle:   nativeTitle(raw.OriginalTitle, raw.Language, raw.Countries, raw.AltTitles.Titles),
-			Tagline:         raw.Tagline,
-			Runtime:         raw.Runtime,
-			Budget:          raw.Budget,
-			Revenue:         raw.Revenue,
-			Status:          raw.Status,
-			Homepage:        raw.Homepage,
-			Links:           raw.ExternalIDs,
-			Genres:          raw.Genres,
-			Cast:            limit(raw.Credits.Cast, maxCast),
-			Directors:       crewWithJobs(raw.Credits.Crew, "Director"),
-			Writers:         crewWithJobs(raw.Credits.Crew, "Screenplay", "Writer", "Story", "Novel"),
-			Videos:          youTubeVideos(raw.Videos.Results, lang),
-			Recommendations: relatedTitles(raw.Recommendations.Results, "movie"),
-			Similar:         relatedTitles(raw.Similar.Results, "movie"),
+			MediaItem:        raw.mediaItem("movie"),
+			OriginalTitle:    nativeTitle(raw.OriginalTitle, raw.Language, raw.Countries, raw.AltTitles.Titles),
+			OriginalLanguage: raw.Language,
+			Tagline:          raw.Tagline,
+			Runtime:          raw.Runtime,
+			Budget:           raw.Budget,
+			Revenue:          raw.Revenue,
+			Status:           raw.Status,
+			Homepage:         raw.Homepage,
+			Links:            raw.ExternalIDs,
+			Genres:           raw.Genres,
+			Cast:             limit(raw.Credits.Cast, maxCast),
+			Directors:        crewWithJobs(raw.Credits.Crew, "Director"),
+			Writers:          crewWithJobs(raw.Credits.Crew, "Screenplay", "Writer", "Story", "Novel"),
+			Videos:           youTubeVideos(raw.Videos.Results, lang),
+			Recommendations:  relatedTitles(raw.Recommendations.Results, "movie"),
+			Similar:          relatedTitles(raw.Similar.Results, "movie"),
 		}
 		m.ImdbID = raw.ImdbID
 		m.EnglishTitle = englishTitle(ctx, m.Title, raw.OriginalTitle, raw.Language, english.Title)

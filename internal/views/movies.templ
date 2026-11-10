@@ -51,6 +51,17 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 			}
 			@categoryBar(homeLists(ctx, discover), "")
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 space-y-10 mt-10">
+				if discover {
+					<div class="card card-sm bg-base-200">
+						<div class="card-body sm:flex-row sm:items-center sm:justify-between gap-3">
+							<div><h2 class="card-title">{ tr(ctx, "What shall we watch tonight?") }</h2><p>{ tr(ctx, "Find something new or choose from your watchlist.") }</p></div>
+							<a href="/discover?pick=1" class="btn btn-primary">
+								@Icon("dices", "size-4")
+								{ tr(ctx, "Help me choose") }
+							</a>
+						</div>
+					</div>
+				}
 				if len(watching) > 0 {
 					@ContinueWatching(watching)
 				}

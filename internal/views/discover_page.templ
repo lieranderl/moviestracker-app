@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"slices"
 
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
@@ -30,6 +31,11 @@ type DiscoverView struct {
 	// (0: they did not); Picks are its titles, none the user has marked.
 	Pick  int
 	Picks []tmdb.MediaItem
+	Source string
+	Pins []int
+	PickRuntimes map[int]int
+	PickNotice string
+	PickLimited bool
 }
 
 // DiscoverRuntimes are the longest runtimes, in minutes, Discover offers.
@@ -50,7 +56,20 @@ func (v DiscoverView) pickURL(draw int, without string) string {
 	q, _ := url.ParseQuery(v.discoverParams(0))
 	q.Del(without)
 	q.Set("pick", strconv.Itoa(draw))
+	if v.Source == "watchlist" { q.Set("source", "watchlist") }
+	for _, id := range v.Pins { q.Add("pin", strconv.Itoa(id)) }
 	return "/discover?" + q.Encode()
+}
+
+func (v DiscoverView) pinURL(id int) string {
+	u, _ := url.Parse(v.pickURL(v.Pick, ""))
+	q := u.Query()
+	q.Del("pin")
+	for _, pinned := range v.Pins { if pinned != id { q.Add("pin", strconv.Itoa(pinned)) } }
+	if !slices.Contains(v.Pins, id) && len(v.Pins) < PickSize { q.Add("pin", strconv.Itoa(id)) }
+	u.RawQuery = q.Encode()
+	u.Fragment = "tonight-picks"
+	return u.String()
 }
 
 // activeFilters are the filters that narrow the titles, with their labels,
@@ -152,6 +171,16 @@ templ DiscoverPage(user *auth.User, v DiscoverView) {
 					<p class="text-sm text-base-content/70">{ tr(ctx, "Filter TMDB's whole catalog by genre, year and rating.") }</p>
 				</header>
 				<form action="/discover" method="GET" class="flex flex-wrap items-center gap-2" data-on:change="el.requestSubmit()" aria-label={ tr(ctx, "Filters") }>
+					if v.Pick > 0 {
+						<input type="hidden" name="pick" value="1"/>
+					}
+					<label class="select select-sm w-auto">
+						<span class="label">{ tr(ctx, "Choose from") }</span>
+						<select name="source">
+							<option value="discover" selected?={ v.Source != "watchlist" }>{ tr(ctx, "Something new") }</option>
+							<option value="watchlist" selected?={ v.Source == "watchlist" }>{ tr(ctx, "From my watchlist") }</option>
+						</select>
+					</label>
 					<div class="join" role="radiogroup" aria-label={ tr(ctx, "Kind") }>
 						<label class="btn btn-sm join-item has-checked:btn-primary has-focus-visible:outline-2 has-focus-visible:outline-primary">
 							<input type="radio" class="sr-only" name="type" value="movie" checked?={ v.Query.MediaType != "tv" }/>
@@ -211,7 +240,13 @@ templ DiscoverPage(user *auth.User, v DiscoverView) {
 						<span class="label">{ tr(ctx, "Sort") }</span>
 						<select name="sort">
 							for _, o := range discoverSorts {
-								<option value={ o.Key } selected?={ o.Key == v.Query.Sort }>{ tr(ctx, o.Label) }</option>
+								<option value={ o.Key } selected?={ o.Key == v.Query.Sort }>
+									if v.Source == "watchlist" && o.Key == "popular" {
+										{ tr(ctx, "Recently saved") }
+									} else {
+										{ tr(ctx, o.Label) }
+									}
+								</option>
 							}
 						</select>
 					</label>
@@ -226,6 +261,12 @@ templ DiscoverPage(user *auth.User, v DiscoverView) {
 				}
 				if v.Pick > 0 && !v.Failed {
 					@tonightPicks(v)
+				}
+				if v.PickNotice != "" {
+					<p role="status" class="alert">{ tr(ctx, v.PickNotice) }</p>
+				}
+				if v.PickLimited {
+					<p role="status" class="alert">{ tr(ctx, "Picks use your 50 most recently saved titles.") }</p>
 				}
 				if !v.Failed && len(v.Items) == 0 {
 					@emptyState("search-x", tr(ctx, "Nothing matches these filters"), tr(ctx, "Try another genre or year, or a lower rating.")) {
@@ -255,19 +296,48 @@ templ tonightPicks(v DiscoverView) {
 					@Icon("dices", "size-5 text-primary")
 					{ tr(ctx, "Tonight's picks") }
 				</h2>
-				if len(v.Picks) > 0 {
-					<a href={ templ.SafeURL(v.pickURL(v.Pick+1, "")) } class="btn btn-sm btn-ghost gap-1.5">
+				if len(v.Picks) > 0 && len(v.Pins) < PickSize {
+					<a href={ templ.SafeURL(v.pickURL(v.Pick+1, "")+"#tonight-picks") } class="btn btn-sm btn-ghost gap-1.5">
 						@Icon("refresh-cw", "size-4")
 						{ tr(ctx, "Pick again") }
 					</a>
 				}
 			</header>
 			if len(v.Picks) > 0 {
+				<p class="text-sm text-base-content/70">{ tr(ctx, "Pin the ones you like, then pick again for the remaining spots.") }</p>
+				if len(v.Pins) >= PickSize {
+					<p role="status">{ tr(ctx, "All picks are pinned. Unpin one to discover another title.") }</p>
+				}
 				<ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-					@BrowseItems(v.Picks)
+					for _, item := range v.Picks {
+						<li class="flex flex-col gap-2">
+							@MediaCard(item)
+							if minutes := v.PickRuntimes[item.ID]; minutes > 0 {
+								<span class="badge badge-ghost">
+									if item.MediaType == "tv" {
+										{ trf(ctx, "%d min per episode", minutes) }
+									} else {
+										{ trf(ctx, "%d min", minutes) }
+									}
+								</span>
+							}
+							<a href={ templ.SafeURL(v.pinURL(item.ID)) } class={ "btn btn-sm", templ.KV("btn-active", slices.Contains(v.Pins, item.ID)) } aria-label={ pinLabel(ctx, item.Title, slices.Contains(v.Pins, item.ID)) }>
+								@Icon("pin", "size-4")
+								if slices.Contains(v.Pins, item.ID) {
+									{ tr(ctx, "Unpin") }
+								} else {
+									{ tr(ctx, "Pin") }
+								}
+							</a>
+						</li>
+					}
 				</ul>
 			} else {
-				<p>{ tr(ctx, "Nothing matches all of that among titles you have not seen or saved. Drop one filter:") }</p>
+				if v.Source == "watchlist" {
+					<p>{ tr(ctx, "No watchlist titles match. Try fewer filters or save something you want to watch.") }</p>
+				} else {
+					<p>{ tr(ctx, "Nothing matches all of that among titles you have not seen or saved. Drop one filter:") }</p>
+				}
 				<div class="flex flex-wrap gap-2">
 					for _, f := range v.activeFilters(ctx) {
 						<a href={ templ.SafeURL(v.pickURL(1, f.Param)) } class="btn btn-sm btn-outline gap-1.5">
@@ -281,7 +351,19 @@ templ tonightPicks(v DiscoverView) {
 	</section>
 }
 
+func pinLabel(ctx context.Context, title string, pinned bool) string {
+	if pinned { return trf(ctx, "Unpin %s", title) }
+	return trf(ctx, "Pin %s", title)
+}
+
 // DiscoverMore is the loader under Discover's grid.
 templ DiscoverMore(v DiscoverView) {
-	@moreLoader(v.Failed, v.Next, v.moreURL(v.Next), "/discover?"+v.discoverParams(0))
+	if v.Failed && v.Source == "watchlist" {
+		<div role="alert" class="alert alert-error">
+			<span>{ tr(ctx, "Your watchlist could not be loaded. Please try again.") }</span>
+			<a href={ templ.SafeURL(v.pickURL(max(1, v.Pick), "")) } class="btn btn-sm">{ tr(ctx, "Retry") }</a>
+		</div>
+	} else {
+		@moreLoader(v.Failed, v.Next, v.moreURL(v.Next), "/discover?"+v.discoverParams(0))
+	}
 }
