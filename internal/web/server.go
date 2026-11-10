@@ -156,6 +156,7 @@ func New(cfg Config) http.Handler {
 	a.library.Consider(a.cfg.Store, a.cfg.Store)
 	handlers.NewRecommendations(a.library, a.userID, a.catalog).Register(mux)
 	a.catalog.ExcludeFromPicks(a.library.MarkedFor(a.userID))
+	a.catalog.PickFromWatchlist(a.cfg.Store, a.userID)
 	titleStates.Register(mux)
 	episodes := handlers.NewEpisodes(a.cfg.Store, a.userID, a.catalog)
 	episodes.UseFileMappings(a.cfg.Store)

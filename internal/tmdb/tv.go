@@ -46,6 +46,7 @@ type TVDetails struct {
 	MediaItem
 	OriginalTitle string
 	// EnglishTitle is the series' English name, empty when TMDB has none.
+	OriginalLanguage string
 	EnglishTitle     string
 	Tagline          string
 	Status           string
@@ -223,6 +224,7 @@ func (c *Client) TV(ctx context.Context, id int) (*TVDetails, error) {
 		t := &TVDetails{
 			MediaItem:        raw.mediaItem("tv"),
 			OriginalTitle:    nativeTitle(raw.OriginalName, raw.Language, raw.Countries, raw.AltTitles.Results),
+			OriginalLanguage: raw.Language,
 			Tagline:          raw.Tagline,
 			Status:           raw.Status,
 			LastAirDate:      raw.LastAirDate,

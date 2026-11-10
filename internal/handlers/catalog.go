@@ -8,6 +8,7 @@ import (
 
 	"github.com/lieranderl/moviestracker-app/internal/auth"
 	"github.com/lieranderl/moviestracker-app/internal/sources"
+	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 )
 
@@ -24,8 +25,10 @@ type Catalog struct {
 	episodes        *Episodes                      // users' watched episodes; nil keeps none
 	// marked are the titles the request's user marked (watched, saved,
 	// hidden), kept out of picks for tonight; nil keeps none out.
-	marked  func(*http.Request) map[string]bool
-	presets *DiscoveryPresets
+	marked    func(*http.Request) map[string]bool
+	presets   *DiscoveryPresets
+	watchlist store.TitleStateStore
+	pickUser  func(*http.Request) (string, bool)
 }
 
 // ExcludeFromPicks keeps the titles marked says the user marked out of
@@ -93,4 +96,9 @@ func (c *Catalog) Title(ctx context.Context, kind string, id int) (tmdb.MediaIte
 		return tmdb.MediaItem{}, err
 	}
 	return movie.MediaItem, nil
+}
+
+// PickFromWatchlist enables account-owned Want to watch candidates.
+func (c *Catalog) PickFromWatchlist(titles store.TitleStateStore, user func(*http.Request) (string, bool)) {
+	c.watchlist, c.pickUser = titles, user
 }
