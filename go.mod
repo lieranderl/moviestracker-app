@@ -1,6 +1,6 @@
 module github.com/lieranderl/moviestracker-app
 
-go 1.27.3
+go 1.27.4
 
 require (
 	cloud.google.com/go/firestore v1.29.2
