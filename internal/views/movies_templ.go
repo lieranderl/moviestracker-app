@@ -176,6 +176,12 @@ func Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, ser
 					return templ_7745c5c3_Err
 				}
 			}
+			if user != nil {
+				templ_7745c5c3_Err = showsThisWeekSlot().Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
 			templ_7745c5c3_Err = recommendationsSlot().Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -252,7 +258,7 @@ func mediaRow(id, title, subtitle, icon, iconTone, badgeTone, emptyMsg string, i
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(id).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 87, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 90, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {
@@ -265,7 +271,7 @@ func mediaRow(id, title, subtitle, icon, iconTone, badgeTone, emptyMsg string, i
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templruntime.NewAttributeExpression(id + "-title").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 87, Col: 91}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 90, Col: 91}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 		if templ_7745c5c3_Err != nil {
@@ -286,7 +292,7 @@ func mediaRow(id, title, subtitle, icon, iconTone, badgeTone, emptyMsg string, i
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templruntime.NewAttributeExpression(id + "-title").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 91, Col: 26}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 94, Col: 26}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
@@ -307,7 +313,7 @@ func mediaRow(id, title, subtitle, icon, iconTone, badgeTone, emptyMsg string, i
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 93, Col: 12}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 96, Col: 12}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -360,7 +366,7 @@ func mediaRow(id, title, subtitle, icon, iconTone, badgeTone, emptyMsg string, i
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Weekly"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 94, Col: 93}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 97, Col: 93}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -373,7 +379,7 @@ func mediaRow(id, title, subtitle, icon, iconTone, badgeTone, emptyMsg string, i
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(subtitle)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 96, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 99, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
@@ -409,7 +415,7 @@ func mediaRow(id, title, subtitle, icon, iconTone, badgeTone, emptyMsg string, i
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(emptyMsg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 105, Col: 20}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 108, Col: 20}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -486,7 +492,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templruntime.NewAttributeExpression(tr(ctx, "Trending highlights")).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 123, Col: 46}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 126, Col: 46}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 			if templ_7745c5c3_Err != nil {
@@ -499,7 +505,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("{ heroSlide: 0, heroTotal: %d, heroPaused: false, heroHovered: false, heroElapsed: 0, heroPlayTrailer: false, heroMuted: true, heroReduced: matchMedia('(prefers-reduced-motion: reduce)').matches }", len(items))).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 124, Col: 241}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 127, Col: 241}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 			if templ_7745c5c3_Err != nil {
@@ -512,7 +518,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templruntime.NewAttributeExpression(heroTick).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 125, Col: 43}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 128, Col: 43}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 			if templ_7745c5c3_Err != nil {
@@ -530,7 +536,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templruntime.NewAttributeExpression(req).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 131, Col: 39}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 134, Col: 39}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 				if templ_7745c5c3_Err != nil {
@@ -580,7 +586,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templruntime.NewAttributeExpression(heroMute).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 149, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 152, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 			if templ_7745c5c3_Err != nil {
@@ -593,7 +599,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templruntime.NewAttributeExpression(tr(ctx, "Toggle trailer sound")).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 152, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 155, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
 			if templ_7745c5c3_Err != nil {
@@ -606,7 +612,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var25 string
 			templ_7745c5c3_Var25, templ_7745c5c3_Err = templruntime.NewAttributeExpression(tr(ctx, "Mute / unmute trailer")).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 153, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 156, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var25)
 			if templ_7745c5c3_Err != nil {
@@ -640,7 +646,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 				var templ_7745c5c3_Var26 string
 				templ_7745c5c3_Var26, templ_7745c5c3_Err = templruntime.NewAttributeExpression(tr(ctx, "Choose slide")).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 164, Col: 195}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 167, Col: 195}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
 				if templ_7745c5c3_Err != nil {
@@ -662,7 +668,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 						var templ_7745c5c3_Var27 string
 						templ_7745c5c3_Var27, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("$heroSlide = %d", idx) + heroGoto).Resolve(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 168, Col: 69}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 171, Col: 69}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
 						if templ_7745c5c3_Err != nil {
@@ -675,7 +681,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 						var templ_7745c5c3_Var28 string
 						templ_7745c5c3_Var28, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("{ 'btn-primary': $heroSlide === %d, 'btn-ghost': $heroSlide !== %d }", idx, idx)).Resolve(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 169, Col: 113}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 172, Col: 113}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
 						if templ_7745c5c3_Err != nil {
@@ -688,7 +694,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 						var templ_7745c5c3_Var29 string
 						templ_7745c5c3_Var29, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("$heroSlide === %d ? 'true' : null", idx)).Resolve(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 170, Col: 85}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 173, Col: 85}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 						if templ_7745c5c3_Err != nil {
@@ -719,7 +725,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 						var templ_7745c5c3_Var32 string
 						templ_7745c5c3_Var32, templ_7745c5c3_Err = templruntime.NewAttributeExpression(item.Title).Resolve(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 172, Col: 25}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 175, Col: 25}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
 						if templ_7745c5c3_Err != nil {
@@ -746,7 +752,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 					var templ_7745c5c3_Var33 string
 					templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(item.Title)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 174, Col: 73}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 177, Col: 73}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 					if templ_7745c5c3_Err != nil {
@@ -759,7 +765,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 					var templ_7745c5c3_Var34 string
 					templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(idx + 1))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 175, Col: 101}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 178, Col: 101}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 					if templ_7745c5c3_Err != nil {
@@ -808,7 +814,7 @@ func heroArrow(label, icon, action string) templ.Component {
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templruntime.NewAttributeExpression(action).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 187, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 190, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var36)
 		if templ_7745c5c3_Err != nil {
@@ -821,7 +827,7 @@ func heroArrow(label, icon, action string) templ.Component {
 		var templ_7745c5c3_Var37 string
 		templ_7745c5c3_Var37, templ_7745c5c3_Err = templruntime.NewAttributeExpression(label).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 189, Col: 20}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 192, Col: 20}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
 		if templ_7745c5c3_Err != nil {
@@ -834,7 +840,7 @@ func heroArrow(label, icon, action string) templ.Component {
 		var templ_7745c5c3_Var38 string
 		templ_7745c5c3_Var38, templ_7745c5c3_Err = templruntime.NewAttributeExpression(label).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 190, Col: 15}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 193, Col: 15}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var38)
 		if templ_7745c5c3_Err != nil {
@@ -884,7 +890,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var40 string
 			templ_7745c5c3_Var40, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("hero-slide-%d", idx)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 198, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 201, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var40)
 			if templ_7745c5c3_Err != nil {
@@ -897,7 +903,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var41 string
 			templ_7745c5c3_Var41, templ_7745c5c3_Err = templruntime.NewAttributeExpression(trf(ctx, "%d of %d: %s", idx+1, total, item.Title)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 200, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 203, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var41)
 			if templ_7745c5c3_Err != nil {
@@ -928,7 +934,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var44 string
 			templ_7745c5c3_Var44, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("{ hidden: $heroSlide !== %d }", idx)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 202, Col: 64}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 205, Col: 64}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var44)
 			if templ_7745c5c3_Err != nil {
@@ -960,7 +966,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var45 string
 			templ_7745c5c3_Var45, templ_7745c5c3_Err = templruntime.NewAttributeExpression(item.BackdropURL()).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 207, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 210, Col: 28}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var45)
 			if templ_7745c5c3_Err != nil {
@@ -993,7 +999,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var46 string
 			templ_7745c5c3_Var46, templ_7745c5c3_Err = templruntime.NewAttributeExpression(item.PosterURL()).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 219, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 222, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var46)
 			if templ_7745c5c3_Err != nil {
@@ -1021,7 +1027,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var47 string
 			templ_7745c5c3_Var47, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("{ 'trailer-fade-in': $heroPlayTrailer && $heroSlide === %d, 'trailer-fade-out': !($heroPlayTrailer && $heroSlide === %d) }", idx, idx)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 231, Col: 164}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 234, Col: 164}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var47)
 			if templ_7745c5c3_Err != nil {
@@ -1034,7 +1040,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var48 string
 			templ_7745c5c3_Var48, templ_7745c5c3_Err = templruntime.NewAttributeExpression(trf(ctx, "%s trailer", item.Title)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 236, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 239, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var48)
 			if templ_7745c5c3_Err != nil {
@@ -1047,7 +1053,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var49 string
 			templ_7745c5c3_Var49, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("{src: ($heroPlayTrailer && $heroSlide === %d) ? 'https://www.youtube-nocookie.com/embed/%s?autoplay=1&controls=0&playsinline=1&rel=0&iv_load_policy=3&disablekb=1&enablejsapi=1&mute=' + (@peek(() => $heroMuted) ? 1 : 0) : null}", idx, url.PathEscape(item.TrailerKey))).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 237, Col: 296}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 240, Col: 296}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var49)
 			if templ_7745c5c3_Err != nil {
@@ -1073,7 +1079,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 		var templ_7745c5c3_Var50 string
 		templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Trending"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 252, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 255, Col: 27}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var50))
 		if templ_7745c5c3_Err != nil {
@@ -1086,7 +1092,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 		var templ_7745c5c3_Var51 string
 		templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(idx + 1))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 252, Col: 89}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 255, Col: 89}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
 		if templ_7745c5c3_Err != nil {
@@ -1114,7 +1120,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var52 string
 			templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinStringErrs(item.ReleaseYear())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 259, Col: 141}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 262, Col: 141}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
 			if templ_7745c5c3_Err != nil {
@@ -1132,7 +1138,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 		var templ_7745c5c3_Var53 string
 		templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(mediaTypeLabel(ctx, item.MediaType, tr(ctx, "TV Series")))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 262, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 265, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 		if templ_7745c5c3_Err != nil {
@@ -1150,7 +1156,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var54 string
 			templ_7745c5c3_Var54, templ_7745c5c3_Err = templruntime.NewAttributeExpression(item.LogoURL()).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 268, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 271, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var54)
 			if templ_7745c5c3_Err != nil {
@@ -1163,7 +1169,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var55 string
 			templ_7745c5c3_Var55, templ_7745c5c3_Err = templruntime.NewAttributeExpression(item.Title).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 269, Col: 23}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 272, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var55)
 			if templ_7745c5c3_Err != nil {
@@ -1187,7 +1193,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var56 string
 			templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(item.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 276, Col: 18}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 279, Col: 18}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 			if templ_7745c5c3_Err != nil {
@@ -1206,7 +1212,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 			var templ_7745c5c3_Var57 string
 			templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(item.Overview)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 281, Col: 21}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 284, Col: 21}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
 			if templ_7745c5c3_Err != nil {
@@ -1224,7 +1230,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 		var templ_7745c5c3_Var58 string
 		templ_7745c5c3_Var58, templ_7745c5c3_Err = templruntime.NewAttributeExpression(mediaHref(item)).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 285, Col: 30}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 288, Col: 30}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var58)
 		if templ_7745c5c3_Err != nil {
@@ -1245,7 +1251,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 		var templ_7745c5c3_Var59 string
 		templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "More info"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 287, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 290, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
 		if templ_7745c5c3_Err != nil {
@@ -1274,7 +1280,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 		var templ_7745c5c3_Var60 string
 		templ_7745c5c3_Var60, templ_7745c5c3_Err = templruntime.NewAttributeExpression("$heroPaused ? " + trJS(ctx, "Stop Preview") + " : " + trJS(ctx, "Play Preview")).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 301, Col: 104}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 304, Col: 104}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var60)
 		if templ_7745c5c3_Err != nil {
@@ -1287,7 +1293,7 @@ func heroSlide(idx, total int, item tmdb.MediaItem) templ.Component {
 		var templ_7745c5c3_Var61 string
 		templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Play Preview"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 301, Col: 132}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 304, Col: 132}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var61))
 		if templ_7745c5c3_Err != nil {
@@ -1417,7 +1423,7 @@ func mediaCard(item tmdb.MediaItem, size string) templ.Component {
 			var templ_7745c5c3_Var66 string
 			templ_7745c5c3_Var66, templ_7745c5c3_Err = templruntime.NewAttributeExpression(item.PosterURL()).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 344, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 347, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var66)
 			if templ_7745c5c3_Err != nil {
@@ -1430,7 +1436,7 @@ func mediaCard(item tmdb.MediaItem, size string) templ.Component {
 			var templ_7745c5c3_Var67 string
 			templ_7745c5c3_Var67, templ_7745c5c3_Err = templruntime.NewAttributeExpression(trf(ctx, "%s poster", item.Title)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 345, Col: 44}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 348, Col: 44}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var67)
 			if templ_7745c5c3_Err != nil {
@@ -1456,7 +1462,7 @@ func mediaCard(item tmdb.MediaItem, size string) templ.Component {
 			var templ_7745c5c3_Var68 string
 			templ_7745c5c3_Var68, templ_7745c5c3_Err = templ.JoinStringErrs(item.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 355, Col: 73}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 358, Col: 73}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var68))
 			if templ_7745c5c3_Err != nil {
@@ -1483,7 +1489,7 @@ func mediaCard(item tmdb.MediaItem, size string) templ.Component {
 			var templ_7745c5c3_Var69 string
 			templ_7745c5c3_Var69, templ_7745c5c3_Err = templ.JoinStringErrs(item.FormattedRating())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 361, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 364, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var69))
 			if templ_7745c5c3_Err != nil {
@@ -1507,7 +1513,7 @@ func mediaCard(item tmdb.MediaItem, size string) templ.Component {
 		var templ_7745c5c3_Var70 string
 		templ_7745c5c3_Var70, templ_7745c5c3_Err = templruntime.NewAttributeExpression(item.Title).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 369, Col: 122}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 372, Col: 122}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var70)
 		if templ_7745c5c3_Err != nil {
@@ -1520,7 +1526,7 @@ func mediaCard(item tmdb.MediaItem, size string) templ.Component {
 		var templ_7745c5c3_Var71 string
 		templ_7745c5c3_Var71, templ_7745c5c3_Err = templruntime.NewAttributeExpression(mediaHref(item)).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 370, Col: 29}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 373, Col: 29}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var71)
 		if templ_7745c5c3_Err != nil {
@@ -1533,7 +1539,7 @@ func mediaCard(item tmdb.MediaItem, size string) templ.Component {
 		var templ_7745c5c3_Var72 string
 		templ_7745c5c3_Var72, templ_7745c5c3_Err = templ.JoinStringErrs(item.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 370, Col: 108}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 373, Col: 108}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var72))
 		if templ_7745c5c3_Err != nil {
@@ -1546,7 +1552,7 @@ func mediaCard(item tmdb.MediaItem, size string) templ.Component {
 		var templ_7745c5c3_Var73 string
 		templ_7745c5c3_Var73, templ_7745c5c3_Err = templ.JoinStringErrs(item.ReleaseYear())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 373, Col: 48}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 376, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var73))
 		if templ_7745c5c3_Err != nil {
@@ -1559,7 +1565,7 @@ func mediaCard(item tmdb.MediaItem, size string) templ.Component {
 		var templ_7745c5c3_Var74 string
 		templ_7745c5c3_Var74, templ_7745c5c3_Err = templ.JoinStringErrs(mediaTypeLabel(ctx, item.MediaType, tr(ctx, "TV")))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 374, Col: 119}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/movies.templ`, Line: 377, Col: 119}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var74))
 		if templ_7745c5c3_Err != nil {
