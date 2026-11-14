@@ -110,7 +110,7 @@ type WeekShow struct {
 	New  tmdb.Airing // the unwatched episode out in the last week; zero when none
 	Next tmdb.Airing // the episode airing within a week; zero when none
 	// TV and Marks are the series and the user's watched episodes of it,
-	// for the episode to continue with.
+	// for the episode to continue with once the user has watched any.
 	TV    *tmdb.TVDetails
 	Marks EpisodeMarks
 }
@@ -153,7 +153,7 @@ templ ShowsThisWeek(shows []WeekShow) {
 									<span class="badge badge-soft badge-primary whitespace-nowrap">{ i18n.Date(ctx, s.Next.AirDate) }</span>
 								</p>
 							}
-							if s.TV != nil && s.Marks.Track {
+							if s.TV != nil && s.Marks.Track && len(s.Marks.Watched) > 0 {
 								if season, episode, ok, _ := nextUnwatched(s.TV, s.Marks); ok {
 									<a href={ templ.SafeURL(fmt.Sprintf("/tv/%d?season=%d#seasons", s.Item.ID, season)) } class="btn btn-sm btn-primary btn-soft gap-1.5">
 										@Icon("skip-forward", "size-4")

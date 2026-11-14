@@ -464,7 +464,7 @@ type WeekShow struct {
 	New  tmdb.Airing // the unwatched episode out in the last week; zero when none
 	Next tmdb.Airing // the episode airing within a week; zero when none
 	// TV and Marks are the series and the user's watched episodes of it,
-	// for the episode to continue with.
+	// for the episode to continue with once the user has watched any.
 	TV    *tmdb.TVDetails
 	Marks EpisodeMarks
 }
@@ -660,7 +660,7 @@ func ShowsThisWeek(shows []WeekShow) templ.Component {
 							return templ_7745c5c3_Err
 						}
 					}
-					if s.TV != nil && s.Marks.Track {
+					if s.TV != nil && s.Marks.Track && len(s.Marks.Watched) > 0 {
 						if season, episode, ok, _ := nextUnwatched(s.TV, s.Marks); ok {
 							templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<a href=\"")
 							if templ_7745c5c3_Err != nil {
