@@ -101,29 +101,35 @@ func TestHomeShowsANewEpisodeUntilItIsWatched(t *testing.T) {
 	}
 }
 
-func TestHomeShowsOfferTheNextEpisodeToContinueWith(t *testing.T) {
-	behind, _ := airedSeries(95396, "Severance", 2)
-	caughtUp, season := airedSeries(3, "Silo", 30)
+func TestHomeShowsOfferTheNextEpisodeToContinueAStartedSeries(t *testing.T) {
+	started, startedSeason := airedSeries(95396, "Severance", 2)
+	caughtUp, caughtUpSeason := airedSeries(3, "Silo", 30)
 	caughtUp.NextEpisode = tmdb.Airing{Season: 1, Number: 3, AirDate: daysAway(1)}
+	untouched, _ := airedSeries(7, "Andor", 1)
 	s := newMediaServer(t, &fakeTMDBDetails{
-		series:  map[int]*tmdb.TVDetails{95396: behind, 3: caughtUp},
-		seasons: map[string]*tmdb.Season{"3/1": season},
+		series:  map[int]*tmdb.TVDetails{95396: started, 3: caughtUp, 7: untouched},
+		seasons: map[string]*tmdb.Season{"95396/1": startedSeason, "3/1": caughtUpSeason},
 	}, nil, "")
 	cookie := signedIn(t, s)
-	req := httptest.NewRequest(http.MethodPost, "/api/episodes/season?tv=3&season=1&watched=1", nil)
-	req.Header.Set("Datastar-Request", "true")
-	req.AddCookie(cookie)
-	rec := httptest.NewRecorder()
-	s.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("marking the season watched = %d %s", rec.Code, rec.Body)
+	for _, mark := range []string{"/api/episodes?tv=95396&season=1&episode=1&watched=1", "/api/episodes/season?tv=3&season=1&watched=1"} {
+		req := httptest.NewRequest(http.MethodPost, mark, nil)
+		req.Header.Set("Datastar-Request", "true")
+		req.AddCookie(cookie)
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("POST %s = %d %s", mark, rec.Code, rec.Body)
+		}
 	}
-	row := homeShows(t, s, cookie, "95396", "3")
-	if !strings.Contains(row, `href="/tv/95396?season=1#seasons"`) || !strings.Contains(row, "Continue with S01E01") {
-		t.Errorf("row does not offer the first unwatched episode of Severance:\n%s", row)
+	row := homeShows(t, s, cookie, "95396", "3", "7")
+	if !strings.Contains(row, `href="/tv/95396?season=1#seasons"`) || !strings.Contains(row, "Continue with S01E02") {
+		t.Errorf("row does not offer the first unwatched episode of a started series:\n%s", row)
 	}
-	if strings.Contains(row, `href="/tv/3?season=`) || strings.Count(row, "Continue with") != 1 {
-		t.Errorf("row offers to continue a series with nothing left to watch:\n%s", row)
+	if strings.Contains(row, `href="/tv/3?season=`) {
+		t.Error("row offers to continue a series with nothing left to watch")
+	}
+	if !strings.Contains(row, "Andor") || strings.Contains(row, `href="/tv/7?season=`) || strings.Count(row, "Continue with") != 1 {
+		t.Errorf("row offers to continue a series the user has not started:\n%s", row)
 	}
 }
 
