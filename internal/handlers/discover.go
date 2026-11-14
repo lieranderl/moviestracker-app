@@ -40,11 +40,28 @@ func (c *Catalog) handleDiscover(w http.ResponseWriter, r *http.Request) {
 			results <- discoverResult{rail: rail, items: items}
 		}()
 	}
+	// Each home rail is settled once all its lists are in (HomeRailSettled).
+	waiting := map[string]int{}
+	for _, rail := range rails {
+		waiting[views.HomeRailOf(r.Context(), rail)]++
+	}
+	filled := map[string]bool{}
 	for range rails {
 		res := <-results
 		if err := sse.PatchElementTempl(views.DiscoverRailLoaded(res.rail, res.items)); err != nil {
 			logSSEError(r, "patch discover rail", err)
 			return
+		}
+		filled[res.rail.Slug] = len(res.items) > 0
+		home := views.HomeRailOf(r.Context(), res.rail)
+		if waiting[home]--; waiting[home] > 0 {
+			continue
+		}
+		if settled := views.HomeRailSettled(r.Context(), home, filled); settled != nil {
+			if err := sse.PatchElementTempl(settled); err != nil {
+				logSSEError(r, "settle home rail", err)
+				return
+			}
 		}
 	}
 }

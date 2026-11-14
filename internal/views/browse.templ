@@ -217,6 +217,10 @@ templ rowMarker(id string) {
 	></span>
 }
 
+// chipID is the id of a home rail's chip in the category bar: a rail that
+// goes away hides its chip too.
+func chipID(railID string) string { return "chip-" + railID }
+
 // barChip is a chip of the category bar.
 type barChip struct {
 	Href, Icon, Title string
@@ -261,7 +265,12 @@ templ categoryBar(chips []barChip, discover, home bool) {
 				</a>
 			</li>
 			for _, c := range chips {
-				<li class="shrink-0">
+				<li
+					class="shrink-0"
+					if c.Row != "" {
+						id={ chipID(c.Row) }
+					}
+				>
 					<a
 						href={ templ.SafeURL(c.Href) }
 						class={ "btn btn-sm btn-soft rounded-full gap-1.5", templ.KV("btn-primary", c.Current) }

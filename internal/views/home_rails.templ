@@ -108,7 +108,8 @@ func trendingEmpty(ctx context.Context, slug string) string {
 	return tr(ctx, "No trending movies available. Please verify TMDB_API_KEY configuration.")
 }
 
-func tabID(listID string) string   { return "tab-" + listID }
+func tabID(listID string) string    { return "tab-" + listID }
+func settleID(railID string) string { return "settle-" + railID }
 func panelID(listID string) string { return "panel-" + listID }
 
 // homeRailSection is a home rail: its title, a tab per list when it has
@@ -126,13 +127,14 @@ templ homeRailSection(r homeRail, trending map[string][]tmdb.MediaItem) {
 		}
 	>
 		@rowMarker(r.id())
-		<header class="flex flex-wrap items-center gap-x-4 gap-y-2">
+		<div id={ settleID(r.id()) } class="hidden"></div>
+		<header class="flex flex-wrap items-center gap-x-4 gap-y-2 min-w-0">
 			<h2 id={ r.id() + "-title" } class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
 				@Icon(r.Icon, "size-5 text-primary")
 				{ tr(ctx, r.Title) }
 			</h2>
 			if tabbed {
-				<div role="tablist" class="tabs tabs-box tabs-sm flex-nowrap" aria-label={ tr(ctx, r.Title) }>
+				<div role="tablist" class="tabs tabs-box tabs-sm flex-nowrap max-w-full overflow-x-auto [scrollbar-width:none]" aria-label={ tr(ctx, r.Title) }>
 					for i, l := range r.Lists {
 						<button
 							type="button"
@@ -220,4 +222,50 @@ templ mediaCarousel(items []tmdb.MediaItem) {
 			</li>
 		}
 	}
+}
+
+// HomeRailOf is the id of the home rail that shows d.
+func HomeRailOf(ctx context.Context, d DiscoverRail) string {
+	for _, r := range homeRails(ctx, true) {
+		for _, l := range r.Lists {
+			if l.Slug == d.Slug {
+				return r.id()
+			}
+		}
+	}
+	return ""
+}
+
+// HomeRailSettled settles the home rail with id once all its lists that
+// load after the page have arrived; filled are the slugs that came with
+// titles. A rail whose first list came back empty moves on to the first
+// list that has some, unless the user picked a tab meanwhile; a rail with
+// nothing at all goes away with its chip. Nil when nothing changes.
+func HomeRailSettled(ctx context.Context, id string, filled map[string]bool) templ.Component {
+	for _, r := range homeRails(ctx, true) {
+		if r.id() != id {
+			continue
+		}
+		for i, l := range r.Lists {
+			if l.lazy() && !filled[l.Slug] {
+				continue
+			}
+			if i == 0 {
+				return nil
+			}
+			first := r.Lists[0].homeID()
+			return homeRailSettle(r, fmt.Sprintf("%s == '%s' && (%s = '%s')", r.signal(), first, r.signal(), l.homeID()))
+		}
+		return homeRailGone(r)
+	}
+	return nil
+}
+
+templ homeRailSettle(r homeRail, init string) {
+	<div id={ settleID(r.id()) } class="hidden" data-init={ init }></div>
+}
+
+templ homeRailGone(r homeRail) {
+	<section id={ r.id() } class="hidden"></section>
+	<li id={ chipID(r.id()) } class="hidden"></li>
 }
