@@ -1,0 +1,271 @@
+package views
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
+)
+
+// homeTab is one list of a home rail, under the short label of its tab.
+type homeTab struct{ Slug, Label string }
+
+// homeRailSpecs are the home page's rails, in page order: each shows one of
+// its lists at a time, picked by a tab. A list the site lacks is left out,
+// and a rail with it. Popular movies is not here: it repeats Trending and
+// Now playing almost title for title.
+var homeRailSpecs = []struct {
+	Key, Title, Icon string
+	Tabs             []homeTab
+}{
+	{Key: "movies", Title: "Movies", Icon: "film", Tabs: []homeTab{{"trending-movies", "Trending"}, {"now-playing", "In theaters"}, {"top-rated-movies", "Top rated"}}},
+	{Key: "series", Title: "Series", Icon: "tv", Tabs: []homeTab{{"trending-series", "Trending"}, {"popular-series", "Popular"}, {"top-rated-series", "Top rated"}}},
+	{Key: "releases", Title: "Releases", Icon: "sparkles", Tabs: []homeTab{{"latest-releases", "Latest"}, {"hdr10-releases", "HDR10"}, {"dolby-vision-releases", "Dolby Vision"}}},
+}
+
+// homeRailList is a list of a home rail.
+type homeRailList struct {
+	BrowseList
+	Label string // of its tab
+}
+
+// lazy says the list arrives after the page, from /api/discover.
+func (l homeRailList) lazy() bool { return l.Day == "" }
+
+// homeRail is a row of the home page: lists of a kind, one shown at a time.
+type homeRail struct {
+	Key, Title, Icon string
+	Lists            []homeRailList
+	Browse           bool // each list links to the whole of it at /browse
+}
+
+func (r homeRail) id() string { return "home-" + r.Key }
+
+// signal is the Datastar signal holding the id of the list shown.
+func (r homeRail) signal() string {
+	return "$homeTab" + strings.ToUpper(r.Key[:1]) + r.Key[1:]
+}
+
+// shows is the expression that is true while the rail shows l.
+func (r homeRail) shows(l homeRailList) string {
+	return fmt.Sprintf("%s == '%s'", r.signal(), l.homeID())
+}
+
+// homeRails are the rails of ctx's site; without discover (no TMDB details)
+// only the trending lists, which come with the page.
+func homeRails(ctx context.Context, discover bool) []homeRail {
+	var rails []homeRail
+	for _, spec := range homeRailSpecs {
+		rail := homeRail{Key: spec.Key, Title: spec.Title, Icon: spec.Icon, Browse: discover}
+		for _, tab := range spec.Tabs {
+			l, ok := FindBrowseList(ctx, tab.Slug)
+			if !ok || (!discover && l.Day == "") {
+				continue
+			}
+			rail.Lists = append(rail.Lists, homeRailList{BrowseList: l, Label: tab.Label})
+		}
+		if len(rail.Lists) > 0 {
+			rails = append(rails, rail)
+		}
+	}
+	return rails
+}
+
+// HomeDiscoverRails are the lists of ctx's site that the home page loads
+// after it has rendered, which /api/discover streams.
+func HomeDiscoverRails(ctx context.Context) []DiscoverRail {
+	shown := map[string]bool{}
+	for _, r := range homeRails(ctx, true) {
+		for _, l := range r.Lists {
+			shown[l.Slug] = true
+		}
+	}
+	var out []DiscoverRail
+	for _, d := range DiscoverRailsFor(ctx) {
+		if shown[d.Slug] {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+// homeChips are the category bar's chips on the home page: one per rail,
+// jumping to it and lit while it is the row in view.
+func homeChips(ctx context.Context, rails []homeRail) []barChip {
+	chips := make([]barChip, 0, len(rails))
+	for _, r := range rails {
+		chips = append(chips, barChip{Href: "#" + r.id(), Icon: r.Icon, Title: tr(ctx, r.Title), Row: r.id()})
+	}
+	return chips
+}
+
+// trendingEmpty is what a trending list says when TMDB sent nothing.
+func trendingEmpty(ctx context.Context, slug string) string {
+	if slug == "trending-series" {
+		return tr(ctx, "No trending TV series available. Please verify TMDB_API_KEY configuration.")
+	}
+	return tr(ctx, "No trending movies available. Please verify TMDB_API_KEY configuration.")
+}
+
+func tabID(listID string) string    { return "tab-" + listID }
+func settleID(railID string) string { return "settle-" + railID }
+func panelID(listID string) string { return "panel-" + listID }
+
+// homeRailSection is a home rail: its title, a tab per list when it has
+// several, and the lists, of which the tab's shows. trending are the lists
+// that come with the page, by slug; the others start as skeletons that
+// /api/discover fills in (DiscoverRailLoaded).
+templ homeRailSection(r homeRail, trending map[string][]tmdb.MediaItem) {
+	{{ tabbed := len(r.Lists) > 1 }}
+	<section
+		id={ r.id() }
+		class="relative space-y-4 scroll-mt-32"
+		aria-labelledby={ r.id() + "-title" }
+		if tabbed {
+			{ templ.Attributes{"data-signals:home-tab-" + r.Key: "'" + r.Lists[0].homeID() + "'"}... }
+		}
+	>
+		@rowMarker(r.id())
+		<div id={ settleID(r.id()) } class="hidden"></div>
+		<header class="flex flex-wrap items-center gap-x-4 gap-y-2 min-w-0">
+			<h2 id={ r.id() + "-title" } class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
+				@Icon(r.Icon, "size-5 text-primary")
+				{ tr(ctx, r.Title) }
+			</h2>
+			if tabbed {
+				<div role="tablist" class="tabs tabs-box tabs-sm flex-nowrap max-w-full overflow-x-auto [scrollbar-width:none]" aria-label={ tr(ctx, r.Title) }>
+					for i, l := range r.Lists {
+						<button
+							type="button"
+							role="tab"
+							id={ tabID(l.homeID()) }
+							aria-controls={ panelID(l.homeID()) }
+							aria-selected={ fmt.Sprint(i == 0) }
+							class={ "tab whitespace-nowrap", templ.KV("tab-active", i == 0) }
+							data-on:click={ fmt.Sprintf("%s = '%s'", r.signal(), l.homeID()) }
+							data-class:tab-active={ r.shows(l) }
+							data-attr:aria-selected={ r.shows(l) + " ? 'true' : 'false'" }
+						>
+							{ tr(ctx, l.Label) }
+						</button>
+					}
+				</div>
+			}
+			if r.Browse {
+				<div class="ms-auto">
+					for i, l := range r.Lists {
+						<span
+							if tabbed && i != 0 {
+								class="hidden"
+							}
+							if tabbed {
+								data-class:hidden={ "!(" + r.shows(l) + ")" }
+							}
+						>
+							@allLink(l.Slug, tr(ctx, l.Title))
+						</span>
+					}
+				</div>
+			}
+		</header>
+		for i, l := range r.Lists {
+			if tabbed {
+				<div
+					id={ panelID(l.homeID()) }
+					role="tabpanel"
+					aria-labelledby={ tabID(l.homeID()) }
+					if i != 0 {
+						class="hidden"
+					}
+					data-class:hidden={ "!(" + r.shows(l) + ")" }
+				>
+					@homeRailItems(l, trending[l.Slug])
+				</div>
+			} else {
+				@homeRailItems(l, trending[l.Slug])
+			}
+		}
+	</section>
+}
+
+// homeRailItems are a list's cards: a skeleton while a lazy list is on its
+// way, otherwise the page's own items.
+templ homeRailItems(l homeRailList, items []tmdb.MediaItem) {
+	if l.lazy() {
+		<div id={ l.homeID() } aria-busy="true">
+			<div class="flex gap-4 overflow-hidden pb-3" aria-hidden="true">
+				for range [7]struct{}{} {
+					<div class="skeleton w-40 sm:w-48 aspect-[2/3] shrink-0"></div>
+				}
+			</div>
+		</div>
+	} else {
+		<div id={ l.homeID() }>
+			if len(items) == 0 {
+				<div role="status" class="alert alert-info alert-soft">
+					@Icon("info", "size-5")
+					<span>{ trendingEmpty(ctx, l.Slug) }</span>
+				</div>
+			} else {
+				@mediaCarousel(items)
+			}
+		</div>
+	}
+}
+
+templ mediaCarousel(items []tmdb.MediaItem) {
+	@carousel() {
+		for _, item := range items {
+			<li class="carousel-item">
+				@MediaCard(item)
+			</li>
+		}
+	}
+}
+
+// HomeRailOf is the id of the home rail that shows d.
+func HomeRailOf(ctx context.Context, d DiscoverRail) string {
+	for _, r := range homeRails(ctx, true) {
+		for _, l := range r.Lists {
+			if l.Slug == d.Slug {
+				return r.id()
+			}
+		}
+	}
+	return ""
+}
+
+// HomeRailSettled settles the home rail with id once all its lists that
+// load after the page have arrived; filled are the slugs that came with
+// titles. A rail whose first list came back empty moves on to the first
+// list that has some, unless the user picked a tab meanwhile; a rail with
+// nothing at all goes away with its chip. Nil when nothing changes.
+func HomeRailSettled(ctx context.Context, id string, filled map[string]bool) templ.Component {
+	for _, r := range homeRails(ctx, true) {
+		if r.id() != id {
+			continue
+		}
+		for i, l := range r.Lists {
+			if l.lazy() && !filled[l.Slug] {
+				continue
+			}
+			if i == 0 {
+				return nil
+			}
+			first := r.Lists[0].homeID()
+			return homeRailSettle(r, fmt.Sprintf("%s == '%s' && (%s = '%s')", r.signal(), first, r.signal(), l.homeID()))
+		}
+		return homeRailGone(r)
+	}
+	return nil
+}
+
+templ homeRailSettle(r homeRail, init string) {
+	<div id={ settleID(r.id()) } class="hidden" data-init={ init }></div>
+}
+
+templ homeRailGone(r homeRail) {
+	<section id={ r.id() } class="hidden"></section>
+	<li id={ chipID(r.id()) } class="hidden"></li>
+}

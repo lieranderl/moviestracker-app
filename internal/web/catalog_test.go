@@ -2,6 +2,7 @@ package web_test
 
 import (
 	"context"
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -92,6 +93,51 @@ func TestTheHomeRowsShowTheLatestReleases(t *testing.T) {
 	page := getWith(t, h, "/browse/latest-releases", session)
 	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), `href="/movie/438631"`) {
 		t.Errorf("GET /browse/latest-releases = %d, want the whole list with Dune", page.Code)
+	}
+}
+
+// The Releases rail opens on Latest. When Latest has nothing, it moves on
+// to the first list that has titles, unless the user already picked one;
+// with no releases at all, the rail and its chip go away.
+func TestTheReleasesRailOpensOnAListThatHasTitles(t *testing.T) {
+	g := newGoogle(t)
+	cfg := withTMDB(t, g.config())
+	cfg.Releases = releases.NewMemory(map[releases.Feed][]releases.Release{
+		releases.HDR10: {{ID: 438631, Title: "Дюна", OriginalTitle: "Dune", PosterPath: "/d.jpg", FoundAt: now}},
+	})
+	h := web.New(cfg)
+	session := signIn(t, h)
+
+	home := getWith(t, h, "/", session).Body.String()
+	if !strings.Contains(home, `id="settle-home-releases"`) {
+		t.Fatal("the releases rail has nowhere to be settled once its lists arrive")
+	}
+	rows := html.UnescapeString(getWith(t, h, "/api/discover", session).Body.String())
+	if !strings.Contains(rows, `id="tab-discover-latest-releases" class="hidden"`) {
+		t.Error("the empty Latest list keeps its tab")
+	}
+	want := `data-init="$homeTabReleases == 'discover-latest-releases' && ($homeTabReleases = 'discover-hdr10-releases')"`
+	if !strings.Contains(rows, want) {
+		t.Errorf("the releases rail does not move on to HDR10; want %s in\n%s", want, rows)
+	}
+}
+
+func TestARailWithNoTitlesAtAllGoesAwayWithItsChip(t *testing.T) {
+	g := newGoogle(t)
+	cfg := withTMDB(t, g.config())
+	cfg.Releases = releases.NewMemory(nil)
+	h := web.New(cfg)
+	session := signIn(t, h)
+
+	home := getWith(t, h, "/", session).Body.String()
+	if !strings.Contains(home, `id="chip-home-releases"`) {
+		t.Fatal("the releases chip has no id to hide it by")
+	}
+	rows := getWith(t, h, "/api/discover", session).Body.String()
+	for _, want := range []string{`id="home-releases" class="hidden"`, `id="chip-home-releases" class="hidden"`} {
+		if !strings.Contains(rows, want) {
+			t.Errorf("an empty releases rail lacks %s", want)
+		}
 	}
 }
 

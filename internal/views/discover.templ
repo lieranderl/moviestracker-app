@@ -8,7 +8,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 )
 
-// DiscoverRail is one lazily loaded rail on the home page.
+// DiscoverRail is a list the home page loads after it renders.
 type DiscoverRail struct {
 	Slug     string
 	Title    string
@@ -17,7 +17,8 @@ type DiscoverRail struct {
 	List     tmdb.List
 }
 
-// DiscoverRails are streamed in by /api/discover, in page order.
+// DiscoverRails are the lists TMDB keeps besides the trending ones; the
+// home page loads those in its rails (HomeDiscoverRails) after it renders.
 var DiscoverRails = []DiscoverRail{
 	{Slug: "now-playing", Title: "Now playing in theaters", Subtitle: "In cinemas right now", Icon: "ticket", List: tmdb.NowPlayingMovies},
 	{Slug: "popular-movies", Title: "Popular movies", Subtitle: "What everyone is watching", Icon: "flame", List: tmdb.PopularMovies},
@@ -44,53 +45,17 @@ func DiscoverRailsFor(ctx context.Context) []DiscoverRail {
 
 func (d DiscoverRail) id() string { return "discover-" + d.Slug }
 
-// discoverSection renders skeleton rails; one SSE request fills them in as
-// each TMDB list arrives, so the home page never waits on them.
-templ discoverSection() {
-	<div class="space-y-10" data-init="@get('/api/discover')">
-		for _, d := range DiscoverRailsFor(ctx) {
-			<section id={ d.id() } class="relative space-y-4 scroll-mt-32" aria-busy="true" aria-label={ tr(ctx, d.Title) }>
-				@rowMarker(d.id())
-				@discoverHeader(d)
-				<div class="flex gap-4 overflow-hidden pb-3" aria-hidden="true">
-					for range [7]struct{}{} {
-						<div class="skeleton w-40 sm:w-48 aspect-[2/3] shrink-0"></div>
-					}
-				</div>
-			</section>
-		}
-	</div>
-}
-
-templ discoverHeader(d DiscoverRail) {
-	<header class="flex items-end justify-between gap-4">
-		<div class="min-w-0">
-			<h2 class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-				@Icon(d.Icon, "size-5 text-primary")
-				{ tr(ctx, d.Title) }
-			</h2>
-			<p class="text-sm text-base-content/70">{ tr(ctx, d.Subtitle) }</p>
-		</div>
-		@allLink(d.Slug, tr(ctx, d.Title))
-	</header>
-}
-
-// DiscoverRailLoaded replaces a skeleton rail; an empty list collapses it.
+// DiscoverRailLoaded fills in a lazy list of a home rail. An empty list
+// says so and hides its tab.
 templ DiscoverRailLoaded(d DiscoverRail, items []tmdb.MediaItem) {
 	if len(items) == 0 {
-		<section id={ d.id() } class="hidden"></section>
-		<li id={ chipID(d.id()) } class="hidden"></li>
+		<button id={ tabID(d.id()) } class="hidden"></button>
+		<div id={ d.id() }>
+			<p role="status" class="text-sm text-base-content/70 py-6">{ tr(ctx, "Nothing here right now.") }</p>
+		</div>
 	} else {
-		<section id={ d.id() } class="relative space-y-4 scroll-mt-32" aria-label={ tr(ctx, d.Title) }>
-			@rowMarker(d.id())
-			@discoverHeader(d)
-			@carousel() {
-				for _, item := range items {
-					<li class="carousel-item">
-						@MediaCard(item)
-					</li>
-				}
-			}
-		</section>
+		<div id={ d.id() }>
+			@mediaCarousel(items)
+		</div>
 	}
 }

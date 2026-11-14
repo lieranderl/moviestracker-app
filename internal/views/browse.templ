@@ -9,14 +9,14 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 )
 
-// BrowseList is a home row shown whole at /browse/{Slug}.
+// BrowseList is a list shown whole at /browse/{Slug}.
 type BrowseList struct {
 	Slug, Title, Subtitle, Icon string
 	Week                        tmdb.List // the list; this week's, for trending
 	Day                         tmdb.List // today's trending; empty for other lists
 }
 
-// BrowseLists are the local app's home rows, in page order.
+// BrowseLists are the local app's lists, in the category bar's order.
 var BrowseLists = browseLists(DiscoverRails)
 
 // cloudBrowseLists are the web app's.
@@ -33,7 +33,7 @@ func browseLists(rails []DiscoverRail) []BrowseList {
 	return lists
 }
 
-// browseListsFor are the home rows of ctx's site, in page order.
+// browseListsFor are the lists of ctx's site, in the category bar's order.
 func browseListsFor(ctx context.Context) []BrowseList {
 	if siteOf(ctx).Cloud {
 		return cloudBrowseLists
@@ -96,7 +96,7 @@ templ BrowsePage(user *auth.User, v BrowseView) {
 	@Layout(tr(ctx, v.List.Title)) {
 		@Navbar(user)
 		<main class="grow pb-20">
-			@categoryBar(browseListsFor(ctx), v.List.Slug)
+			@categoryBar(browseChips(ctx, v.List.Slug), false, false)
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
 				<header class="flex flex-wrap items-end justify-between gap-4">
 					<div class="min-w-0 space-y-1">
@@ -173,7 +173,7 @@ templ moreLoader(failed bool, next int, more, retry string) {
 	</div>
 }
 
-// homeID is the id of the list's row on the home page.
+// homeID is the id of the list in its rail on the home page.
 func (l BrowseList) homeID() string {
 	if l.Day != "" {
 		return l.Slug
@@ -185,11 +185,11 @@ func (l BrowseList) homeID() string {
 // JavaScript array; rowBefore is the row above it ("" for the first).
 func rowsFrom(ctx context.Context, id string) (rows, rowBefore string) {
 	var ids []string
-	for _, l := range browseListsFor(ctx) {
-		if l.homeID() == id || len(ids) > 0 {
-			ids = append(ids, "'"+l.homeID()+"'")
+	for _, r := range homeRails(ctx, true) {
+		if r.id() == id || len(ids) > 0 {
+			ids = append(ids, "'"+r.id()+"'")
 		} else {
-			rowBefore = l.homeID()
+			rowBefore = r.id()
 		}
 	}
 	return "[" + strings.Join(ids, ", ") + "]", rowBefore
@@ -217,28 +217,37 @@ templ rowMarker(id string) {
 	></span>
 }
 
-// chipID is the id of a home row's chip in the category bar: a row that
-// collapses hides its chip too.
-func chipID(rowID string) string { return "chip-" + rowID }
+// chipID is the id of a home rail's chip in the category bar: a rail that
+// goes away hides its chip too.
+func chipID(railID string) string { return "chip-" + railID }
 
-// homeLists are the rows the home page shows: the trending ones, and the
-// discovery rails when TMDB details are set up.
-func homeLists(ctx context.Context, discover bool) []BrowseList {
-	if discover {
-		return browseListsFor(ctx)
-	}
-	return browseListsFor(ctx)[:2]
+// barChip is a chip of the category bar.
+type barChip struct {
+	Href, Icon, Title string
+	Row               string // on the home page, the row the chip jumps to
+	Current           bool   // the page the chip opens is the one shown
 }
 
-// categoryBar sticks under the navbar with a chip per home row. On the
-// home page (current "") chips jump to their row, and the row in view
-// lights up its chip; on a browse page they open the other lists.
-templ categoryBar(lists []BrowseList, current string) {
+// browseChips are the category bar's chips on a browse page: one per list
+// of ctx's site, each opening its list; current is the list shown.
+func browseChips(ctx context.Context, current string) []barChip {
+	lists := browseListsFor(ctx)
+	chips := make([]barChip, 0, len(lists))
+	for _, l := range lists {
+		chips = append(chips, barChip{Href: "/browse/" + l.Slug, Icon: l.Icon, Title: tr(ctx, l.Title), Current: l.Slug == current})
+	}
+	return chips
+}
+
+// categoryBar sticks under the navbar: Discover, then chips. On the home
+// page chips jump to their row (homeChips), and the row in view lights up
+// its chip; on a browse page they open the other lists (browseChips).
+templ categoryBar(chips []barChip, discover, home bool) {
 	<nav
 		id="category-bar"
 		class="sticky top-16 z-40 bg-base-100/80 backdrop-blur-md border-b border-base-content/10"
 		aria-label={ tr(ctx, "Categories") }
-		if current == "" {
+		if home {
 			data-signals:home-row="''"
 		}
 	>
@@ -246,8 +255,8 @@ templ categoryBar(lists []BrowseList, current string) {
 			<li class="shrink-0">
 				<a
 					href="/discover"
-					class={ "btn btn-sm btn-soft rounded-full gap-1.5", templ.KV("btn-primary", current == discoverSlug) }
-					if current == discoverSlug {
+					class={ "btn btn-sm btn-soft rounded-full gap-1.5", templ.KV("btn-primary", discover) }
+					if discover {
 						aria-current="page"
 					}
 				>
@@ -255,33 +264,26 @@ templ categoryBar(lists []BrowseList, current string) {
 					{ tr(ctx, "Discover") }
 				</a>
 			</li>
-			for _, l := range lists {
+			for _, c := range chips {
 				<li
 					class="shrink-0"
-					if current == "" {
-						id={ chipID(l.homeID()) }
+					if c.Row != "" {
+						id={ chipID(c.Row) }
 					}
 				>
-					if current == "" {
-						<a
-							href={ templ.SafeURL("#" + l.homeID()) }
-							class="btn btn-sm btn-soft rounded-full gap-1.5"
-							data-class:btn-primary={ fmt.Sprintf("$homeRow == '%s'", l.homeID()) }
-						>
-							@Icon(l.Icon, "size-4")
-							{ tr(ctx, l.Title) }
-						</a>
-					} else if l.Slug == current {
-						<a href={ templ.SafeURL("/browse/" + l.Slug) } class="btn btn-sm btn-soft btn-primary rounded-full gap-1.5" aria-current="page">
-							@Icon(l.Icon, "size-4")
-							{ tr(ctx, l.Title) }
-						</a>
-					} else {
-						<a href={ templ.SafeURL("/browse/" + l.Slug) } class="btn btn-sm btn-soft rounded-full gap-1.5">
-							@Icon(l.Icon, "size-4")
-							{ tr(ctx, l.Title) }
-						</a>
-					}
+					<a
+						href={ templ.SafeURL(c.Href) }
+						class={ "btn btn-sm btn-soft rounded-full gap-1.5", templ.KV("btn-primary", c.Current) }
+						if c.Current {
+							aria-current="page"
+						}
+						if c.Row != "" {
+							data-class:btn-primary={ fmt.Sprintf("$homeRow == '%s'", c.Row) }
+						}
+					>
+						@Icon(c.Icon, "size-4")
+						{ c.Title }
+					</a>
 				</li>
 			}
 		</ul>

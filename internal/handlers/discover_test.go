@@ -9,15 +9,15 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 )
 
-func TestHomeRendersDiscoveryRailsThatLoadLazily(t *testing.T) {
+func TestHomeRendersListsThatLoadLazily(t *testing.T) {
 	server := newMediaServer(t, &fakeTMDBDetails{}, &fakeJacRed{}, "")
 
 	body := html.UnescapeString(get(t, server, "/movies", true).Body.String())
 
 	for _, want := range []string{
 		`data-init="@get('/api/discover')"`,
-		`id="discover-now-playing"`, "Now playing in theaters",
-		`id="discover-popular-movies"`, `id="discover-top-rated-movies"`,
+		`id="discover-now-playing"`, "In theaters",
+		`id="discover-top-rated-movies"`,
 		`id="discover-popular-series"`, `id="discover-top-rated-series"`,
 	} {
 		if !strings.Contains(body, want) {
@@ -26,7 +26,7 @@ func TestHomeRendersDiscoveryRailsThatLoadLazily(t *testing.T) {
 	}
 }
 
-func TestDiscoverStreamsEachRail(t *testing.T) {
+func TestDiscoverStreamsEachLazyListOfTheHomeRails(t *testing.T) {
 	server := newMediaServer(t, &fakeTMDBDetails{lists: map[tmdb.List][]tmdb.MediaItem{
 		tmdb.NowPlayingMovies: {{ID: 1, Title: "In Theaters", MediaType: "movie"}},
 		tmdb.PopularMovies:    {{ID: 2, Title: "Crowd Pleaser", MediaType: "movie"}},
@@ -37,26 +37,29 @@ func TestDiscoverStreamsEachRail(t *testing.T) {
 
 	body := get(t, server, "/api/discover", true).Body.String()
 
-	if n := strings.Count(body, "event: datastar-patch-elements"); n != 5 {
-		t.Errorf("patches = %d, want one per rail (5)", n)
+	if n := strings.Count(body, "event: datastar-patch-elements"); n != 4 {
+		t.Errorf("patches = %d, want one per lazy list (4)", n)
 	}
-	for _, want := range []string{`href="/movie/1"`, `href="/movie/2"`, `href="/movie/3"`, `href="/tv/4"`, `href="/tv/5"`} {
+	for _, want := range []string{`href="/movie/1"`, `href="/movie/3"`, `href="/tv/4"`, `href="/tv/5"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("discover stream missing %q", want)
 		}
 	}
+	if strings.Contains(body, `href="/movie/2"`) {
+		t.Error("discover streams Popular movies, which home does not show")
+	}
 }
 
-func TestDiscoverHidesRailsThatFail(t *testing.T) {
+func TestDiscoverHidesTheTabOfAListThatFails(t *testing.T) {
 	server := newMediaServer(t, &fakeTMDBDetails{err: errors.New("tmdb down")}, &fakeJacRed{}, "")
 
 	body := get(t, server, "/api/discover", true).Body.String()
 
-	if !strings.Contains(body, `id="discover-popular-movies" class="hidden"`) {
-		t.Errorf("failed rails should collapse, got %q", body)
+	if !strings.Contains(body, `id="tab-discover-top-rated-movies" class="hidden"`) {
+		t.Errorf("a failed list should hide its tab, got %q", body)
 	}
-	if !strings.Contains(body, `id="chip-discover-popular-movies" class="hidden"`) {
-		t.Errorf("a collapsed rail should hide its chip in the category bar, got %q", body)
+	if !strings.Contains(body, `id="discover-top-rated-movies"`) || !strings.Contains(body, "Nothing here right now.") {
+		t.Errorf("a failed list should stop loading and say it is empty, got %q", body)
 	}
 }
 

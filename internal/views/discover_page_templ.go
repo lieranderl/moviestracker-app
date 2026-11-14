@@ -209,7 +209,7 @@ func DiscoverPage(user *auth.User, v DiscoverView) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = categoryBar(browseListsFor(ctx), discoverSlug).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = categoryBar(browseChips(ctx, ""), true, false).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

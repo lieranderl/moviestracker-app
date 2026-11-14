@@ -134,8 +134,8 @@ func TestMoviesPageAuthenticatedRendersDashboard(t *testing.T) {
 
 	tbody := rec.Body.String()
 	for _, expected := range []string{
-		"Trending Movies",
-		"Trending TV Series",
+		`id="trending-movies"`,
+		`id="trending-series"`,
 		"Cosmic Horizons",
 		"Cyberpunk Legacy",
 		"carousel",
