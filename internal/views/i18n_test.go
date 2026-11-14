@@ -79,6 +79,12 @@ func tableTexts() []string {
 	for _, l := range cloudBrowseLists {
 		out = append(out, l.Title, l.Subtitle)
 	}
+	for _, r := range homeRailSpecs {
+		out = append(out, r.Title)
+		for _, tab := range r.Tabs {
+			out = append(out, tab.Label)
+		}
+	}
 	for _, o := range sortOptions {
 		out = append(out, o.Label)
 	}

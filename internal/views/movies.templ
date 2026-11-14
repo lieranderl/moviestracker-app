@@ -37,7 +37,7 @@ const cmd = JSON.stringify({ event: 'command', func: $heroMuted ? 'mute' : 'unMu
 document.querySelectorAll('iframe[data-trailer-iframe]').forEach(f => f.contentWindow?.postMessage(cmd, 'https://www.youtube-nocookie.com'))
 `
 
-// Movies is the authenticated home; discover adds the lazily loaded rails.
+// Movies is the authenticated home; discover adds the lazily loaded lists.
 // Movies is the home page; watching is what the user has not finished.
 templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, series []tmdb.MediaItem, discover bool, watching []store.Progress) {
 	@Layout(tr(ctx, "Trending Movies & Series")) {
@@ -49,7 +49,8 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 			} else if len(movies) > 0 {
 				@HeroBillboard(movies[:min(len(movies), 5)])
 			}
-			@categoryBar(homeLists(ctx, discover), "")
+			{{ rails := homeRails(ctx, discover) }}
+			@categoryBar(homeChips(ctx, rails), false, true)
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 space-y-10 mt-10">
 				if discover {
 					<div class="card card-sm bg-base-200">
@@ -72,51 +73,17 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 				if load := siteOf(ctx).RecentTorrents; load != nil {
 					@RecentTorrentsSlot(load)
 				}
-				@mediaRow("trending-movies", tr(ctx, "Trending Movies"), tr(ctx, "Top trending films from The Movie Database"), "film", "text-primary", "badge-primary", tr(ctx, "No trending movies available. Please verify TMDB_API_KEY configuration."), movies, discover)
-				@mediaRow("trending-series", tr(ctx, "Trending TV Series"), tr(ctx, "Top trending episodic series and releases"), "tv", "text-accent", "badge-accent", tr(ctx, "No trending TV series available. Please verify TMDB_API_KEY configuration."), series, discover)
+				for _, r := range rails {
+					@homeRailSection(r, map[string][]tmdb.MediaItem{"trending-movies": movies, "trending-series": series})
+				}
 				if discover {
-					@discoverSection()
+					<div class="hidden" data-init="@get('/api/discover')"></div>
 				}
 			</div>
 			@toTopButton()
 		</main>
 		@siteFooter()
 	}
-}
-
-// mediaRow is a home row; with all, its header links to the whole list at
-// /browse/{id}.
-templ mediaRow(id, title, subtitle, icon, iconTone, badgeTone, emptyMsg string, items []tmdb.MediaItem, all bool) {
-	<section id={ id } class="relative space-y-4 scroll-mt-32" aria-labelledby={ id + "-title" }>
-		@rowMarker(id)
-		<header class="flex items-end justify-between gap-4">
-			<div class="min-w-0">
-				<h2 id={ id + "-title" } class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-					@Icon(icon, "size-5 "+iconTone)
-					{ title }
-					<span class={ "badge badge-sm badge-soft font-semibold", badgeTone }>{ tr(ctx, "Weekly") }</span>
-				</h2>
-				<p class="text-sm text-base-content/70">{ subtitle }</p>
-			</div>
-			if all {
-				@allLink(id, title)
-			}
-		</header>
-		if len(items) == 0 {
-			<div role="status" class="alert alert-info alert-soft">
-				@Icon("info", "size-5")
-				<span>{ emptyMsg }</span>
-			</div>
-		} else {
-			@carousel() {
-				for _, item := range items {
-					<li class="carousel-item">
-						@MediaCard(item)
-					</li>
-				}
-			}
-		}
-	</section>
 }
 
 templ HeroBillboard(items []tmdb.MediaItem) {

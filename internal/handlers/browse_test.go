@@ -12,12 +12,12 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 )
 
-func TestEveryHomeRowLinksToAllOfIt(t *testing.T) {
+func TestEveryHomeListLinksToAllOfIt(t *testing.T) {
 	server := newMediaServer(t, &fakeTMDBDetails{}, &fakeJacRed{}, "")
 
 	body := get(t, server, "/movies", true).Body.String()
 
-	for _, slug := range []string{"trending-movies", "trending-series", "now-playing", "popular-movies", "top-rated-movies", "popular-series", "top-rated-series"} {
+	for _, slug := range []string{"trending-movies", "trending-series", "now-playing", "top-rated-movies", "popular-series", "top-rated-series"} {
 		if !strings.Contains(body, `href="/browse/`+slug+`"`) {
 			t.Errorf("home has no link to all of %s", slug)
 		}
@@ -154,12 +154,11 @@ func TestTheHomePageJumpsToEachRowFromABarThatFollowsTheScroll(t *testing.T) {
 
 	for _, want := range []string{
 		`id="category-bar"`,
-		`href="#trending-movies"`, `href="#trending-series"`, `href="#discover-now-playing"`, `href="#discover-top-rated-series"`,
+		`href="#home-movies"`, `href="#home-series"`,
 		// A row lights up its chip once it reaches the bars, and the row
 		// above takes it back only when the row returns below them.
-		`data-on:scroll__window__throttle.100ms.trailing="el.getBoundingClientRect().top < 0 ? ($homeRow = 'discover-popular-movies') : (['discover-popular-movies', 'discover-top-rated-movies', 'discover-popular-series', 'discover-top-rated-series'].includes($homeRow) && ($homeRow = 'discover-now-playing'))"`,
-		`data-class:btn-primary="$homeRow == 'discover-popular-movies'"`,
-		`id="chip-discover-popular-movies"`,
+		`data-on:scroll__window__throttle.100ms.trailing="el.getBoundingClientRect().top < 0 ? ($homeRow = 'home-series') : (['home-series'].includes($homeRow) && ($homeRow = 'home-movies'))"`,
+		`data-class:btn-primary="$homeRow == 'home-series'"`,
 		`href="#top"`, "Back to top",
 	} {
 		if !strings.Contains(body, want) {

@@ -15,8 +15,8 @@ type discoverResult struct {
 	items []tmdb.MediaItem
 }
 
-// handleDiscover fetches every home discovery list concurrently and patches
-// each rail as soon as its list arrives; failed lists collapse their rail.
+// handleDiscover fetches every lazy list of the home rails concurrently and
+// patches each in as soon as it arrives; a failed list hides its tab.
 func (c *Catalog) handleDiscover(w http.ResponseWriter, r *http.Request) {
 	if c.apiUser(w, r) == nil {
 		return
@@ -26,7 +26,7 @@ func (c *Catalog) handleDiscover(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Buffered so fetchers never block, even if the client goes away early.
-	rails := views.DiscoverRailsFor(r.Context())
+	rails := views.HomeDiscoverRails(r.Context())
 	results := make(chan discoverResult, len(rails))
 	for _, rail := range rails {
 		go func() {
