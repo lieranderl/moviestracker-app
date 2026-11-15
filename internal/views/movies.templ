@@ -84,7 +84,7 @@ templ HeroBillboard(items []tmdb.MediaItem) {
 			if req := heroIMDbRequest(items); req != "" {
 				<div class="hidden" data-init={ req }></div>
 			}
-			<div id="hero-carousel" class="relative min-h-[520px] lg:min-h-[640px]">
+			<div id="hero-carousel" class="relative min-h-[520px] lg:min-h-[clamp(520px,calc(100svh-240px),640px)]">
 				for idx, item := range items {
 					@heroSlide(idx, len(items), item)
 				}
