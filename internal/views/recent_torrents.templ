@@ -26,16 +26,10 @@ templ RecentTorrents(torrents []torrserver.Torrent) {
 	<div id="recent-torrents-row">
 		if recent := recentTorrents(torrents); len(recent) > 0 {
 			<div class="space-y-4">
-				<header class="flex items-end justify-between gap-4">
-					<h2 class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-						@Icon("server", "size-5 text-secondary")
-						{ tr(ctx, "Recently added to TorrServer") }
-					</h2>
-					<a href="/torrserver" class="btn btn-ghost btn-sm gap-1">
-						{ tr(ctx, "Open TorrServer") }
-						@Icon("chevron-right", "size-4")
-					</a>
-				</header>
+				@rowHeader() {
+					@rowTitle("", "server", true, tr(ctx, "Recently added to TorrServer"))
+					@rowLink("/torrserver", tr(ctx, "Open TorrServer"), "")
+				}
 				@carousel() {
 					for _, t := range recent {
 						<li class="carousel-item">

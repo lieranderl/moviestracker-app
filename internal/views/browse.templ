@@ -84,10 +84,48 @@ func (v BrowseView) moreURL(page int) string {
 }
 
 templ allLink(slug, title string) {
-	<a href={ templ.SafeURL("/browse/" + slug) } class="btn btn-ghost btn-sm shrink-0 gap-1" aria-label={ trf(ctx, "All %s", title) }>
-		{ tr(ctx, "All") }
+	@rowLink("/browse/"+slug, tr(ctx, "All"), trf(ctx, "All %s", title))
+}
+
+// rowLink is a row's link out to the whole of it, after its title; label
+// names it on screen, name (when not empty) to assistive tech.
+templ rowLink(href, label, name string) {
+	<a
+		href={ templ.SafeURL(href) }
+		class="btn btn-ghost btn-sm shrink-0 gap-1 ms-auto"
+		if name != "" {
+			aria-label={ name }
+		}
+	>
+		{ label }
 		@Icon("arrow-right", "size-4")
 	</a>
+}
+
+// rowHeader is a home row's header: its title (rowTitle), then what the
+// row offers, such as tabs, with its link out (rowLink) at the far end.
+templ rowHeader() {
+	<header class="flex flex-wrap items-center gap-x-4 gap-y-2 min-w-0">
+		{ children... }
+	</header>
+}
+
+// rowTitle is a home row's heading: its icon, in the tone of the user's own
+// rows (personal) or of the catalog's, then its title.
+templ rowTitle(id, icon string, personal bool, title string) {
+	<h2
+		if id != "" {
+			id={ id }
+		}
+		class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2"
+	>
+		if personal {
+			@Icon(icon, "size-5 text-secondary")
+		} else {
+			@Icon(icon, "size-5 text-primary")
+		}
+		{ title }
+	</h2>
 }
 
 // BrowsePage is a whole list as a grid of posters, 20 at first and 20 more
@@ -96,7 +134,7 @@ templ BrowsePage(user *auth.User, v BrowseView) {
 	@Layout(tr(ctx, v.List.Title)) {
 		@Navbar(user)
 		<main class="grow pb-20">
-			@categoryBar(browseChips(ctx, v.List.Slug), false, false)
+			@categoryBar(browseChips(ctx, v.List.Slug), false, false, false)
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
 				<header class="flex flex-wrap items-end justify-between gap-4">
 					<div class="min-w-0 space-y-1">
@@ -242,7 +280,7 @@ func browseChips(ctx context.Context, current string) []barChip {
 // categoryBar sticks under the navbar: Discover, then chips. On the home
 // page chips jump to their row (homeChips), and the row in view lights up
 // its chip; on a browse page they open the other lists (browseChips).
-templ categoryBar(chips []barChip, discover, home bool) {
+templ categoryBar(chips []barChip, discover, home, choose bool) {
 	<nav
 		id="category-bar"
 		class="sticky top-16 z-40 bg-base-100/80 backdrop-blur-md border-b border-base-content/10"
@@ -252,6 +290,14 @@ templ categoryBar(chips []barChip, discover, home bool) {
 		}
 	>
 		<ul class="max-w-7xl mx-auto px-4 sm:px-8 py-2 flex gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:none]">
+			if choose {
+				<li class="shrink-0">
+					<a href="/discover?pick=1" class="btn btn-sm btn-secondary rounded-full gap-1.5">
+						@Icon("dices", "size-4")
+						{ tr(ctx, "Help me choose") }
+					</a>
+				</li>
+			}
 			<li class="shrink-0">
 				<a
 					href="/discover"

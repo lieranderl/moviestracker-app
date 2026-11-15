@@ -12,13 +12,13 @@ import (
 )
 
 // The user's own rows come first under the billboard, as one zone: what to
-// resume, then recommendations; the chooser and the catalog follow.
+// resume, then recommendations; the catalog follows.
 func TestHomeShowsTheUsersOwnRowsBeforeTheCatalog(t *testing.T) {
 	hero := []tmdb.MediaItem{{ID: 1, Title: "Dune", MediaType: "movie", BackdropPath: "/dune.jpg"}}
 	watching := []store.Progress{{Hash: "abc", Title: "Severance", Position: 60e9, Duration: 3000e9}}
 	out := html.UnescapeString(render(t, views.Movies(testUser, hero, hero, nil, true, watching)))
 
-	order := []string{"Dune", `id="up-next"`, `id="recommendations"`, "What shall we watch tonight?", `id="home-movies"`}
+	order := []string{"Dune", `id="up-next"`, `id="recommendations"`, `id="home-movies"`}
 	at := -1
 	for _, want := range order {
 		i := strings.Index(out, want)

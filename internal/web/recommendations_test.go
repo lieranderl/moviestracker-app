@@ -23,7 +23,7 @@ func TestTheHomePageRecommendsTitlesLikeOnesTheUserWatched(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := html.UnescapeString(send(t, h, http.MethodGet, "/api/recommendations", session).Body.String())
-	for _, want := range []string{`id="recommendations"`, "Because you watched Dune", `href="/movie/329865"`, `href="/movie/335984"`} {
+	for _, want := range []string{`id="recommendations"`, "Because you watched Dune", `href="/movie/329865"`, `href="/movie/335984"`, "feedback=notInterested&on=1", "feedback=moreLikeThis&on=1"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("recommendations lack %q:\n%s", want, body)
 		}
