@@ -130,3 +130,33 @@ func TestTheBarAndTheConnectionCardShareTheirBadges(t *testing.T) {
 		t.Errorf("the bar and the card draw the connection apart: %q %q", connected, hls)
 	}
 }
+
+// Removing a TorrServer asks first: its bin opens a dialog naming it, and
+// only the dialog's Remove deletes it.
+func TestRemovingATorrServerAsksFirst(t *testing.T) {
+	out := html.UnescapeString(render(t, views.WebTorrServerPage(testUser, twoServers, nil)))
+
+	bin := regexp.MustCompile(`<button[^>]*aria-label="Remove Home"[^>]*>`).FindString(out)
+	if strings.Contains(bin, "@delete") || !strings.Contains(bin, "$_tsRemoveID = 'a'; $_tsRemoveName = 'Home'; $_tsRemoveOpen = true") {
+		t.Errorf("the bin removes the server at once or does not ask: %s", bin)
+	}
+	dialog := regexp.MustCompile(`(?s)<dialog id="ts-remove-modal".*?</dialog>`).FindString(out)
+	for _, want := range []string{"Remove TorrServer?", `data-text="$_tsRemoveName"`, "Cancel",
+		"@delete('/api/torrservers/' + $_tsRemoveID, {filterSignals: {include: /^tsSelected$/}}); $_tsRemoveOpen = false"} {
+		if !strings.Contains(dialog, want) {
+			t.Errorf("the removal dialog lacks %q", want)
+		}
+	}
+}
+
+// Removing a TorrServer and removing a torrent ask with the same dialog.
+func TestBothRemovalsAskWithTheSameDialog(t *testing.T) {
+	out := html.UnescapeString(render(t, views.WebTorrServerPage(testUser, twoServers, nil)))
+	shape := func(id string) string {
+		d := regexp.MustCompile(`(?s)<dialog id="` + id + `".*?</dialog>`).FindString(out)
+		return regexp.MustCompile(`(?s)(id|aria-labelledby|data-effect|data-on:close|data-on:click|data-text)="[^"]*"|>[^<]*<`).ReplaceAllString(d, "")
+	}
+	if a, b := shape("ts-remove-modal"), shape("torr-confirm-modal"); a == "" || a != b {
+		t.Errorf("the two removal dialogs differ:\n%s\n%s", a, b)
+	}
+}

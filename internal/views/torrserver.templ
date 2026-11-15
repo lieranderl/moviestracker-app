@@ -1274,11 +1274,17 @@ templ torrConfirmModal() {
 }
 
 templ torrConfirmModalFor(browser bool) {
-	@modalDialog("torr-confirm-modal", "confirmOpen", "", "", "max-w-md", nil) {
-		@modalHeader("torr-confirm-modal", tr(ctx, "Remove torrent?"), "trash-2", "text-error")
+	@removeConfirmModal("torr-confirm-modal", "confirmOpen", tr(ctx, "Remove torrent?"), "confirmName", tr(ctx, "will be removed from the TorrServer database. This cannot be undone."), confirmRemove(browser))
+}
+
+// removeConfirmModal asks before removing something: title, then the name in
+// $nameSignal followed by message, and Cancel or Remove, which runs action.
+templ removeConfirmModal(id, openSignal, title, nameSignal, message, action string) {
+	@modalDialog(id, openSignal, "", "", "max-w-md", nil) {
+		@modalHeader(id, title, "trash-2", "text-error")
 		<p class="mt-4 text-sm">
-			<span class="font-semibold break-all" data-text="$confirmName"></span>
-			{ tr(ctx, "will be removed from the TorrServer database. This cannot be undone.") }
+			<span class="font-semibold break-all" data-text={ "$" + nameSignal }></span>
+			{ message }
 		</p>
 		<div class="modal-action">
 			<form method="dialog">
@@ -1286,7 +1292,7 @@ templ torrConfirmModalFor(browser bool) {
 			</form>
 			<button
 				type="button"
-				data-on:click={ confirmRemove(browser) }
+				data-on:click={ action }
 				class="btn btn-sm btn-error"
 			>
 				@Icon("trash-2", "size-4")
