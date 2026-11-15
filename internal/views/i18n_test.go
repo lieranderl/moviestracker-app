@@ -127,7 +127,7 @@ var upstreamTexts = []string{
 	"Trailer", "Teaser", "Clip", "Featurette", "Behind the Scenes", "Bloopers", "Opening Credits",
 	"Acting", "Directing", "Writing", "Production", "Sound", "Camera", "Editing", "Art", "Crew",
 	"Costume & Make-Up", "Visual Effects", "Lighting", "Creator",
-	"Added", "Getting Info", "Preload", "Working", "Closed", "Dropped (in db)", "Dropped",
+	"Added", "Getting Info", "Preload", "Working", "Closed", "Idle · saved", "Dropped",
 	"Download", "Install", "Start TorrServer", "Ready",
 	"Torrent added", "Torrent getting info", "Torrent preload", "Torrent working", "Torrent closed", "Torrent in db",
 }

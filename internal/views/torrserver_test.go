@@ -721,3 +721,59 @@ func TestPickingThePlayingAudioTrackKeepsTheRememberedLanguage(t *testing.T) {
 		t.Errorf("picking the playing track overwrites the remembered language: %s", pick[1])
 	}
 }
+
+// A torrent card stays calm: only removing is red, an idle torrent shows no
+// empty peers and speeds, and the hash stays out of the text.
+func TestATorrentCardKeepsRedForRemovingAndHidesWhatIsEmpty(t *testing.T) {
+	hash := "acf60056170cf53b38411412335b9aaaaaaaaaaa"
+	idle := torrserver.Torrent{Hash: hash, Title: "Resident Evil (2026)", Stat: 5, StatString: "Torrent in db"}
+	working := torrserver.Torrent{Hash: "bb" + hash[2:], Title: "Top Gun", Stat: 3, Download: 2048, Connected: 3, TotalPeers: 9}
+	out := html.UnescapeString(render(t, views.TorrServerListFragment(testLinks, []torrserver.Torrent{idle, working})))
+	card := func(h string) string {
+		c, _, _ := strings.Cut(out[strings.Index(out, `id="torr-card-`+h+`"`):], "</article>")
+		return c
+	}
+
+	idleCard := card(hash)
+	if !strings.Contains(idleCard, "Idle · saved") || strings.Contains(idleCard, "Dropped") {
+		t.Error("an idle torrent is not called idle")
+	}
+	if strings.Contains(idleCard, `class="stats `) {
+		t.Error("an idle torrent shows its empty peers and speeds")
+	}
+	if !strings.Contains(card("bb"+hash[2:]), `class="stats `) {
+		t.Error("a working torrent hides its peers and speeds")
+	}
+	if strings.Contains(idleCard, ">"+hash+"<") {
+		t.Error("the card spells out its hash")
+	}
+	for label, red := range map[string]bool{"Copy magnet link": false, "Drop cache": false, "Remove torrent": true} {
+		b := regexp.MustCompile(`<button[^>]*aria-label="` + label + `"[^>]*>`).FindString(idleCard)
+		if b == "" {
+			t.Fatalf("the card lacks %s", label)
+		}
+		tinted := regexp.MustCompile(`text-(accent|warning|error)`).MatchString(b)
+		if tinted != red || (red && !strings.Contains(b, "text-error")) {
+			t.Errorf("%s tinted = %t, want only Remove in red: %s", label, tinted, b)
+		}
+	}
+}
+
+// The two ways to play are explained above the list until the viewer says
+// they have read it; the play buttons keep explaining themselves.
+func TestTheStreamKindsAreExplainedUntilDismissed(t *testing.T) {
+	out := html.UnescapeString(torrPage(t, true))
+	legend := regexp.MustCompile(`<div id="stream-kinds"[^>]*>`).FindString(out)
+	if !strings.Contains(legend, `data-show="!$_streamKindsSeen"`) {
+		t.Errorf("the explanation never goes away: %s", legend)
+	}
+	for _, want := range []string{
+		"_streamKindsSeen: localStorage.getItem('mt-stream-kinds-seen') === '1'",
+		"localStorage.setItem('mt-stream-kinds-seen', '1'); $_streamKindsSeen = true",
+		"Got it",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("page lacks %q", want)
+		}
+	}
+}
