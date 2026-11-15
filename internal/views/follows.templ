@@ -115,56 +115,40 @@ type WeekShow struct {
 	Marks EpisodeMarks
 }
 
-// showsThisWeekSlot is where the home page's row of followed series goes;
-// it asks for the row once the page has loaded.
+// showsThisWeekSlot is where Up next's followed series go; it asks for
+// them once the page has loaded.
 templ showsThisWeekSlot() {
-	<div id="shows-this-week" class="contents" data-init="@get('/api/home/shows')"></div>
+	<ul id="shows-this-week" role="list" class="contents" data-init="@get('/api/home/shows')"></ul>
 }
 
-// ShowsThisWeek is the home row of followed series with an episode this
-// week; with none the slot stays empty.
+// ShowsThisWeek are Up next's cards of the followed series with an episode
+// this week; with none the list stays empty.
 templ ShowsThisWeek(shows []WeekShow) {
-	<div id="shows-this-week" class="contents">
-		if len(shows) > 0 {
-			<section class="relative space-y-4 scroll-mt-32" aria-labelledby="shows-this-week-title">
-				<header class="flex items-end justify-between gap-4">
-					<h2 id="shows-this-week-title" class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-						@Icon("calendar-days", "size-5 text-accent")
-						{ tr(ctx, "Your shows this week") }
-					</h2>
-					<a href={ templ.SafeURL(CalendarPath) } class="btn btn-sm btn-ghost gap-1">
-						{ tr(ctx, "All upcoming") }
-						@Icon("arrow-right", "size-4")
-					</a>
-				</header>
-				@carousel() {
-					for _, s := range shows {
-						<li class="carousel-item flex-col gap-1.5">
-							@MediaCard(s.Item)
-							if s.New.Number > 0 {
-								<p class="flex flex-wrap items-center gap-1.5 text-sm">
-									<span class="font-mono text-primary">{ fmt.Sprintf("S%02dE%02d", s.New.Season, s.New.Number) }</span>
-									<span class="badge badge-soft badge-accent whitespace-nowrap">{ tr(ctx, "New episode") }</span>
-								</p>
-							}
-							if s.Next.Number > 0 {
-								<p class="flex flex-wrap items-center gap-1.5 text-sm">
-									<span class="font-mono text-primary">{ fmt.Sprintf("S%02dE%02d", s.Next.Season, s.Next.Number) }</span>
-									<span class="badge badge-soft badge-primary whitespace-nowrap">{ i18n.Date(ctx, s.Next.AirDate) }</span>
-								</p>
-							}
-							if s.TV != nil && s.Marks.Track && len(s.Marks.Watched) > 0 {
-								if season, episode, ok, _ := nextUnwatched(s.TV, s.Marks); ok {
-									<a href={ templ.SafeURL(fmt.Sprintf("/tv/%d?season=%d#seasons", s.Item.ID, season)) } class="btn btn-sm btn-primary btn-soft gap-1.5">
-										@Icon("skip-forward", "size-4")
-										{ trf(ctx, "Continue with %s", fmt.Sprintf("S%02dE%02d", season, episode)) }
-									</a>
-								}
-							}
-						</li>
+	<ul id="shows-this-week" role="list" class="contents">
+		for _, s := range shows {
+			<li class="carousel-item flex-col gap-1.5">
+				@MediaCard(s.Item)
+				if s.New.Number > 0 {
+					<p class="flex flex-wrap items-center gap-1.5 text-sm">
+						<span class="font-mono text-primary">{ fmt.Sprintf("S%02dE%02d", s.New.Season, s.New.Number) }</span>
+						<span class="badge badge-soft badge-accent whitespace-nowrap">{ tr(ctx, "New episode") }</span>
+					</p>
+				}
+				if s.Next.Number > 0 {
+					<p class="flex flex-wrap items-center gap-1.5 text-sm">
+						<span class="font-mono text-primary">{ fmt.Sprintf("S%02dE%02d", s.Next.Season, s.Next.Number) }</span>
+						<span class="badge badge-soft badge-primary whitespace-nowrap">{ i18n.Date(ctx, s.Next.AirDate) }</span>
+					</p>
+				}
+				if s.TV != nil && s.Marks.Track && len(s.Marks.Watched) > 0 {
+					if season, episode, ok, _ := nextUnwatched(s.TV, s.Marks); ok {
+						<a href={ templ.SafeURL(fmt.Sprintf("/tv/%d?season=%d#seasons", s.Item.ID, season)) } class="btn btn-sm btn-primary btn-soft gap-1.5">
+							@Icon("skip-forward", "size-4")
+							{ trf(ctx, "Continue with %s", fmt.Sprintf("S%02dE%02d", season, episode)) }
+						</a>
 					}
 				}
-			</section>
+			</li>
 		}
-	</div>
+	</ul>
 }

@@ -62,12 +62,12 @@ func TestRecommendationsFollowTheUsersFeedback(t *testing.T) {
 	}
 	more := send(http.MethodPost, "/api/recommendations/feedback?type=movie&id=13&feedback=moreLikeThis&on=1", "")
 	firstRow := regexp.MustCompile(`(?s)<h2.*?</h2>`).FindString(more)
-	if !strings.Contains(firstRow, "More like Movie 13") || !strings.Contains(more, `href="/movie/14"`) {
-		t.Errorf("asking for more like movie 13 should start the first row:\n%s", more)
+	if !strings.Contains(firstRow, "Based on Movie 13") || !strings.Contains(more, `href="/movie/14"`) {
+		t.Errorf("asking for more like movie 13 should lead the row:\n%s", more)
 	}
 	reset := send(http.MethodPost, "/api/recommendations/feedback/reset", "")
-	if !strings.Contains(reset, `href="/movie/12"`) || strings.Contains(reset, "More like Movie 13") {
-		t.Errorf("a reset should bring movie 12 back and drop the extra row:\n%s", reset)
+	if !strings.Contains(reset, `href="/movie/12"`) || strings.Contains(reset, "Based on Movie 13") {
+		t.Errorf("a reset should bring movie 12 back and drop it from the row:\n%s", reset)
 	}
 }
 

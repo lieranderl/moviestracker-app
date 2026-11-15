@@ -211,9 +211,24 @@ templ sectionHeading(title, subtitle string) {
 // and forward buttons where there is a mouse, which has no sideways scroll.
 templ carousel() {
 	<div class="relative group/carousel">
-		<ul class="carousel carousel-start w-[calc(100%+2rem)] gap-4 scroll-smooth scroll-px-4 -mx-4 px-4 -mt-3 pt-3 -mb-5 pb-8">
+		<ul class={ carouselTrack }>
 			{ children... }
 		</ul>
+		@carouselButton(false)
+		@carouselButton(true)
+	</div>
+}
+
+// carouselTrack is a carousel's scrolling row of cards.
+const carouselTrack = "carousel carousel-start w-[calc(100%+2rem)] gap-4 scroll-smooth scroll-px-4 -mx-4 px-4 -mt-3 pt-3 -mb-5 pb-8"
+
+// carouselOfLists is a carousel whose cards come in lists of their own
+// (`ul.contents`), one after another, which the server patches apart.
+templ carouselOfLists() {
+	<div class="relative group/carousel">
+		<div class={ carouselTrack }>
+			{ children... }
+		</div>
 		@carouselButton(false)
 		@carouselButton(true)
 	</div>

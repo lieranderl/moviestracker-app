@@ -70,12 +70,12 @@ func TestTheWebPlayerReportsProgressWithTheRelayedTorrentAndOffersToResume(t *te
 
 func TestTheHomePageListsWhatAUserIsWatching(t *testing.T) {
 	h, session, _ := favorites(t)
-	if page := getWith(t, h, "/", session).Body.String(); strings.Contains(page, `id="continue-watching"`) {
-		t.Error("a user who never played anything sees Continue watching")
+	if page := getWith(t, h, "/", session).Body.String(); strings.Contains(page, "/torrserver?play=") {
+		t.Error("a user who never played anything has a file to resume")
 	}
 	postPlayer(t, h, "/api/progress", duneProgress, session)
 	page := html.UnescapeString(getWith(t, h, "/", session).Body.String())
-	for _, want := range []string{`id="continue-watching"`, "Continue watching", `href="/torrserver?play=aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111&file=2"`, `value="27"`, "Dune", "1:53:50 left"} {
+	for _, want := range []string{`id="continue-watching"`, "Up next", `href="/torrserver?play=aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111&file=2"`, `value="27"`, "Dune", "1:53:50 left"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("home page lacks %q", want)
 		}
@@ -140,20 +140,20 @@ func TestAUserCanRemoveAContinueWatchingEntryWithoutChangingTheirLibrary(t *test
 		t.Fatal(err)
 	}
 	page := html.UnescapeString(getWith(t, h, "/", session).Body.String())
-	if !strings.Contains(page, "Remove Dune from Continue watching") {
-		t.Error("Continue watching has no labelled remove action")
+	if !strings.Contains(page, "Remove Dune from Up next") {
+		t.Error("Up next has no labelled remove action")
 	}
 	res := send(t, h, http.MethodDelete, "/api/progress?hash=aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111&index=2", session)
 	if res.Code != http.StatusOK || !strings.Contains(res.Header().Get("Content-Type"), "text/event-stream") {
 		t.Fatalf("remove = %d %s, want SSE success", res.Code, res.Body)
 	}
-	if strings.Contains(res.Body.String(), "continue-watching-title") {
-		t.Error("removing the final entry kept the row heading")
+	if strings.Contains(res.Body.String(), "carousel-item") {
+		t.Error("removing the final entry kept a card")
 	}
-	if !strings.Contains(res.Body.String(), "Removed from Continue watching") {
+	if !strings.Contains(res.Body.String(), "Removed from Up next") {
 		t.Error("removing progress was not announced")
 	}
-	if page := getWith(t, h, "/", session).Body.String(); strings.Contains(page, "continue-watching-title") {
+	if page := getWith(t, h, "/", session).Body.String(); strings.Contains(page, "Remove Dune from Up next") {
 		t.Error("removed entry returns on page reload")
 	}
 	resume := send(t, h, http.MethodGet, "/api/progress/resume?hash=aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111&index=2&at=600", session)
@@ -200,7 +200,7 @@ func TestRemovingOneContinueWatchingEntryKeepsOtherCards(t *testing.T) {
 	path := "/api/progress?hash=aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111&index=2"
 	for range 2 {
 		res := send(t, h, http.MethodDelete, path, session)
-		if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "Remove Arrival from Continue watching") || strings.Contains(res.Body.String(), "Remove Dune from Continue watching") {
+		if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "Remove Arrival from Up next") || strings.Contains(res.Body.String(), "Remove Dune from Up next") {
 			t.Errorf("reset response lost another card or retained Dune: %d %s", res.Code, res.Body)
 		}
 		if res.Result().Header.Get("Cache-Control") != "no-store" {
@@ -245,12 +245,12 @@ func TestProgressRemovalFailuresExplainHowToRetry(t *testing.T) {
 			postPlayer(t, h, "/api/progress", duneProgress, session)
 			path := "/api/progress?hash=aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111&index=2"
 			res := send(t, h, http.MethodDelete, path, session)
-			if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "Continue watching could not be updated. Please try again.") || strings.Contains(res.Body.String(), "Removed from Continue watching.") {
+			if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "Up next could not be updated. Please try again.") || strings.Contains(res.Body.String(), "Removed from Up next.") {
 				t.Errorf("failure lacks retry feedback: %d %s", res.Code, res.Body)
 			}
 			boundary.resetErr, boundary.errorRead = nil, nil
 			retry := send(t, h, http.MethodDelete, path, session)
-			if retry.Code != http.StatusOK || !strings.Contains(retry.Body.String(), "Removed from Continue watching.") {
+			if retry.Code != http.StatusOK || !strings.Contains(retry.Body.String(), "Removed from Up next.") {
 				t.Errorf("retry did not recover: %d %s", retry.Code, retry.Body)
 			}
 		})

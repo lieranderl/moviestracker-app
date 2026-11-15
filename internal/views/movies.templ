@@ -52,6 +52,11 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 			{{ rails := homeRails(ctx, discover) }}
 			@categoryBar(homeChips(ctx, rails), false, true)
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 space-y-10 mt-10">
+				@upNext(watching, user != nil)
+				if load := siteOf(ctx).RecentTorrents; load != nil {
+					@RecentTorrentsSlot(load)
+				}
+				@recommendationsSlot()
 				if discover {
 					<div class="card card-sm bg-base-200">
 						<div class="card-body sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -62,16 +67,6 @@ templ Movies(user *auth.User, hero []tmdb.MediaItem, movies []tmdb.MediaItem, se
 							</a>
 						</div>
 					</div>
-				}
-				if len(watching) > 0 {
-					@ContinueWatching(watching)
-				}
-				if user != nil {
-					@showsThisWeekSlot()
-				}
-				@recommendationsSlot()
-				if load := siteOf(ctx).RecentTorrents; load != nil {
-					@RecentTorrentsSlot(load)
 				}
 				for _, r := range rails {
 					@homeRailSection(r, map[string][]tmdb.MediaItem{"trending-movies": movies, "trending-series": series})

@@ -89,7 +89,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div id=\"recommendations\" class=\"space-y-10\" data-signals=\"{ recBusy: false }\" data-attr:aria-busy=\"$recBusy\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div id=\"recommendations\" class=\"space-y-10 empty:hidden\" data-signals=\"{ recBusy: false }\" data-attr:aria-busy=\"$recBusy\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -177,7 +177,7 @@ func RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) temp
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = Icon("sparkles", "size-5 text-accent").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = Icon("sparkles", "size-5 text-secondary").Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

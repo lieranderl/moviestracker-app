@@ -126,7 +126,7 @@ func (p *Progress) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/progress/title", p.handleTitle)
 }
 
-// handleReset removes one file from Continue watching. A zero-position
+// handleReset removes one file from Up next. A zero-position
 // record suppresses resume fallback to an older TorrServer timecode.
 func (p *Progress) handleReset(w http.ResponseWriter, r *http.Request) {
 	uid, ok := p.user(r)

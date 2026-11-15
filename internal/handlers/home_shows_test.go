@@ -47,7 +47,7 @@ func TestHomeShowsFollowedSeriesAiringWithinAWeek(t *testing.T) {
 	}
 	s := newMediaServer(t, &fakeTMDBDetails{series: series}, nil, "")
 	row := homeShows(t, s, signedIn(t, s), "95396", "3")
-	for _, want := range []string{"Your shows this week", "Severance", "S02E05", soon.Format("2 Jan 2006"), `href="/calendar"`} {
+	for _, want := range []string{`id="shows-this-week"`, "Severance", "S02E05", soon.Format("2 Jan 2006")} {
 		if !strings.Contains(row, want) {
 			t.Errorf("row lacks %q:\n%s", want, row)
 		}
@@ -144,7 +144,7 @@ func TestHomeShowsAreOnlyForASignedInUserAndEmptyWithNothingThisWeek(t *testing.
 		t.Errorf("signed out: %d %s", rec.Code, rec.Body)
 	}
 	row := homeShows(t, s, signedIn(t, s), "3")
-	if !strings.Contains(row, `<div id="shows-this-week" class="contents"></div>`) {
+	if !strings.Contains(row, `<ul id="shows-this-week" role="list" class="contents"></ul>`) {
 		t.Errorf("a week with no episodes does not leave the row empty:\n%s", row)
 	}
 }

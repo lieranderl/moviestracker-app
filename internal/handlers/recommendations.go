@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/lieranderl/moviestracker-app/internal/store"
 	"log/slog"
-	"maps"
 	"net/http"
 	"slices"
 	"strings"
@@ -17,10 +16,12 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/views"
 )
 
-// Recommendation limits: rows on the home page, titles whose TMDB
-// recommendations are looked up to fill them, and lookups at once.
+// Recommendation limits: titles the home page's row mixes and the row's
+// length (a catalog rail's), titles whose TMDB recommendations are looked
+// up to find them, and lookups at once.
 const (
-	recommendationRows    = 3
+	recommendationSources = 3
+	recommendationTitles  = 20
 	recommendationSeeds   = 6
 	recommendationLookups = 3
 )
@@ -78,42 +79,59 @@ func (c *Catalog) related(ctx context.Context, kind string, id int) ([]tmdb.Medi
 	return movie.Recommendations, nil
 }
 
-// recommendationRows are the rows seeds make, in their order: each holds
-// TMDB's recommendations for its seed (related[i], answered[i] when its
-// lookup finished) that the user has not marked and no row above shows.
-// With waiting, they stop at the first seed still being looked up.
-func recommendationRowsFor(ctx context.Context, seeds []seed, related [][]tmdb.MediaItem, answered []bool, marked map[string]bool, waiting bool) []views.RecommendationRow {
-	shown := maps.Clone(marked)
-	var rows []views.RecommendationRow
+// recommendationRowsFor is the row seeds make: TMDB's recommendations
+// (related[i], answered[i] when its lookup finished) for the first
+// recommendationSources seeds that have any the user has not marked, a
+// title from each in turn, none twice and at most recommendationTitles. With waiting, the seeds stop at
+// the first still being looked up. full says the row has all its sources.
+func recommendationRowsFor(ctx context.Context, seeds []seed, related [][]tmdb.MediaItem, answered []bool, marked map[string]bool, waiting bool) (rows []views.RecommendationRow, full bool) {
+	var sources [][]tmdb.MediaItem
+	var names []string
+	watched := true
 	for i, s := range seeds {
-		if len(rows) == recommendationRows || (waiting && !answered[i]) {
+		if len(sources) == recommendationSources || (waiting && !answered[i]) {
 			break
 		}
-		row := views.RecommendationRow{Title: i18n.Tf(ctx, "Because you saved %s", s.title)}
-		switch {
-		case s.more:
-			row.Title = i18n.Tf(ctx, "More like %s", s.title)
-		case s.watched:
-			row.Title = i18n.Tf(ctx, "Because you watched %s", s.title)
+		fresh := slices.DeleteFunc(slices.Clone(related[i]), func(it tmdb.MediaItem) bool { return marked[titleKey(it.MediaType, it.ID)] })
+		if len(fresh) == 0 {
+			continue
 		}
-		for _, it := range related[i] {
-			if key := titleKey(it.MediaType, it.ID); !shown[key] {
-				shown[key] = true
+		sources = append(sources, fresh)
+		names = append(names, s.title)
+		watched = watched && s.watched
+	}
+	if len(sources) == 0 {
+		return nil, false
+	}
+	row := views.RecommendationRow{Title: i18n.Tf(ctx, "Based on %s", i18n.List(ctx, names))}
+	if watched {
+		row.Title = i18n.Tf(ctx, "Because you watched %s", i18n.List(ctx, names))
+	}
+	shown := map[string]bool{}
+	for turn := 0; len(row.Items) < recommendationTitles; turn++ {
+		took := false
+		for _, items := range sources {
+			if turn >= len(items) {
+				continue
+			}
+			took = true
+			if it := items[turn]; !shown[titleKey(it.MediaType, it.ID)] && len(row.Items) < recommendationTitles {
+				shown[titleKey(it.MediaType, it.ID)] = true
 				row.Items = append(row.Items, it)
 			}
 		}
-		if len(row.Items) > 0 {
-			rows = append(rows, row)
+		if !took {
+			break
 		}
 	}
-	return rows
+	return []views.RecommendationRow{row}, len(sources) == recommendationSources
 }
 
 // rows looks up TMDB's recommendations for the first seeds, a few at a
 // time and all within one deadline (the catalog timeout). Each lookup gets
 // half of it, so titles TMDB is slow on give their turn to the next ones.
-// Once the seeds answered in order fill the rows, the other lookups stop;
-// at the deadline the rows are made of what was answered.
+// Once the seeds answered in order fill the row, the other lookups stop;
+// at the deadline the row is made of what was answered.
 func (rc *Recommendations) rows(ctx context.Context, seeds []seed, marked map[string]bool) []views.RecommendationRow {
 	seeds = seeds[:min(len(seeds), recommendationSeeds)]
 	budget := rc.catalog.catalogTimeout
@@ -138,7 +156,8 @@ func (rc *Recommendations) rows(ctx context.Context, seeds []seed, marked map[st
 			}(next)
 		}
 		if running == 0 {
-			return recommendationRowsFor(ctx, seeds, related, answered, marked, false)
+			rows, _ := recommendationRowsFor(ctx, seeds, related, answered, marked, false)
+			return rows
 		}
 		take := func(a answer) {
 			running--
@@ -151,7 +170,7 @@ func (rc *Recommendations) rows(ctx context.Context, seeds []seed, marked map[st
 		select {
 		case a := <-answers:
 			take(a)
-			if rows := recommendationRowsFor(ctx, seeds, related, answered, marked, true); len(rows) == recommendationRows {
+			if rows, full := recommendationRowsFor(ctx, seeds, related, answered, marked, true); full {
 				return rows
 			}
 		case <-ctx.Done():
@@ -159,13 +178,14 @@ func (rc *Recommendations) rows(ctx context.Context, seeds []seed, marked map[st
 				take(<-answers)
 			}
 			slog.Warn("tmdb recommendations ran out of time", "unanswered", running, "not looked up", len(seeds)-next)
-			return recommendationRowsFor(ctx, seeds, related, answered, marked, false)
+			rows, _ := recommendationRowsFor(ctx, seeds, related, answered, marked, false)
+			return rows
 		}
 	}
 }
 
-// handleRows patches the home page's recommendation rows: one per title
-// the user watched or saved, holding TMDB's recommendations for it.
+// handleRows patches the home page's recommendation row: TMDB's
+// recommendations for the titles the user watched or saved last.
 func (rc *Recommendations) handleRows(w http.ResponseWriter, r *http.Request) {
 	uid, ok := rc.user(r)
 	if !ok {
