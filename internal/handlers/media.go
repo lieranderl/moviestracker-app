@@ -445,7 +445,7 @@ func (s *Server) handleRecentTorrents(w http.ResponseWriter, r *http.Request) {
 		slog.Debug("listing recent torrents failed", "error", err)
 		torrents = nil
 	}
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.RecentTorrents(torrents)); err != nil {
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.RecentTorrents(torrents, s.titlePages())); err != nil {
 		logSSEError(r, "patch recent torrents", err)
 	}
 }
