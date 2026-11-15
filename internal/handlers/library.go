@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"cmp"
 	"context"
 	"net/http"
 	"slices"
@@ -134,7 +133,8 @@ func (l *Library) summarise(ctx context.Context, uid string) (LibrarySummary, er
 		return LibrarySummary{}, err
 	}
 	liked := slices.Clone(watched)
-	// Rated titles lead, best first; one rated 4 or less starts no row.
+	// Watched titles lead, the latest first; one rated 4 or less starts
+	// nothing.
 	liked = slices.DeleteFunc(liked, func(t store.TitleState) bool {
 		r := ratings[titleKey(t.Kind, t.TMDBID)]
 		if r > 0 && r <= 4 {
@@ -142,9 +142,6 @@ func (l *Library) summarise(ctx context.Context, uid string) (LibrarySummary, er
 			return true
 		}
 		return false
-	})
-	slices.SortStableFunc(liked, func(a, b store.TitleState) int {
-		return cmp.Compare(rankOf(ratings, b), rankOf(ratings, a))
 	})
 	for _, t := range liked {
 		add(seed{kind: t.Kind, id: t.TMDBID, title: t.Title, watched: true})
@@ -201,12 +198,4 @@ func (l *Library) ratings(ctx context.Context, uid string) (map[string]int, erro
 		return nil, nil
 	}
 	return Ratings(ctx, l.reviews, uid) // from the library list controls
-}
-
-// rankOf orders watched titles as seeds: by rating, unrated ones as a 6.
-func rankOf(ratings map[string]int, t store.TitleState) int {
-	if r := ratings[titleKey(t.Kind, t.TMDBID)]; r > 0 {
-		return r
-	}
-	return 6
 }

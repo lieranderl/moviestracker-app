@@ -197,9 +197,9 @@ func WebPrivacy() templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var12 string
-				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "where you stopped watching each video, for Continue watching: the torrent's hash, the file's name, the title and the position;"))
+				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "where you stopped watching each video, for Up next: the torrent's hash, the file's name, the title and the position;"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_privacy.templ`, Line: 46, Col: 149}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_privacy.templ`, Line: 46, Col: 139}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {

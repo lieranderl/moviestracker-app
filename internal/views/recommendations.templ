@@ -43,7 +43,7 @@ func FeedbackURL(it tmdb.MediaItem, feedback string, on bool) string {
 // the slot stays empty. With f.Allow each card can be hidden or asked for
 // more like it.
 templ RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) {
-	<div id="recommendations" class="space-y-10" data-signals="{ recBusy: false }" data-attr:aria-busy="$recBusy">
+	<div id="recommendations" class="space-y-10 empty:hidden" data-signals="{ recBusy: false }" data-attr:aria-busy="$recBusy">
 		if f.Undone != nil {
 			<div role="status" class="alert alert-soft">
 				@Icon("eye-off", "size-5")
@@ -54,7 +54,7 @@ templ RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) {
 		for i, row := range rows {
 			<section class="relative space-y-4" aria-labelledby={ fmt.Sprintf("recommended-%d-title", i) }>
 				<h2 id={ fmt.Sprintf("recommended-%d-title", i) } class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-					@Icon("sparkles", "size-5 text-accent")
+					@Icon("sparkles", "size-5 text-secondary")
 					{ row.Title }
 				</h2>
 				@carousel() {

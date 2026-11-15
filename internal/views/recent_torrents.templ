@@ -15,7 +15,7 @@ const maxRecentTorrents = 10
 // adapter's way to list them. The app asks its server, which reaches
 // TorrServer; the web app's browser lists the visitor's and posts them.
 templ RecentTorrentsSlot(load templ.Attributer) {
-	<section id="recent-torrents" { load... }>
+	<section id="recent-torrents" class="hidden has-[.carousel-item]:block" { load... }>
 		<div id="recent-torrents-row"></div>
 	</section>
 }
@@ -28,7 +28,7 @@ templ RecentTorrents(torrents []torrserver.Torrent) {
 			<div class="space-y-4">
 				<header class="flex items-end justify-between gap-4">
 					<h2 class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-						@Icon("server", "size-5 text-primary")
+						@Icon("server", "size-5 text-secondary")
 						{ tr(ctx, "Recently added to TorrServer") }
 					</h2>
 					<a href="/torrserver" class="btn btn-ghost btn-sm gap-1">

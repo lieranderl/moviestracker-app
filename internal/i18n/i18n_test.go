@@ -98,3 +98,21 @@ func TestDatesNameTheMonthInTheLanguage(t *testing.T) {
 		t.Errorf("Russian date = %q", got)
 	}
 }
+
+func TestAListOfNamesReadsAsASentenceInEitherLanguage(t *testing.T) {
+	ru := i18n.WithLang(context.Background(), i18n.Russian)
+	for _, c := range []struct {
+		ctx   context.Context
+		names []string
+		want  string
+	}{
+		{context.Background(), []string{"Dune"}, "Dune"},
+		{context.Background(), []string{"Dune", "Andor"}, "Dune and Andor"},
+		{context.Background(), []string{"Dune", "Severance", "Andor"}, "Dune, Severance and Andor"},
+		{ru, []string{"Дюна", "Разделение", "Андор"}, "Дюна, Разделение и Андор"},
+	} {
+		if got := i18n.List(c.ctx, c.names); got != c.want {
+			t.Errorf("List(%q) = %q, want %q", c.names, got, c.want)
+		}
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"slices"
 	"strings"
@@ -16,7 +17,9 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 )
 
-func TestTheLocalHomePageRecommendsAtMostThreeRowsWithoutRepeats(t *testing.T) {
+// Home recommends one row, mixing TMDB's picks for the three titles the
+// user watched last: a title from each in turn, none twice.
+func TestTheLocalHomePageMixesTheLastThreeWatchedIntoOneRow(t *testing.T) {
 	related := func(ids ...int) []tmdb.MediaItem {
 		var out []tmdb.MediaItem
 		for _, id := range ids {
@@ -26,18 +29,90 @@ func TestTheLocalHomePageRecommendsAtMostThreeRowsWithoutRepeats(t *testing.T) {
 	}
 	movies := map[int]*tmdb.MovieDetails{}
 	for id, recs := range map[int][]int{4: {11, 12}, 3: {12, 13}, 2: {14}, 1: {15}} {
-		movies[id] = &tmdb.MovieDetails{MediaItem: tmdb.MediaItem{ID: id, Title: "Seed", MediaType: "movie"}, Recommendations: related(recs...)}
+		movies[id] = &tmdb.MovieDetails{MediaItem: tmdb.MediaItem{ID: id, Title: fmt.Sprint("Seed ", id), MediaType: "movie"}, Recommendations: related(recs...)}
 	}
 	s := newMediaServer(t, &fakeTMDBDetails{movies: movies}, nil, "")
 	for _, id := range []string{"1", "2", "3", "4"} {
 		sendAs(t, s, http.MethodPost, "/api/titles/state?type=movie&id="+id+"&state=watched")
 	}
 	body := sendAs(t, s, http.MethodGet, "/api/recommendations")
-	if got := strings.Count(body, "Because you watched"); got != 3 {
-		t.Errorf("%d rows, want 3", got)
+	if got := strings.Count(body, "<h2"); got != 1 {
+		t.Errorf("%d rows, want 1", got)
 	}
-	if got := strings.Count(body, `href="/movie/12"`); got != 1 {
-		t.Errorf("movie 12 shows %d times, want once", got)
+	if !strings.Contains(body, "Because you watched Seed 4, Seed 3 and Seed 2") {
+		t.Errorf("the row does not name the three titles it is made of:\n%s", body)
+	}
+	var got []string
+	for _, m := range regexp.MustCompile(`href="/movie/(\d+)"`).FindAllStringSubmatch(body, -1) {
+		got = append(got, m[1])
+	}
+	if !slices.Equal(got, []string{"11", "12", "14", "13"}) {
+		t.Errorf("row = %v, want 11, 12, 14, 13: one from each title in turn, none twice, nothing from the fourth", got)
+	}
+}
+
+// The row follows what the user watched last, a series as much as a
+// movie: a title rated highly long ago does not push out this week's.
+func TestTheRowFollowsTheLatestWatchedNotTheBestRated(t *testing.T) {
+	one := func(id int, kind string) []tmdb.MediaItem {
+		return []tmdb.MediaItem{{ID: id, Title: "Title", MediaType: kind}}
+	}
+	movies := map[int]*tmdb.MovieDetails{}
+	for id, rec := range map[int]int{1: 11, 2: 12, 4: 14} {
+		movies[id] = &tmdb.MovieDetails{MediaItem: tmdb.MediaItem{ID: id, Title: fmt.Sprint("Film ", id), MediaType: "movie"}, Recommendations: one(rec, "movie")}
+	}
+	series := map[int]*tmdb.TVDetails{3: {MediaItem: tmdb.MediaItem{ID: 3, Title: "Show 3", MediaType: "tv"}, Recommendations: one(13, "tv")}}
+	s := newMediaServer(t, &fakeTMDBDetails{movies: movies, series: series}, nil, "")
+	cookie := signedIn(t, s)
+	send := func(path, body string) {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+		req.Header.Set("Datastar-Request", "true")
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(cookie)
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("POST %s = %d %s", path, rec.Code, rec.Body)
+		}
+	}
+	send("/api/titles/state?type=movie&id=1&state=watched", "")
+	send("/api/titles/review?type=movie&id=1", `{"reviewRating":9}`)
+	send("/api/titles/state?type=movie&id=2&state=watched", "")
+	send("/api/titles/state?type=tv&id=3&state=watched", "")
+	send("/api/titles/state?type=movie&id=4&state=watched", "")
+
+	body := sendAs(t, s, http.MethodGet, "/api/recommendations")
+	if !strings.Contains(body, "Because you watched Film 4, Show 3 and Film 2") {
+		t.Errorf("the row is not made of the three titles watched last:\n%s", body)
+	}
+	if !strings.Contains(body, `href="/tv/13"`) || strings.Contains(body, `href="/movie/11"`) {
+		t.Error("the row should mix in the series' picks and leave out the older, best-rated film's")
+	}
+}
+
+// The row holds as many titles as a catalog rail, and names a row made
+// partly of saved titles for what it is based on.
+func TestTheRowHoldsTwentyTitlesAndSaysWhatItIsBasedOn(t *testing.T) {
+	movies := map[int]*tmdb.MovieDetails{}
+	for id := 1; id <= 3; id++ {
+		var recs []tmdb.MediaItem
+		for n := range 10 {
+			recs = append(recs, tmdb.MediaItem{ID: id*100 + n, Title: "Title", MediaType: "movie"})
+		}
+		movies[id] = &tmdb.MovieDetails{MediaItem: tmdb.MediaItem{ID: id, Title: fmt.Sprint("Film ", id), MediaType: "movie"}, Recommendations: recs}
+	}
+	s := newMediaServer(t, &fakeTMDBDetails{movies: movies}, nil, "")
+	sendAs(t, s, http.MethodPost, "/api/titles/state?type=movie&id=1&state=watched")
+	sendAs(t, s, http.MethodPost, "/api/titles/state?type=movie&id=2&state=watched")
+	sendAs(t, s, http.MethodPost, "/api/titles/state?type=movie&id=3&state=want")
+
+	body := sendAs(t, s, http.MethodGet, "/api/recommendations")
+	if got := regexp.MustCompile(`href="/movie/\d+"`).FindAllString(body, -1); len(got) != 20 {
+		t.Errorf("row has %d titles, want 20", len(got))
+	}
+	if !strings.Contains(body, "Based on Film 2, Film 1 and Film 3") {
+		t.Errorf("a row partly of saved titles should say what it is based on:\n%s", body)
 	}
 }
 
@@ -110,17 +185,18 @@ func slowRecommendations(t *testing.T, budget time.Duration, f *slowTMDB) *Serve
 	return s
 }
 
-// rowTitles are the seeds of the recommendation rows, top to bottom.
+// rowTitles are the titles the recommendation row is made of, as its
+// heading names them.
 func rowTitles(body string) []string {
-	var out []string
-	for _, m := range regexp.MustCompile(`Because you watched (Seed \d)`).FindAllStringSubmatch(body, -1) {
-		out = append(out, m[1])
+	m := regexp.MustCompile(`Because you watched ([^<]+)`).FindStringSubmatch(body)
+	if m == nil {
+		return nil
 	}
-	return out
+	return regexp.MustCompile(`, | and `).Split(strings.TrimSpace(m[1]), -1)
 }
 
 // Titles TMDB never answers for cost the rows one deadline, not one each,
-// and the titles it answered for still make rows.
+// and the titles it answered for still make the row.
 func TestSlowTitlesDelayRecommendationsByOneDeadlineAndKeepTheRest(t *testing.T) {
 	const budget = 200 * time.Millisecond
 	never := make(chan struct{})
@@ -133,14 +209,14 @@ func TestSlowTitlesDelayRecommendationsByOneDeadlineAndKeepTheRest(t *testing.T)
 		t.Errorf("recommendations took %s with three titles TMDB never answered; want within %s", took, 2*budget)
 	}
 	if got := rowTitles(body); !slices.Equal(got, []string{"Seed 3", "Seed 2"}) {
-		t.Errorf("rows = %v, want the answered Seed 3 then Seed 2", got)
+		t.Errorf("row is made of %v, want the answered Seed 3 then Seed 2", got)
 	}
 	if f.maxInFlight > 3 {
 		t.Errorf("%d TMDB lookups at once, want at most 3", f.maxInFlight)
 	}
 }
 
-// Rows keep the order of the titles they start from, whichever TMDB
+// The row keeps the order of the titles it is made of, whichever TMDB
 // answers first.
 func TestRecommendationRowsKeepTheirOrderWhicheverAnswersFirst(t *testing.T) {
 	five := make(chan struct{})
@@ -148,6 +224,6 @@ func TestRecommendationRowsKeepTheirOrderWhicheverAnswersFirst(t *testing.T) {
 	s := slowRecommendations(t, time.Second, f)
 	body := sendAs(t, s, http.MethodGet, "/api/recommendations")
 	if got := rowTitles(body); !slices.Equal(got, []string{"Seed 6", "Seed 5", "Seed 4"}) {
-		t.Errorf("rows = %v, want Seed 6, 5, 4 though 5 answered before 6", got)
+		t.Errorf("row is made of %v, want Seed 6, 5, 4 though 5 answered before 6", got)
 	}
 }

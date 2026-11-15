@@ -206,7 +206,7 @@ func TestTheLocalAppRemovesContinueWatchingWithoutRestoringExternalTimecodes(t *
 	req.AddCookie(signedIn(t, s))
 	res := httptest.NewRecorder()
 	s.ServeHTTP(res, req)
-	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "Removed from Continue watching.") {
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "Removed from Up next.") {
 		t.Fatalf("local reset = %d %s", res.Code, res.Body)
 	}
 	if body := getResume(t, s, 2); strings.Contains(body, "Resume from") {
@@ -215,7 +215,7 @@ func TestTheLocalAppRemovesContinueWatchingWithoutRestoringExternalTimecodes(t *
 	if at, ok := viewed.Load(2); !ok || at != 2530.0 {
 		t.Errorf("reset changed the external TorrServer timecode: %v, %v", at, ok)
 	}
-	if page := get(t, s, "/", true).Body.String(); strings.Contains(page, "continue-watching-title") {
+	if page := get(t, s, "/", true).Body.String(); strings.Contains(page, "/torrserver?play=") {
 		t.Error("the removed entry returns on the local home page")
 	}
 }

@@ -78,6 +78,15 @@ func Tf(ctx context.Context, format string, args ...any) string {
 	return fmt.Sprintf(T(ctx, format), args...)
 }
 
+// List joins names as a sentence in ctx's language: "A, B and C".
+func List(ctx context.Context, names []string) string {
+	if len(names) < 2 {
+		return strings.Join(names, "")
+	}
+	last := len(names) - 1
+	return Tf(ctx, "%s and %s", strings.Join(names[:last], ", "), names[last])
+}
+
 // N formats n with the plural form its count takes in ctx's language: one
 // and other are the English forms ("%d season", "%d seasons").
 func N(ctx context.Context, n int, one, other string) string {
