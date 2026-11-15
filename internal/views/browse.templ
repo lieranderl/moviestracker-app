@@ -149,6 +149,11 @@ templ BrowsePage(user *auth.User, v BrowseView) {
 							{ tr(ctx, v.List.Title) }
 						</h1>
 						<p class="text-sm text-base-content/70">{ tr(ctx, v.List.Subtitle) }</p>
+						if r, ok := browseRailOf(ctx, v.List.Slug); ok && len(r.Lists) > 1 {
+							<div class="pt-2">
+								@browseTabs(r, v.List.Slug)
+							</div>
+						}
 					</div>
 					if v.List.Day != "" {
 						<nav role="tablist" class="tabs tabs-box tabs-sm" aria-label={ tr(ctx, "Trending over") }>
@@ -271,12 +276,69 @@ type barChip struct {
 // browseChips are the category bar's chips on a browse page: one per list
 // of ctx's site, each opening its list; current is the list shown.
 func browseChips(ctx context.Context, current string) []barChip {
-	lists := browseListsFor(ctx)
-	chips := make([]barChip, 0, len(lists))
-	for _, l := range lists {
-		chips = append(chips, barChip{Href: "/browse/" + l.Slug, Icon: l.Icon, Title: tr(ctx, l.Title), Current: l.Slug == current})
+	rails := browseRails(ctx)
+	chips := make([]barChip, 0, len(rails))
+	for _, r := range rails {
+		_, in := r.listOf(current)
+		chips = append(chips, barChip{Href: "/browse/" + r.Lists[0].Slug, Icon: r.Icon, Title: tr(ctx, r.Title), Current: in})
 	}
 	return chips
+}
+
+// browseOnly are lists home leaves out but browsing offers, by the rail
+// of their kind: Popular movies repeats Trending and In theaters on home.
+var browseOnly = []struct{ Rail, Slug, Label string }{{"movies", "popular-movies", "Popular"}}
+
+// browseRails are the browse pages' groups of lists: home's rails, with the
+// lists only browsing offers added to theirs.
+func browseRails(ctx context.Context) []homeRail {
+	rails := homeRails(ctx, true)
+	for _, extra := range browseOnly {
+		l, ok := FindBrowseList(ctx, extra.Slug)
+		if !ok {
+			continue
+		}
+		for i := range rails {
+			if rails[i].Key == extra.Rail {
+				rails[i].Lists = append(rails[i].Lists, homeRailList{BrowseList: l, Label: extra.Label})
+			}
+		}
+	}
+	return rails
+}
+
+// browseRailOf is the browse group holding the list slug.
+func browseRailOf(ctx context.Context, slug string) (homeRail, bool) {
+	for _, r := range browseRails(ctx) {
+		if _, in := r.listOf(slug); in {
+			return r, true
+		}
+	}
+	return homeRail{}, false
+}
+
+// listOf is the rail's list slug, and whether it has it.
+func (r homeRail) listOf(slug string) (homeRailList, bool) {
+	for _, l := range r.Lists {
+		if l.Slug == slug {
+			return l, true
+		}
+	}
+	return homeRailList{}, false
+}
+
+// browseTabs switch between a browse group's lists, the page's own selected.
+templ browseTabs(r homeRail, current string) {
+	<nav role="tablist" class="tabs tabs-box tabs-sm flex-nowrap max-w-full overflow-x-auto [scrollbar-width:none]" aria-label={ tr(ctx, r.Title) }>
+		for _, l := range r.Lists {
+			<a
+				role="tab"
+				href={ templ.SafeURL("/browse/" + l.Slug) }
+				class={ "tab", templ.KV("tab-active", l.Slug == current) }
+				aria-selected={ fmt.Sprint(l.Slug == current) }
+			>{ tr(ctx, l.Label) }</a>
+		}
+	</nav>
 }
 
 // categoryBar sticks under the navbar: Discover, then chips. On the home

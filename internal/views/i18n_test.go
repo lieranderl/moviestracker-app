@@ -85,6 +85,9 @@ func tableTexts() []string {
 			out = append(out, tab.Label)
 		}
 	}
+	for _, extra := range browseOnly {
+		out = append(out, extra.Label)
+	}
 	for _, o := range sortOptions {
 		out = append(out, o.Label)
 	}
