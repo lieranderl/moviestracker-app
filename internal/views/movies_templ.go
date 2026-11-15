@@ -250,7 +250,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div id=\"hero-carousel\" class=\"relative min-h-[520px] lg:min-h-[min(640px,calc(100svh-240px))]\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div id=\"hero-carousel\" class=\"relative min-h-[520px] lg:min-h-[clamp(520px,calc(100svh-240px),640px)]\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
