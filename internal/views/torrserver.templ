@@ -739,7 +739,7 @@ templ torrentFileRow(links StreamLinks, hash string, f torrserver.FileStat, fold
 				{ playAttrs(hash, f, clean, hls)... }
 				data-video={ fmt.Sprint(isVideo) }
 				data-tv={ fmt.Sprint(tv) }
-				class="btn btn-xs btn-ghost btn-square"
+				class="btn btn-xs pointer-coarse:btn-md btn-ghost btn-square"
 				aria-label={ tr(ctx, "More for this file") }
 				title={ tr(ctx, "Open in VLC or IINA, copy links, inspect tracks") }
 			>
@@ -1684,20 +1684,20 @@ templ streamGroup(kind string, play templ.Attributes) {
 		class={ "flex items-center rounded-field border",
 			templ.KV("border-primary/30 bg-primary/5", !hls), templ.KV("border-secondary/30 bg-secondary/5", hls) }
 	>
-		<span class={ "pl-2 pr-1 text-[9px] font-bold uppercase tracking-wide", templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }>{ label }</span>
+		<span class={ "pl-2 pr-1 text-[9px] pointer-coarse:text-xs font-bold uppercase tracking-wide", templ.KV("text-primary", !hls), templ.KV("text-secondary", hls) }>{ label }</span>
 		<button
 			type="button"
 			data-action="play"
 			data-kind={ kind }
 			{ play... }
-			class={ "btn btn-xs btn-square shadow-none", templ.KV("btn-primary", !hls), templ.KV("btn-secondary", hls) }
+			class={ "btn btn-xs pointer-coarse:btn-md btn-square shadow-none", templ.KV("btn-primary", !hls), templ.KV("btn-secondary", hls) }
 			aria-label={ trf(ctx, "Play %s", label) }
 			title={ playHelp }
 			if playHelpHLS != "" {
 				data-attr:title={ playHelpHLS }
 			}
 		>
-			@Icon("play", "size-3.5")
+			@Icon("play", "size-3.5 pointer-coarse:size-5")
 		</button>
 	</div>
 }

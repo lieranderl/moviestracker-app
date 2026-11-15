@@ -777,3 +777,22 @@ func TestTheStreamKindsAreExplainedUntilDismissed(t *testing.T) {
 		}
 	}
 }
+
+// On a touch screen a file's play buttons and its menu are finger-sized;
+// with a mouse they stay compact.
+func TestAFilesPlayButtonsAreFingerSizedOnTouchScreens(t *testing.T) {
+	out := html.UnescapeString(torrPageWith(t, torrserver.FileStat{ID: 1, Path: "Dune.2021.2160p.mkv", Length: 9e9}))
+	for _, re := range []string{
+		`<button[^>]*data-action="play"[^>]*data-kind="direct"[^>]*>`,
+		`<button[^>]*data-action="play"[^>]*data-kind="hls"[^>]*>`,
+		`<button[^>]*data-action="more"[^>]*>`,
+	} {
+		b := regexp.MustCompile(re).FindString(out)
+		if b == "" {
+			t.Fatalf("page lacks %s", re)
+		}
+		if !strings.Contains(b, "btn-xs") || !strings.Contains(b, "pointer-coarse:btn-md") {
+			t.Errorf("a file's button is not finger-sized on touch screens: %s", b)
+		}
+	}
+}
