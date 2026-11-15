@@ -88,16 +88,18 @@ templ allLink(slug, title string) {
 }
 
 // rowLink is a row's link out to the whole of it, after its title; label
-// names it on screen, name (when not empty) to assistive tech.
+// names it on screen, name (when not empty) to assistive tech. On a phone
+// it shows only its arrow, to keep to its title's line.
 templ rowLink(href, label, name string) {
 	<a
 		href={ templ.SafeURL(href) }
-		class="btn btn-ghost btn-sm shrink-0 gap-1 ms-auto"
+		class="btn btn-ghost btn-sm max-sm:btn-square shrink-0 gap-1 ms-auto"
 		if name != "" {
 			aria-label={ name }
 		}
+		title={ label }
 	>
-		{ label }
+		<span class="max-sm:sr-only">{ label }</span>
 		@Icon("arrow-right", "size-4")
 	</a>
 }

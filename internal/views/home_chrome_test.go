@@ -103,7 +103,7 @@ func TestHomeRowsShareOneHeader(t *testing.T) {
 		}
 	}
 
-	link := regexp.MustCompile(`<a href="([^"]*)" class="([^"]*)"[^>]*>[^<]*<svg[^>]*><path d="M5 12h14"/>`)
+	link := regexp.MustCompile(`<a href="([^"]*)" class="([^"]*)"[^>]*>\s*(?:<span[^>]*>[^<]*</span>)?\s*<svg[^>]*><path d="M5 12h14"/>`)
 	classes := map[string]string{}
 	for _, out := range []string{home, torrents} {
 		for _, m := range link.FindAllStringSubmatch(out, -1) {
@@ -135,5 +135,24 @@ func TestRecommendationFeedbackSitsOnThePoster(t *testing.T) {
 	}
 	if strings.Contains(out, "btn-xs") || strings.Contains(out, ">More like this<") {
 		t.Error("feedback buttons are still under the card")
+	}
+}
+
+// On a phone a row's link out keeps to its title's line: it shows only its
+// arrow (its words stay for assistive tech), and a rail's tabs take the
+// line below.
+func TestOnPhonesARowsLinkKeepsToItsTitlesLine(t *testing.T) {
+	watching := []store.Progress{{Hash: "abc", Index: 1, Title: "Severance", Position: 60e9, Duration: 3000e9}}
+	home := html.UnescapeString(render(t, views.Movies(testUser, nil, nil, nil, true, watching)))
+
+	for _, href := range []string{"/calendar", "/browse/trending-movies"} {
+		link := regexp.MustCompile(`(?s)<a href="` + regexp.QuoteMeta(href) + `" class="btn btn-ghost[^>]*>.*?</a>`).FindString(home)
+		if !strings.Contains(link, "max-sm:btn-square") || !regexp.MustCompile(`<span class="max-sm:sr-only">[^<]+</span>`).MatchString(link) {
+			t.Errorf("the link to %s spells itself out on phones: %s", href, link)
+		}
+	}
+	tabs := regexp.MustCompile(`<div role="tablist"[^>]*>`).FindString(home[strings.Index(home, `id="home-movies"`):])
+	if !strings.Contains(tabs, "max-sm:order-last") || !strings.Contains(tabs, "max-sm:basis-full") {
+		t.Errorf("a rail's tabs share its title's line on phones: %s", tabs)
 	}
 }
