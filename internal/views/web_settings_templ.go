@@ -247,7 +247,7 @@ func webSettings(sections []SettingsSection) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<section id=\"ts-settings\" class=\"card bg-base-200/60 border border-base-content/10\" data-show=\"$tsSelected\" data-keys=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<section id=\"ts-settings\" class=\"card bg-base-200/60 border border-base-content/10 scroll-mt-20\" data-show=\"$tsSelected\" data-keys=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -260,14 +260,14 @@ func webSettings(sections []SettingsSection) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" data-signals=\"{_tsSettingsOpen: false, _tsSettingsSection: 'engine', _tsSettingsNonce: 0, _tsSettingsValidating: false, tsSettingsValues: {}, _tsSettingsState: {busy:false, ok:false, problem:'', status:0}}\" data-effect=\"$_tsSettingsOpen ? tsSettingsRead(el, $tsSelected, $_tsSettingsSection, JSON.parse(el.dataset.keys)[$_tsSettingsSection]) : tsSettingsCancel(el)\" data-on:ts-settings-loading=\"const d = evt.detail; if ($_tsSettingsOpen && d.url === $tsSelected && d.section === $_tsSettingsSection) { $_tsSettingsNonce = d.nonce; $_tsSettingsState = {busy:true, ok:false, problem:'', status:0} }\" data-on:ts-settings=\"const d = evt.detail; if (!$_tsSettingsOpen || d.url !== $tsSelected || d.nonce !== $_tsSettingsNonce) return; $_tsSettingsState = {busy:false, ok:false, problem:d.problem, status:d.status}; if (!d.problem) { @post('/api/ts/settings', {contentType: 'json', payload:d}) }\" data-on:ts-settings-saved=\"const d = evt.detail; if (d.url === $tsSelected && d.nonce === $_tsSettingsNonce) { $_tsSettingsState = {busy:d.busy, ok:d.ok, problem:d.problem, status:d.status} }\"><div class=\"card-body gap-4\"><div class=\"flex items-center justify-between gap-3\"><h2 class=\"card-title text-base\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" data-signals=\"{_tsSettingsOpen: false, _tsSettingsSection: 'engine', _tsSettingsNonce: 0, _tsSettingsValidating: false, tsSettingsValues: {}, _tsSettingsState: {busy:false, ok:false, problem:'', status:0}}\" data-effect=\"$_tsSettingsOpen ? tsSettingsRead(el, $tsSelected, $_tsSettingsSection, JSON.parse(el.dataset.keys)[$_tsSettingsSection]) : tsSettingsCancel(el)\" data-on:ts-settings-loading=\"const d = evt.detail; if ($_tsSettingsOpen && d.url === $tsSelected && d.section === $_tsSettingsSection) { $_tsSettingsNonce = d.nonce; $_tsSettingsState = {busy:true, ok:false, problem:'', status:0} }\" data-on:ts-settings=\"const d = evt.detail; if (!$_tsSettingsOpen || d.url !== $tsSelected || d.nonce !== $_tsSettingsNonce) return; $_tsSettingsState = {busy:false, ok:false, problem:d.problem, status:d.status}; if (!d.problem) { @post('/api/ts/settings', {contentType: 'json', payload:d}) }\" data-on:ts-settings-saved=\"const d = evt.detail; if (d.url === $tsSelected && d.nonce === $_tsSettingsNonce) { $_tsSettingsState = {busy:d.busy, ok:d.ok, problem:d.problem, status:d.status} }\"><div class=\"card-body gap-4\"><div class=\"hidden\" data-effect=\"$_tsSettingsOpen && requestAnimationFrame(() => el.closest('#ts-settings').scrollIntoView({behavior: 'smooth', block: 'start'}))\"></div><div class=\"flex items-center justify-between gap-3\"><h2 class=\"card-title text-base\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "TorrServer settings"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 66, Col: 69}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 67, Col: 69}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
@@ -280,7 +280,7 @@ func webSettings(sections []SettingsSection) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Settings"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 67, Col: 177}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 68, Col: 177}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -293,7 +293,7 @@ func webSettings(sections []SettingsSection) templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templruntime.NewAttributeExpression(tr(ctx, "Settings section")).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 71, Col: 68}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 72, Col: 68}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 		if templ_7745c5c3_Err != nil {
@@ -311,7 +311,7 @@ func webSettings(sections []SettingsSection) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.ID).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 73, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 74, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 			if templ_7745c5c3_Err != nil {
@@ -324,7 +324,7 @@ func webSettings(sections []SettingsSection) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, s.Title))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 73, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 74, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
@@ -342,7 +342,7 @@ func webSettings(sections []SettingsSection) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Refresh"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 76, Col: 236}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 77, Col: 236}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
@@ -355,7 +355,7 @@ func webSettings(sections []SettingsSection) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Checking…"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 78, Col: 162}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 79, Col: 162}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -368,7 +368,7 @@ func webSettings(sections []SettingsSection) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "TorrServer asks for a login. Add its username and password in this browser."))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 80, Col: 149}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 81, Col: 149}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
@@ -381,7 +381,7 @@ func webSettings(sections []SettingsSection) templ.Component {
 		var templ_7745c5c3_Var23 string
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "This TorrServer has no GStreamer settings."))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 81, Col: 123}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 82, Col: 123}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
@@ -394,7 +394,7 @@ func webSettings(sections []SettingsSection) templ.Component {
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "TorrServer settings could not be read or saved. Check the connection and try again."))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 82, Col: 211}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 83, Col: 211}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
@@ -407,7 +407,7 @@ func webSettings(sections []SettingsSection) templ.Component {
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(tr(ctx, "Settings saved."))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 84, Col: 121}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/web_settings.templ`, Line: 85, Col: 121}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {

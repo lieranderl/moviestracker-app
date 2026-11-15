@@ -20,7 +20,7 @@ for running it from source, on a server, or in a container.
 | `/movie/{id}`, `/tv/{id}` | signed in | Title pages: hero, credits, seasons & episodes (TV), JacRed sources (quality and HDR picked before searching; tracker and voice filters), trailers, recommendations |
 | `/person/{id}` | signed in | Biography, known-for rail, movie/TV filmography |
 | `/search?q=` | signed in | Live multi-search across movies, TV and people; trending discovery when blank |
-| `/torrserver` | signed in | TorrServer torrent manager and player (Direct or HLS per file, Play all and a playlist for torrents of several videos); Add Torrents takes magnet, http(s) `.torrent` and `torrs://` links, info-hashes and `.torrent` files |
+| `/torrserver` | signed in | TorrServer torrent manager and player (in the web app, once the picked TorrServer answers, the page opens on its torrents under a one-line bar; its Servers and Settings buttons unfold the server list, connection details and settings; Direct or HLS per file, Play all and a playlist for torrents of several videos); Add Torrents takes magnet, http(s) `.torrent` and `torrs://` links, info-hashes and `.torrent` files |
 | `/s/<token>/…` | anyone with the link | Signed 7-day stream links for VLC, TVs and `.m3u` playlists; one file each |
 
 `/` sends signed-in users to `/movies` and everyone else to `/login`.

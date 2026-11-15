@@ -204,6 +204,7 @@ var ru = map[string]string{
 	"Remove %s":                "Удалить %s",
 	"Connection":               "Подключение",
 	"Check again":              "Проверить снова",
+	"Servers":                  "Серверы",
 	"Checking…":                "Проверяем…",
 	"Connected":                "Подключено",
 	"HLS conversion available": "Доступна конвертация в HLS",

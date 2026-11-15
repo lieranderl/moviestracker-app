@@ -65,7 +65,7 @@ templ playbackReadiness(browser bool) {
 		<div class="flex flex-wrap gap-2">
 			<button type="button" class="btn btn-sm" data-show={ v.Connected + " && " + v.Conversion + " && $_file.video" } data-on:click={ readinessPlayHLS(browser) }>{ tr(ctx,"Play with HLS") }</button>
 			if browser {
-				<a href="#ts-status" class="link text-xs" data-show={ "!" + v.Connected } data-on:click="$fileMenuOpen = false">{ tr(ctx,"Connection settings") }</a>
+				<a href="#ts-status" class="link text-xs" data-show={ "!" + v.Connected } data-on:click="$fileMenuOpen = false; $_tsManageOpen = true">{ tr(ctx,"Connection settings") }</a>
 			} else {
 				<a href="/settings/sources" class="link text-xs" data-show={ "!" + v.Connected + " && $canRemove" }>{ tr(ctx,"Connection settings") }</a>
 			}
