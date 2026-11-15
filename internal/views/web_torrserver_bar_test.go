@@ -148,3 +148,15 @@ func TestRemovingATorrServerAsksFirst(t *testing.T) {
 		}
 	}
 }
+
+// Removing a TorrServer and removing a torrent ask with the same dialog.
+func TestBothRemovalsAskWithTheSameDialog(t *testing.T) {
+	out := html.UnescapeString(render(t, views.WebTorrServerPage(testUser, twoServers, nil)))
+	shape := func(id string) string {
+		d := regexp.MustCompile(`(?s)<dialog id="` + id + `".*?</dialog>`).FindString(out)
+		return regexp.MustCompile(`(?s)(id|aria-labelledby|data-effect|data-on:close|data-on:click|data-text)="[^"]*"|>[^<]*<`).ReplaceAllString(d, "")
+	}
+	if a, b := shape("ts-remove-modal"), shape("torr-confirm-modal"); a == "" || a != b {
+		t.Errorf("the two removal dialogs differ:\n%s\n%s", a, b)
+	}
+}

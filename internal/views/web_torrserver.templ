@@ -125,22 +125,7 @@ templ webTorrServerBar(servers []store.TorrServer) {
 // webTorrServerRemoveModal asks before removing a TorrServer: the address
 // and the login this browser keeps for it would have to be typed again.
 templ webTorrServerRemoveModal() {
-	@modalDialog("ts-remove-modal", "_tsRemoveOpen", "", "", "max-w-md", nil) {
-		@modalHeader("ts-remove-modal", tr(ctx, "Remove TorrServer?"), "trash-2", "text-error")
-		<p class="mt-4 text-sm">
-			<span class="font-semibold break-all" data-text="$_tsRemoveName"></span>
-			{ tr(ctx, "will be removed from your TorrServers, and this browser forgets its login. Its torrents stay on the TorrServer.") }
-		</p>
-		<div class="modal-action">
-			<form method="dialog">
-				<button class="btn btn-sm btn-ghost">{ tr(ctx, "Cancel") }</button>
-			</form>
-			<button type="button" class="btn btn-sm btn-error" data-on:click="@delete('/api/torrservers/' + $_tsRemoveID, {filterSignals: {include: /^tsSelected$/}}); $_tsRemoveOpen = false">
-				@Icon("trash-2", "size-4")
-				{ tr(ctx, "Remove") }
-			</button>
-		</div>
-	}
+	@removeConfirmModal("ts-remove-modal", "_tsRemoveOpen", tr(ctx, "Remove TorrServer?"), "_tsRemoveName", tr(ctx, "will be removed from your TorrServers, and this browser forgets its login. Its torrents stay on the TorrServer."), "@delete('/api/torrservers/' + $_tsRemoveID, {filterSignals: {include: /^tsSelected$/}}); $_tsRemoveOpen = false")
 }
 
 // tsConnectionBadges show a connected TorrServer: its version, and whether it
