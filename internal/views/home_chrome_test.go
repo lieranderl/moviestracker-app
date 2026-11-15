@@ -156,3 +156,13 @@ func TestOnPhonesARowsLinkKeepsToItsTitlesLine(t *testing.T) {
 		t.Errorf("a rail's tabs share its title's line on phones: %s", tabs)
 	}
 }
+
+// On a desktop the billboard leaves room for the first row's heading: it is
+// at most 640px tall, and shorter on a short window.
+func TestTheBillboardLeavesRoomForTheFirstRow(t *testing.T) {
+	out := render(t, views.HeroBillboard([]tmdb.MediaItem{{ID: 1, Title: "Dune", MediaType: "movie"}}))
+	tag := regexp.MustCompile(`<div id="hero-carousel"[^>]*>`).FindString(out)
+	if !strings.Contains(tag, "lg:min-h-[min(640px,calc(100svh-240px))]") || strings.Contains(tag, "lg:min-h-[640px]") {
+		t.Errorf("the billboard takes a fixed 640px on desktop: %s", tag)
+	}
+}
