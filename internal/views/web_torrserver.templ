@@ -23,7 +23,7 @@ func webTorrServerSignals(servers []store.TorrServer) string {
 	if len(servers) > 0 {
 		first = servers[0].URL
 	}
-	return fmt.Sprintf(`{ tsSelected: localStorage.getItem('mt-ts-selected') || %q, _readinessStatus: {}, _readinessHasStatus: false, _readinessServer: '', tsStatus: {checking: %t, ok: false, version: '', hls: false, hlsKnown: false, problem: '', status: 0}, tsAddOpen: false, _tsManageOpen: false, _tsSettingsJump: 0, tsName: '', tsUrl: '', tsUser: '', tsPass: '', tsFormError: '', tsForget: '' }`, first, len(servers) > 0)
+	return fmt.Sprintf(`{ tsSelected: localStorage.getItem('mt-ts-selected') || %q, _readinessStatus: {}, _readinessHasStatus: false, _readinessServer: '', tsStatus: {checking: %t, ok: false, version: '', hls: false, hlsKnown: false, problem: '', status: 0}, tsAddOpen: false, _tsManageOpen: false, _tsSettingsJump: 0, _tsRemoveOpen: false, _tsRemoveID: '', _tsRemoveName: '', tsName: '', tsUrl: '', tsUser: '', tsPass: '', tsFormError: '', tsForget: '' }`, first, len(servers) > 0)
 }
 
 // webTorrServerAdd saves the form's login in this browser, then sends only
@@ -68,6 +68,7 @@ templ WebTorrServerPage(user *auth.User, servers []store.TorrServer, settings []
 					@webTorrServerStatus()
 					@webSettings(settings)
 				</div>
+				@webTorrServerRemoveModal()
 				<div data-signals={ webPlayerSignals() }>
 					@webTorrentsBox()
 					@webPlayer()
@@ -119,6 +120,27 @@ templ webTorrServerBar(servers []store.TorrServer) {
 			</button>
 		</div>
 	</div>
+}
+
+// webTorrServerRemoveModal asks before removing a TorrServer: the address
+// and the login this browser keeps for it would have to be typed again.
+templ webTorrServerRemoveModal() {
+	@modalDialog("ts-remove-modal", "_tsRemoveOpen", "", "", "max-w-md", nil) {
+		@modalHeader("ts-remove-modal", tr(ctx, "Remove TorrServer?"), "trash-2", "text-error")
+		<p class="mt-4 text-sm">
+			<span class="font-semibold break-all" data-text="$_tsRemoveName"></span>
+			{ tr(ctx, "will be removed from your TorrServers, and this browser forgets its login. Its torrents stay on the TorrServer.") }
+		</p>
+		<div class="modal-action">
+			<form method="dialog">
+				<button class="btn btn-sm btn-ghost">{ tr(ctx, "Cancel") }</button>
+			</form>
+			<button type="button" class="btn btn-sm btn-error" data-on:click="@delete('/api/torrservers/' + $_tsRemoveID, {filterSignals: {include: /^tsSelected$/}}); $_tsRemoveOpen = false">
+				@Icon("trash-2", "size-4")
+				{ tr(ctx, "Remove") }
+			</button>
+		</div>
+	}
 }
 
 // tsConnectionBadges show a connected TorrServer: its version, and whether it
@@ -194,7 +216,7 @@ templ WebTorrServers(servers []store.TorrServer) {
 					type="button"
 					class="btn btn-ghost btn-sm btn-square text-error"
 					aria-label={ trf(ctx, "Remove %s", s.Name) }
-					data-on:click={ fmt.Sprintf("@delete('/api/torrservers/%s', {filterSignals: {include: /^tsSelected$/}})", s.ID) }
+					data-on:click={ "$_tsRemoveID = " + jsString(s.ID) + "; $_tsRemoveName = " + jsString(s.Name) + "; $_tsRemoveOpen = true" }
 				>
 					@Icon("trash-2", "size-4")
 				</button>
