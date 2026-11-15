@@ -235,14 +235,14 @@ func homeRailSection(r homeRail, trending map[string][]tmdb.MediaItem) templ.Com
 				return templ_7745c5c3_Err
 			}
 			if tabbed {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div role=\"tablist\" class=\"tabs tabs-box tabs-sm flex-nowrap max-w-full overflow-x-auto [scrollbar-width:none]\" aria-label=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div role=\"tablist\" class=\"tabs tabs-box tabs-sm flex-nowrap max-w-full overflow-x-auto [scrollbar-width:none] max-sm:order-last max-sm:basis-full\" aria-label=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(tr(ctx, r.Title)).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home_rails.templ`, Line: 134, Col: 145}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/home_rails.templ`, Line: 134, Col: 181}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 				if templ_7745c5c3_Err != nil {
