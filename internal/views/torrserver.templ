@@ -543,13 +543,14 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 							if t.Category != "" {
 								<span class="badge badge-sm badge-ghost font-mono">{ t.Category }</span>
 							}
-							<span class="text-base-content/40 font-mono text-[11px] truncate max-w-[120px] sm:max-w-[200px]" title={ t.Hash }>{ t.Hash }</span>
 						</div>
-						<div class="stats stats-horizontal bg-base-100/90 border border-base-content/10 shadow-xs mt-2 w-full max-w-sm">
-							@torrStat(tr(ctx, "Peers"), t.FormattedPeers(), "")
-							@torrStat(tr(ctx, "Down"), t.FormattedDownloadSpeed(), "text-success")
-							@torrStat(tr(ctx, "Up"), t.FormattedUploadSpeed(), "text-info")
-						</div>
+						if t.Active() {
+							<div class="stats stats-horizontal bg-base-100/90 border border-base-content/10 shadow-xs mt-2 w-full max-w-sm">
+								@torrStat(tr(ctx, "Peers"), t.FormattedPeers(), "")
+								@torrStat(tr(ctx, "Down"), t.FormattedDownloadSpeed(), "text-success")
+								@torrStat(tr(ctx, "Up"), t.FormattedUploadSpeed(), "text-info")
+							</div>
+						}
 					</div>
 				</div>
 				<div class="flex flex-wrap items-center gap-2 shrink-0 self-end @2xl:self-center">
@@ -563,8 +564,8 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 						data-action="copy"
 						data-copy-link={ t.MagnetLink() }
 						data-msg={ tr(ctx, "Magnet link copied to clipboard") }
-						class="btn btn-ghost btn-sm btn-circle text-accent"
-						title={ tr(ctx, "Copy magnet link") }
+						class="btn btn-ghost btn-sm btn-circle"
+						title={ tr(ctx, "Copy magnet link") + " · " + t.Hash }
 						aria-label={ tr(ctx, "Copy magnet link") }
 					>
 						@Icon("magnet", "size-4")
@@ -574,7 +575,7 @@ templ torrentCard(links StreamLinks, t torrserver.Torrent) {
 							type="button"
 							data-action="drop"
 							data-hash={ t.Hash }
-							class="btn btn-ghost btn-sm btn-circle text-warning"
+							class="btn btn-ghost btn-sm btn-circle"
 							title={ tr(ctx, "Drop active torrent cache") }
 							aria-label={ tr(ctx, "Drop cache") }
 						>
@@ -1618,13 +1619,27 @@ func alertClass(alertType string) string {
 	}
 }
 
-// streamKindsLegend explains, once above the list, the two ways to watch
-// that every file and the player offer.
+// streamKindsLegend explains, above the list, the two ways to watch that
+// every file and the player offer, until the viewer says they read it (kept
+// in this browser); the play buttons explain themselves in their titles.
 templ streamKindsLegend() {
-	<div id="stream-kinds" class="grid gap-3 sm:grid-cols-2">
-		@streamKind(tr(ctx, "Direct"), tr(ctx, "The original file"), tr(ctx, "The original file, full quality. For VLC and other players, and TVs."), "file-play", false)
-		<div class="contents" data-show="$gst">
-			@streamKind("HLS", tr(ctx, "Converted as it plays"), tr(ctx, "Converted by GStreamer as it plays. Plays in any browser, on phones and TVs."), "monitor-play", true)
+	<div
+		id="stream-kinds"
+		class="space-y-2"
+		data-signals="{_streamKindsSeen: localStorage.getItem('mt-stream-kinds-seen') === '1'}"
+		data-show="!$_streamKindsSeen"
+	>
+		<div class="grid gap-3 sm:grid-cols-2">
+			@streamKind(tr(ctx, "Direct"), tr(ctx, "The original file"), tr(ctx, "The original file, full quality. For VLC and other players, and TVs."), "file-play", false)
+			<div class="contents" data-show="$gst">
+				@streamKind("HLS", tr(ctx, "Converted as it plays"), tr(ctx, "Converted by GStreamer as it plays. Plays in any browser, on phones and TVs."), "monitor-play", true)
+			</div>
+		</div>
+		<div class="flex justify-end">
+			<button type="button" class="btn btn-ghost btn-xs gap-1" data-on:click="localStorage.setItem('mt-stream-kinds-seen', '1'); $_streamKindsSeen = true">
+				@Icon("check", "size-3.5")
+				{ tr(ctx, "Got it") }
+			</button>
 		</div>
 	</div>
 }

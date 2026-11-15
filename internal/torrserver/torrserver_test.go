@@ -664,3 +664,26 @@ func TestEchoTellsAnHLSCheckThatFailedFromATorrServerThatCannotConvert(t *testin
 		})
 	}
 }
+
+// A torrent TorrServer keeps but is not running is idle, said plainly; only
+// one preloading or working (or moving data) is active.
+func TestATorrentSaysPlainlyWhetherItIsIdleOrActive(t *testing.T) {
+	for _, c := range []struct {
+		t      torrserver.Torrent
+		label  string
+		active bool
+	}{
+		{torrserver.Torrent{Stat: 5, StatString: "Torrent in db"}, "Idle · saved", false},
+		{torrserver.Torrent{Stat: 3}, "Working", true},
+		{torrserver.Torrent{Stat: 2}, "Preload", true},
+		{torrserver.Torrent{Stat: 4, Download: 1024}, "Closed", true},
+		{torrserver.Torrent{Stat: 4}, "Closed", false},
+	} {
+		if got := c.t.StatusLabel(); got != c.label {
+			t.Errorf("stat %d label = %q, want %q", c.t.Stat, got, c.label)
+		}
+		if got := c.t.Active(); got != c.active {
+			t.Errorf("stat %d (down %v) active = %t, want %t", c.t.Stat, c.t.Download, got, c.active)
+		}
+	}
+}

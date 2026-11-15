@@ -180,10 +180,16 @@ func (t Torrent) GettingInfo() bool {
 	return t.Stat == 0 || t.Stat == 1
 }
 
+// Active says the torrent is running or moving data: preloading, working,
+// or with any download or upload speed.
+func (t Torrent) Active() bool {
+	return t.Stat == 2 || t.Stat == 3 || t.Download > 0 || t.Upload > 0
+}
+
 // StatusLabel returns a user-friendly label for the torrent status.
 func (t Torrent) StatusLabel() string {
 	if t.Stat == 5 || t.StatString == "Torrent in db" {
-		return "Dropped (in db)"
+		return "Idle · saved"
 	}
 	if t.StatString != "" {
 		return t.StatString
@@ -200,7 +206,7 @@ func (t Torrent) StatusLabel() string {
 	case 4:
 		return "Closed"
 	case 5:
-		return "Dropped (in db)"
+		return "Idle · saved"
 	default:
 		return "Dropped"
 	}
