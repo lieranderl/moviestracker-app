@@ -56,7 +56,9 @@ func TestTheLocalHomePageMixesTheLastThreeWatchedIntoOneRow(t *testing.T) {
 // coarse clock the marks can share a moment; ties order by kind and id, which
 // here agree with the order watched.)
 func TestTheRowFollowsTheLatestWatchedNotTheBestRated(t *testing.T) {
-	one := func(id int, kind string) []tmdb.MediaItem { return []tmdb.MediaItem{{ID: id, Title: "Title", MediaType: kind}} }
+	one := func(id int, kind string) []tmdb.MediaItem {
+		return []tmdb.MediaItem{{ID: id, Title: "Title", MediaType: kind}}
+	}
 	movies := map[int]*tmdb.MovieDetails{}
 	for id, rec := range map[int]int{1: 11, 2: 12, 3: 13} {
 		movies[id] = &tmdb.MovieDetails{MediaItem: tmdb.MediaItem{ID: id, Title: fmt.Sprint("Film ", id), MediaType: "movie"}, Recommendations: one(rec, "movie")}
