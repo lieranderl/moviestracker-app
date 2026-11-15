@@ -73,7 +73,7 @@ func TestHomeRowsShareOneHeader(t *testing.T) {
 	watching := []store.Progress{{Hash: "abc", Index: 1, Title: "Severance", Position: 60e9, Duration: 3000e9}}
 	home := html.UnescapeString(render(t, views.Movies(testUser, nil, nil, nil, true, watching)))
 	recs := html.UnescapeString(render(t, views.RecommendationRows([]views.RecommendationRow{{Title: "Because you watched Dune", Items: []tmdb.MediaItem{{ID: 2, Title: "Arrival", MediaType: "movie"}}}}, views.RecommendationFeedback{})))
-	torrents := html.UnescapeString(render(t, views.RecentTorrents([]torrserver.Torrent{{Hash: "a", Title: "Dune", Timestamp: 1}})))
+	torrents := html.UnescapeString(render(t, views.RecentTorrents([]torrserver.Torrent{{Hash: "a", Title: "Dune", Timestamp: 1}}, nil)))
 
 	header := regexp.MustCompile(`<header[^>]*>`)
 	for name, out := range map[string]string{"up next": home[strings.Index(home, `id="up-next"`):], "movies": home[strings.Index(home, `id="home-movies"`):], "recommendations": recs, "torrents": torrents} {
@@ -165,5 +165,31 @@ func TestTheBillboardLeavesRoomForTheFirstRow(t *testing.T) {
 	tag := regexp.MustCompile(`<div id="hero-carousel"[^>]*>`).FindString(out)
 	if !strings.Contains(tag, "lg:min-h-[clamp(520px,calc(100svh-240px),640px)]") || strings.Contains(tag, "lg:min-h-[640px]") {
 		t.Errorf("the billboard takes a fixed 640px on desktop: %s", tag)
+	}
+}
+
+// A torrent in "Recently added to TorrServer" opens its title's page when
+// the title is known (from the torrent's data, or the app's own match),
+// and TorrServer when it is not.
+func TestARecentTorrentOpensItsTitle(t *testing.T) {
+	torrents := []torrserver.Torrent{
+		{Hash: "a", Title: "Dune", Timestamp: 3, Data: `{"tmdb":{"id":438631,"type":"movie"}}`},
+		{Hash: "b", Title: "Andor", Timestamp: 2},
+		{Hash: "c", Title: "Unknown", Timestamp: 1},
+	}
+	page := func(hash string) string {
+		if hash == "b" {
+			return "/tv/83867"
+		}
+		return ""
+	}
+	out := html.UnescapeString(render(t, views.RecentTorrents(torrents, page)))
+	got := regexp.MustCompile(`<li class="carousel-item"><a href="([^"]*)"`).FindAllStringSubmatch(out, -1)
+	var hrefs []string
+	for _, m := range got {
+		hrefs = append(hrefs, m[1])
+	}
+	if want := []string{"/movie/438631", "/tv/83867", "/torrserver"}; strings.Join(hrefs, " ") != strings.Join(want, " ") {
+		t.Errorf("recent torrents link to %v, want %v", hrefs, want)
 	}
 }
