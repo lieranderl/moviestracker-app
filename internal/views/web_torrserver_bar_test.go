@@ -44,7 +44,7 @@ func TestAConnectedTorrServerPageOpensOnItsTorrents(t *testing.T) {
 		`aria-controls="ts-manage"`, `data-attr:aria-expanded="($_tsManageOpen || $tsAddOpen) ? 'true' : 'false'"`,
 		// Closing the servers closes the add form too, which also unfolds them.
 		`const open = $_tsManageOpen || $tsAddOpen; $_tsManageOpen = !open; if (open) { $tsAddOpen = false }`,
-		"$_tsManageOpen = true; $_tsSettingsOpen = true",
+		"$_tsManageOpen = true; $_tsSettingsOpen = true; $_tsSettingsJump++",
 	} {
 		if !strings.Contains(barBody, want) {
 			t.Errorf("the bar lacks %q", want)
@@ -112,7 +112,21 @@ func TestTheBarQuotesTorrServerAddresses(t *testing.T) {
 func TestOpeningSettingsScrollsToThem(t *testing.T) {
 	out := html.UnescapeString(render(t, views.WebTorrServerPage(testUser, twoServers, nil)))
 	settings := out[strings.Index(out, `id="ts-settings"`):]
-	if !strings.Contains(settings, `data-effect="$_tsSettingsOpen && requestAnimationFrame(() => el.closest('#ts-settings').scrollIntoView({behavior: 'smooth', block: 'start'}))"`) {
+	// Every press scrolls, also when the settings were open already.
+	if !strings.Contains(settings, `data-effect="$_tsSettingsJump && requestAnimationFrame(() => el.closest('#ts-settings').scrollIntoView({behavior: 'smooth', block: 'start'}))"`) {
 		t.Error("opening the settings leaves them out of view")
+	}
+	if !strings.Contains(out, "_tsSettingsJump: 0") {
+		t.Error("the page does not count presses of Settings")
+	}
+}
+
+// The bar and the connection card show the connection with the same badges.
+func TestTheBarAndTheConnectionCardShareTheirBadges(t *testing.T) {
+	out := html.UnescapeString(render(t, views.WebTorrServerPage(testUser, twoServers, nil)))
+	connected := regexp.MustCompile(`<span class="badge badge-success badge-soft gap-1.5"[^>]*>`).FindAllString(out, -1)
+	hls := regexp.MustCompile(`<span class="badge badge-info badge-soft gap-1.5[^"]*"[^>]*>`).FindAllString(out, -1)
+	if len(connected) != 2 || len(hls) != 2 || connected[0] != connected[1] {
+		t.Errorf("the bar and the card draw the connection apart: %q %q", connected, hls)
 	}
 }

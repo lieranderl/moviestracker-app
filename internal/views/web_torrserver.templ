@@ -23,7 +23,7 @@ func webTorrServerSignals(servers []store.TorrServer) string {
 	if len(servers) > 0 {
 		first = servers[0].URL
 	}
-	return fmt.Sprintf(`{ tsSelected: localStorage.getItem('mt-ts-selected') || %q, _readinessStatus: {}, _readinessHasStatus: false, _readinessServer: '', tsStatus: {checking: %t, ok: false, version: '', hls: false, hlsKnown: false, problem: '', status: 0}, tsAddOpen: false, _tsManageOpen: false, tsName: '', tsUrl: '', tsUser: '', tsPass: '', tsFormError: '', tsForget: '' }`, first, len(servers) > 0)
+	return fmt.Sprintf(`{ tsSelected: localStorage.getItem('mt-ts-selected') || %q, _readinessStatus: {}, _readinessHasStatus: false, _readinessServer: '', tsStatus: {checking: %t, ok: false, version: '', hls: false, hlsKnown: false, problem: '', status: 0}, tsAddOpen: false, _tsManageOpen: false, _tsSettingsJump: 0, tsName: '', tsUrl: '', tsUser: '', tsPass: '', tsFormError: '', tsForget: '' }`, first, len(servers) > 0)
 }
 
 // webTorrServerAdd saves the form's login in this browser, then sends only
@@ -100,14 +100,7 @@ templ webTorrServerBar(servers []store.TorrServer) {
 			<span class="loading loading-spinner loading-xs"></span>
 			{ tr(ctx, "Checking…") }
 		</span>
-		<span class="badge badge-success badge-soft gap-1.5" data-show="$tsStatus.ok">
-			@Icon("circle-check", "size-3.5")
-			<span data-text={ trJS(ctx, "Connected") + " + ' · ' + $tsStatus.version" }>{ tr(ctx, "Connected") }</span>
-		</span>
-		<span class="badge badge-info badge-soft gap-1.5 max-sm:hidden" data-show="$tsStatus.ok && $tsStatus.hls">
-			@Icon("wand-sparkles", "size-3.5")
-			{ tr(ctx, "HLS conversion available") }
-		</span>
+		@tsConnectionBadges("max-sm:hidden")
 		<div class="ms-auto flex items-center gap-1">
 			<button
 				type="button"
@@ -120,12 +113,25 @@ templ webTorrServerBar(servers []store.TorrServer) {
 				@Icon("hard-drive", "size-4")
 				{ tr(ctx, "Servers") }
 			</button>
-			<button type="button" class="btn btn-ghost btn-sm gap-1.5" aria-controls="ts-manage" data-on:click="$_tsManageOpen = true; $_tsSettingsOpen = true">
+			<button type="button" class="btn btn-ghost btn-sm gap-1.5" aria-controls="ts-manage" data-on:click="$_tsManageOpen = true; $_tsSettingsOpen = true; $_tsSettingsJump++">
 				@Icon("settings", "size-4")
 				{ tr(ctx, "Settings") }
 			</button>
 		</div>
 	</div>
+}
+
+// tsConnectionBadges show a connected TorrServer: its version, and whether it
+// converts to HLS. hlsClass adds to the HLS badge (the bar hides it on phones).
+templ tsConnectionBadges(hlsClass string) {
+	<span class="badge badge-success badge-soft gap-1.5" data-show="$tsStatus.ok">
+		@Icon("circle-check", "size-3.5")
+		<span data-text={ trJS(ctx, "Connected") + " + ' · ' + $tsStatus.version" }>{ tr(ctx, "Connected") }</span>
+	</span>
+	<span class={ "badge badge-info badge-soft gap-1.5", hlsClass } data-show="$tsStatus.ok && $tsStatus.hls">
+		@Icon("wand-sparkles", "size-3.5")
+		{ tr(ctx, "HLS conversion available") }
+	</span>
 }
 
 // webTorrServerForm scrolls into view as it opens: its buttons sit above it,
@@ -228,14 +234,7 @@ templ webTorrServerStatus() {
 			// HTTPS certificate.
 			<details class="collapse collapse-arrow rounded-none overflow-visible" data-show="$tsStatus.ok">
 				<summary class="collapse-title min-h-0 p-0 pe-8 flex flex-wrap items-center gap-2">
-					<span class="badge badge-success badge-soft gap-1.5">
-						@Icon("circle-check", "size-3.5")
-						<span data-text={ trJS(ctx, "Connected") + " + ' · ' + $tsStatus.version" }></span>
-					</span>
-					<span class="badge badge-info badge-soft gap-1.5" data-show="$tsStatus.hls">
-						@Icon("wand-sparkles", "size-3.5")
-						{ tr(ctx, "HLS conversion available") }
-					</span>
+					@tsConnectionBadges("")
 				</summary>
 				<div class="collapse-content p-0 space-y-3">
 					<p class="pt-3 text-sm text-base-content/70" data-show="$tsStatus.hlsKnown && !$tsStatus.hls">{ tr(ctx, "This TorrServer has no GStreamer, so videos play only in formats the browser supports. Its -gst build converts the others to HLS.") }</p>
