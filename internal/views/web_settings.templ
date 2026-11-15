@@ -52,7 +52,7 @@ func settingsKeys(sections []SettingsSection) string {
 templ webSettings(sections []SettingsSection) {
 	<section
 		id="ts-settings"
-		class="card bg-base-200/60 border border-base-content/10"
+		class="card bg-base-200/60 border border-base-content/10 scroll-mt-20"
 		data-show="$tsSelected"
 		data-keys={ settingsKeys(sections) }
 		data-signals="{_tsSettingsOpen: false, _tsSettingsSection: 'engine', _tsSettingsNonce: 0, _tsSettingsValidating: false, tsSettingsValues: {}, _tsSettingsState: {busy:false, ok:false, problem:'', status:0}}"
@@ -62,6 +62,7 @@ templ webSettings(sections []SettingsSection) {
 		data-on:ts-settings-saved="const d = evt.detail; if (d.url === $tsSelected && d.nonce === $_tsSettingsNonce) { $_tsSettingsState = {busy:d.busy, ok:d.ok, problem:d.problem, status:d.status} }"
 	>
 		<div class="card-body gap-4">
+			<div class="hidden" data-effect="$_tsSettingsJump && requestAnimationFrame(() => el.closest('#ts-settings').scrollIntoView({behavior: 'smooth', block: 'start'}))"></div>
 			<div class="flex items-center justify-between gap-3">
 				<h2 class="card-title text-base">{ tr(ctx, "TorrServer settings") }</h2>
 				<button type="button" class="btn btn-ghost btn-sm" data-on:click="$_tsSettingsOpen = !$_tsSettingsOpen; if (!$_tsSettingsOpen) { $_tsSettingsNonce++ }">{ tr(ctx, "Settings") }</button>

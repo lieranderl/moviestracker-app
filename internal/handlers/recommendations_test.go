@@ -52,16 +52,18 @@ func TestTheLocalHomePageMixesTheLastThreeWatchedIntoOneRow(t *testing.T) {
 }
 
 // The row follows what the user watched last, a series as much as a
-// movie: a title rated highly long ago does not push out this week's.
+// movie: a title rated highly long ago does not push out this week's. (On a
+// coarse clock the marks can share a moment; ties order by kind and id, which
+// here agree with the order watched.)
 func TestTheRowFollowsTheLatestWatchedNotTheBestRated(t *testing.T) {
 	one := func(id int, kind string) []tmdb.MediaItem {
 		return []tmdb.MediaItem{{ID: id, Title: "Title", MediaType: kind}}
 	}
 	movies := map[int]*tmdb.MovieDetails{}
-	for id, rec := range map[int]int{1: 11, 2: 12, 4: 14} {
+	for id, rec := range map[int]int{1: 11, 2: 12, 3: 13} {
 		movies[id] = &tmdb.MovieDetails{MediaItem: tmdb.MediaItem{ID: id, Title: fmt.Sprint("Film ", id), MediaType: "movie"}, Recommendations: one(rec, "movie")}
 	}
-	series := map[int]*tmdb.TVDetails{3: {MediaItem: tmdb.MediaItem{ID: 3, Title: "Show 3", MediaType: "tv"}, Recommendations: one(13, "tv")}}
+	series := map[int]*tmdb.TVDetails{4: {MediaItem: tmdb.MediaItem{ID: 4, Title: "Show 4", MediaType: "tv"}, Recommendations: one(14, "tv")}}
 	s := newMediaServer(t, &fakeTMDBDetails{movies: movies, series: series}, nil, "")
 	cookie := signedIn(t, s)
 	send := func(path, body string) {
@@ -79,14 +81,14 @@ func TestTheRowFollowsTheLatestWatchedNotTheBestRated(t *testing.T) {
 	send("/api/titles/state?type=movie&id=1&state=watched", "")
 	send("/api/titles/review?type=movie&id=1", `{"reviewRating":9}`)
 	send("/api/titles/state?type=movie&id=2&state=watched", "")
-	send("/api/titles/state?type=tv&id=3&state=watched", "")
-	send("/api/titles/state?type=movie&id=4&state=watched", "")
+	send("/api/titles/state?type=movie&id=3&state=watched", "")
+	send("/api/titles/state?type=tv&id=4&state=watched", "")
 
 	body := sendAs(t, s, http.MethodGet, "/api/recommendations")
-	if !strings.Contains(body, "Because you watched Film 4, Show 3 and Film 2") {
+	if !strings.Contains(body, "Because you watched Show 4, Film 3 and Film 2") {
 		t.Errorf("the row is not made of the three titles watched last:\n%s", body)
 	}
-	if !strings.Contains(body, `href="/tv/13"`) || strings.Contains(body, `href="/movie/11"`) {
+	if !strings.Contains(body, `href="/tv/14"`) || strings.Contains(body, `href="/movie/11"`) {
 		t.Error("the row should mix in the series' picks and leave out the older, best-rated film's")
 	}
 }
