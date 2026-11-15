@@ -119,13 +119,13 @@ templ HeroBillboard(items []tmdb.MediaItem) {
 					for idx, item := range items {
 						<button
 							type="button"
-							class="p-2 group/dot rounded-full focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-white"
+							class="p-2 group/dot rounded-full focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-neutral-content"
 							aria-label={ trf(ctx, "Slide %d of %d: %s", idx+1, len(items), item.Title) }
 							data-on:click={ fmt.Sprintf("$heroSlide = %d", idx) + heroGoto }
 							data-attr:aria-current={ fmt.Sprintf("$heroSlide === %d ? 'true' : null", idx) }
 						>
 							<span
-								class={ "block size-2.5 rounded-full bg-white shadow transition-opacity group-hover/dot:opacity-100", templ.KV("opacity-40", idx != 0) }
+								class={ "block size-2.5 rounded-full bg-neutral-content shadow transition-opacity group-hover/dot:opacity-100", templ.KV("opacity-40", idx != 0) }
 								data-class:opacity-40={ fmt.Sprintf("$heroSlide !== %d", idx) }
 							></span>
 						</button>

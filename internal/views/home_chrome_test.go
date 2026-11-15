@@ -59,6 +59,9 @@ func TestTheBillboardPicksSlidesWithLabelledDots(t *testing.T) {
 			t.Errorf("dot %d is not labelled %q: %s", i+1, name, dots[i])
 		}
 	}
+	if strings.Contains(picker, "-white") {
+		t.Errorf("the picker colours itself outside the theme's tokens:\n%s", picker)
+	}
 	if strings.Contains(picker, ">Dune<") || strings.Contains(picker, ">Arrival<") {
 		t.Errorf("the picker spells out slide titles:\n%s", picker)
 	}

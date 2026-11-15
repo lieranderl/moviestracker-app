@@ -360,7 +360,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				for idx, item := range items {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<button type=\"button\" class=\"p-2 group/dot rounded-full focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-white\" aria-label=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<button type=\"button\" class=\"p-2 group/dot rounded-full focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-neutral-content\" aria-label=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -411,7 +411,7 @@ func HeroBillboard(items []tmdb.MediaItem) templ.Component {
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						var templ_7745c5c3_Var16 = []any{"block size-2.5 rounded-full bg-white shadow transition-opacity group-hover/dot:opacity-100", templ.KV("opacity-40", idx != 0)}
+						var templ_7745c5c3_Var16 = []any{"block size-2.5 rounded-full bg-neutral-content shadow transition-opacity group-hover/dot:opacity-100", templ.KV("opacity-40", idx != 0)}
 						templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_ElementWriter, templ_7745c5c3_Var16...)
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
