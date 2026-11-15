@@ -53,24 +53,16 @@ templ RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) {
 		}
 		for i, row := range rows {
 			<section class="relative space-y-4" aria-labelledby={ fmt.Sprintf("recommended-%d-title", i) }>
-				<h2 id={ fmt.Sprintf("recommended-%d-title", i) } class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-					@Icon("sparkles", "size-5 text-secondary")
-					{ row.Title }
-				</h2>
+				@rowHeader() {
+					@rowTitle(fmt.Sprintf("recommended-%d-title", i), "sparkles", true, row.Title)
+				}
 				@carousel() {
 					for _, item := range row.Items {
-						<li class="carousel-item flex-col gap-1">
-							@MediaCard(item)
+						<li class="carousel-item">
 							if f.Allow {
-								<div class="flex justify-center gap-1" role="group" aria-label={ trf(ctx, "Feedback on %s", item.Title) }>
-									<button type="button" class="btn btn-xs btn-ghost gap-1" title={ tr(ctx, "Recommend more like this") } data-indicator:rec-busy data-attr:disabled="$recBusy" data-on:click={ fmt.Sprintf("!$recBusy && @post('%s')", FeedbackURL(item, "moreLikeThis", true)) }>
-										@Icon("thumbs-up", "size-3.5")
-										{ tr(ctx, "More like this") }
-									</button>
-									<button type="button" class="btn btn-xs btn-ghost btn-square" aria-label={ trf(ctx, "Not interested in %s", item.Title) } title={ tr(ctx, "Not interested") } data-indicator:rec-busy data-attr:disabled="$recBusy" data-on:click={ fmt.Sprintf("!$recBusy && @post('%s')", FeedbackURL(item, "notInterested", true)) }>
-										@Icon("eye-off", "size-3.5")
-									</button>
-								</div>
+								@mediaCardWith(item, carouselCard, recommendationFeedback(item))
+							} else {
+								@MediaCard(item)
 							}
 						</li>
 					}
@@ -88,4 +80,25 @@ templ RecommendationRows(rows []RecommendationRow, f RecommendationFeedback) {
 			</button>
 		}
 	</div>
+}
+
+// recommendationFeedback asks for more titles like item, or none like it,
+// among the poster's quick actions.
+templ recommendationFeedback(item tmdb.MediaItem) {
+	@feedbackAction(trf(ctx, "Recommend more titles like %s", item.Title), "thumbs-up", FeedbackURL(item, "moreLikeThis", true))
+	@feedbackAction(trf(ctx, "Not interested in %s", item.Title), "eye-off", FeedbackURL(item, "notInterested", true))
+}
+
+templ feedbackAction(label, icon, url string) {
+	<button
+		type="button"
+		class="btn btn-sm btn-square join-item"
+		aria-label={ label }
+		title={ label }
+		data-indicator:rec-busy
+		data-attr:disabled="$recBusy"
+		data-on:click={ fmt.Sprintf("!$recBusy && @post('%s')", url) }
+	>
+		@Icon(icon, "size-4")
+	</button>
 }

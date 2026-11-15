@@ -128,11 +128,8 @@ templ homeRailSection(r homeRail, trending map[string][]tmdb.MediaItem) {
 	>
 		@rowMarker(r.id())
 		<div id={ settleID(r.id()) } class="hidden"></div>
-		<header class="flex flex-wrap items-center gap-x-4 gap-y-2 min-w-0">
-			<h2 id={ r.id() + "-title" } class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-				@Icon(r.Icon, "size-5 text-primary")
-				{ tr(ctx, r.Title) }
-			</h2>
+		@rowHeader() {
+			@rowTitle(r.id()+"-title", r.Icon, false, tr(ctx, r.Title))
 			if tabbed {
 				<div role="tablist" class="tabs tabs-box tabs-sm flex-nowrap max-w-full overflow-x-auto [scrollbar-width:none]" aria-label={ tr(ctx, r.Title) }>
 					for i, l := range r.Lists {
@@ -168,7 +165,7 @@ templ homeRailSection(r homeRail, trending map[string][]tmdb.MediaItem) {
 					}
 				</div>
 			}
-		</header>
+		}
 		for i, l := range r.Lists {
 			if tabbed {
 				<div

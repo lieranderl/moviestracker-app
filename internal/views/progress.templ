@@ -100,19 +100,13 @@ func progressPercent(p store.Progress) int {
 // either has a card.
 templ upNext(watching []store.Progress, shows bool) {
 	<div id="continue-watching-status" role="status" aria-atomic="true" class="empty:hidden"></div>
-	<section id="up-next" class="hidden has-[.carousel-item]:block relative scroll-mt-32" aria-labelledby="up-next-title" data-signals="{_progressRemoving: false}">
-		<header class="flex items-end justify-between gap-4 mb-4">
-			<h2 id="up-next-title" class="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-				@Icon("history", "size-5 text-secondary")
-				{ tr(ctx, "Up next") }
-			</h2>
+	<section id="up-next" class="hidden has-[.carousel-item]:block relative space-y-4 scroll-mt-32" aria-labelledby="up-next-title" data-signals="{_progressRemoving: false}">
+		@rowHeader() {
+			@rowTitle("up-next-title", "history", true, tr(ctx, "Up next"))
 			if shows {
-				<a href={ templ.SafeURL(CalendarPath) } class="btn btn-sm btn-ghost gap-1">
-					{ tr(ctx, "All upcoming") }
-					@Icon("arrow-right", "size-4")
-				</a>
+				@rowLink(CalendarPath, tr(ctx, "All upcoming"), "")
 			}
-		</header>
+		}
 		@carouselOfLists() {
 			@ContinueWatching(watching)
 			if shows {

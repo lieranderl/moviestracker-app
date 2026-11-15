@@ -16,10 +16,13 @@ func mediaKind(item tmdb.MediaItem) string {
 // cardActions mark a card's title Want to watch or Watched without leaving
 // the page; the card toast (cardToast) offers to undo it. They show on
 // hover or focus, and always on touch screens.
-templ cardActions(item tmdb.MediaItem) {
+templ cardActions(item tmdb.MediaItem, more templ.Component) {
 	<div class="join absolute bottom-2 right-2 z-10 shadow-md opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity">
 		@cardAction(item, "want", "bookmark", trf(ctx, "Add %s to Want to watch", item.Title))
 		@cardAction(item, "watched", "eye", trf(ctx, "Mark %s as watched", item.Title))
+		if more != nil {
+			@more
+		}
 	</div>
 }
 

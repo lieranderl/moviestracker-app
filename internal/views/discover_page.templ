@@ -157,7 +157,7 @@ templ DiscoverPage(user *auth.User, v DiscoverView) {
 	@Layout(tr(ctx, "Discover")) {
 		@Navbar(user)
 		<main class="grow pb-20">
-			@categoryBar(browseChips(ctx, ""), true, false)
+			@categoryBar(browseChips(ctx, ""), true, false, false)
 			<div class="max-w-7xl mx-auto px-4 sm:px-8 mt-8 space-y-6">
 				<header class="space-y-1">
 					<a href={ templ.SafeURL(homeHref(ctx)) } class="link link-hover text-sm text-base-content/70 inline-flex items-center gap-1">
