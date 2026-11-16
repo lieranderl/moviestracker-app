@@ -33,7 +33,7 @@ func (a *app) handleTorrents(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.WebTorrents(torrents)); err != nil {
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.WebTorrents(torrents, a.titlePages(torrents))); err != nil {
 		slog.Warn("patching torrents failed", "error", err)
 	}
 }
@@ -45,7 +45,7 @@ func (a *app) handleRecentTorrents(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.RecentTorrents(torrents, nil)); err != nil {
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.RecentTorrents(torrents, a.titlePages(torrents))); err != nil {
 		slog.Warn("patching recent torrents failed", "error", err)
 	}
 }

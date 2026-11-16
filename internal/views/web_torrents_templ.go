@@ -126,11 +126,15 @@ func torrentAddTransport(browser bool) templ.Attributes {
 }
 
 // webStreamLinks describes relative TorrServer paths, resolved by the browser.
-func webStreamLinks(torrents []torrserver.Torrent) StreamLinks {
+// A torrent opens its title's page from its data, else from page (the
+// app's own match of a hash to a title, nil if none).
+func webStreamLinks(torrents []torrserver.Torrent, page func(hash string) string) StreamLinks {
 	pages := map[string]string{}
 	for _, t := range torrents {
 		if kind, id := t.TMDB(); kind != "" {
 			pages[t.Hash] = fmt.Sprintf("/%s/%d", kind, id)
+		} else if page != nil {
+			pages[t.Hash] = page(t.Hash)
 		}
 	}
 	return StreamLinks{Browser: true,
@@ -144,7 +148,9 @@ func webStreamLinks(torrents []torrserver.Torrent) StreamLinks {
 	}
 }
 
-func WebTorrents(torrents []torrserver.Torrent) templ.Component {
+// WebTorrents is the TorrServer page's list of the browser's torrents; page
+// is as for webStreamLinks.
+func WebTorrents(torrents []torrserver.Torrent, page func(hash string) string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -161,7 +167,7 @@ func WebTorrents(torrents []torrserver.Torrent) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = TorrServerListFragment(webStreamLinks(torrents), torrents).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = TorrServerListFragment(webStreamLinks(torrents, page), torrents).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -173,7 +179,7 @@ func WebTorrents(torrents []torrserver.Torrent) templ.Component {
 	})
 }
 
-func WebTorrent(t *torrserver.Torrent) templ.Component {
+func WebTorrent(t *torrserver.Torrent, page func(hash string) string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -190,7 +196,7 @@ func WebTorrent(t *torrserver.Torrent) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = torrentCard(webStreamLinks([]torrserver.Torrent{*t}), *t).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = torrentCard(webStreamLinks([]torrserver.Torrent{*t}, page), *t).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

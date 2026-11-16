@@ -48,12 +48,14 @@ type Config struct {
 
 // app is the web app's state behind its routes.
 type app struct {
-	cfg      Config
-	signer   signer
-	catalog  *handlers.Catalog
-	progress *handlers.Progress
-	library  *handlers.Library // users' library summaries, kept until their library changes
-	feeds    *cachedFeeds      // the backend's release feeds, as the home rows read them
+	cfg          Config
+	signer       signer
+	catalog      *handlers.Catalog
+	progress     *handlers.Progress
+	library      *handlers.Library      // users' library summaries, kept until their library changes
+	feeds        *cachedFeeds           // the backend's release feeds, as the home rows read them
+	titles       *titleMatches          // titles matched to the names of visitors' torrents
+	titleMatcher *handlers.TitleMatcher // looks the names' titles up on TMDB
 }
 
 func (a *app) now() time.Time {
@@ -95,6 +97,8 @@ func New(cfg Config) http.Handler {
 		cfg.Sources.Details = releaseLists{DetailsProvider: cfg.Sources.Details, feeds: feeds}
 	}
 	a := &app{cfg: cfg, signer: signer{key: cfg.SessionKey}, feeds: feeds}
+	a.titles = &titleMatches{pages: map[string]string{}}
+	a.titleMatcher = a.newTitleMatcher(a.titles)
 	a.catalog = handlers.NewCatalog(func() *sources.Clients { return &a.cfg.Sources }, a.catalogUser, "/", catalogTimeout)
 	a.catalog.KeepDiscoveryPresets(handlers.NewDiscoveryPresets(a.cfg.Store, a.userID, a.catalog))
 
