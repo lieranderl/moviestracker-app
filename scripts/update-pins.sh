@@ -54,17 +54,26 @@ old_enough() {
   [ $((now - $1)) -ge "$min_age" ]
 }
 
+# TorrServer's pinned builds (TorrServer-gst-*) come from its MatriX series.
+# Upstream may mark a release of another series latest (Silo.2 has no
+# GStreamer builds), so the newest stable MatriX release is chosen from the
+# list, and a newer one outside it is only reported, for a person to look at.
 update_torrserver() {
-  local auth=() rel tag published pinned
+  local auth=() releases rel tag published pinned newest
   [ -n "${GH_TOKEN:-}" ] && auth=(-H "Authorization: Bearer $GH_TOKEN")
   # ${auth[@]+…}: macOS's bash 3.2 calls an empty array unbound under set -u.
-  rel="$(fetch ${auth[@]+"${auth[@]}"} -H "Accept: application/vnd.github+json" "$github_api/repos/YouROK/TorrServer/releases/latest")"
+  releases="$(fetch ${auth[@]+"${auth[@]}"} -H "Accept: application/vnd.github+json" "$github_api/repos/YouROK/TorrServer/releases?per_page=100")"
+  pinned="$(awk '$1 == "version" {print $2}' "$lock")"
+  newest="$(jq -r '[.[] | select((.prerelease or .draft) | not)] | max_by(.published_at) | .tag_name // empty' <<<"$releases")"
+  rel="$(jq -c '[.[] | select((.prerelease or .draft) | not) | select(.tag_name | test("^MatriX\\.[0-9]+(\\.[0-9]+)*$"))]
+    | max_by(.tag_name | ltrimstr("MatriX.") | split(".") | map(tonumber)) // empty' <<<"$releases")"
+  [ -n "$rel" ] || fail "TorrServer has no stable MatriX.<number> release: pin it by hand"
   tag="$(jq -r '.tag_name' <<<"$rel")"
   published="$(jq -r '.published_at | fromdateiso8601' <<<"$rel")"
-  pinned="$(awk '$1 == "version" {print $2}' "$lock")"
-  [ "$(jq -r '.prerelease' <<<"$rel")" = false ] || return 0
-  [[ "$tag" =~ ^MatriX\.[0-9]+(\.[0-9]+)*$ ]] || fail "TorrServer's latest release is $tag, not MatriX.<number>: pin it by hand"
-  # GitHub's latest can be an older release upstream marked so: no downgrades.
+  if [ -n "$newest" ] && [[ ! "$newest" =~ ^MatriX\. ]]; then
+    echo "update-pins: TorrServer's newest release is $newest, outside the MatriX series; staying on MatriX (pin it by hand to move)" >&2
+  fi
+  # No downgrades, should the pin be newer than every listed release.
   is_newer "${tag#MatriX.}" "${pinned#MatriX.}" || return 0
   old_enough "$published" || return 0
 

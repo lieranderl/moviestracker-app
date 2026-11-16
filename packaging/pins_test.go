@@ -27,10 +27,24 @@ type upstream struct {
 	tsPublished time.Time
 	tsAssets    map[string]string // file name → GitHub's digest, "sha256:…"
 	tsLicense   string
+	tsOthers    []release // listed ahead of tsTag: other series, pre-releases
 
 	gstVersions  []string // folders under data/pkg/osx
 	gstPkg       string   // the runtime installer's content, for every version
 	gstPublished time.Time
+}
+
+// release is one of TorrServer's GitHub releases, as its API lists them.
+type release struct {
+	Tag        string    `json:"tag_name"`
+	Published  time.Time `json:"published_at"`
+	Prerelease bool      `json:"prerelease"`
+	Assets     []asset   `json:"assets"`
+}
+
+type asset struct {
+	Name   string `json:"name"`
+	Digest string `json:"digest"`
 }
 
 // current is upstream as scripts/torrserver.lock and install-gstreamer.sh
@@ -55,22 +69,13 @@ func current() upstream {
 func (u upstream) serve(t *testing.T) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /repos/YouROK/TorrServer/releases/latest", func(w http.ResponseWriter, r *http.Request) {
-		type asset struct {
-			Name   string `json:"name"`
-			Digest string `json:"digest"`
-		}
-		rel := struct {
-			Tag        string    `json:"tag_name"`
-			Published  time.Time `json:"published_at"`
-			Prerelease bool      `json:"prerelease"`
-			Assets     []asset   `json:"assets"`
-		}{Tag: u.tsTag, Published: u.tsPublished}
+	mux.HandleFunc("GET /repos/YouROK/TorrServer/releases", func(w http.ResponseWriter, r *http.Request) {
+		rel := release{Tag: u.tsTag, Published: u.tsPublished}
 		for name, digest := range u.tsAssets {
 			rel.Assets = append(rel.Assets, asset{name, digest})
 		}
 		rel.Assets = append(rel.Assets, asset{"TorrServer-freebsd-amd64", "sha256:00"})
-		_ = json.NewEncoder(w).Encode(rel)
+		_ = json.NewEncoder(w).Encode(append(u.tsOthers, rel))
 	})
 	mux.HandleFunc("GET /YouROK/TorrServer/{tag}/LICENSE", func(w http.ResponseWriter, r *http.Request) {
 		if r.PathValue("tag") != u.tsTag {
@@ -270,6 +275,30 @@ func TestTheNewestStableGStreamerIsPinnedAndDevelopmentVersionsSkipped(t *testin
 	}
 	if !strings.Contains(out, "GStreamer 1.28.8 → 1.28.10") {
 		t.Errorf("the summary does not name the GStreamer update:\n%s", out)
+	}
+}
+
+func TestTorrServerStaysOnMatriXWhenUpstreamStartsAnotherSeries(t *testing.T) {
+	up := current()
+	up.tsTag = "MatriX.149"
+	up.tsPublished = time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
+	up.tsLicense = "GNU GENERAL PUBLIC LICENSE\nVersion 3\n"
+	up.tsOthers = []release{
+		{Tag: "MatriX.150", Published: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), Prerelease: true},
+		{Tag: "Silo.2", Published: time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC), Assets: []asset{{"TorrServer-linux-amd64", "sha256:00"}}},
+	}
+	root := pinnedRepo(t)
+
+	out, err := updatePins(t, root, up.serve(t), time.Date(2026, 11, 13, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("update-pins.sh: %v\n%s", err, out)
+	}
+
+	if lock := read(t, filepath.Join(root, "scripts", "torrserver.lock")); !strings.Contains(lock, "version MatriX.149\n") {
+		t.Errorf("torrserver.lock does not pin MatriX.149:\n%s", lock)
+	}
+	if !strings.Contains(out, "Silo.2") {
+		t.Errorf("update-pins.sh does not mention the other series:\n%s", out)
 	}
 }
 
