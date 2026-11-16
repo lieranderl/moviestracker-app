@@ -28,9 +28,10 @@ templ webTorrentsBox() {
 		id="ts-torrents-box"
 		class="space-y-4"
 		data-ref:_list
+		data-signals:_ts-list-matching="false"
 		data-show="$tsSelected && $tsStatus.ok"
 		data-effect="$gst = $tsStatus.hls; $gstKnown = $tsStatus.hlsKnown; $tsSelected && $tsStatus.ok && tsList(el, $tsSelected)"
-		data-on-interval__duration.5s="$tsSelected && $tsStatus.ok && tsList(el, $tsSelected)"
+		data-on-interval__duration.5s="$tsSelected && $tsStatus.ok && tsList(el, $tsSelected, $_tsListMatching)"
 		data-on:click={ webListActions(ctx) }
 		data-on:ts-files={ `if (evt.detail.url !== $tsSelected) return; if (evt.detail.torrent) { @post('/api/ts/files', {payload: {hash:evt.detail.hash, index:1, kind:'direct', torrent:evt.detail.torrent}}) } else { $toastError = true; $toast = ` + trJS(ctx, "TorrServer could not load playback information. Check the connection or login, then retry.") + ` }` }
 		data-on:ts-torrents="@post('/api/ts/torrents', {payload: {torrents: evt.detail}})"
@@ -58,11 +59,15 @@ func torrentAddTransport(browser bool) templ.Attributes {
 }
 
 // webStreamLinks describes relative TorrServer paths, resolved by the browser.
-func webStreamLinks(torrents []torrserver.Torrent) StreamLinks {
+// A torrent opens its title's page from its data, else from page (the
+// app's own match of a hash to a title, nil if none).
+func webStreamLinks(torrents []torrserver.Torrent, page func(hash string) string) StreamLinks {
 	pages := map[string]string{}
 	for _, t := range torrents {
 		if kind, id := t.TMDB(); kind != "" {
 			pages[t.Hash] = fmt.Sprintf("/%s/%d", kind, id)
+		} else if page != nil {
+			pages[t.Hash] = page(t.Hash)
 		}
 	}
 	return StreamLinks{Browser: true,
@@ -76,11 +81,13 @@ func webStreamLinks(torrents []torrserver.Torrent) StreamLinks {
 	}
 }
 
-templ WebTorrents(torrents []torrserver.Torrent) {
-	@TorrServerListFragment(webStreamLinks(torrents), torrents)
+// WebTorrents is the TorrServer page's list of the browser's torrents; page
+// is as for webStreamLinks.
+templ WebTorrents(torrents []torrserver.Torrent, page func(hash string) string) {
+	@TorrServerListFragment(webStreamLinks(torrents, page), torrents)
 	@torrCount(len(torrents))
 }
 
-templ WebTorrent(t *torrserver.Torrent) {
-	@torrentCard(webStreamLinks([]torrserver.Torrent{*t}), *t)
+templ WebTorrent(t *torrserver.Torrent, page func(hash string) string) {
+	@torrentCard(webStreamLinks([]torrserver.Torrent{*t}, page), *t)
 }

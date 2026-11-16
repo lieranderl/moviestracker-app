@@ -118,7 +118,7 @@ func (a *app) handlePlayerFiles(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.WebTorrent(data.Torrent)); err != nil {
+	if err := datastar.NewSSE(w, r).PatchElementTempl(views.WebTorrent(data.Torrent, a.titles.pagesOf([]torrserver.Torrent{*data.Torrent}))); err != nil {
 		slog.Warn("patching torrent files failed", "error", err)
 	}
 }

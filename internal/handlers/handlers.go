@@ -29,6 +29,7 @@ import (
 	"github.com/lieranderl/moviestracker-app/internal/store"
 	"github.com/lieranderl/moviestracker-app/internal/streamlink"
 	playback "github.com/lieranderl/moviestracker-app/internal/streams"
+	"github.com/lieranderl/moviestracker-app/internal/tmdb"
 	"github.com/lieranderl/moviestracker-app/internal/torrserver"
 	"github.com/lieranderl/moviestracker-app/internal/update"
 	"github.com/lieranderl/moviestracker-app/internal/views"
@@ -82,7 +83,7 @@ type Server struct {
 	version            string
 	hlsOutputs         hlsOutputCache         // what GStreamer serves, as seen by the stream proxy
 	setupCode          string                 // lets another device create the first admin
-	titles             titleLookups           // torrents whose titles were looked up on TMDB
+	titles             *TitleMatcher          // looks up torrents' titles on TMDB
 	appsPort           *gateway.Port          // other apps' door to TorrServer; nil without one
 	appsTLSPort        *gateway.Port          // the same door over HTTPS; nil without one
 	appsProblem        atomic.Pointer[string] // why the apps port did not open at startup
@@ -146,6 +147,8 @@ func NewServer(cfg Config) (*Server, error) {
 	s.live = live.New(s.liveTopic(cfg.LivePolling.withDefaults()))
 	s.current.Store(&sources.Clients{Catalog: cfg.TMDB, Details: cfg.Details, Torrents: cfg.Torrents, IMDb: cfg.IMDb})
 	s.Catalog = NewCatalog(s.clients, s.userFromRequest, "/login", s.catalogTimeout)
+	s.titles = NewTitleMatcher(s.streams, func() tmdb.DetailsProvider { return s.clients().Details }, s.catalogTimeout,
+		func(t torrserver.Torrent) string { return strings.ToLower(t.Hash) }, savedTitles{s})
 	presets, err := store.OpenDiscoveryPresetFile(filepath.Join(cfg.Store.Dir(), "discovery-presets.json"))
 	if err != nil {
 		return nil, err

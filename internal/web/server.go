@@ -48,12 +48,14 @@ type Config struct {
 
 // app is the web app's state behind its routes.
 type app struct {
-	cfg      Config
-	signer   signer
-	catalog  *handlers.Catalog
-	progress *handlers.Progress
-	library  *handlers.Library // users' library summaries, kept until their library changes
-	feeds    *cachedFeeds      // the backend's release feeds, as the home rows read them
+	cfg          Config
+	signer       signer
+	catalog      *handlers.Catalog
+	progress     *handlers.Progress
+	library      *handlers.Library      // users' library summaries, kept until their library changes
+	feeds        *cachedFeeds           // the backend's release feeds, as the home rows read them
+	titles       *titleMatches          // titles matched to the names of visitors' torrents
+	titleMatcher *handlers.TitleMatcher // looks the names' titles up on TMDB
 }
 
 func (a *app) now() time.Time {
@@ -95,6 +97,8 @@ func New(cfg Config) http.Handler {
 		cfg.Sources.Details = releaseLists{DetailsProvider: cfg.Sources.Details, feeds: feeds}
 	}
 	a := &app{cfg: cfg, signer: signer{key: cfg.SessionKey}, feeds: feeds}
+	a.titles = &titleMatches{pages: map[string]string{}}
+	a.titleMatcher = a.newTitleMatcher(a.titles)
 	a.catalog = handlers.NewCatalog(func() *sources.Clients { return &a.cfg.Sources }, a.catalogUser, "/", catalogTimeout)
 	a.catalog.KeepDiscoveryPresets(handlers.NewDiscoveryPresets(a.cfg.Store, a.userID, a.catalog))
 
@@ -281,10 +285,13 @@ var torrServerCheck = templ.OrderedAttributes{
 
 // recentTorrents lists, for home's first row, the torrents of the TorrServer
 // last picked: the browser lists them (this server cannot reach it) and
-// posts them to /api/ts/recent, which renders the row.
+// posts them to /api/ts/recent, which renders the row; again while their
+// titles are being matched (_tsRecentMatching).
 var recentTorrents = templ.OrderedAttributes{
 	{Key: "data-signals:_ts-recent-url", Value: "localStorage.getItem('mt-ts-selected') || ''"},
+	{Key: "data-signals:_ts-recent-matching", Value: "false"},
 	{Key: "data-effect", Value: "$_tsRecentUrl && tsList(el, $_tsRecentUrl)"},
+	{Key: "data-on-interval__duration.3s", Value: "$_tsRecentUrl && $_tsRecentMatching && tsList(el, $_tsRecentUrl, true)"},
 	{Key: "data-on:ts-torrents", Value: "@post('/api/ts/recent', {payload: {torrents: evt.detail}})"},
 }
 
