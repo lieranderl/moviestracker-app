@@ -324,7 +324,9 @@ directive signs the uninstaller too.
 at least a week old (`scripts/update-pins.sh`, which you can also run
 yourself: it takes the SHA-256 GitHub publishes for each TorrServer file and
 the `.sha256sum` beside GStreamer's installer, and skips GStreamer's odd,
-development minor versions). CI builds and tests the apps and the image with
+development minor versions). TorrServer follows its MatriX series, which
+has the `TorrServer-gst-*` builds; a newer release of another series (Silo)
+is only reported in the job's log, for a person to pin by hand. CI builds and tests the apps and the image with
 it; before merging, play an MKV (HLS) and an MP4 (Direct) in the Mac app. The
 next release carries the new versions to everyone; nothing updates them in
 installed apps on its own.
