@@ -285,10 +285,13 @@ var torrServerCheck = templ.OrderedAttributes{
 
 // recentTorrents lists, for home's first row, the torrents of the TorrServer
 // last picked: the browser lists them (this server cannot reach it) and
-// posts them to /api/ts/recent, which renders the row.
+// posts them to /api/ts/recent, which renders the row; again while their
+// titles are being matched (_tsRecentMatching).
 var recentTorrents = templ.OrderedAttributes{
 	{Key: "data-signals:_ts-recent-url", Value: "localStorage.getItem('mt-ts-selected') || ''"},
+	{Key: "data-signals:_ts-recent-matching", Value: "false"},
 	{Key: "data-effect", Value: "$_tsRecentUrl && tsList(el, $_tsRecentUrl)"},
+	{Key: "data-on-interval__duration.3s", Value: "$_tsRecentUrl && $_tsRecentMatching && tsList(el, $_tsRecentUrl, true)"},
 	{Key: "data-on:ts-torrents", Value: "@post('/api/ts/recent', {payload: {torrents: evt.detail}})"},
 }
 

@@ -1,6 +1,7 @@
 package web_test
 
 import (
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -67,14 +68,20 @@ const duneByName = `{"torrents":[{"hash":"aaaa1111aaaa1111aaaa1111aaaa1111aaaa11
 func TestTorrentsNamedByTitleAndYearLinkToTheirTitlePage(t *testing.T) {
 	h, session, _ := searchingTMDB(t)
 
+	if first := postTorrents(t, h, duneByName, session).Body.String(); !strings.Contains(first, `"_tsListMatching":true`) {
+		t.Errorf("while Dune (2021) is looked up the list does not ask to be posted again:\n%s", first)
+	}
 	page := eventually(t, func() string { return postTorrents(t, h, duneByName, session).Body.String() }, `href="/movie/438631"`)
 	if !strings.Contains(page, `href="/movie/438631"`) || !strings.Contains(page, `aria-label="Open the movie page"`) {
 		t.Errorf("the TorrServer page does not link Dune (2021) to /movie/438631:\n%s", page)
 	}
+	if !strings.Contains(page, `"_tsListMatching":false`) {
+		t.Errorf("once matched the list still asks to be posted again:\n%s", page)
+	}
 	if strings.Contains(page, `href="/movie/841"`) {
 		t.Error("Dune (2021) is linked to the 1984 Dune")
 	}
-	if home := postRecent(t, h, duneByName, session).Body.String(); !strings.Contains(home, `href="/movie/438631"`) {
+	if home := postRecent(t, h, duneByName, session).Body.String(); !strings.Contains(home, `href="/movie/438631"`) || !strings.Contains(home, `"_tsRecentMatching":false`) {
 		t.Errorf("Home's recent torrent does not open /movie/438631:\n%s", home)
 	}
 }
@@ -95,5 +102,19 @@ func TestATorrentWithoutATitleIsNotSearchedAgainRightAway(t *testing.T) {
 	}
 	if strings.Count(page, `aria-label="Open the movie page"`) != 1 {
 		t.Error("the unknown torrent links to a movie page")
+	}
+}
+
+// The TorrServer page and Home post their list again while its titles are
+// being matched, though the list itself did not change.
+func TestPagesPostTheirListAgainWhileTitlesAreMatched(t *testing.T) {
+	h, session, _ := searchingTMDB(t)
+	home := html.UnescapeString(getWith(t, h, "/", session).Body.String())
+	if !strings.Contains(home, "$_tsRecentMatching && tsList(el, $_tsRecentUrl, true)") {
+		t.Error("Home does not post its torrents again while their titles are matched")
+	}
+	page := html.UnescapeString(getWith(t, h, "/torrserver", session).Body.String())
+	if !strings.Contains(page, "tsList(el, $tsSelected, $_tsListMatching)") {
+		t.Error("the TorrServer page does not post its torrents again while their titles are matched")
 	}
 }

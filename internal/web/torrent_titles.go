@@ -70,8 +70,9 @@ func (a *app) newTitleMatcher(matches *titleMatches) *handlers.TitleMatcher {
 }
 
 // titlePages starts matching the titles of torrents not matched yet and
-// returns where those matched already link.
-func (a *app) titlePages(torrents []torrserver.Torrent) func(hash string) string {
-	a.titleMatcher.Match(torrents)
-	return a.titles.pagesOf(torrents)
+// returns where those matched already link, and whether some are still
+// being matched (the browser then posts the list again until they are).
+func (a *app) titlePages(torrents []torrserver.Torrent) (page func(hash string) string, matching bool) {
+	matching = a.titleMatcher.Match(torrents)
+	return a.titles.pagesOf(torrents), matching
 }

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"cmp"
 	"context"
 	"regexp"
 	"strings"
@@ -33,7 +34,7 @@ type TitleMatches interface {
 // tv category, as it names the releases it sends and as people often do.
 // Only an exact name and year of that kind on TMDB counts. Each torrent is
 // looked up once: again after a cooldown when TMDB failed, or when it
-// found nothing and Miss is set.
+// found nothing and Miss is set, or when matches no longer knows it.
 type TitleMatcher struct {
 	details func() tmdb.DetailsProvider
 	matches TitleMatches
@@ -51,46 +52,52 @@ type TitleMatcher struct {
 	// more are, the ones due are dropped, then all. 0 has no bound.
 	Pending int
 
-	mu      sync.Mutex
-	next    map[string]time.Time // by key: no lookup before
-	running bool                 // a batch is being looked up
+	mu       sync.Mutex
+	next     map[string]time.Time // by key: no lookup before (after a miss or failure)
+	inflight map[string]bool      // keys being looked up
+	running  bool                 // a batch is being looked up
 }
 
 // NewTitleMatcher returns a matcher looking titles up with details, within
 // ctx and timeout per lookup, keeping what it finds in matches by key.
 func NewTitleMatcher(ctx context.Context, details func() tmdb.DetailsProvider, timeout time.Duration, key func(torrserver.Torrent) string, matches TitleMatches) *TitleMatcher {
-	return &TitleMatcher{details: details, matches: matches, key: key, ctx: ctx, timeout: timeout, next: map[string]time.Time{}}
+	return &TitleMatcher{details: details, matches: matches, key: key, ctx: ctx, timeout: timeout, next: map[string]time.Time{}, inflight: map[string]bool{}}
 }
 
 // Match looks up, in the background, the titles of torrents not matched yet.
-// While a batch is being looked up, another waits for the next Match.
-func (m *TitleMatcher) Match(torrents []torrserver.Torrent) {
+// While a batch is being looked up, another waits for the next Match. It
+// says whether any of torrents is still to be looked up or being looked up:
+// a later Match may then find its title.
+func (m *TitleMatcher) Match(torrents []torrserver.Torrent) (pending bool) {
 	if m.details() == nil {
-		return
+		return false
 	}
 	now := time.Now()
 	var todo []torrserver.Torrent
 	m.mu.Lock()
-	if m.running {
-		m.mu.Unlock()
-		return
-	}
 	for _, t := range torrents {
-		if m.Batch > 0 && len(todo) >= m.Batch {
-			break
-		}
 		key := m.key(t)
+		if m.inflight[key] {
+			pending = true
+			continue
+		}
 		if now.Before(m.next[key]) || !matchable(t) || m.matches.Known(key) {
 			continue
 		}
-		m.next[key] = now.Add(100 * 365 * 24 * time.Hour) // until looked up
+		pending = true
+		if m.running || (m.Batch > 0 && len(todo) >= m.Batch) {
+			continue
+		}
+		m.inflight[key] = true
 		todo = append(todo, t)
 	}
 	m.prune(now)
-	m.running = len(todo) > 0
+	if len(todo) > 0 {
+		m.running = true
+	}
 	m.mu.Unlock()
 	if len(todo) == 0 {
-		return
+		return pending
 	}
 	go func() {
 		defer func() {
@@ -103,27 +110,25 @@ func (m *TitleMatcher) Match(torrents []torrserver.Torrent) {
 			id, err := findTitle(ctx, m.details(), t)
 			cancel()
 			key := m.key(t)
+			if id > 0 && err == nil {
+				m.matches.Remember(key, t, id)
+			}
+			m.mu.Lock()
+			delete(m.inflight, key)
 			switch {
 			case err != nil:
-				m.retry(key, titleRetry)
-			case id > 0:
-				m.matches.Remember(key, t, id)
-			case m.Miss > 0:
-				m.retry(key, m.Miss)
+				m.next[key] = time.Now().Add(titleRetry)
+			case id == 0:
+				m.next[key] = time.Now().Add(cmp.Or(m.Miss, 100*365*24*time.Hour)) // 0: never again
 			}
+			m.mu.Unlock()
 		}
 	}()
-}
-
-// retry lets key be looked up again after wait.
-func (m *TitleMatcher) retry(key string, wait time.Duration) {
-	m.mu.Lock()
-	m.next[key] = time.Now().Add(wait)
-	m.mu.Unlock()
+	return true
 }
 
 // prune keeps at most Pending next lookups: first dropping those due, then
-// all (the lookups of a batch still running are marked again as they end).
+// all (which only looks those torrents up again).
 func (m *TitleMatcher) prune(now time.Time) {
 	if m.Pending <= 0 || len(m.next) <= m.Pending {
 		return

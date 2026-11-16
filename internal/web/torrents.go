@@ -33,8 +33,14 @@ func (a *app) handleTorrents(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.WebTorrents(torrents, a.titlePages(torrents))); err != nil {
+	page, matching := a.titlePages(torrents)
+	sse := datastar.NewSSE(w, r)
+	if err := sse.PatchElementTempl(views.WebTorrents(torrents, page)); err != nil {
 		slog.Warn("patching torrents failed", "error", err)
+		return
+	}
+	if err := sse.MarshalAndPatchSignals(map[string]bool{"_tsListMatching": matching}); err != nil {
+		slog.Warn("patching torrent matching failed", "error", err)
 	}
 }
 
@@ -45,8 +51,14 @@ func (a *app) handleRecentTorrents(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := datastar.NewSSE(w, r).PatchElementTempl(views.RecentTorrents(torrents, a.titlePages(torrents))); err != nil {
+	page, matching := a.titlePages(torrents)
+	sse := datastar.NewSSE(w, r)
+	if err := sse.PatchElementTempl(views.RecentTorrents(torrents, page)); err != nil {
 		slog.Warn("patching recent torrents failed", "error", err)
+		return
+	}
+	if err := sse.MarshalAndPatchSignals(map[string]bool{"_tsRecentMatching": matching}); err != nil {
+		slog.Warn("patching recent torrent matching failed", "error", err)
 	}
 }
 
