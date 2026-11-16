@@ -12,10 +12,10 @@
 set -euo pipefail
 
 # The GStreamer this Moviestracker is tested with. Update all lines together.
-gst_version="1.28.8"
+gst_version="1.28.9"
 gst_url="https://gstreamer.freedesktop.org/data/pkg/osx/$gst_version/gstreamer-1.0-$gst_version-universal.pkg"
-gst_sha256="d371ab04a7632713626836c2fc234e863cc98484c74c473eba99b0fbd9b3a3fe"
-gst_size=156581817
+gst_sha256="05d27c8e9b4374bbcf1788cf1604bb4b1a4bdcbdc13bc37b67d3a225c8aa86a6"
+gst_size=157001006
 
 # The parts TorrServer's pipelines need: demuxers, parsers, x264, libav
 # (AAC, AC3, DTS), Apple's hardware codecs, and the HTTP source from "net".
