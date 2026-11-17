@@ -10,11 +10,11 @@
     "assets:js": "bun build frontend/player.js --outfile=static/player.js --minify --target=browser --format=esm && bun build frontend/theme.js --outfile=static/theme.js --minify --target=browser && bun build frontend/torrserver.js --outfile=static/torrserver.js --minify --target=browser --format=esm"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "4.3.3",
+    "@tailwindcss/cli": "4.3.5",
     "daisyui": "5.7.50",
-    "lucide": "1.66.0",
-    "simple-icons": "16.36.0",
-    "tailwindcss": "4.3.3"
+    "lucide": "1.70.0",
+    "simple-icons": "16.37.0",
+    "tailwindcss": "4.3.5"
   },
   "dependencies": {
     "hls.js": "^1.7.4"
