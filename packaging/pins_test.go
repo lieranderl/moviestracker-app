@@ -48,10 +48,12 @@ type asset struct {
 }
 
 // current is upstream as scripts/torrserver.lock and install-gstreamer.sh
-// pin it: MatriX.148 and GStreamer 1.28.8.
-func current() upstream {
+// pin it.
+func current(t *testing.T) upstream {
+	t.Helper()
+	p := pinned(t)
 	return upstream{
-		tsTag:       "MatriX.148",
+		tsTag:       p.torrServer,
 		tsPublished: time.Date(2026, 10, 31, 11, 28, 48, 0, time.UTC),
 		tsAssets: map[string]string{
 			"TorrServer-gst-darwin-amd64":      "sha256:16dd1349cc6da05cf5803c6d6074641698c2889378fe24f32fdc34757c9a4fab",
@@ -60,7 +62,7 @@ func current() upstream {
 			"TorrServer-gst-linux-arm64":       "sha256:40563b627fe91c59af67c1e385115f4baf6271ba719ad0a08c1770f81c4f767e",
 			"TorrServer-gst-windows-amd64.exe": "sha256:6344cb5896d6d1dfe54aaf879157de8c5c8ed6eb847dbb80d87b0ea193dcb2a5",
 		},
-		gstVersions:  []string{"1.26.9", "1.28.7", "1.28.8"},
+		gstVersions:  []string{"1.26.9", "1.28.7", p.gstVersion},
 		gstPublished: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC),
 	}
 }
@@ -162,8 +164,9 @@ func read(t *testing.T, path string) string {
 }
 
 func TestANewerTorrServerIsPinnedWithGitHubsChecksums(t *testing.T) {
-	up := current()
-	up.tsTag = "MatriX.149"
+	up := current(t)
+	from, next := up.tsTag, pinned(t).torrServerAfter(t, 1)
+	up.tsTag = next
 	up.tsPublished = time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
 	up.tsLicense = "GNU GENERAL PUBLIC LICENSE\nVersion 3\n"
 	for name := range up.tsAssets {
@@ -178,7 +181,7 @@ func TestANewerTorrServerIsPinnedWithGitHubsChecksums(t *testing.T) {
 
 	want := `# TorrServer release Moviestracker is tested with, and the SHA-256 GitHub
 # publishes for each file. Update all lines together.
-version MatriX.149
+version ` + next + `
 TorrServer-gst-darwin-amd64 ` + sha("TorrServer-gst-darwin-amd64 149") + `
 TorrServer-gst-darwin-arm64 ` + sha("TorrServer-gst-darwin-arm64 149") + `
 TorrServer-gst-linux-amd64 ` + sha("TorrServer-gst-linux-amd64 149") + `
@@ -190,7 +193,7 @@ LICENSE ` + sha("GNU GENERAL PUBLIC LICENSE\nVersion 3\n") + `
 	if got := read(t, filepath.Join(root, "scripts", "torrserver.lock")); got != want {
 		t.Errorf("torrserver.lock =\n%s\nwant\n%s", got, want)
 	}
-	if !strings.Contains(out, "TorrServer MatriX.148 → MatriX.149") {
+	if !strings.Contains(out, "TorrServer "+from+" → "+next) {
 		t.Errorf("the summary does not name the TorrServer update:\n%s", out)
 	}
 }
@@ -208,7 +211,7 @@ func unchanged(t *testing.T, root string) {
 func TestNothingChangesWhenThePinsAreCurrent(t *testing.T) {
 	root := pinnedRepo(t)
 
-	out, err := updatePins(t, root, current().serve(t), time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC))
+	out, err := updatePins(t, root, current(t).serve(t), time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("update-pins.sh: %v\n%s", err, out)
 	}
@@ -220,8 +223,9 @@ func TestNothingChangesWhenThePinsAreCurrent(t *testing.T) {
 }
 
 func TestAReleaseYoungerThanAWeekWaits(t *testing.T) {
-	up := current()
-	up.tsTag = "MatriX.149"
+	up := current(t)
+	next := pinned(t).torrServerAfter(t, 1)
+	up.tsTag = next
 	up.tsPublished = time.Date(2026, 11, 9, 0, 0, 0, 0, time.UTC)
 	root := pinnedRepo(t)
 
@@ -234,8 +238,9 @@ func TestAReleaseYoungerThanAWeekWaits(t *testing.T) {
 }
 
 func TestATorrServerReleaseMissingAPlatformIsRefused(t *testing.T) {
-	up := current()
-	up.tsTag = "MatriX.149"
+	up := current(t)
+	next := pinned(t).torrServerAfter(t, 1)
+	up.tsTag = next
 	up.tsPublished = time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
 	delete(up.tsAssets, "TorrServer-gst-windows-amd64.exe")
 	root := pinnedRepo(t)
@@ -252,9 +257,11 @@ func TestATorrServerReleaseMissingAPlatformIsRefused(t *testing.T) {
 }
 
 func TestTheNewestStableGStreamerIsPinnedAndDevelopmentVersionsSkipped(t *testing.T) {
-	up := current()
-	up.gstVersions = []string{"1.26.9", "1.28.7", "1.28.10", "1.28.8", "1.29.2"}
-	up.gstPkg = "GStreamer 1.28.10 runtime"
+	up := current(t)
+	from := pinned(t).gstVersion
+	next, dev := pinned(t).gstNext(t)
+	up.gstVersions = []string{"1.26.9", "1.28.7", next, from, dev}
+	up.gstPkg = "GStreamer " + next + " runtime"
 	root := pinnedRepo(t)
 
 	out, err := updatePins(t, root, up.serve(t), time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC))
@@ -264,27 +271,28 @@ func TestTheNewestStableGStreamerIsPinnedAndDevelopmentVersionsSkipped(t *testin
 
 	script := read(t, filepath.Join(root, "macos", "install-gstreamer.sh"))
 	for _, want := range []string{
-		`gst_version="1.28.10"`,
-		`gst_sha256="` + sha("GStreamer 1.28.10 runtime") + `"`,
-		`gst_size=25` + "\n",
+		`gst_version="` + next + `"`,
+		`gst_sha256="` + sha(up.gstPkg) + `"`,
+		`gst_size=` + fmt.Sprint(len(up.gstPkg)) + "\n",
 		`gst_url="https://gstreamer.freedesktop.org/data/pkg/osx/$gst_version/gstreamer-1.0-$gst_version-universal.pkg"`,
 	} {
 		if !strings.Contains(script, want) {
 			t.Errorf("install-gstreamer.sh lacks %s", want)
 		}
 	}
-	if !strings.Contains(out, "GStreamer 1.28.8 → 1.28.10") {
+	if !strings.Contains(out, "GStreamer "+from+" → "+next) {
 		t.Errorf("the summary does not name the GStreamer update:\n%s", out)
 	}
 }
 
 func TestTorrServerStaysOnMatriXWhenUpstreamStartsAnotherSeries(t *testing.T) {
-	up := current()
-	up.tsTag = "MatriX.149"
+	up := current(t)
+	next := pinned(t).torrServerAfter(t, 1)
+	up.tsTag = next
 	up.tsPublished = time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
 	up.tsLicense = "GNU GENERAL PUBLIC LICENSE\nVersion 3\n"
 	up.tsOthers = []release{
-		{Tag: "MatriX.150", Published: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), Prerelease: true},
+		{Tag: pinned(t).torrServerAfter(t, 2), Published: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), Prerelease: true},
 		{Tag: "Silo.2", Published: time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC), Assets: []asset{{"TorrServer-linux-amd64", "sha256:00"}}},
 	}
 	root := pinnedRepo(t)
@@ -294,8 +302,8 @@ func TestTorrServerStaysOnMatriXWhenUpstreamStartsAnotherSeries(t *testing.T) {
 		t.Fatalf("update-pins.sh: %v\n%s", err, out)
 	}
 
-	if lock := read(t, filepath.Join(root, "scripts", "torrserver.lock")); !strings.Contains(lock, "version MatriX.149\n") {
-		t.Errorf("torrserver.lock does not pin MatriX.149:\n%s", lock)
+	if lock := read(t, filepath.Join(root, "scripts", "torrserver.lock")); !strings.Contains(lock, "version "+next+"\n") {
+		t.Errorf("torrserver.lock does not pin %s:\n%s", next, lock)
 	}
 	if !strings.Contains(out, "Silo.2") {
 		t.Errorf("update-pins.sh does not mention the other series:\n%s", out)
@@ -303,8 +311,8 @@ func TestTorrServerStaysOnMatriXWhenUpstreamStartsAnotherSeries(t *testing.T) {
 }
 
 func TestAnOlderTorrServerMarkedLatestIsNotADowngrade(t *testing.T) {
-	up := current()
-	up.tsTag = "MatriX.145"
+	up := current(t)
+	up.tsTag = "MatriX.145" // older than the pin
 	up.tsPublished = time.Date(2026, 9, 17, 0, 0, 0, 0, time.UTC)
 	root := pinnedRepo(t)
 
