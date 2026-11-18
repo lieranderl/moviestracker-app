@@ -1,0 +1,10 @@
+# Vulnerabilities reviewed and accepted. Scorecard's Vulnerabilities check
+# and osv-scanner both read this file. Each entry expires so it is re-checked.
+
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf" # CVE-2026-112366, picomatch ReDoS via repeated extglobs
+ignoreUntil = 2027-02-18
+reason = """picomatch 4.0.7 is the latest release and every version is affected, so there is no \
+upgrade. It is only pulled in at build time by @tailwindcss/cli -> @parcel/watcher for --watch \
+globs, which come from our own build scripts, never from users. Nothing ships it in the binary or \
+static assets. Drop this entry once a fixed picomatch is released."""
