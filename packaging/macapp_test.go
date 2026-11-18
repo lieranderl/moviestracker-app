@@ -100,7 +100,7 @@ func isAMenuBarAppWithItsIconAndLicences(t *testing.T, app string) {
 	}
 	// The GStreamer download is the app's own script, pinned to one version.
 	script := filepath.Join(app, "Contents", "Resources", "install-gstreamer.sh")
-	if got := strings.TrimSpace(run(t, app, nil, script, "--version")); got != "1.28.8" {
-		t.Errorf("bundled GStreamer script installs %q, want 1.28.8", got)
+	if got := strings.TrimSpace(run(t, app, nil, script, "--version")); got != pinned(t).gstVersion {
+		t.Errorf("bundled GStreamer script installs %q, want %s", got, pinned(t).gstVersion)
 	}
 }
